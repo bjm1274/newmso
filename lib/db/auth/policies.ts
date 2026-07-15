@@ -33,6 +33,13 @@ import { eq } from 'drizzle-orm';
 import type { D1Client } from '../client-d1';
 import { messages } from '../schema';
 import {
+  canAccessChatRoom,
+  canChangeChatRoomMembers,
+  isNoticeRoomType,
+  loadChatRoomMembership,
+  parseMembersField,
+} from '@/lib/chat-room-membership';
+import {
   type ErpClaims,
   erpIsAdmin,
   erpStaffId,
@@ -170,6 +177,83 @@ async function messagesSelfDeleteGuard(
   return target.sender_id !== null && target.sender_id === me;
 }
 
+/**
+ * claims.erp_staff_id 원문(시스템마스터 '9999' 등 non-UUID 포함).
+ * erpStaffId는 UUID만 반환하므로 insert sender 강제에는 원문을 사용.
+ */
+function claimsStaffIdRaw(claims: ErpClaims): string | null {
+  const v = claims.erp_staff_id;
+  if (typeof v !== 'string') return null;
+  const trimmed = v.trim();
+  return trimmed || null;
+}
+
+/**
+ * messages INSERT: (1) sender_id === 세션 staff id 강제(사칭 차단)
+ * (2) room 존재 + 멤버십(notice type 예외).
+ * d1/mutate → assertAccess 경로에서만 적용. 서버 cron/직접 drizzle insert는 우회.
+ */
+async function messagesInsertGuard(
+  db: D1Client,
+  claims: ErpClaims,
+  row: Record<string, unknown>,
+): Promise<boolean> {
+  const me = claimsStaffIdRaw(claims);
+  if (me === null) return false;
+
+  const senderId = getField<string>(row, 'sender_id');
+  if (senderId === null || String(senderId).trim() !== me) return false;
+
+  const roomId = getField<string>(row, 'room_id');
+  if (roomId === null || !String(roomId).trim()) return false;
+
+  const room = await loadChatRoomMembership(db, String(roomId));
+  if (!room) return false;
+
+  return canAccessChatRoom(room, me);
+}
+
+/**
+ * chat_rooms UPDATE (d1/mutate 경로): 멤버 또는 관리 권한만.
+ * notice 방 메타 sync는 인증 사용자 허용. 타인 강퇴는 생성자/특권.
+ */
+async function chatRoomsUpdateGuard(
+  db: D1Client,
+  claims: ErpClaims,
+  row: Record<string, unknown>,
+): Promise<boolean> {
+  if (erpIsAdmin(claims) || erpCanManageCompany(claims)) return true;
+
+  const me = claimsStaffIdRaw(claims);
+  if (me === null) return false;
+
+  const id = getField<string | number>(row, 'id');
+  if (id === null) return false;
+
+  const room = await loadChatRoomMembership(db, String(id));
+  if (!room) return false;
+
+  // notice 방: 클라이언트가 멤버 목록 sync 용으로 update — 로그인 사용자 허용
+  // (type이 set 으로 notice로 바뀌는 경우도 row.type 참고)
+  const nextType = getField<string>(row, 'type');
+  if (isNoticeRoomType(room.type) || isNoticeRoomType(nextType)) return true;
+
+  if (!canAccessChatRoom(room, me)) return false;
+
+  if (Object.prototype.hasOwnProperty.call(row, 'members')) {
+    const nextMembers = parseMembersField(row.members);
+    return canChangeChatRoomMembers({
+      prevMembers: room.members,
+      nextMembers,
+      userId: me,
+      createdBy: room.created_by,
+      isPrivileged: false,
+    });
+  }
+
+  return true;
+}
+
 // ─────────────────────────────────────────────────────────────
 // 정책 레지스트리
 // 미등록 테이블은 erpIsAdmin only로 default-deny.
@@ -235,9 +319,10 @@ export const POLICY_REGISTRY: Registry = {
   popups: PUBLIC_ALL('popups'),
   disciplinary_committees: PUBLIC_ALL('disciplinary_committees'),
 
-  // 채팅 메시지: 전송(insert)·조회(select)는 PUBLIC 유지하되, UPDATE(soft-delete)는
-  // 작성자 본인 또는 admin만 허용(asyncGuards로 sender_id 확인). 임의 사용자가 남의
-  // 메시지를 is_deleted=1로 지우는 권한상승을 차단. hard DELETE는 별도(아래 주석).
+  // 채팅 메시지: select는 PUBLIC 유지(조회 스코프는 별도 phase).
+  // INSERT: sender_id=세션 staff + 방 멤버십(notice 예외) — 사칭/비멤버 전송 차단.
+  // UPDATE(soft-delete): 작성자 본인 또는 admin만 (asyncGuards).
+  // hard DELETE는 별도 정책 강화 대상.
   messages: {
     table: 'messages',
     select: 'PUBLIC',
@@ -245,7 +330,20 @@ export const POLICY_REGISTRY: Registry = {
     update: 'PUBLIC',
     delete: 'PUBLIC',
     asyncGuards: {
+      insert: messagesInsertGuard,
       update: messagesSelfDeleteGuard } },
+
+  // chat_rooms: select/insert는 PUBLIC 유지(목록 스코프·방생성 강화는 별도).
+  // UPDATE: 멤버(또는 notice/관리 권한)만 — d1/mutate 우회 변조 차단.
+  // 전용 PATCH 라우트(/api/chat-rooms/[id])에서도 동일 규칙 적용.
+  chat_rooms: {
+    table: 'chat_rooms',
+    select: 'PUBLIC',
+    insert: 'PUBLIC',
+    update: 'PUBLIC',
+    delete: 'PUBLIC',
+    asyncGuards: {
+      update: chatRoomsUpdateGuard } },
 
   // ── STAFF_IN_SCOPE / SELF_OR_SAME_COMPANY / SELF_ONLY (직원 단위)
   push_subscriptions: {

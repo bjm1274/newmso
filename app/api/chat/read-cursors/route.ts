@@ -15,6 +15,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { upsertRoomReadCursors } from '@/lib/chat-read-cursors';
+import { getD1Binding, getD1Drizzle } from '@/lib/db';
+import { canAccessChatRoom, loadChatRoomMembership } from '@/lib/chat-room-membership';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,7 +45,30 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const result = await upsertRoomReadCursors({ userId, roomIds, readAt });
+    // 멤버십 필터: 비멤버 방 커서 쓰기를 차단. 존재하지 않거나 비멤버인 방은 제외.
+    // (배치 갱신 중 일부 방만 실패해도 멤버 방 커서는 저장)
+    const d1 = await getD1Binding();
+    let allowedRoomIds = roomIds;
+    if (d1) {
+      const db = getD1Drizzle(d1);
+      const filtered: string[] = [];
+      for (const roomId of roomIds) {
+        const room = await loadChatRoomMembership(db, roomId);
+        if (room && canAccessChatRoom(room, userId)) {
+          filtered.push(roomId);
+        }
+      }
+      allowedRoomIds = filtered;
+    }
+
+    if (allowedRoomIds.length === 0) {
+      return NextResponse.json(
+        { ok: false, error: 'Not a member of any requested room' },
+        { status: 403 },
+      );
+    }
+
+    const result = await upsertRoomReadCursors({ userId, roomIds: allowedRoomIds, readAt });
     return NextResponse.json({ ok: result.ok, readAt: result.readAt });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal error';

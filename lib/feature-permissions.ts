@@ -43,6 +43,34 @@ export const CHAT_PERMISSION_ITEMS: FeaturePermissionItem[] = [
 ];
 
 /**
+ * 공유캘린더 세부 권한 — 메인 메뉴 menu_공유캘린더 하위
+ * (근무표 조회 / 게시판 일정 / 외부 캘린더 동기화)
+ */
+export const CALENDAR_PERMISSION_ITEMS: FeaturePermissionItem[] = [
+  {
+    key: 'calendar_근무표조회',
+    label: '근무표 일정 조회',
+    hint: '간호근무표(nurse_schedules) 월별 편성을 캘린더에 표시합니다.',
+  },
+  {
+    key: 'calendar_게시판일정',
+    label: '게시판 일정 표시',
+    hint: '게시판 「일정」 카테고리 글을 캘린더에 함께 표시합니다.',
+  },
+  {
+    key: 'calendar_외부동기화',
+    label: '외부 캘린더 동기화',
+    hint: '구글 캘린더 등 ICS 구독 URL 복사. 끄면 동기화 버튼이 숨겨집니다.',
+    tone: 'warning',
+  },
+  {
+    key: 'calendar_전체직원근무표',
+    label: '전체 직원 근무표 열람',
+    hint: '끄면 본인 근무 일정만 표시합니다. (개인정보 보호)',
+  },
+];
+
+/**
  * 추가기능 카드 — FEATURE_CARDS(추가기능공통.tsx) 와 동일 목록
  */
 export const EXTRA_FEATURE_PERMISSION_ITEMS: FeaturePermissionItem[] = [
@@ -236,6 +264,13 @@ export const FEATURE_PERMISSION_GROUPS: FeaturePermissionGroup[] = [
     label: '추가기능 세부 권한',
     description: '추가기능 안에서 열 수 있는 카드별 접근 권한입니다. (실제 카드 목록과 동일)',
     items: EXTRA_FEATURE_PERMISSION_ITEMS,
+  },
+  {
+    id: 'calendar',
+    label: '공유캘린더 세부 권한',
+    description:
+      '공유캘린더 메뉴 안 기능별 접근입니다. 메인 메뉴 「공유캘린더」를 먼저 허용한 뒤 세부 토글을 설정하세요. 미설정(undefined)은 허용으로 취급합니다.',
+    items: CALENDAR_PERMISSION_ITEMS,
   },
   {
     id: 'board',

@@ -11,6 +11,10 @@
  * `runInappNotificationJobs()`를 piggyback 호출한다. "영영 안 옴" 상태는
  * 해소되지만 즉시성은 1일/회 수준이다.
  *
+ * lookback 정합: attendance / payroll / word-filter 는 26시간 lookback +
+ * 7일 dedupe 키로 일 1회 piggyback 에서도 누락을 막는다.
+ * (과거 5분 lookback 은 일 1회 실행과 불일치해 23h55m 분량이 빠졌음.)
+ *
  * 즉시성을 높이고 싶다면 다음 중 하나를 선택:
  *   1) 외부 cron(cron-job.org, GitHub Actions 등)에서 Bearer CRON_SECRET 로
  *      본 라우트를 5분 주기 호출.

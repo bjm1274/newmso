@@ -19,6 +19,7 @@ import { PayrollAndCertificatesHub } from '@/app/main/기능부품/마이페이�
 import MyDocuments from '@/app/main/기능부품/마이페이지/서류제출';
 import MobileHeader from '../셸/MobileHeader';
 import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
+import { canAccessMyPageTab } from '@/lib/access-control';
 
 export type 내정보Props = {
   user: ErpUser;
@@ -50,7 +51,9 @@ export default function 내정보({ user, sub, onSub, onLogout, onSwitchTab }: �
   } else if (sub === 'leave') {
     contentElement = <연차 user={user} onBack={onBack} onSwitchTab={onSwitchTab} />;
   } else if (sub === 'records') {
-    contentElement = (
+    const canRecords =
+      canAccessMyPageTab(user, 'salary') || canAccessMyPageTab(user, 'certificates');
+    contentElement = canRecords ? (
       <div className="m-screen">
         <div className="m-scroll" style={{ padding: '0 0 0' }}>
           <PayrollAndCertificatesHub
@@ -59,6 +62,13 @@ export default function 내정보({ user, sub, onSub, onLogout, onSwitchTab }: �
             onBack={onBack}
             onChangeView={setRecordsView}
           />
+        </div>
+      </div>
+    ) : (
+      <div className="m-screen">
+        <MobileHeader title="급여·증명서" back={onBack} />
+        <div className="m-scroll" style={{ padding: '16px' }}>
+          <p style={{ fontSize: 14, color: 'var(--z-500)' }}>급여·증명서 조회 권한이 없습니다.</p>
         </div>
       </div>
     );

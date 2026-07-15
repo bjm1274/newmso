@@ -113,8 +113,9 @@ export function useChatRoomManagement({
       members: string[];
       systemContent: string;
     }) => {
-      await persistRoomMembers(roomId, members);
+      // 시스템 메시지 먼저(내보내기/초대 모두 현재 멤버 자격으로 insert)
       await insertRoomSystemMessage(roomId, systemContent);
+      await persistRoomMembers(roomId, members);
       updateRoomMembersLocally(roomId, members);
       await fetchData();
     },
@@ -146,8 +147,7 @@ export function useChatRoomManagement({
         (id: unknown) => String(id) !== String(effectiveChatUserId || user?.id || ''),
       );
 
-      await persistRoomMembers(String(selectedRoom.id), newMembers);
-
+      // 퇴장 안내는 멤버십 해제 전에 기록(서버 messages insert 멤버 검증 통과 필요)
       const leaverName = user?.name || '알 수 없음';
       let leaveNoticeFailed = false;
       try {
@@ -159,6 +159,8 @@ export function useChatRoomManagement({
         leaveNoticeFailed = true;
         console.error('leave room system message error', leaveNoticeError);
       }
+
+      await persistRoomMembers(String(selectedRoom.id), newMembers);
 
       const leftRoomId = String(selectedRoom.id);
       setChatRooms((prev) => prev.filter((room) => String(room.id) !== leftRoomId));

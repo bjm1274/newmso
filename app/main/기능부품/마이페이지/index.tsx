@@ -377,6 +377,7 @@ function MyPageMain({
       if (!tab) return false;
 
       if (tab === 'salary' || tab === 'records_salary') {
+        if (!canAccessMyPageTab(user, 'salary')) return false;
         setActiveTab('records');
         setRecordsView('salary');
         persistRecordsView('salary');
@@ -384,6 +385,7 @@ function MyPageMain({
       }
 
       if (tab === 'certificates' || tab === 'records_certificates') {
+        if (!canAccessMyPageTab(user, 'certificates')) return false;
         setActiveTab('records');
         setRecordsView('certificates');
         persistRecordsView('certificates');
@@ -392,6 +394,13 @@ function MyPageMain({
 
       const allowedTabs = ['profile', 'records', 'todo', 'commute', 'leave', 'documents', 'notifications'] as const;
       if ((allowedTabs as readonly string[]).includes(tab)) {
+        if (tab === 'records') {
+          const canSalary = canAccessMyPageTab(user, 'salary');
+          const canCert = canAccessMyPageTab(user, 'certificates');
+          if (!canSalary && !canCert) return false;
+          if (canSalary) setRecordsView('salary');
+          else setRecordsView('certificates');
+        }
         setActiveTab(tab as typeof allowedTabs[number]);
         return true;
       }
@@ -410,7 +419,7 @@ function MyPageMain({
     } catch {
       // ignore
     }
-  }, [initialMyPageTab, onConsumeMyPageInitialTab]);
+  }, [initialMyPageTab, onConsumeMyPageInitialTab, user]);
 
   // 탭 변경 시 현재 탭을 로컬스토리지에 저장하여 새로고침해도 유지
   useEffect(() => {
@@ -556,11 +565,16 @@ function MyPageMain({
   const handleFavoriteClick = useCallback((fav: FavoriteEntry) => {
     if (fav.kind === 'mypage') {
       if (fav.tab === 'records_certificates') {
+        if (!canAccessMyPageTab(user, 'certificates')) return;
         setActiveTab('records');
         setRecordsView('certificates');
       } else if (fav.tab === 'records_salary') {
+        if (!canAccessMyPageTab(user, 'salary')) return;
         setActiveTab('records');
         setRecordsView('salary');
+      } else if (fav.tab === 'records') {
+        if (!canAccessMyPageTab(user, 'salary') && !canAccessMyPageTab(user, 'certificates')) return;
+        setActiveTab('records');
       } else if (fav.tab === 'notifications') {
         setActiveTab('notifications');
       } else {
@@ -573,7 +587,7 @@ function MyPageMain({
       return;
     }
     applyMainMenu(fav.mainMenu, fav.subView, fav.innerTab);
-  }, [applyMainMenu]);
+  }, [applyMainMenu, user]);
 
   const handleFavoriteRemove = useCallback((id: string) => {
     setFavorites((prev) => prev.filter((entry) => entry.id !== id));
@@ -805,10 +819,12 @@ function MyPageMain({
       icon: 'Receipt',
       tone: 'neutral',
       value: null,
-      onClick: () => {
-        setRecordsView('salary');
-        setActiveTab('records');
-      } },
+      onClick: canAccessMyPageTab(user, 'salary')
+        ? () => {
+            setRecordsView('salary');
+            setActiveTab('records');
+          }
+        : undefined },
     {
       key: 'certificates',
       label: '증명서',
@@ -816,10 +832,12 @@ function MyPageMain({
       icon: 'FileText',
       tone: 'neutral',
       value: null,
-      onClick: () => {
-        setRecordsView('certificates');
-        setActiveTab('records');
-      } },
+      onClick: canAccessMyPageTab(user, 'certificates')
+        ? () => {
+            setRecordsView('certificates');
+            setActiveTab('records');
+          }
+        : undefined },
     {
       key: 'approvals',
       label: '미결재',
@@ -1141,7 +1159,7 @@ function MyPageMain({
           )}
           {activeTab === 'todo' && <div data-testid="mypage-todo-tab" className="animate-premium-fade pb-3"><MyTodoList user={user} onChatNavigate={onOpenChatMessage} /></div>}
           {activeTab === 'leave' && <div data-testid="mypage-leave-tab" className="animate-premium-fade pb-3"><AnnualLeaveUsagePanel user={user} onBack={() => setActiveTab('profile')} /></div>}
-          {activeTab === 'records' && (
+          {activeTab === 'records' && (canAccessMyPageTab(user, 'salary') || canAccessMyPageTab(user, 'certificates')) && (
             <div data-testid="mypage-records-tab" className="animate-premium-fade pb-3">
               <PayrollAndCertificatesHub
                 user={user}

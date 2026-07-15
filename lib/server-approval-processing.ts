@@ -355,21 +355,8 @@ export async function processFinalApprovalEffects(
         // Phase 8-C: D1 직접 upsert — db + mirror 2단 처리 대체.
         const leaveDb = await requireD1ForApprovalProcessing('leave_attendance.upsert');
 
-        // 연차 신규 부여(+)인 경우, 승인 시 직원의 연차 총량(annual_leave_total) 가산 처리
-        if (leaveType === '연차(부여)') {
-          const staffRows = await leaveDb
-            .select({ annual_leave_total: staffMembersTable.annual_leave_total })
-            .from(staffMembersTable)
-            .where(eq(staffMembersTable.id, senderId))
-            .limit(1);
-          const currentTotal = Number(staffRows[0]?.annual_leave_total ?? 0);
-          const newTotal = currentTotal + days;
-          
-          await leaveDb
-            .update(staffMembersTable)
-            .set({ annual_leave_total: newTotal })
-            .where(eq(staffMembersTable.id, senderId));
-        }
+        // 연차(부여): staff_members.annual_leave_total 직접 쓰기 금지.
+        // 잔액 SSOT 는 leave_balances — 아래에서 recalculateLeaveBalance 경로로 반영.
 
         // 연차(부여) 및 연차(과거사용)는 실제 휴가 사용이 아니므로 출결부 마킹 생략
         if (leaveType !== '연차(부여)' && leaveType !== '연차(과거사용)') {

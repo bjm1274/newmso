@@ -1,5 +1,6 @@
 import { readSessionFromRequest } from '@/lib/server-session';
 import { getD1Binding } from '@/lib/db';
+import { hasPermission, isAdminUser } from '@/lib/access-control';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,6 +8,41 @@ function getUserId(session: any): string | null {
   if (!session?.user) return null;
   const uid = String(session.user.id ?? session.user.user_id ?? '').trim();
   return uid || null;
+}
+
+/** 알림 관리 발송 권한: role admin | permissions.admin | menu_관리자 */
+function canSendAsNotificationAdmin(sessionUser: unknown): boolean {
+  const user = sessionUser as { role?: string | null; permissions?: Record<string, unknown> | null } | null;
+  return isAdminUser(user) || hasPermission(user, 'menu_관리자');
+}
+
+function parsePermissions(raw: unknown): Record<string, unknown> {
+  if (!raw) return {};
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+function isAdminStaffRow(row: {
+  role?: string | null;
+  permissions?: unknown;
+}): boolean {
+  const role = String(row.role ?? '').trim().toLowerCase();
+  if (role === 'admin') return true;
+  const permissions = parsePermissions(row.permissions);
+  const adminFlag = permissions.admin;
+  if (adminFlag === true || adminFlag === 1 || adminFlag === '1' || adminFlag === 'true') return true;
+  if (permissions.menu_관리자 === true) return true;
+  return false;
 }
 
 // 1. GET: 알림 목록 조회 또는 안읽은 갯수 카운트
@@ -78,13 +114,54 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
+    // uid 검증 후 session.user 보장 (TS null 좁히기)
+    const sessionUser = session?.user;
+    if (!sessionUser) {
+      return new Response(JSON.stringify({ ok: false, error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+    }
+    const isNotifAdmin = canSendAsNotificationAdmin(sessionUser);
 
     if (body.send_to_admins === true && Array.isArray(body.alerts)) {
-      // D1에서 행정팀, 원무팀, 경영지원팀 직원 조회
+      // 호출자 관리자 권한 필수 (role admin | permissions.admin | menu_관리자)
+      if (!isNotifAdmin) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'Forbidden: admin only' }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      const sessionCompany = String((sessionUser as any)?.company ?? '').trim();
+      const sessionCompanyId = String((sessionUser as any)?.company_id ?? '').trim();
+
+      // 관리자 직원 조회 후 권한·회사 스코프 필터
       const adminUsersResult = await d1
-        .prepare("SELECT id FROM staff_members WHERE department IN ('행정팀', '원무팀', '경영지원팀')")
-        .all<{ id: string }>();
-      const adminUsers = adminUsersResult?.results || [];
+        .prepare(
+          `SELECT id, company, company_id, role, permissions, status
+           FROM staff_members
+           WHERE status IS NULL OR TRIM(COALESCE(status, '')) = '' OR status = '재직'`,
+        )
+        .all<{
+          id: string;
+          company: string | null;
+          company_id: string | null;
+          role: string | null;
+          permissions: string | null;
+          status: string | null;
+        }>();
+
+      const adminUsers = (adminUsersResult?.results || []).filter((row) => {
+        if (!isAdminStaffRow(row)) return false;
+        // 세션에 회사 정보가 있으면 동일 회사만
+        if (sessionCompanyId || sessionCompany) {
+          const rowCompanyId = String(row.company_id ?? '').trim();
+          const rowCompany = String(row.company ?? '').trim();
+          if (sessionCompanyId && rowCompanyId) return rowCompanyId === sessionCompanyId;
+          if (sessionCompany && rowCompany) return rowCompany === sessionCompany;
+          // 한쪽만 비어 있으면 보수적으로 제외
+          return false;
+        }
+        return true;
+      });
 
       if (adminUsers.length === 0) {
         return new Response(JSON.stringify({ ok: true, data: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -125,11 +202,24 @@ export async function POST(request: Request) {
       return new Response(JSON.stringify({ ok: true, data: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
 
+    // 일반 insert: 기본 본인만. 타인 target 은 관리자만 (세션 검증 필수)
+    for (const item of items) {
+      const requestedUserId = String(item.user_id || uid).trim();
+      if (requestedUserId !== uid && !isNotifAdmin) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'Forbidden: can only create notifications for self' }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+    }
+
     const statements = [];
     const insertedIds = [];
 
     for (const item of items) {
-      const targetUserId = String(item.user_id || uid).trim();
+      const requestedUserId = String(item.user_id || uid).trim();
+      // 비관리자는 무조건 세션 uid. 관리자도 세션 검증을 통과한 요청 user_id 만 허용
+      const targetUserId = isNotifAdmin ? requestedUserId : uid;
       const type = String(item.type || 'notification').trim();
       const title = String(item.title || '알림').trim();
       const content = String(item.body || '').trim();

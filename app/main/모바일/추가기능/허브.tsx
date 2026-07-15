@@ -12,6 +12,7 @@
  */
 
 import type { ErpUser } from '@/types';
+import { canAccessMainMenu } from '@/lib/access-control';
 import MIcon from '../공통/MIcon';
 
 export type AddonModuleKey =
@@ -110,6 +111,8 @@ export type 허브Props = {
 };
 
 export default function 허브({ user, onBack, onOpen }: 허브Props) {
+  const canCalendar = canAccessMainMenu(user as never, '공유캘린더');
+
   return (
     <div
       className="m-screen"
@@ -189,6 +192,7 @@ export default function 허브({ user, onBack, onOpen }: 허브Props) {
                 gap: 10 }}
             >
               {group.items.map((item) => {
+                if (item.id === 'calendar' && !canCalendar) return null;
                 const theme = ADDON_THEMES[item.id] || ADDON_THEMES.org;
                 return (
                   <button

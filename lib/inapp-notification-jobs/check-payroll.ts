@@ -1,7 +1,9 @@
 /**
  * Phase 8-A — 급여 정산 알림 보강.
- * payroll_records 최근 PAYROLL_LOOKBACK_MIN(60) 분 내 created → staff_id 에게 'payroll' 알림.
+ * payroll_records 최근 PAYROLL_LOOKBACK_MIN 분 내 created → staff_id 에게 'payroll' 알림.
  * dedupe key: `payroll:{record_id}`
+ *
+ * lookback: 인앱 cron 일 1회 piggyback 누락 방지용 26시간. dedupe(7일)로 중복 차단.
  */
 import 'server-only';
 import {
@@ -24,7 +26,8 @@ type PayrollRow = {
   net_pay: number | null;
 };
 
-const PAYROLL_LOOKBACK_MIN = 60;
+/** 일 1회 piggyback 실행 시 누락 방지 — 26h (dedupe로 중복 차단) */
+const PAYROLL_LOOKBACK_MIN = 26 * 60;
 
 export async function checkPayrollSettled(): Promise<CheckJobResult> {
   const cutoff = new Date(Date.now() - PAYROLL_LOOKBACK_MIN * 60 * 1000).toISOString();

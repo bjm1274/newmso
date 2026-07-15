@@ -15,7 +15,9 @@ import { useIOData, useEmptyMessage } from './stock-workcenter-data';
 
 export default function InoutWorkcenter() {
   const [showInoutRegister, setShowInoutRegister] = useState(false);
-  const data = useIOData();
+  const { user } = useAppData();
+  const userCompany = typeof user?.company === 'string' ? user.company : undefined;
+  const data = useIOData(userCompany);
 
   const kpiItems = useMemo<KpiItem[]>(
     () => [

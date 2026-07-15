@@ -23,13 +23,16 @@ const LegacyInventoryCount = dynamic(
 
 export default function AuditWorkcenter() {
   const { user } = useAppData();
-  const statusData = useStatusData();
+  const userCompany = typeof user?.company === 'string' ? user.company : undefined;
+  const statusData = useStatusData(userCompany);
   const [inventoryList, setInventoryList] = useState<any[]>([]);
 
   const fetchInventory = useCallback(async () => {
-    const { data } = await db.from('inventory').select('*').order('name');
+    let q = db.from('inventory').select('*').order('name');
+    if (userCompany && userCompany !== '전체') q = q.eq('company', userCompany);
+    const { data } = await q;
     if (data) setInventoryList(data);
-  }, []);
+  }, [userCompany]);
 
   useEffect(() => {
     void fetchInventory();

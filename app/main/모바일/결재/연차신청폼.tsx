@@ -148,7 +148,9 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
 
     const senderName = String(user.name || '').trim() || '이름 없음';
     const senderCompany = company;
-    const leaveTypeLabel = kind === '반차' ? '반차 (0.5)' : '연차 (1.0)';
+    // leave_type / meta.leaveType / meta.vType 동일 키 (kind: '연차'|'반차')
+    // — 서버 ensureApproved 가 leave_type 완전일치로 대기 row 를 승격
+    const leaveTypeKey = kind;
 
     // 1) leave_requests insert (기존 인사관리 모듈 동일 컬럼)
     let leaveRequestInserted = false;
@@ -159,7 +161,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
         table: 'leave_requests',
         payload: {
           staff_id: staffId,
-          leave_type: kind,
+          leave_type: leaveTypeKey,
           start_date: start,
           end_date: end,
           days,
@@ -196,10 +198,11 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
         ccDepartments: ['행정팀'],
         ccUsers,
         extraMeta: {
-          vType: leaveTypeLabel,
-          leaveType: leaveTypeLabel,
+          vType: leaveTypeKey,
+          leaveType: leaveTypeKey,
           startDate: start,
           endDate: end,
+          days,
           reason: reason || '',
           leave_request_synced: leaveRequestInserted,
           delegateId: delegateId || null,

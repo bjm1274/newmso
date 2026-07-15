@@ -87,16 +87,20 @@ export function useStatusData(
     const load = async () => {
       try {
         const invQuery = db.from('inventory').select('*').limit(500);
+        let logsQuery = db
+          .from('inventory_logs')
+          .select('actor_name,department,quantity,change_type,created_at,company')
+          .in('change_type', ['사용', '소모', '출고'])
+          .order('created_at', { ascending: false })
+          .limit(500);
+        if (userCompany && userCompany !== '전체') {
+          logsQuery = logsQuery.eq('company', userCompany);
+        }
         const [inv, logs] = await Promise.all([
           userCompany && userCompany !== '전체'
             ? invQuery.eq('company', userCompany)
             : invQuery,
-          db
-            .from('inventory_logs')
-            .select('actor_name,department,quantity,change_type,created_at')
-            .in('change_type', ['사용', '소모', '출고'])
-            .order('created_at', { ascending: false })
-            .limit(500),
+          logsQuery,
         ]);
 
         if (cancelled) return;

@@ -3,9 +3,7 @@ import { toast } from '@/lib/toast';
 import {
   appendApprovalHistory,
   getApprovalRevision,
-  isApprovalLocked,
-  lockApprovalMeta } from '@/lib/approval-workflow';
-import { db } from '@/lib/db-client';
+  isApprovalLocked } from '@/lib/approval-workflow';
 import { useApprovalHistoryEntry } from './useApprovalHistoryEntry';
 import type { StaffMember } from '@/types';
 import { hasPermission } from '@/lib/access-control';
@@ -13,7 +11,6 @@ import type {
   TransitionApprovalsOnServer } from './useApprovalBulkActions';
 
 type ApprovalRecord = Record<string, unknown>;
-type ApprovalHistoryEntry = Parameters<typeof appendApprovalHistory>[1];
 
 type UseApprovalActionsParams = {
   user: StaffMember | null;
@@ -69,31 +66,6 @@ export function useApprovalActions({
   }, []);
 
   const buildApprovalHistoryEntry = useApprovalHistoryEntry(user);
-
-  const buildNextApprovalMetaData = useCallback(
-    (
-      baseMetaData: ApprovalRecord | null | undefined,
-      action: ApprovalHistoryEntry['action'],
-      options?: {
-        note?: string | null;
-        lock?: boolean;
-        currentApproverId?: string | null;
-        revision?: number | null;
-      }
-    ) => {
-      let nextMetaData = appendApprovalHistory(baseMetaData, {
-        ...buildApprovalHistoryEntry(action, options?.note),
-        current_approver_id: options?.currentApproverId ?? null,
-        revision: options?.revision ?? null });
-      if (options?.lock) {
-        nextMetaData = appendApprovalHistory(lockApprovalMeta(nextMetaData, user?.id ? String(user.id) : null), {
-          ...buildApprovalHistoryEntry('locked', '결재 문서 잠금'),
-          revision: options?.revision ?? null });
-      }
-      return nextMetaData;
-    },
-    [buildApprovalHistoryEntry, user?.id]
-  );
 
   const handleApproveAction = useCallback(async (item: ApprovalRecord) => {
     const comment = await openPrompt({
@@ -203,53 +175,17 @@ export function useApprovalActions({
         toast(result.error, 'error');
         return;
       }
+      toast('반려 처리 결과를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.', 'error');
     } catch (serverTransitionError) {
-      console.error('반려 서버 처리 실패, 클라이언트 fallback 실행:', serverTransitionError);
-    }
-
-    const routingError = await syncDelegatedApprovalRouting(item, originalCurrentApproverId);
-    if (routingError) {
-      toast('결재선을 초기화하지 못했습니다. 잠시 후 다시 시도해 주세요.');
-      return;
-    }
-
-    const rejectMetaData = item.meta_data as ApprovalRecord | null | undefined;
-    const nextRejectedMetaData = buildNextApprovalMetaData(rejectMetaData, 'rejected', {
-      note: reason || '반려',
-      lock: true,
-      currentApproverId,
-      revision: getApprovalRevision(rejectMetaData) });
-    const rejectResult = await db
-      .from('approvals')
-      .update({ status: '반려', meta_data: { ...nextRejectedMetaData, reject_reason: reason } })
-      .eq('id', item.id);
-
-    if (!rejectResult.error) {
-      toast('반려 처리했습니다.', 'success');
-      fetchApprovals();
-      void markApprovalNotificationsAsRead([String(item.id || '')]);
-      return;
-    }
-
-    const { error } = await db
-      .from('approvals')
-      .update({ status: '반려', meta_data: { ...(nextRejectedMetaData || {}), reject_reason: reason } })
-      .eq('id', item.id);
-    if (!error) {
-      toast('반려 처리했습니다.', 'success');
-      fetchApprovals();
-      void markApprovalNotificationsAsRead([String(item.id || '')]);
-    } else {
-      toast(`반려 처리에 실패했습니다. ${error?.message || ''}`, 'error');
+      console.error('반려 서버 처리 실패:', serverTransitionError);
+      toast('반려 처리를 서버에서 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.', 'error');
     }
   }, [
-    buildNextApprovalMetaData,
     fetchApprovals,
     markApprovalNotificationsAsRead,
     openPrompt,
     resolveEffectiveApproverId,
     resolveStoredCurrentApproverId,
-    syncDelegatedApprovalRouting,
     transitionApprovalsOnServer,
     user?.id,
   ]);

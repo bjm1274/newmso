@@ -45,6 +45,7 @@ import 업무공유상세 from './업무공유상세';
 import 업무가이드 from './업무가이드';
 import 공유캘린더 from './공유캘린더';
 import type { OpCheckCard } from './data-hooks';
+import { canAccessMainMenu } from '@/lib/access-control';
 
 type View =
   | { kind: 'hub' }
@@ -130,6 +131,10 @@ export default function 추가기능({ user, onBack, initialView }: 추가기능
               toast('PC 버전에서 이용 가능합니다', 'info');
               return;
             }
+            if (key === 'calendar' && !canAccessMainMenu(user as never, '공유캘린더')) {
+              toast('공유캘린더 메뉴 권한이 없습니다.', 'warning');
+              return;
+            }
             const next = MODULE_TO_VIEW[key];
             if (next) setView(next);
           }}
@@ -209,7 +214,7 @@ export default function 추가기능({ user, onBack, initialView }: 추가기능
       contentElement = <업무가이드 user={user} onBack={goBackOrHub} />;
       break;
     case 'calendar':
-      contentElement = <공유캘린더 onBack={goBackOrHub} />;
+      contentElement = <공유캘린더 onBack={goBackOrHub} user={user} />;
       break;
     default:
       contentElement = null;

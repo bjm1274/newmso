@@ -2,12 +2,14 @@
 
 /**
  * 모바일 공유캘린더 — PC SharedCalendar 핵심(근무표 year_month) 조회.
- * ESL/마감보고와 무관. nurse_schedules 부재 시 빈 상태 안내.
+ * 세부 권한: calendar_근무표조회 / calendar_전체직원근무표
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
+import { canAccessCalendarFeature, canAccessMainMenu } from '@/lib/access-control';
+import type { ErpUser } from '@/types';
 import MobileHeader from '../셸/MobileHeader';
 import MChip from '../공통/MChip';
 import MIcon from '../공통/MIcon';
@@ -19,7 +21,13 @@ type ShiftRow = {
   shift_code?: string | null;
 };
 
-export default function 공유캘린더({ onBack }: { onBack: () => void }) {
+export default function 공유캘린더({
+  onBack,
+  user,
+}: {
+  onBack: () => void;
+  user?: ErpUser | null;
+}) {
   const today = useMemo(() => new Date(), []);
   const [cursor, setCursor] = useState(
     () => new Date(today.getFullYear(), today.getMonth(), 1),
@@ -28,18 +36,39 @@ export default function 공유캘린더({ onBack }: { onBack: () => void }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const canMenu = canAccessMainMenu(user as never, '공유캘린더');
+  const canViewShifts = canAccessCalendarFeature(user as never, '근무표조회');
+  const canViewAll = canAccessCalendarFeature(user as never, '전체직원근무표');
+  const selfId = String((user as { id?: string } | null | undefined)?.id ?? '').trim();
+
   const ym = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
   const daysInMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
 
   const load = useCallback(async () => {
+    if (!canMenu) {
+      setRows([]);
+      setError('공유캘린더 메뉴 권한이 없습니다.');
+      setLoading(false);
+      return;
+    }
+    if (!canViewShifts) {
+      setRows([]);
+      setError('근무표 일정 조회 권한이 없습니다. 관리자 권한 설정을 확인하세요.');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const res = await db
+      let query = db
         .from('nurse_schedules')
         .select('staff_id,staff_name,day,shift_code')
         .eq('year_month', ym)
         .limit(2000);
+      if (!canViewAll && selfId) {
+        query = query.eq('staff_id', selfId);
+      }
+      const res = await query;
       if (res.error) {
         const msg = String((res.error as { message?: string })?.message || res.error);
         setRows([]);
@@ -58,7 +87,7 @@ export default function 공유캘린더({ onBack }: { onBack: () => void }) {
     } finally {
       setLoading(false);
     }
-  }, [ym]);
+  }, [ym, canMenu, canViewShifts, canViewAll, selfId]);
 
   useEffect(() => {
     void load();

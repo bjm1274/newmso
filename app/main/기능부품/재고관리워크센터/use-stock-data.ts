@@ -303,9 +303,10 @@ export function useIOData(userCompany?: string): IOWorkcenterData & { refresh: (
           .limit(50);
         let suppliersQ = db.from('suppliers').select('*').order('name').limit(30);
         if (companyFilter) {
+          // schema: inventory_logs.company, purchase_orders.requester_company
+          // suppliers 테이블에는 company 컬럼 없음 → 필터 금지
           logsQ = logsQ.eq('company', companyFilter);
-          ordersQ = ordersQ.eq('company', companyFilter);
-          suppliersQ = suppliersQ.eq('company', companyFilter);
+          ordersQ = ordersQ.eq('requester_company', companyFilter);
         }
 
         const [logsRes, ordersRes, suppliersRes] = await Promise.all([logsQ, ordersQ, suppliersQ]);

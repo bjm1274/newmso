@@ -42,8 +42,9 @@ const TABS: TabItem<AnalyzeTab>[] = [
 
 export default function AnalyzeWorkcenter() {
   const [tab, setTab] = useState<AnalyzeTab>('abc');
-  const data = useAnalyzeData();
   const { user } = useAppData();
+  const userCompany = typeof user?.company === 'string' ? user.company : undefined;
+  const data = useAnalyzeData(userCompany);
 
   const kpiItems = useMemo<KpiItem[]>(
     () => [

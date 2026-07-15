@@ -174,17 +174,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
       const { error: insErr } = await db.from('leave_requests').insert([payload]);
       if (insErr) throw insErr;
 
-      // 직원 연차 총량 즉시 갱신
-      if (leaveType === '연차(부여)') {
-        const staff = staffs.find((s) => String(s.id) === selectedStaffId);
-        const currentTotal = Number(staff?.annual_leave_total ?? 0);
-        await db
-          .from('staff_members')
-          .update({ annual_leave_total: currentTotal + finalDays })
-          .eq('id', selectedStaffId);
-      }
-
-      // 백엔드 동기화 API
+      // staff_members.annual_leave_total 직접 쓰기 금지 — leave_balances SSOT 동기화
       await fetch('/api/admin/annual-leave/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -216,17 +206,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
 
       if (error) throw error;
 
-      // '연차(부여)' 형 요청 승인 시 직원 데이터 갱신
-      if (req.leave_type === '연차(부여)' && status === '승인') {
-        const daysVal = req.days || calculateLeaveDays(req.start_date, req.end_date);
-        const staff = staffs.find((s) => String(s.id) === String(req.staff_id));
-        const currentTotal = Number(staff?.annual_leave_total ?? 0);
-        await db
-          .from('staff_members')
-          .update({ annual_leave_total: currentTotal + daysVal })
-          .eq('id', req.staff_id);
-      }
-
+      // staff_members.annual_leave_total 직접 쓰기 금지 — leave_balances SSOT 동기화
       await fetch('/api/admin/annual-leave/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

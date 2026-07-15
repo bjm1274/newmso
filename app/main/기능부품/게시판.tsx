@@ -5,7 +5,7 @@ import { toast } from '@/lib/toast';
 import { EmptyState, PermissionState } from '@/app/components/StatePanel';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { useDeferredValue, useState, useEffect, useMemo, useRef, useCallback, type MouseEvent as ReactMouseEvent } from 'react';
-import { canAccessBoard, isAdminUser, isPrivilegedUser } from '@/lib/access-control';
+import { canAccessBoard, isAdminUser, isMsoUser, isPrivilegedUser } from '@/lib/access-control';
 import { getStaffLikeId, resolveStaffLike } from '@/lib/staff-identity';
 import { db } from '@/lib/db-client';
 import { subscribeRealtimeBatched } from '@/lib/realtime-bus';
@@ -455,10 +455,27 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
     setLoading(true);
     const { data } = await withMissingColumnsFallback<BoardPostRow[]>(
       async (omittedColumns): Promise<QueryResult<BoardPostRow[]>> => {
-        const result = await db
+        let query = db
           .from('board_posts')
           .select(buildSelectColumns(BOARD_POST_REQUIRED_SELECT_COLUMNS, BOARD_POST_OPTIONAL_COLUMNS, omittedColumns))
-          .eq('board_type', requestedBoard)
+          .eq('board_type', requestedBoard);
+
+        // 회사 격리: MSO는 selectedCo/selectedCompanyId, 병원 직원은 세션 company
+        const scopeCompanyId =
+          (selectedCompanyId && String(selectedCompanyId).trim()) ||
+          (!isMsoUser(user) && user?.company_id ? String(user.company_id).trim() : '') ||
+          '';
+        const scopeCompanyName =
+          (selectedCo && selectedCo !== '전체' ? String(selectedCo).trim() : '') ||
+          (!isMsoUser(user) && user?.company ? String(user.company).trim() : '') ||
+          '';
+        if (scopeCompanyId && !omittedColumns.has('company_id')) {
+          query = query.eq('company_id', scopeCompanyId);
+        } else if (scopeCompanyName) {
+          query = query.eq('company', scopeCompanyName);
+        }
+
+        const result = await query
           .order('created_at', { ascending: false })
           .limit(500);
         return result as unknown as QueryResult<BoardPostRow[]>;
@@ -609,7 +626,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
     if (activeBoard === '수술일정' || activeBoard === 'MRI일정') {
       setCalendarMonth(new Date());
     }
-  }, [activeBoard, effectiveBoardUserId, loadBoardAudience]);
+  }, [activeBoard, effectiveBoardUserId, loadBoardAudience, selectedCo, selectedCompanyId, user]);
 
   useEffect(() => {
     void loadBoardReadState();

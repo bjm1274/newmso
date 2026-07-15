@@ -85,13 +85,14 @@ interface HrMenu {
 }
 
 const HR_MENU: HrMenu[] = [
-  { id: 'member', label: '구성원', sub: '명단 · 인사발령 · 교육 · 자격', icon: 'users', tone: 'accent' },
-  { id: 'attend', label: '근태', sub: '대시보드 · 근무표 · 3교대 · 근태이상', icon: 'clock', tone: 'success' },
-  { id: 'leave', label: '연차 · 휴가', sub: '잔여 · 신청 내역 · 소멸 알림 · 계획서', icon: 'calendar', tone: 'accent' },
-  { id: 'abnormal', label: '근태이상', sub: '이상 근태 검토 · 조치', icon: 'alertTri', tone: 'warning' },
-  { id: 'payroll', label: '급여 워크센터', sub: '정산 · 대장 · 시뮬레이터 · 13개 모듈', icon: 'won', tone: 'warning' },
-  { id: 'welfare', label: '복지', sub: '경조사 · 건강검진 · 면허/자격 · 의료기기', icon: 'badge', tone: 'accent' },
-  { id: 'docs', label: '계약 · 문서', sub: '계약 · 자동생성 · 증명서 · 서류 제출', icon: 'fileText', tone: '' },
+  // perm 은 canAccessHrSection 워크센터 합집합 키(member/attend/…) 또는 세부 hr_* 키
+  { id: 'member', label: '구성원', sub: '명단 · 인사발령 · 교육 · 자격', icon: 'users', tone: 'accent', perm: 'member' },
+  { id: 'attend', label: '근태', sub: '대시보드 · 근무표 · 3교대 · 근태이상', icon: 'clock', tone: 'success', perm: 'attend' },
+  { id: 'leave', label: '연차 · 휴가', sub: '잔여 · 신청 내역 · 소멸 알림 · 계획서', icon: 'calendar', tone: 'accent', perm: 'leave' },
+  { id: 'abnormal', label: '근태이상', sub: '이상 근태 검토 · 조치', icon: 'alertTri', tone: 'warning', perm: 'abnormal' },
+  { id: 'payroll', label: '급여 워크센터', sub: '정산 · 대장 · 시뮬레이터 · 13개 모듈', icon: 'won', tone: 'warning', perm: 'payroll' },
+  { id: 'welfare', label: '복지', sub: '경조사 · 건강검진 · 면허/자격 · 의료기기', icon: 'badge', tone: 'accent', perm: 'welfare' },
+  { id: 'docs', label: '계약 · 문서', sub: '계약 · 자동생성 · 증명서 · 서류 제출', icon: 'fileText', tone: '', perm: 'docs' },
   // 오프보딩·문서보관함은 PC와 동일하게 권한 보유자에게만 노출(퇴사 처리·회사 문서 열람).
   { id: 'offboarding', label: '오프보딩', sub: '퇴사 처리 · 체크리스트 · 권한 회수', icon: 'out', tone: 'danger', perm: 'hr_오프보딩' },
   { id: 'archive', label: '문서보관함', sub: '규정 · 양식 · 근로계약서 · 결재 보관', icon: 'box', tone: '', perm: 'hr_문서보관함' },
@@ -127,6 +128,20 @@ export default function 인사관리({
     }
     setView('hub');
   }, [view, onExit]);
+
+  // 딥링크/초기 view 도 허브와 동일 hr_* / canAccess 게이트
+  const viewPerm = HR_MENU.find((m) => m.id === view)?.perm;
+  if (view !== 'hub' && view !== 'form-member' && view !== 'form-leave' && viewPerm && !canAccessHrSection(user, viewPerm)) {
+    return (
+      <Hub
+        user={user}
+        company={selectedCompany}
+        onCompanyChange={setSelectedCompany}
+        onExit={onExit}
+        onOpen={(v) => setView(v)}
+      />
+    );
+  }
 
   switch (view) {
     case 'member':

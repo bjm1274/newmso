@@ -207,7 +207,26 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
     }
     if (data) {
       const row = Array.isArray(data) ? (data as { id: string }[])[0] : (data as { id: string });
-      onCreated(String(row?.id ?? ''));
+      const newId = String(row?.id ?? '');
+      // 공지/경조사 즉시 방송 (createBoardPost 경로 외 enqueue 경로 보완)
+      if (newId && (boardType === '공지사항' || boardType === '경조사')) {
+        try {
+          const res = await fetch('/api/board/notice-broadcast', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ postId: newId, useAnonymous: anonymousFinal }),
+          });
+          if (!res.ok) {
+            const errBody = await res.json().catch(() => ({}));
+            const reason = String((errBody as { error?: string })?.error || `HTTP ${res.status}`);
+            toast(`공지 자동 발송 실패: ${reason}`, 'error');
+          }
+        } catch {
+          toast('공지 자동 발송 중 오류가 발생했습니다.', 'error');
+        }
+      }
+      onCreated(newId);
     }
   };
 

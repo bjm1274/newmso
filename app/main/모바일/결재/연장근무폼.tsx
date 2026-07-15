@@ -74,10 +74,10 @@ export default function SApprovalOvertimeForm({
       const start = new Date();
       start.setDate(start.getDate() - 120);
       const startStr = formatKoreanDateKey(start);
-      // 스키마 정합: attendances 는 check_in_time/check_out_time (at 아님). overtime_minutes 컬럼 없음 → 시간 차로 계산.
+      // 스키마 정합: attendances 는 check_in_time/check_out_time 만 존재 (overtime_minutes 컬럼 없음)
       const { data, error } = await db
         .from('attendances')
-        .select('work_date, check_in_time, check_out_time, overtime_minutes')
+        .select('work_date, check_in_time, check_out_time')
         .eq('staff_id', staffId)
         .gte('work_date', startStr)
         .order('work_date', { ascending: false });
@@ -86,8 +86,8 @@ export default function SApprovalOvertimeForm({
         .map((r) => {
           const checkIn = (r.check_in_time as string) ?? null;
           const checkOut = (r.check_out_time as string) ?? null;
-          let minutes = Number(r.overtime_minutes ?? 0);
-          if ((!minutes || Number.isNaN(minutes)) && checkIn && checkOut) {
+          let minutes = 0;
+          if (checkIn && checkOut) {
             const inMs = new Date(checkIn).getTime();
             const outMs = new Date(checkOut).getTime();
             if (Number.isFinite(inMs) && Number.isFinite(outMs) && outMs > inMs) {

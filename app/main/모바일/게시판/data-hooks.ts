@@ -15,6 +15,7 @@ import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import type { AttachmentItem, BoardPost } from '@/types';
 import {
+  BOARD_AUTO_CHAT_TYPES,
   BOARD_COMMENT_SELECT,
   BOARD_POST_OPTIONAL_COLUMNS,
   BOARD_POST_REQUIRED_SELECT_COLUMNS,
@@ -24,6 +25,36 @@ import {
 import { withMissingColumnsFallback } from '@/lib/db-compat';
 import { loadStarSet } from './별표훅';
 import { normalizePoll } from './게시판변경';
+
+/** 공지/경조사 등록 직후 채팅·푸시 방송 (PC notice-broadcast 패리티) */
+async function broadcastNoticeIfNeeded(
+  postId: string,
+  boardType: string,
+  scheduledPublishAt?: string | null,
+  useAnonymous = false,
+): Promise<void> {
+  if (!BOARD_AUTO_CHAT_TYPES.has(boardType)) return;
+  // 예약 발행(미래) 공지는 즉시 방송하지 않음 — PC와 동일
+  if (boardType === '공지사항' && scheduledPublishAt) {
+    const t = new Date(scheduledPublishAt).getTime();
+    if (Number.isFinite(t) && t > Date.now()) return;
+  }
+  try {
+    const res = await fetch('/api/board/notice-broadcast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ postId, useAnonymous: Boolean(useAnonymous) }),
+    });
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      const reason = String((errBody as { error?: string })?.error || `HTTP ${res.status}`);
+      toast(`공지 자동 발송 실패: ${reason}`, 'error');
+    }
+  } catch {
+    toast('공지 자동 발송 중 오류가 발생했습니다.', 'error');
+  }
+}
 
 // ─────────────────────────────────────────────
 // 카테고리 정의 — handoff와 1:1
@@ -122,7 +153,7 @@ export type UseBoardPostsResult = {
  * 모듈 캐시 — 게시판 탭 언마운트 후에도 칩 카운트·목록이 0으로 깜빡이지 않게 유지.
  * 카테고리 전환은 클라이언트 필터만 하고, 항상 전체 보드를 병렬 조회한다.
  */
-let boardPostsCache: { userId: string | null; posts: BoardListPost[] } | null = null;
+let boardPostsCache: { userId: string | null; company: string | null; posts: BoardListPost[] } | null = null;
 let boardPostsInflight: Promise<BoardListPost[]> | null = null;
 
 /**
@@ -134,21 +165,31 @@ export function useBoardPosts(
   company?: string | null,
   _boardTypeFilter?: string | null,
 ): UseBoardPostsResult {
+  const companyKey = company && company !== '전체' ? company : null;
   const cached =
-    boardPostsCache && boardPostsCache.userId === userId ? boardPostsCache.posts : null;
+    boardPostsCache &&
+    boardPostsCache.userId === userId &&
+    boardPostsCache.company === companyKey
+      ? boardPostsCache.posts
+      : null;
   const [posts, setPosts] = useState<BoardListPost[]>(() => cached ?? []);
   const [loading, setLoading] = useState(() => !cached);
 
   const fetchPosts = useCallback(async () => {
     // 캐시가 있으면 소프트 리프레시 — loading 깜빡임 없이 배경 갱신
-    const hasCache = Boolean(boardPostsCache && boardPostsCache.userId === userId && boardPostsCache.posts.length > 0);
+    const hasCache = Boolean(
+      boardPostsCache &&
+        boardPostsCache.userId === userId &&
+        boardPostsCache.company === companyKey &&
+        boardPostsCache.posts.length > 0,
+    );
     if (!hasCache) setLoading(true);
 
     const run = async (): Promise<BoardListPost[]> => {
       const fetchOneType = async (boardType: string): Promise<BoardPost[]> => {
         const { data, error } = await withMissingColumnsFallback<BoardPost[]>(
           async (omittedColumns) => {
-            const q = db
+            let q = db
               .from('board_posts')
               .select(
                 buildSelectColumns(
@@ -157,10 +198,14 @@ export function useBoardPosts(
                   omittedColumns,
                 ),
               )
-              .eq('board_type', boardType)
+              .eq('board_type', boardType);
+            // 회사 격리 — 세션 user.company (이름). company_id 우선 시 상위 훅에서 company_id 전달 확장 가능
+            if (company && company !== '전체') {
+              q = q.eq('company', company);
+            }
+            const result = await q
               .order('created_at', { ascending: false })
               .limit(1000);
-            const result = await q;
             return result as unknown as { data: BoardPost[] | null; error: unknown };
           },
           [...BOARD_POST_OPTIONAL_COLUMNS],
@@ -237,12 +282,16 @@ export function useBoardPosts(
         });
       }
       const enriched = await boardPostsInflight;
-      boardPostsCache = { userId, posts: enriched };
+      boardPostsCache = { userId, company: companyKey, posts: enriched };
       setPosts(enriched);
     } catch (err) {
       toast(`게시판 조회 실패: ${(err as Error)?.message ?? '오류'}`, 'error');
       // 캐시가 있으면 빈 목록으로 지우지 않음 (숫자 깜빡임 방지)
-      if (!boardPostsCache || boardPostsCache.userId !== userId) {
+      if (
+        !boardPostsCache ||
+        boardPostsCache.userId !== userId ||
+        boardPostsCache.company !== companyKey
+      ) {
         setPosts([]);
       }
     } finally {
@@ -601,7 +650,17 @@ export async function createBoardPost(input: CreateBoardPostInput): Promise<Boar
       }
     }
     if (error) throw error;
-    return data as BoardPost;
+    const inserted = data as BoardPost;
+    // 공지/경조사: PC와 동일하게 notice-broadcast (채팅·인앱·푸시)
+    if (inserted?.id) {
+      await broadcastNoticeIfNeeded(
+        String(inserted.id),
+        boardType,
+        scheduledIso,
+        useAnonymous,
+      );
+    }
+    return inserted;
   } catch (err) {
     toast(`등록 실패: ${(err as Error)?.message ?? '오류'}`, 'error');
     return null;

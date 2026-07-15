@@ -96,7 +96,7 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
     { id: 4, text: '고정자산 감가상각 전표 등록 완료', done: false },
     { id: 5, text: '선급비용 및 미지급비용 당월 배부 처리 완료', done: false },
   ]);
-  const [isClosingProcess, setIsClosingProcess] = useState(false);
+  const isClosingProcess = false;
 
   // 매입 대사 불일치: D1 테이블 없음 → 빈 목록
   const reconcileIssues: ReconcileIssue[] = [];
@@ -312,7 +312,8 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
           .eq('id', account.id);
       }
       setBankSyncs(updated);
-      toast('금융 기관 데이터가 실시간으로 동기화되어 DB에 업데이트되었습니다.', 'success');
+      // 실제 잔액·거래 수신 없이 updated_at 만 갱신 — 실시간 동기화로 오인 금지
+      toast('연동 시각만 갱신했습니다. 잔액·거래 실시간 수신은 준비 중입니다.', 'info');
     } catch (err) {
       console.error(err);
       toast('금융 기관 동기화 업데이트 실패', 'error');
@@ -329,11 +330,8 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
       toast(`남은 체크리스트가 있습니다: ${unfinished.length}건`, 'error');
       return;
     }
-    setIsClosingProcess(true);
-    setTimeout(() => {
-      setIsClosingProcess(false);
-      toast('2026년 6월 회계 마감이 승인 처리되었습니다.', 'success');
-    }, 1500);
+    // 서버 원장 잠금·감사 로그 API 없음 — 가짜 success 금지
+    toast('결산 마감은 서버 연동 준비 중입니다. 실제 원장 마감은 아직 처리되지 않습니다.', 'info');
   };
 
   // --- Calculations ---
@@ -391,7 +389,7 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
         <div className="flex items-center gap-2">
           <button 
             type="button" 
-            onClick={() => toast('엑셀 원장 파일이 생성되었습니다.', 'success')} 
+            onClick={() => toast('Excel 다운로드는 준비 중입니다.', 'info')} 
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] font-bold text-xs hover:bg-[var(--muted)] transition-all active:scale-[0.98]"
           >
             <Download size={13} />
@@ -683,7 +681,7 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                       국세청 홈택스 신고용 전자파일(변환 포맷)과 부가세 신고서 양식을 출력/다운로드할 수 있습니다.
                     </p>
                   </div>
-                  <button onClick={() => toast('홈택스 전송용 전자파일이 생성되었습니다.', 'success')} className="w-full py-2.5 rounded-lg bg-[var(--accent)] text-white font-bold text-xs hover:bg-[var(--accent-hover)] transition-all active:scale-[0.98]">
+                  <button onClick={() => toast('홈택스 전자파일 생성은 연동 준비 중입니다.', 'info')} className="w-full py-2.5 rounded-lg bg-[var(--accent)] text-white font-bold text-xs hover:bg-[var(--accent-hover)] transition-all active:scale-[0.98]">
                     전자신고용 파일 다운로드
                   </button>
                 </div>
@@ -1165,12 +1163,10 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                                   {exp.state === '대기중' ? (
                                     <div className="flex justify-center gap-1.5">
                                       <button onClick={() => {
-                                        setExpenses(prev => prev.map(e => e.id === exp.id ? { ...e, state: '승인완료' } : e));
-                                        toast('경비 청구가 승인되었습니다.', 'success');
+                                        toast('경비 승인·반려은 서버 연동 준비 중입니다.', 'info');
                                       }} className="px-2 py-1 rounded bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] font-bold hover:bg-emerald-100 transition-all">승인</button>
                                       <button onClick={() => {
-                                        setExpenses(prev => prev.map(e => e.id === exp.id ? { ...e, state: '반려' } : e));
-                                        toast('경비 청구가 반려되었습니다.', 'error');
+                                        toast('경비 승인·반려은 서버 연동 준비 중입니다.', 'info');
                                       }} className="px-2 py-1 rounded bg-red-50 text-red-600 border border-red-200 text-[10px] font-bold hover:bg-red-100 transition-all">반려</button>
                                     </div>
                                   ) : (
@@ -1226,7 +1222,7 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                         { id: 'exp-' + (prev.length + 1), date: new Date().toISOString().split('T')[0], name: user?.name || '기안자', desc: newExpense.desc, category: newExpense.category, amount: val, state: '대기중' }
                       ]);
                       setNewExpense({ desc: '', category: '소모품비', amount: '' });
-                      toast('영수증 및 지출 정보가 등록되었습니다.', 'success');
+                      toast('화면에만 임시 표시됩니다. 경비 청구 서버 저장은 연동 준비 중입니다.', 'info');
                     }} className="space-y-3">
                       <div>
                         <label className="block text-[11px] font-bold text-[var(--toss-gray-4)] mb-1">내용 / 적요</label>
@@ -1324,7 +1320,7 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                         { id: 'disb-' + (prev.length + 1), date: new Date().toISOString().split('T')[0], vendor: newDisb.vendor, desc: newDisb.desc, amount: val, state: '기안중' }
                       ]);
                       setNewDisb({ vendor: '', desc: '', amount: '' });
-                      toast('지출결의서 기안이 임시저장되었습니다.', 'success');
+                      toast('화면에만 임시 표시됩니다. 지출결의 서버 저장은 연동 준비 중입니다.', 'info');
                     }} className="space-y-3">
                       <div>
                         <label className="block text-[11px] font-bold text-[var(--toss-gray-4)] mb-1">지급처 (거래처명)</label>
@@ -1373,10 +1369,7 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                             <div>
                               {sync.state === '대기중' ? (
                                 <button onClick={() => {
-                                  setPayrollSyncs(prev => prev.map(p => p.period === sync.period ? { ...p, state: '전송완료', synced_at: new Date().toISOString().replace('T', ' ').substring(0, 16) } : p));
-                                  const salaryRow = { id: 'sal-' + Date.now(), date: new Date().toISOString().split('T')[0], desc: `${sync.period} 회계 처리`, debitAcc: '급여', creditAcc: '보통예금', amount: sync.totalAmount };
-                                  setJournalEntries(prev => [salaryRow, ...prev]);
-                                  toast('급여 전표 분개가 성공적으로 자동 발행되었습니다.', 'success');
+                                  toast('급여 전표 자동 발행은 서버 연동 준비 중입니다.', 'info');
                                 }} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-xs font-bold hover:bg-[var(--accent-hover)] transition-all">
                                   <ArrowLeftRight size={12} />
                                   <span>회계 전표 전송</span>
@@ -1449,8 +1442,7 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                               </td>
                               <td className="p-3 text-center">
                                 <button onClick={() => {
-                                  setTaxReports(prev => prev.map((r, i) => i === idx ? { ...r, status: '완료' } : r));
-                                  toast(`${report.type} 홈택스 파일(.txt)이 다운로드 되었습니다.`, 'success');
+                                  toast(`${report.type} 홈택스 파일 생성은 연동 준비 중입니다.`, 'info');
                                 }} className="flex mx-auto items-center gap-1 px-2.5 py-1 rounded bg-[var(--muted)] text-[var(--toss-gray-4)] border border-[var(--border)] hover:bg-[var(--border)] text-[10px] font-bold transition-all">
                                   <Download size={11} />
                                   <span>파일 생성 (.txt)</span>

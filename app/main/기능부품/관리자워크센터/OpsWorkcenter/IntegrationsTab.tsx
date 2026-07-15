@@ -16,50 +16,50 @@ import IntegrationCard, {
   type IntegrationStatus,
   type IntegrationVendor } from './IntegrationCard';
 
-// ─── fallback 6개 (사용자 명세) ───────────────────────────────────
+// ─── fallback 6개 — DB 미존재/실패 시. 가짜 "연결됨"/발송 건수 금지 ──
 const FALLBACK_INTEGRATIONS: Integration[] = [
   {
     id: 'int-kakao',
     vendor: 'kakao',
     name: '카카오 알림톡',
-    sub: '발송 12,840건/월 · 발신 프로필 sy_inc',
-    status: 'connected',
-    lastSyncedLabel: '5분 전' },
+    sub: '연동 준비 중 — 실데이터 없음',
+    status: 'pending',
+    lastSyncedLabel: '미연동' },
   {
     id: 'int-naver-works',
     vendor: 'naver-works',
     name: '네이버웍스',
-    sub: '메시지 4,210건/월 · OAuth 활성',
-    status: 'connected',
-    lastSyncedLabel: '12분 전' },
+    sub: '연동 준비 중 — 실데이터 없음',
+    status: 'pending',
+    lastSyncedLabel: '미연동' },
   {
     id: 'int-slack',
     vendor: 'slack',
     name: '슬랙',
-    sub: '채널 6개 연결 · #mso-알림 외 5',
-    status: 'connected',
-    lastSyncedLabel: '1분 전' },
+    sub: '연동 준비 중 — 실데이터 없음',
+    status: 'pending',
+    lastSyncedLabel: '미연동' },
   {
     id: 'int-hometax',
     vendor: 'hometax',
     name: '홈택스',
-    sub: '세금계산서 발송 · 원천징수 자동화',
-    status: 'connected',
-    lastSyncedLabel: '오늘 09:00' },
+    sub: '연동 준비 중 — 실데이터 없음',
+    status: 'pending',
+    lastSyncedLabel: '미연동' },
   {
     id: 'int-edi',
     vendor: 'edi',
     name: 'EDI 4대보험',
-    sub: 'EDI 신고 자동화 · 국민·건강·고용·산재',
-    status: 'connected',
-    lastSyncedLabel: '오늘 08:30' },
+    sub: '연동 준비 중 — 실데이터 없음',
+    status: 'pending',
+    lastSyncedLabel: '미연동' },
   {
     id: 'int-bank',
     vendor: 'bank',
     name: '시중은행',
-    sub: '자동 이체 · 펌뱅킹 — 설정 필요',
+    sub: '미연동 — 펌뱅킹 설정 필요',
     status: 'disconnected',
-    lastSyncedLabel: '연결 안됨' },
+    lastSyncedLabel: '미연동' },
 ];
 
 // ─── 검증 헬퍼 (JM4) ──────────────────────────────────────────────
@@ -91,7 +91,8 @@ function toIntegration(row: unknown): Integration | null {
   const vendor = isVendor(r.vendor) ? r.vendor : null;
   const name = typeof r.name === 'string' ? r.name : null;
   const sub = typeof r.sub === 'string' ? r.sub : '';
-  const status = isStatus(r.status) ? r.status : 'connected';
+  // 상태 미상은 connected 로 위장하지 않음
+  const status = isStatus(r.status) ? r.status : 'pending';
   if (!id || !vendor || !name) return null;
   const lastSyncedLabel =
     typeof r.last_synced_label === 'string' ? r.last_synced_label : undefined;
@@ -161,7 +162,11 @@ export default function IntegrationsTab({
           <b className="text-[var(--foreground)] tabular-nums">{connectedCount}</b>개
         </p>
         <p className="text-[10.5px] text-[var(--toss-gray-3)]" aria-live="polite">
-          {loading ? '동기화 중…' : source === 'supabase' ? '실데이터' : '샘플 표시'}
+          {loading
+            ? '동기화 중…'
+            : source === 'supabase'
+              ? '실데이터'
+              : '연동 준비 중 (실연동 미구성)'}
         </p>
       </div>
 

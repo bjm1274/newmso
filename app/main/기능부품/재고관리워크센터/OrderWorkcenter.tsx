@@ -10,6 +10,7 @@ import {
   type FilterChip,
   type KpiItem } from './stock-workcenter-common';
 import type { PurchaseOrderRow } from './stock-types';
+import { useAppData } from '@/app/main/contexts/AppDataContext';
 import { useIOData, useEmptyMessage } from './stock-workcenter-data';
 
 const LegacyPurchaseOrderManagement = dynamic(
@@ -53,7 +54,9 @@ function PurchaseOrderOverlay({ onClose }: { onClose: () => void }) {
 
 export default function OrderWorkcenter() {
   const [showPurchase, setShowPurchase] = useState(false);
-  const data = useIOData();
+  const { user } = useAppData();
+  const userCompany = typeof user?.company === 'string' ? user.company : undefined;
+  const data = useIOData(userCompany);
 
   const kicker = "§ 구매/발주";
   const title = "공급망 발주 관리";

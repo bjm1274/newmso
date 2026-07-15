@@ -58,13 +58,14 @@ const DEFAULT_TOGGLES = [
   { key: 'attendance', name: '근태 이상 자동 감지 알림', s: true },
 ];
 
-const INTEGRATIONS: { name: string; state: '연결됨' | '연결 안됨'; sub: string; tone: ChipTone }[] = [
-  { name: '카카오톡 알림톡', state: '연결됨', sub: '발신 프로필 sy_inc', tone: 'success' },
-  { name: '네이버웍스', state: '연결됨', sub: 'OAuth 활성', tone: 'success' },
-  { name: '슬랙', state: '연결됨', sub: '#mso-알림 채널', tone: 'success' },
-  { name: '국세청 홈택스', state: '연결됨', sub: '전자세금계산서·원천징수', tone: 'success' },
-  { name: '4대보험 EDI', state: '연결됨', sub: '국민·건강·고용·산재', tone: 'success' },
-  { name: '은행 펌뱅킹', state: '연결 안됨', sub: '급여 자동이체용 — 설정 필요', tone: 'warn' },
+// 실연동 전 — 가짜 "연결됨" 금지 (연동 준비 중 / 미연동으로 정직 표기)
+const INTEGRATIONS: { name: string; state: string; sub: string; tone: ChipTone }[] = [
+  { name: '카카오톡 알림톡', state: '연동 준비 중', sub: '실연동 미구성', tone: 'muted' },
+  { name: '네이버웍스', state: '연동 준비 중', sub: '실연동 미구성', tone: 'muted' },
+  { name: '슬랙', state: '연동 준비 중', sub: '실연동 미구성', tone: 'muted' },
+  { name: '국세청 홈택스', state: '연동 준비 중', sub: '실연동 미구성', tone: 'muted' },
+  { name: '4대보험 EDI', state: '연동 준비 중', sub: '실연동 미구성', tone: 'muted' },
+  { name: '은행 펌뱅킹', state: '미연동', sub: '급여 자동이체용 — 설정 필요', tone: 'warn' },
 ];
 
 function SelectField({ label, options }: { label: string; options: string[] }) {

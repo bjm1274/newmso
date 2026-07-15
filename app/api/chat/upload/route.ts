@@ -7,6 +7,8 @@ import { readSessionFromRequest } from '@/lib/server-session';
 import { checkRateLimit, recordFailedAttempt } from '@/lib/rate-limit';
 import { CHAT_MAX_FILE_SIZE_BYTES as MAX_FILE_SIZE_BYTES, CHAT_MAX_VIDEO_SIZE_BYTES as MAX_VIDEO_SIZE_BYTES } from '@/lib/chat-upload-constants';
 import { DEFAULT_CONTENT_TYPE, normalizeUploadMimeType } from '@/lib/upload-mime';
+import { getD1Binding, getD1Drizzle } from '@/lib/db';
+import { assertChatRoomMember } from '@/lib/chat-room-membership';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,6 +23,9 @@ type UploadPlanRequest = {
   fileName?: string;
   mimeType?: string;
   fileSize?: number;
+  /** 선택: 전달 시 방 멤버십(notice 예외) 검증 */
+  room_id?: string;
+  roomId?: string;
 };
 
 type UploadPlanResponse = {
@@ -97,7 +102,40 @@ function validateUploadTarget(fileName: string, mimeType: string, fileSize: numb
   }
 }
 
-async function createSignedUploadPlan(payload: UploadPlanRequest): Promise<NextResponse> {
+/**
+ * room_id가 있으면 멤버십 검증. 없으면 하위호환으로 통과
+ * (클라가 room_id를 보내기 시작하면 완전 강제).
+ */
+async function assertOptionalRoomMembership(
+  userId: string,
+  roomIdRaw: unknown,
+): Promise<NextResponse | null> {
+  const roomId = String(roomIdRaw ?? '').trim();
+  if (!roomId) return null;
+
+  const d1 = await getD1Binding();
+  if (!d1) {
+    // 로컬 등 binding 없음: 멤버십 스킵(기존 동작 유지)
+    return null;
+  }
+  const db = getD1Drizzle(d1);
+  const membership = await assertChatRoomMember(db, roomId, userId);
+  if (!membership.ok) {
+    return NextResponse.json({ error: membership.error }, { status: membership.status });
+  }
+  return null;
+}
+
+async function createSignedUploadPlan(
+  payload: UploadPlanRequest,
+  userId: string,
+): Promise<NextResponse> {
+  const roomDenied = await assertOptionalRoomMembership(
+    userId,
+    payload.room_id ?? payload.roomId,
+  );
+  if (roomDenied) return roomDenied;
+
   const rawFileName = String(payload.fileName || '').trim();
   const mimeType = normalizeUploadMimeType(rawFileName, payload.mimeType || DEFAULT_CONTENT_TYPE);
   const fileName = normalizeUploadFileName(rawFileName, mimeType);
@@ -133,7 +171,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const rateKey = `chat-upload:${String(session.user.id)}`;
+    const userId = String(session.user.id).trim();
+    const rateKey = `chat-upload:${userId}`;
     const rate = await checkRateLimit(rateKey, UPLOAD_RATE_LIMIT_MAX, UPLOAD_RATE_LIMIT_WINDOW_MS);
     if (!rate.allowed) {
       return NextResponse.json(
@@ -147,7 +186,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     if (contentType.includes('application/json')) {
       const payload = (await request.json().catch(() => ({}))) as UploadPlanRequest;
-      return await createSignedUploadPlan(payload);
+      return await createSignedUploadPlan(payload, userId);
     }
 
     const contentLength = Number(request.headers.get('content-length') || '0');
@@ -161,6 +200,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!(file instanceof File)) {
       return NextResponse.json({ error: '업로드할 파일이 없습니다.' }, { status: 400 });
     }
+
+    const roomDenied = await assertOptionalRoomMembership(
+      userId,
+      formData.get('room_id') ?? formData.get('roomId'),
+    );
+    if (roomDenied) return roomDenied;
 
     const rawFileName = String(file.name || '').trim();
     const mimeType = normalizeUploadMimeType(rawFileName, file.type || DEFAULT_CONTENT_TYPE);

@@ -14,13 +14,15 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ErpUser } from '@/types';
-import { isAdminUser, isPrivilegedUser } from '@/lib/access-control';
+import { canAccessBoard, isAdminUser, isPrivilegedUser } from '@/lib/access-control';
 import SBoard from './게시판목록';
 import SBoardDetail from './게시판상세';
 import SFormPost from './글작성';
 import {
+  BOARD_CATS,
   type BoardCatId,
   type BoardListPost,
+  boardTypeToCat,
   resolveBoardSubView,
   useBoardDetail,
   useBoardPosts } from './data-hooks';
@@ -90,9 +92,59 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
   // 권한: 관리자 또는 시스템 마스터 → 고정·예약 옵션 노출
   const canAdmin = useMemo(() => isAdminUser(user) || isPrivilegedUser(user), [user]);
 
+  // 보드별 읽기 권한 — PC canAccessBoard 패리티
+  const readableBoardTypes = useMemo(() => {
+    return BOARD_CATS
+      .map((c) => c.boardType)
+      .filter((bt): bt is string => {
+        if (!bt) return false;
+        return canAccessBoard(user, bt, 'read');
+      });
+  }, [user]);
+
+  const canReadCat = useCallback(
+    (catId: BoardCatId) => {
+      if (catId === 'all') return readableBoardTypes.length > 0;
+      const def = BOARD_CATS.find((c) => c.id === catId);
+      if (!def?.boardType) return false;
+      return canAccessBoard(user, def.boardType, 'read');
+    },
+    [user, readableBoardTypes],
+  );
+
+  // 현재 카테고리 쓰기 권한 (전체면 하나라도 write 가능하면 작성 버튼 노출)
+  const canWrite = useMemo(() => {
+    if (cat === 'all') {
+      return BOARD_CATS.some(
+        (c) => c.boardType && canAccessBoard(user, c.boardType, 'write'),
+      );
+    }
+    const def = BOARD_CATS.find((c) => c.id === cat);
+    return Boolean(def?.boardType && canAccessBoard(user, def.boardType, 'write'));
+  }, [user, cat]);
+
   // 항상 전체 보드 로드 → 칩 카운트 안정. 카테고리 전환은 클라이언트 필터.
+  // company 필터로 타사 게시글 차단.
   const { posts: fetched, loading, refetch: refetchPosts } = useBoardPosts(userId, userCompany);
-  const posts = overridePosts ?? fetched;
+  const posts = useMemo(() => {
+    const base = overridePosts ?? fetched;
+    // 읽기 권한 없는 보드 타입 제거
+    return base.filter((p) => {
+      const bt = String(p.board_type ?? '').trim();
+      if (!bt) return false;
+      return canAccessBoard(user, bt, 'read');
+    });
+  }, [overridePosts, fetched, user]);
+
+  // 현재 cat에 읽기 권한이 없으면 접근 가능한 첫 보드로 폴백
+  useEffect(() => {
+    if (!canReadCat(cat)) {
+      const fallback =
+        BOARD_CATS.find((c) => c.id !== 'all' && c.boardType && canAccessBoard(user, c.boardType, 'read'))?.id
+        ?? 'all';
+      setCat(fallback as BoardCatId);
+    }
+  }, [cat, canReadCat, user]);
 
   const refetch = useCallback(async () => {
     setOverridePosts(null);
@@ -119,9 +171,10 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
   }, []);
 
   const handleWrite = useCallback(() => {
+    if (!canWrite) return;
     setEditPost(null);
     setView('write');
-  }, []);
+  }, [canWrite]);
 
   // 상세 ⋯ → 수정 모드 (글작성 EDIT)
   const handleEdit = useCallback((p: BoardListPost) => {
@@ -195,22 +248,91 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
 
   let contentElement: React.ReactNode;
 
-  if (view === 'write') {
+  // 읽기 권한 보드가 하나도 없으면 차단
+  if (readableBoardTypes.length === 0) {
     contentElement = (
-      <SFormPost
-        user={{ id: userId, name: userName, company: userCompany, company_id: userCompanyId }}
-        canAdmin={canAdmin}
-        initialCat={cat}
-        editPost={editPost}
-        onCancel={() => {
-          setEditPost(null);
-          setView(editPost ? 'detail' : 'list');
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 24,
+          gap: 8,
+          textAlign: 'center',
         }}
-        onCreated={handleCreated}
-      />
+      >
+        <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--z-900)' }}>
+          게시판 접근 권한이 없습니다
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--z-500)', fontWeight: 600 }}>
+          메인 메뉴 권한과 게시판 읽기 권한을 확인해 주세요.
+        </div>
+        <button
+          type="button"
+          onClick={onBack}
+          style={{
+            marginTop: 12,
+            padding: '10px 16px',
+            borderRadius: 10,
+            border: '1px solid rgba(0,0,0,0.08)',
+            background: 'rgba(255,255,255,0.8)',
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          돌아가기
+        </button>
+      </div>
     );
+  } else if (view === 'write') {
+    const editBoardType = editPost ? String(editPost.board_type ?? '') : '';
+    const canWriteEdit = editPost
+      ? canAccessBoard(user, editBoardType || '자유게시판', 'write') || canAdmin
+      : canWrite;
+    if (canWriteEdit) {
+      contentElement = (
+        <SFormPost
+          user={{ id: userId, name: userName, company: userCompany, company_id: userCompanyId }}
+          canAdmin={canAdmin}
+          initialCat={cat}
+          editPost={editPost}
+          onCancel={() => {
+            setEditPost(null);
+            setView(editPost ? 'detail' : 'list');
+          }}
+          onCreated={handleCreated}
+        />
+      );
+    } else {
+      // write 권한 없으면 목록으로 폴백
+      contentElement = (
+        <SBoard
+          posts={posts}
+          loading={loading}
+          cat={cat}
+          onCat={setCat}
+          onOpen={handleOpen}
+          onWrite={handleWrite}
+          onBack={onBack}
+          userId={userId}
+          onStarChanged={handleStarChanged}
+          onRefresh={refetch}
+          showHome={false}
+          onOpenCategory={handleOpenCategory}
+          company={userCompany ?? ''}
+          canWrite={false}
+          readableCats={readableBoardTypes.map((bt) => boardTypeToCat(bt))}
+        />
+      );
+    }
   } else if (view === 'detail') {
     const currentIsLiked = postId ? likeSet.has(postId) : false;
+    const detailBoardType = post ? String(post.board_type ?? '') : '';
+    const canWriteDetail = detailBoardType
+      ? canAccessBoard(user, detailBoardType, 'write')
+      : false;
     contentElement = (
       <SBoardDetail
         post={post}
@@ -223,6 +345,7 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
         currentUserId={userId}
         currentUserName={userName}
         canAdmin={canAdmin}
+        canWriteBoard={canWriteDetail}
         isLiked={currentIsLiked}
         onLikedChange={handleLikedChange}
         onEdit={handleEdit}
@@ -245,6 +368,8 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
         showHome={false}
         onOpenCategory={handleOpenCategory}
         company={userCompany ?? ''}
+        canWrite={canWrite}
+        readableCats={readableBoardTypes.map((bt) => boardTypeToCat(bt))}
       />
     );
   }

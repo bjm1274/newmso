@@ -56,6 +56,8 @@ export type SBoardDetailProps = {
   currentUserName?: string | null;
   /** 관리자/시스템 마스터 — 수정·삭제·읽음현황 게이트 */
   canAdmin?: boolean;
+  /** 해당 보드 board_*_write 권한 (PC canAccessBoard write 패리티) */
+  canWriteBoard?: boolean;
   /** 내 좋아요 상태 */
   isLiked: boolean;
   /** 좋아요 토글 후 부모 상태 동기화 */
@@ -81,6 +83,7 @@ export default function SBoardDetail({
   currentUserId,
   currentUserName,
   canAdmin = false,
+  canWriteBoard = false,
   isLiked,
   onLikedChange,
   onEdit,
@@ -299,9 +302,9 @@ export default function SBoardDetail({
   // (early return 이후라 useMemo 불가 — 단순 동기 호출. extract 자체가 가볍다.)
   const bodyForRender = extractAttachmentMetaFromContent(String(post.content ?? '')).displayContent;
 
-  // 권한 / 투표 / 읽음
-  const canEdit = canEditMobilePost(post, currentUserId, canAdmin);
-  const canDelete = canDeleteMobilePost(post, currentUserId, canAdmin);
+  // 권한 / 투표 / 읽음 — board write 게이트 + 작성자/관리자 (PC 패리티)
+  const canEdit = canWriteBoard && canEditMobilePost(post, currentUserId, canAdmin);
+  const canDelete = (canWriteBoard || canAdmin) && canDeleteMobilePost(post, currentUserId, canAdmin);
   const canSeeReadStatus = !isAnonymousReadStatusPost(post);
   const poll = extractPoll((post as { poll?: unknown }).poll);
   const pollVotes = parsePollVotes((post as { poll_votes?: unknown }).poll_votes);

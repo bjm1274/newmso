@@ -62,6 +62,21 @@ const STRICT_EXTRA_FEATURE_PERMISSION_KEYS = new Set([
   'extra_OP체크',
 ]);
 
+/** 공유캘린더 세부 기능 id → permissions 키 */
+const CALENDAR_PERMISSION_KEYS: Record<string, string> = {
+  근무표조회: 'calendar_근무표조회',
+  게시판일정: 'calendar_게시판일정',
+  외부동기화: 'calendar_외부동기화',
+  전체직원근무표: 'calendar_전체직원근무표',
+};
+
+export type CalendarFeatureId =
+  | '근무표조회'
+  | '게시판일정'
+  | '외부동기화'
+  | '전체직원근무표'
+  | string;
+
 const BOARD_PERMISSION_KEYS: Record<string, { read: string; write: string }> = {
   공지사항: { read: 'board_공지사항_read', write: 'board_공지사항_write' },
   자유게시판: { read: 'board_자유게시판_read', write: 'board_자유게시판_write' },
@@ -661,6 +676,29 @@ export function canAccessExtraFeature(
   const explicit = getExplicitPermissionState(user, permissionKey);
   if (explicit !== null) return explicit;
   return isAdminUser(user) || hasPermission(user, permissionKey);
+}
+
+/**
+ * 공유캘린더 세부 권한.
+ * - 메인 메뉴 menu_공유캘린더 가 꺼져 있으면 전부 false
+ * - 세부 키 미설정(undefined) → 허용 (기존 사용자 차단 방지)
+ * - 명시 false 만 차단
+ */
+export function canAccessCalendarFeature(
+  user: UserLike | null | undefined,
+  featureIdOrPermissionKey: CalendarFeatureId
+): boolean {
+  if (isPrivilegedUser(user)) return true;
+  if (!canAccessMainMenu(user, '공유캘린더')) return false;
+
+  const permissionKey = resolvePermissionKey(
+    String(featureIdOrPermissionKey),
+    CALENDAR_PERMISSION_KEYS,
+  );
+  const explicit = getExplicitPermissionState(user, permissionKey);
+  if (explicit !== null) return explicit;
+  // 미설정 = 허용 (menu_공유캘린더 통과 전제)
+  return true;
 }
 
 export function hasUserPayloadChanged(currentUser: any, nextUser: any): boolean {

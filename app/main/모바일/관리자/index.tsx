@@ -14,9 +14,10 @@
  * JM6: 카드 버튼 시맨틱 + aria-label
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { ErpUser } from '@/types';
-import { canAccessMainMenu } from '@/lib/access-control';
+import { canAccessAdminSection, canAccessMainMenu } from '@/lib/access-control';
+import { hasSystemMasterPermission } from '@/lib/system-master';
 import { useAppData } from '@/app/main/contexts/AppDataContext';
 import { useExecOverview } from '@/app/main/기능부품/관리자워크센터/useExecOverview';
 import MobileHeader from '../셸/MobileHeader';
@@ -65,6 +66,16 @@ const HUB_ITEMS: HubItem[] = [
   { id: 'audit', label: '감사·백업', sub: '로그·이상·급여검사·DR', icon: 'alertTri', tone: 'warning' },
 ];
 
+/** 모바일 허브 카드 → admin_* 세부 권한 (PC canAccessAdminSection / 시스템마스터 게이트와 동일) */
+function canAccessAdminHubItem(user: ErpUser, id: Exclude<AdminView, 'hub'>): boolean {
+  if (id === 'master') {
+    // PC 관리자전용과 동일: 시스템마스터 플래그 필수
+    return hasSystemMasterPermission(user as Record<string, unknown>);
+  }
+  // exec/company/roles/ops/forms/audit — 영문 워크센터 id 매핑 지원
+  return canAccessAdminSection(user, id);
+}
+
 export default function 관리자({ user, onBack }: AdminProps) {
   const [view, setView] = useState<AdminView>('hub');
 
@@ -81,6 +92,11 @@ export default function 관리자({ user, onBack }: AdminProps) {
 
   if (!allowed) {
     return <AccessDenied onBack={onBack} />;
+  }
+
+  // 세부 권한 미달 시 서브뷰 직접 진입 차단 (허브로 복귀)
+  if (view !== 'hub' && !canAccessAdminHubItem(user, view)) {
+    return <Hub user={user} onBack={onBack} onOpen={(v) => setView(v)} />;
   }
 
   switch (view) {
@@ -122,6 +138,12 @@ function Hub({
   const overview = useExecOverview(staffs);
   const totalLabor = overview.corpRows.reduce((s, r) => s + r.laborCost, 0);
 
+  const visibleItems = useMemo(
+    () => HUB_ITEMS.filter((item) => canAccessAdminHubItem(user, item.id)),
+    [user],
+  );
+  const canOpenExec = canAccessAdminHubItem(user, 'exec');
+
   const heroPrimary = overview.loading
     ? '불러오는 중…'
     : `결재 대기 ${overview.pendingApprovalCount}건 · 재직 ${overview.activeStaffCount}명`;
@@ -136,55 +158,74 @@ function Hub({
         eyebrow="운영"
         back={onBack}
         actions={
-          <button
-            type="button"
-            aria-label="경영 대시보드 열기"
-            onClick={() => onOpen('exec')}
-            title="경영 대시보드"
-          >
-            <MIcon name="layers" size={20} />
-          </button>
+          canOpenExec ? (
+            <button
+              type="button"
+              aria-label="경영 대시보드 열기"
+              onClick={() => onOpen('exec')}
+              title="경영 대시보드"
+            >
+              <MIcon name="layers" size={20} />
+            </button>
+          ) : undefined
         }
       />
       <div className="m-scroll">
-        <button
-          type="button"
-          className="m-admin-hero"
-          onClick={() => onOpen('exec')}
-          aria-label="경영 대시보드로 이동"
-          style={{
-            width: '100%',
-            textAlign: 'left',
-            border: 'none',
-            cursor: 'pointer',
-            appearance: 'none' }}
-        >
-          <div className="cap">{company || ''} 통합 관리</div>
-          <div className="lbl">경영 현황 (읽기 전용 KPI)</div>
-          <div className="big m-tnum" style={{ fontSize: 15, fontWeight: 700 }}>
-            {heroPrimary}
+        {canOpenExec ? (
+          <button
+            type="button"
+            className="m-admin-hero"
+            onClick={() => onOpen('exec')}
+            aria-label="경영 대시보드로 이동"
+            style={{
+              width: '100%',
+              textAlign: 'left',
+              border: 'none',
+              cursor: 'pointer',
+              appearance: 'none' }}
+          >
+            <div className="cap">{company || ''} 통합 관리</div>
+            <div className="lbl">경영 현황 (읽기 전용 KPI)</div>
+            <div className="big m-tnum" style={{ fontSize: 15, fontWeight: 700 }}>
+              {heroPrimary}
+            </div>
+            <div className="delta">{heroSecondary}</div>
+          </button>
+        ) : (
+          <div className="m-admin-hero" aria-label="관리자 허브">
+            <div className="cap">{company || ''} 통합 관리</div>
+            <div className="lbl">권한이 있는 관리 메뉴만 표시됩니다</div>
+            <div className="big m-tnum" style={{ fontSize: 15, fontWeight: 700 }}>
+              {heroPrimary}
+            </div>
+            <div className="delta">{heroSecondary}</div>
           </div>
-          <div className="delta">{heroSecondary}</div>
-        </button>
+        )}
         <div className="m-section">
           <div className="m-section-h">
             <div className="lbl">관리자 메뉴</div>
-            <div className="cnt">{HUB_ITEMS.length}</div>
+            <div className="cnt">{visibleItems.length}</div>
           </div>
           <div className="m-card flush macos-glass macos-squircle">
-            {HUB_ITEMS.map((item) => (
-              <MListRow
-                key={item.id}
-                icon={item.icon}
-                iconTone={item.tone}
-                label={item.label}
-                sub={item.sub}
-                onClick={() => onOpen(item.id)}
-                badge={item.badge}
-                badgeTone={item.badgeTone}
-                ariaLabel={item.label}
-              />
-            ))}
+            {visibleItems.length === 0 ? (
+              <div className="px-4 py-6 text-center text-[12px] text-[var(--toss-gray-4)]" role="status">
+                접근 가능한 관리자 세부 메뉴가 없습니다.
+              </div>
+            ) : (
+              visibleItems.map((item) => (
+                <MListRow
+                  key={item.id}
+                  icon={item.icon}
+                  iconTone={item.tone}
+                  label={item.label}
+                  sub={item.sub}
+                  onClick={() => onOpen(item.id)}
+                  badge={item.badge}
+                  badgeTone={item.badgeTone}
+                  ariaLabel={item.label}
+                />
+              ))
+            )}
           </div>
         </div>
         <div style={{ height: 24 }} />

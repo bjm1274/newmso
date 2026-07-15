@@ -52,6 +52,9 @@ type PurchaseOrderInsert = {
   created_by: string | null;
   notes: string;
   expected_delivery_date?: string | null;
+  /** schema: purchase_orders.requester_company (company 컬럼 없음) */
+  requester_company?: string | null;
+  requester_department?: string | null;
 };
 
 // YYYY.MM.DD → ISO date. 형식 불일치/빈 값 → null
@@ -114,7 +117,8 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
       if (company && company !== '전체') invQ = invQ.eq('company', company);
       const [invRes, supRes] = await Promise.all([
         invQ,
-        db.from('suppliers').select('id, name, company').order('name').limit(100),
+        // suppliers 스키마에 company 컬럼 없음 — id/name만 조회
+        db.from('suppliers').select('id, name').order('name').limit(100),
       ]);
       const invRows = Array.isArray(invRes.data) ? invRes.data : [];
       setCatalog(
@@ -126,13 +130,7 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
           stock: Number(r.quantity ?? 0) || 0,
         })),
       );
-      let supRows = Array.isArray(supRes.data) ? (supRes.data as Record<string, unknown>[]) : [];
-      if (company && company !== '전체') {
-        supRows = supRows.filter((s) => {
-          const c = String(s.company ?? '').trim();
-          return !c || c === company || c === '전체';
-        });
-      }
+      const supRows = Array.isArray(supRes.data) ? (supRes.data as Record<string, unknown>[]) : [];
       setSuppliers(
         supRows.map((s) => ({
           id: String(s.id ?? ''),
@@ -234,7 +232,12 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
         status: '대기',
         total_amount: total,
         created_by: typeof user?.id === 'string' ? user.id : null,
-        notes: noteParts.join(' · ') };
+        notes: noteParts.join(' · '),
+        requester_company: companyTag || null,
+        requester_department:
+          typeof (user as { department?: string | null } | null)?.department === 'string'
+            ? String((user as { department?: string | null }).department)
+            : null };
       if (expectedDelivery) payload.expected_delivery_date = expectedDelivery;
 
       // PC 패턴 분석: purchase_orders에 status='대기'로 insert.

@@ -207,31 +207,8 @@ export default function LeaveWorkcenter({
 
       if (error) throw error;
 
-      // 만약 '연차(부여)' 유형이고 상태가 '승인'으로 되었거나 철회되는 경우
-      if (targetLeave.leave_type === '연차(부여)') {
-        // DB에 저장된 days가 있다면 우선 적용하고, 없으면 정본 calculateLeaveDays 로 통일
-        const days = typeof targetLeave.days === 'number' && targetLeave.days > 0
-          ? targetLeave.days
-          : calculateLeaveDays(targetLeave.start_date, targetLeave.end_date || targetLeave.start_date);
-
-        const staff = staffs.find((s) => String(s.id) === String(targetLeave.staff_id));
-        const currentTotal = Number(staff?.annual_leave_total ?? 0);
-        let newTotal = currentTotal;
-
-        if (previousStatus !== '승인' && status === '승인') {
-          newTotal = currentTotal + days;
-        } else if (previousStatus === '승인' && status !== '승인') {
-          newTotal = Math.max(0, currentTotal - days);
-        }
-
-        if (newTotal !== currentTotal) {
-          await db
-            .from('staff_members')
-            .update({ annual_leave_total: newTotal })
-            .eq('id', targetLeave.staff_id);
-        }
-      }
-
+      // 연차(부여) 포함 — staff_members.annual_leave_total 직접 쓰기 금지.
+      // leave_balances SSOT 재계산 (recalculateLeaveBalance)
       try {
         const syncRes = await fetch('/api/admin/annual-leave/sync', {
           method: 'POST',
@@ -277,19 +254,7 @@ export default function LeaveWorkcenter({
       const { error } = await db.from('leave_requests').delete().eq('id', id);
       if (error) throw error;
 
-      if (target.status === '승인' && target.leave_type === '연차(부여)') {
-        const days = typeof target.days === 'number' && target.days > 0
-          ? target.days
-          : calculateLeaveDays(target.start_date, target.end_date || target.start_date);
-        const staff = staffs.find((s) => String(s.id) === String(target.staff_id));
-        const currentTotal = Number(staff?.annual_leave_total ?? 0);
-        const newTotal = Math.max(0, currentTotal - days);
-        await db
-          .from('staff_members')
-          .update({ annual_leave_total: newTotal })
-          .eq('id', target.staff_id);
-      }
-
+      // 삭제 후 leave_balances 재계산 (staff_members.annual_leave_total 직접 쓰기 금지)
       try {
         const syncRes = await fetch('/api/admin/annual-leave/sync', {
           method: 'POST',

@@ -756,17 +756,20 @@ export async function dispatchChatPushForMessage(params: {
   const notificationRows: NotificationInsertRow[] = targetIds.map((targetId) => {
     const preferred = choosePreferredChatNotification(existingNotificationsByUser.get(targetId) || []);
     preferred?.staleIds.forEach((id) => staleNotificationIds.add(id));
+    // 멘션 대상이면 type/metadata를 mention 으로 기록 (mention_only 방 설정·UI 멘션 탭 정상화)
+    const isMention = mentionedIds.has(targetId);
+    const rowType = isMention ? 'mention' : 'message';
 
     return {
       id: preferred?.keep?.id || buildDeterministicNotificationId(targetId, notificationStableKey),
       user_id: targetId,
-      type: 'message',
+      type: rowType,
       title,
       body: previewBody,
       metadata: buildChatNotificationMetadata({
         roomId: params.roomId,
         messageId: params.messageId,
-        notificationType: 'message',
+        notificationType: rowType,
         dedupeKey:
           albumContext.isAlbumBatch && albumContext.albumId
             ? `chat:album:${albumContext.albumId}:${targetId}`

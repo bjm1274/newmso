@@ -19,6 +19,7 @@ import type { ErpUser } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
 import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
+import { canAccessMyPageTab } from '@/lib/access-control';
 import MIcon from '../공통/MIcon';
 import { useMonthlyAttendance, useTodayCounts } from './data-hooks';
 import { useAnnualLeaveSummary } from '@/lib/annual-leave-summary';
@@ -183,8 +184,15 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
       [section]: !prev[section] }));
   }, []);
 
+  const canRecords =
+    canAccessMyPageTab(user, 'salary') || canAccessMyPageTab(user, 'certificates');
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    const applyAccess = (items: QuickItem[]) =>
+      items.map((item) =>
+        item.id === 'records' ? { ...item, visible: canRecords && item.visible !== false } : item,
+      );
     const saved = localStorage.getItem('mso_quick_menu_order');
     if (saved) {
       try {
@@ -198,14 +206,14 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
           .filter(Boolean) as QuickItem[];
         
         const missing = DEFAULT_QUICK_ITEMS.filter((d) => !loaded.some((l) => l.id === d.id));
-        setQuickItems([...loaded, ...missing.map(m => ({ ...m, visible: true }))]);
+        setQuickItems(applyAccess([...loaded, ...missing.map(m => ({ ...m, visible: true }))]));
       } catch {
-        setQuickItems(DEFAULT_QUICK_ITEMS.map((item) => ({ ...item, visible: true })));
+        setQuickItems(applyAccess(DEFAULT_QUICK_ITEMS.map((item) => ({ ...item, visible: true }))));
       }
     } else {
-      setQuickItems(DEFAULT_QUICK_ITEMS.map((item) => ({ ...item, visible: true })));
+      setQuickItems(applyAccess(DEFAULT_QUICK_ITEMS.map((item) => ({ ...item, visible: true }))));
     }
-  }, []);
+  }, [canRecords]);
 
 
 
@@ -277,6 +285,10 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
     });
 
   const handleQuick = useCallback((item: QuickItem) => {
+    if (item.id === 'records' && !canRecords) {
+      toast('급여·증명서 조회 권한이 없습니다.', 'error');
+      return;
+    }
     if (item.pwGate) {
       setPwGate('records');
       return;
@@ -288,7 +300,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
     if (item.tab && onSwitchTab) {
       onSwitchTab(item.tab, item.id);
     }
-  }, [onSub, onSwitchTab]);
+  }, [onSub, onSwitchTab, canRecords]);
 
   /* 연차 잔여 — SSOT (15일 폴백 없음) */
   const leaveRemaining = leaveSummary.loading ? null : leaveSummary.remaining;

@@ -144,8 +144,22 @@ export const FORM_SCHEMAS: Record<string, FormSchema> = {
         ],
         [['구매 사유', v.reason]],
       ),
-    buildMeta: (v) => ({ request_category: 'purchase', form_fields: fieldsToMeta(FORM_SCHEMAS.purchase, v) }),
-    buildTitle: (v, ctx) => `${ctx.userName} 물품구매 신청${v.item ? ` - ${v.item}` : ''}` },
+    buildMeta: (v) => ({
+      request_category: 'purchase',
+      form_fields: fieldsToMeta(FORM_SCHEMAS.purchase, v),
+      // 서버 final inventory_workflow 는 meta_data.items 를 기대 (PC 물품신청 스키마 정합)
+      items: [
+        {
+          name: String(v.item || '').trim(),
+          quantity: Number(v.qty) || 1,
+          unit: 'EA',
+          estimated_amount: Number(v.amount) || 0,
+          vendor: String(v.vendor || '').trim() || null,
+          reason: String(v.reason || '').trim() || null,
+        },
+      ].filter((row) => row.name),
+    }),
+    buildTitle: (v, ctx) => `${ctx.userName} 물품신청${v.item ? ` - ${v.item}` : ''}` },
 
   // 수리요청서
   repair_request: {

@@ -16,7 +16,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { readSessionFromRequest } from '@/lib/server-session';
-import { getD1Binding, getD1Drizzle, chat_typing_status, eq, and, gt, sql } from '@/lib/db';
+import { getD1Binding, getD1Drizzle, chat_typing_status, eq, and, gt } from '@/lib/db';
+import { assertChatRoomMember } from '@/lib/chat-room-membership';
 
 const TYPING_TTL_SECONDS = 5;
 
@@ -63,6 +64,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const db = getD1Drizzle(d1);
+
+  const membership = await assertChatRoomMember(db, roomId, userId);
+  if (!membership.ok) {
+    return NextResponse.json({ error: membership.error }, { status: membership.status });
+  }
+
   const now = new Date().toISOString();
 
   try {
@@ -152,6 +159,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   const db = getD1Drizzle(d1);
+
+  if (userId) {
+    const membership = await assertChatRoomMember(db, roomId, userId);
+    if (!membership.ok) {
+      return NextResponse.json({ error: membership.error }, { status: membership.status });
+    }
+  }
 
   // updated_at이 TTL 이내인 행 — SQLite datetime 연산으로 필터
   const cutoff = new Date(Date.now() - TYPING_TTL_SECONDS * 1000).toISOString();

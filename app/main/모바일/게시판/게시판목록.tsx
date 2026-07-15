@@ -73,6 +73,10 @@ export type SBoardProps = {
   onOpenCategory?: (catId: BoardCatId) => void;
   /** 헤더 sub 텍스트에 표시할 회사명 */
   company?: string;
+  /** board_*_write — false면 작성 버튼 숨김 */
+  canWrite?: boolean;
+  /** 읽기 허용 카테고리 (all 제외 cat id). 없으면 전체 칩 노출 */
+  readableCats?: BoardCatId[];
 };
 
 // ─── 필터 유틸 ────────────────────────────────────────────
@@ -233,7 +237,9 @@ function SBoardBase({
   onRefresh,
   showHome,
   onOpenCategory,
-  company }: SBoardProps) {
+  company,
+  canWrite = true,
+  readableCats }: SBoardProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   // Phase: op/mri 일정 게시판 — 리스트 ↔ 달력 토글
@@ -323,23 +329,25 @@ function SBoardBase({
             >
               <MIcon name="search" size={15} color="var(--z-600)" />
             </button>
-            <button
-              type="button"
-              onClick={onWrite}
-              aria-label="새 글 작성"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 28,
-                height: 28,
-                borderRadius: 8,
-                background: 'rgba(0, 0, 0, 0.03)',
-                border: '1px solid rgba(0, 0, 0, 0.05)',
-                cursor: 'pointer' }}
-            >
-              <MIcon name="edit" size={15} color="var(--z-600)" />
-            </button>
+            {canWrite && (
+              <button
+                type="button"
+                onClick={onWrite}
+                aria-label="새 글 작성"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 28,
+                  height: 28,
+                  borderRadius: 8,
+                  background: 'rgba(0, 0, 0, 0.03)',
+                  border: '1px solid rgba(0, 0, 0, 0.05)',
+                  cursor: 'pointer' }}
+              >
+                <MIcon name="edit" size={15} color="var(--z-600)" />
+              </button>
+            )}
           </>
         }
       />
@@ -387,7 +395,11 @@ function SBoardBase({
           overflowX: 'auto',
           scrollbarWidth: 'none' }}
       >
-        {BOARD_CATS.filter((c) => c.id !== 'all').map((c) => {
+        {BOARD_CATS.filter((c) => {
+          if (c.id === 'all') return false;
+          if (!readableCats || readableCats.length === 0) return true;
+          return readableCats.includes(c.id);
+        }).map((c) => {
           const active = cat === c.id;
           const count = countByCat(posts, c.id);
           return (

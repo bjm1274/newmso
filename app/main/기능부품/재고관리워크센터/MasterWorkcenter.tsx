@@ -43,16 +43,20 @@ const TABS: TabItem<MasterTab>[] = [
 
 export default function MasterWorkcenter() {
   const { user } = useAppData();
+  const userCompany = typeof user?.company === 'string' ? user.company : undefined;
   const [tab, setTab] = useState<MasterTab>('product');
   const [inventoryList, setInventoryList] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
 
   const fetchInventory = useCallback(async () => {
-    const { data } = await db.from('inventory').select('*').order('name');
+    let q = db.from('inventory').select('*').order('name');
+    if (userCompany && userCompany !== '전체') q = q.eq('company', userCompany);
+    const { data } = await q;
     if (data) setInventoryList(data);
-  }, []);
+  }, [userCompany]);
 
   const fetchSuppliers = useCallback(async () => {
+    // suppliers 스키마에 company 컬럼 없음 — 전역 거래처 목록
     const { data } = await db.from('suppliers').select('*').order('name');
     if (data) setSuppliers(data);
   }, []);

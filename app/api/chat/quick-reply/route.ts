@@ -6,11 +6,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readSessionFromRequest } from '@/lib/server-session';
 import {
   messages as messagesTable,
-  chat_rooms as chatRoomsTable,
   getD1Binding,
   getD1Drizzle,
-  updateChatRoomLastMessage,
-  eq } from '@/lib/db';
+  updateChatRoomLastMessage } from '@/lib/db';
+import { assertChatRoomMember } from '@/lib/chat-room-membership';
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,43 +30,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'room_id and content are required' }, { status: 400 });
     }
 
-    // 방 존재 및 멤버 확인
-    type RoomResult = { id: string; members: unknown; type: string | null };
-    let room: RoomResult | null = null;
-
     const d1 = await getD1Binding();
     if (!d1) return NextResponse.json({ error: 'D1 binding not available' }, { status: 500 });
     const db = getD1Drizzle(d1);
-    const rows = await db
-      .select({
-        id: chatRoomsTable.id,
-        members: chatRoomsTable.members,
-        type: chatRoomsTable.type })
-      .from(chatRoomsTable)
-      .where(eq(chatRoomsTable.id, room_id))
-      .limit(1);
-    const rawRoom = rows[0] ?? null;
-    if (rawRoom) {
-      // D1 members는 TEXT(JSON) → 파싱
-      let parsedMembers: unknown = rawRoom.members;
-      if (typeof rawRoom.members === 'string' && rawRoom.members.length > 0) {
-        try { parsedMembers = JSON.parse(rawRoom.members); } catch { parsedMembers = []; }
-      }
-      room = { id: rawRoom.id, members: parsedMembers, type: rawRoom.type };
+
+    // 방 존재 + 멤버십(notice 예외) — 공용 헬퍼
+    const membership = await assertChatRoomMember(db, room_id, senderId);
+    if (!membership.ok) {
+      return NextResponse.json({ error: membership.error }, { status: membership.status });
     }
 
-    if (!room) {
-      return NextResponse.json({ error: 'Room not found' }, { status: 404 });
-    }
-
-    // notice 방(전체 공지)이 아닌 경우 멤버 확인
-    const isNoticeRoom = room.type === 'notice';
-    const members: unknown[] = Array.isArray(room.members) ? room.members : [];
-    if (!isNoticeRoom && !members.some((m) => String(m) === senderId)) {
-      return NextResponse.json({ error: 'Not a member of this room' }, { status: 403 });
-    }
-
-    // 메시지 삽입 — D1에 직접 삽입
+    // 메시지 삽입 — D1에 직접 삽입 (sender_id = 세션, 위조 불가)
     const trimmedContent = content.trim().slice(0, 2000);
     const messageCreatedAt = new Date().toISOString().replace('T', ' ').substring(0, 19);
     const messageId = crypto.randomUUID();

@@ -217,12 +217,7 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
     setLeaving(true);
     try {
       const newMembers = memberIds.filter((id) => String(id) !== String(userId));
-      const result = await patchChatRoom(String(room.id), { members: newMembers });
-      if (!result.ok) {
-        toast(result.error || '채팅방 나가기에 실패했습니다.', 'error');
-        return;
-      }
-      // PC handleLeaveRoom과 동일하게 '퇴장' 안내 메시지를 남김(실패해도 나가기는 진행)
+      // 퇴장 안내는 멤버십 해제 전에 기록(서버 messages insert 멤버 검증 통과 필요)
       try {
         await sendMobileTextMessage({
           roomId: String(room.id),
@@ -230,6 +225,11 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
           content: `[퇴장] ${userName || '알 수 없음'}님이 채팅방을 나갔습니다.` });
       } catch (noticeError) {
         logger.warn('leave room system message error', noticeError);
+      }
+      const result = await patchChatRoom(String(room.id), { members: newMembers });
+      if (!result.ok) {
+        toast(result.error || '채팅방 나가기에 실패했습니다.', 'error');
+        return;
       }
       setLeaveConfirmOpen(false);
       setInfoOpen(false);

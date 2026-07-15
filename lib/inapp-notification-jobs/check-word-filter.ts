@@ -1,8 +1,10 @@
 /**
  * Phase 8-A — 단어 필터 (금지어 감지) 알림 보강.
- * messages 최근 MESSAGE_LOOKBACK_MIN(5) 분 내 INSERT 중 BANNED_WORDS 포함
+ * messages 최근 MESSAGE_LOOKBACK_MIN 분 내 INSERT 중 BANNED_WORDS 포함
  *   → 시스템 마스터 사용자에게 'word-filter' 알림.
  * dedupe key: `word-filter:{message_id}`
+ *
+ * lookback: 인앱 cron 일 1회 piggyback 누락 방지용 26시간. dedupe(7일)로 중복 차단.
  *
  * BANNED_WORDS 저장 위치:
  *  - 운영: 환경변수 BANNED_WORDS_JSON (콤마 또는 JSON 배열)
@@ -38,7 +40,8 @@ type MessageRow = {
   created_at: string | null;
 };
 
-const MESSAGE_LOOKBACK_MIN = 5;
+/** 일 1회 piggyback 실행 시 누락 방지 — 26h (dedupe로 중복 차단) */
+const MESSAGE_LOOKBACK_MIN = 26 * 60;
 
 function parseBannedWordsEnv(): string[] {
   const raw = String(process.env.BANNED_WORDS_JSON || '').trim();

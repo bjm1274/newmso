@@ -35,7 +35,7 @@ const FORM_CATEGORIES: FormCategory[] = [
   {
     g: '재무/물품',
     items: [
-      { slug: 'purchase', name: '물품구매 신청' },
+      { slug: 'purchase', name: '물품신청' },
       { slug: 'repair_request', name: '수리요청서' },
     ] },
   {

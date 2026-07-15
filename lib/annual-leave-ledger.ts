@@ -229,14 +229,9 @@ export async function ensureApprovedAnnualLeaveRequest(params: EnsureApprovedAnn
     .limit(1);
 
   const existingRow = existingRows[0] ?? null;
-  const matchedRow =
-    existingRow &&
-    (isApprovedLeaveStatus(existingRow.status) || String(existingRow.status ?? '').trim() === '')
-      ? existingRow
-      : null;
-
-  if (matchedRow?.id) {
-    if (!isApprovedLeaveStatus(matchedRow.status)) {
+  // 대기/빈 상태 포함 — 모바일 pre-insert 대기 row 를 승인으로 승격 (고아·이중 insert 방지)
+  if (existingRow?.id) {
+    if (!isApprovedLeaveStatus(existingRow.status)) {
       await db
         .update(leaveRequestsTable)
         .set({
@@ -245,9 +240,9 @@ export async function ensureApprovedAnnualLeaveRequest(params: EnsureApprovedAnn
           // D1 스키마에 company_id 있음
           ...(params.companyId ? { company_id: params.companyId } : {}),
           days: payload.days ?? (isHalfLeaveType(payload.leave_type) ? 0.5 : calculateLeaveDays(payload.start_date, payload.end_date)) })
-        .where(eq(leaveRequestsTable.id, matchedRow.id));
+        .where(eq(leaveRequestsTable.id, existingRow.id));
     }
-    return matchedRow.id;
+    return existingRow.id;
   }
 
   // INSERT — D1 스키마에 없는 컬럼(approval_id, company_name, delegate_* 등) 제외

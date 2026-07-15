@@ -53,8 +53,9 @@ export default function StatusWorkcenter() {
   const [supplyOpen, setSupplyOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  const data = useStatusData();
   const { user } = useAppData();
+  const userCompany = typeof user?.company === 'string' ? user.company : undefined;
+  const data = useStatusData(userCompany);
   const isInventoryOpsUser = useMemo(
     () =>
       (String(user?.company || '').trim() === INVENTORY_SUPPORT_COMPANY &&

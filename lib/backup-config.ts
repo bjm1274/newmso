@@ -26,7 +26,7 @@ export const BACKUP_GROUPS: BackupGroupDefinition[] = [
       'employment_contracts',
       'work_shifts',
       'shift_assignments',
-      'annual_leave_promotions',
+      'annual_leave_promotion_logs',
       'approval_form_types',
       'approval_templates',
     ] },

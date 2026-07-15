@@ -7,6 +7,7 @@ import MyCertificates from './증명서관리';
 import { db, d1 } from '@/lib/db-client';
 import { resolveIssuedPayrollRecords } from '@/lib/payroll-records';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
+import { canAccessMyPageTab } from '@/lib/access-control';
 import { LucideIcon } from '../조직도서브/조직도측면창';
 import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 
@@ -40,10 +41,12 @@ export function PayrollAndCertificatesHub({
   onChangeView?: (view: 'salary' | 'certificates') => void;
 }) {
   const resolvedStaffId = useResolvedStaffId(user as Record<string, unknown> | null);
+  const canSalary = canAccessMyPageTab(user, 'salary');
+  const canCertificates = canAccessMyPageTab(user, 'certificates');
   const [summary, setSummary] = useState({ salaryCount: 0, certificateCount: 0 });
 
   useEffect(() => {
-    if (!resolvedStaffId) {
+    if (!resolvedStaffId || (!canSalary && !canCertificates)) {
       setSummary({ salaryCount: 0, certificateCount: 0 });
       return;
     }
@@ -52,35 +55,47 @@ export function PayrollAndCertificatesHub({
       try {
         const [salaryRecordsRes, salaryNotiRes, certRes, approvedDocsRes] = await Promise.all([
           // 명세서 뷰어와 동일 기준으로 집계하도록 레코드와 발송 알림을 함께 조회한다.
-          db
-            .from('payroll_records')
-            .select('record_type, status, year_month')
-            .eq('staff_id', resolvedStaffId),
-          d1.from('notifications')
-            .select('title, body')
-            .eq('user_id', resolvedStaffId)
-            .eq('type', '급여명세'),
-          db
-            .from('certificate_issuances')
-            .select('id', { count: 'exact', head: true })
-            .eq('staff_id', resolvedStaffId),
-          db
-            .from('approvals')
-            .select('id', { count: 'exact', head: true })
-            .eq('sender_id', resolvedStaffId)
-            .eq('status', '승인')
-            // 기존 '양식신청' 레코드와 신규 '증명서발급' 레코드 모두 집계
-            .in('type', ['양식신청', '증명서발급']),
+          canSalary
+            ? db
+                .from('payroll_records')
+                .select('record_type, status, year_month')
+                .eq('staff_id', resolvedStaffId)
+            : Promise.resolve({ data: [] as unknown[] }),
+          canSalary
+            ? d1.from('notifications')
+                .select('title, body')
+                .eq('user_id', resolvedStaffId)
+                .eq('type', '급여명세')
+            : Promise.resolve({ data: [] as unknown[] }),
+          canCertificates
+            ? db
+                .from('certificate_issuances')
+                .select('id', { count: 'exact', head: true })
+                .eq('staff_id', resolvedStaffId)
+            : Promise.resolve({ count: 0 }),
+          canCertificates
+            ? db
+                .from('approvals')
+                .select('id', { count: 'exact', head: true })
+                .eq('sender_id', resolvedStaffId)
+                .eq('status', '승인')
+                // 기존 '양식신청' 레코드와 신규 '증명서발급' 레코드 모두 집계
+                .in('type', ['양식신청', '증명서발급'])
+            : Promise.resolve({ count: 0 }),
         ]);
 
-        const issuedSalaryRecords = resolveIssuedPayrollRecords(
-          (salaryRecordsRes.data ?? []) as { record_type?: unknown; status?: unknown; year_month?: unknown }[],
-          (salaryNotiRes.data ?? []) as { title?: unknown; body?: unknown }[],
-        );
+        const issuedSalaryRecords = canSalary
+          ? resolveIssuedPayrollRecords(
+              (salaryRecordsRes.data ?? []) as { record_type?: unknown; status?: unknown; year_month?: unknown }[],
+              (salaryNotiRes.data ?? []) as { title?: unknown; body?: unknown }[],
+            )
+          : [];
 
         setSummary({
           salaryCount: issuedSalaryRecords.length,
-          certificateCount: (certRes.count || 0) + (approvedDocsRes.count || 0) });
+          certificateCount: canCertificates
+            ? ((certRes as { count?: number }).count || 0) + ((approvedDocsRes as { count?: number }).count || 0)
+            : 0 });
       } catch (error) {
         console.error('[마이페이지공통섹션] 급여·증명서 요약 조회 실패:', error);
         setSummary({ salaryCount: 0, certificateCount: 0 });
@@ -88,7 +103,34 @@ export function PayrollAndCertificatesHub({
     };
 
     void fetchSummary();
-  }, [resolvedStaffId]);
+  }, [resolvedStaffId, canSalary, canCertificates]);
+
+  // 권한 없으면 데이터 조회·렌더 모두 차단 (hooks 이후 early return)
+  if (!canSalary && !canCertificates) {
+    return (
+      <div className="space-y-4 p-3 md:p-4">
+        <p className="text-sm text-[var(--toss-gray-4)]">급여·증명서 조회 권한이 없습니다.</p>
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--toss-gray-4)]"
+          >
+            돌아가기
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  const effectiveView: 'salary' | 'certificates' =
+    activeView === 'salary' && canSalary
+      ? 'salary'
+      : activeView === 'certificates' && canCertificates
+        ? 'certificates'
+        : canSalary
+          ? 'salary'
+          : 'certificates';
 
   return (
     <div className="space-y-4 p-3 md:p-4">
@@ -110,59 +152,63 @@ export function PayrollAndCertificatesHub({
             )}
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <button
-              type="button"
-              aria-label="월별 정산 카드"
-              onClick={() => onChangeView?.('salary')}
-              className={`rounded-[var(--radius-xl)] border px-5 py-4 text-left transition-all ${
-                activeView === 'salary'
-                  ? 'border-[var(--accent)] bg-[var(--accent-light)]/60 shadow-sm'
-                  : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">급여명세서</p>
-                  <p className="mt-1 text-[13px] font-bold text-[var(--foreground)]">월별 명세서 및 정산 내역</p>
+            {canSalary && (
+              <button
+                type="button"
+                aria-label="월별 정산 카드"
+                onClick={() => onChangeView?.('salary')}
+                className={`rounded-[var(--radius-xl)] border px-5 py-4 text-left transition-all ${
+                  effectiveView === 'salary'
+                    ? 'border-[var(--accent)] bg-[var(--accent-light)]/60 shadow-sm'
+                    : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">급여명세서</p>
+                    <p className="mt-1 text-[13px] font-bold text-[var(--foreground)]">월별 명세서 및 정산 내역</p>
+                  </div>
+                  <span className="rounded-[var(--radius-md)] bg-[var(--card)] px-3 py-1 text-sm font-black text-[var(--accent)] shadow-sm">
+                    {summary.salaryCount}건
+                  </span>
                 </div>
-                <span className="rounded-[var(--radius-md)] bg-[var(--card)] px-3 py-1 text-sm font-black text-[var(--accent)] shadow-sm">
-                  {summary.salaryCount}건
-                </span>
-              </div>
-            </button>
-            <button
-              type="button"
-              aria-label="발급 문서 카드"
-              onClick={() => onChangeView?.('certificates')}
-              className={`rounded-[var(--radius-xl)] border px-5 py-4 text-left transition-all ${
-                activeView === 'certificates'
-                  ? 'border-[var(--accent)] bg-[var(--accent-light)]/60 shadow-sm'
-                  : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">발급된 증명서</p>
-                  <p className="mt-1 text-[13px] font-bold text-[var(--foreground)]">발급 완료 및 승인 문서 확인</p>
+              </button>
+            )}
+            {canCertificates && (
+              <button
+                type="button"
+                aria-label="발급 문서 카드"
+                onClick={() => onChangeView?.('certificates')}
+                className={`rounded-[var(--radius-xl)] border px-5 py-4 text-left transition-all ${
+                  effectiveView === 'certificates'
+                    ? 'border-[var(--accent)] bg-[var(--accent-light)]/60 shadow-sm'
+                    : 'border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--toss-gray-3)]">발급된 증명서</p>
+                    <p className="mt-1 text-[13px] font-bold text-[var(--foreground)]">발급 완료 및 승인 문서 확인</p>
+                  </div>
+                  <span className="rounded-[var(--radius-md)] bg-[var(--card)] px-3 py-1 text-sm font-black text-[var(--accent)] shadow-sm">
+                    {summary.certificateCount}건
+                  </span>
                 </div>
-                <span className="rounded-[var(--radius-md)] bg-[var(--card)] px-3 py-1 text-sm font-black text-[var(--accent)] shadow-sm">
-                  {summary.certificateCount}건
-                </span>
-              </div>
-            </button>
+              </button>
+            )}
           </div>
         </div>
       </section>
 
-      {activeView === 'salary' ? (
+      {effectiveView === 'salary' && canSalary ? (
         <div data-testid="mypage-salary-tab">
           <SalarySlipContainer user={user} />
         </div>
-      ) : (
+      ) : effectiveView === 'certificates' && canCertificates ? (
         <div data-testid="mypage-certificates-tab">
           <MyCertificates user={user} />
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

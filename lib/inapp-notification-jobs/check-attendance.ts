@@ -1,7 +1,10 @@
 /**
  * Phase 8-A — 출퇴근 이벤트 알림 보강.
- * attendance 최근 ATTENDANCE_LOOKBACK_MIN(5) 분 내 created → staff_id 에게 'attendance' 알림.
+ * attendance 최근 ATTENDANCE_LOOKBACK_MIN 분 내 created → staff_id 에게 'attendance' 알림.
  * dedupe key: `attendance:{id}:{status_key}` (status_key: checkin/checkout/late/absent)
+ *
+ * lookback: 인앱 cron 이 외부 5분 주기 또는 일 1회 piggyback 모두 커버하도록
+ * 26시간(1560분). 중복은 loadExistingDedupeKeys(7일) 로 차단.
  */
 import 'server-only';
 import {
@@ -26,7 +29,8 @@ type AttendanceRow = {
   status: string | null;
 };
 
-const ATTENDANCE_LOOKBACK_MIN = 5;
+/** 일 1회 piggyback 실행 시 누락 방지 — 26h (외부 5분 cron 과 호환, dedupe로 중복 차단) */
+const ATTENDANCE_LOOKBACK_MIN = 26 * 60;
 
 function resolveAttendanceEvent(row: AttendanceRow): {
   statusKey: string;
