@@ -2,7 +2,7 @@
  * 결재(전자결재) 공용 순수 유틸 — cross-lib 4중 중복 통합.
  *
  * 서버(lib/server-approval-transition.ts, app/api/approvals/process-final/route.ts)와
- * 클라이언트 훅(전자결재서브/*), 대시보드 유틸(마이페이지/역할별대시보드/format-utils.ts)에
+ * 클라이언트 훅(전자결재서브/*) 및 모바일 결재 상세 등에
  * 독립 정의되던 순수 함수들을 한곳으로 모음.
  *
  * 주의: `user`/`actor`를 캡처하던 useCallback 클로저는 순수하지 않으므로 여기로 옮기지 않는다.

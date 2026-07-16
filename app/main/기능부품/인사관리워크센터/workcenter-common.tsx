@@ -243,7 +243,7 @@ export function WorkcenterShell({
 
 // ─── Embedded view wrapper (기존 한글 컴포넌트 import 시 안전 렌더) ───
 //
-// 기존 한글 파일(예: 근태관리메인.tsx)을 import해서 탭 본문으로 재사용한다.
+// 워크센터 탭 본문으로 도메인 컴포넌트(예: RosterWorkspace)를 임베드한다.
 // 만약 컴포넌트 내부에서 예외가 발생해도 워크센터 전체가 깨지지 않도록
 // React Error Boundary로 감싼다. (JM3: 에러는 정상 흐름의 일부)
 
