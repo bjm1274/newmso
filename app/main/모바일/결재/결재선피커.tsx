@@ -9,34 +9,39 @@
  *   - 추가된 결재자: ↑↓ 순서 변경, X 제거
  *   - "기본값으로" / "적용" 버튼
  *
+ * 공용 kit: ./staff-picker/* (타입·lazy fetch·filter/group·atoms)
+ * 공개 API(ApproverPick, toApproverPick, default export) 유지.
+ *
  * JM(파일당 500줄, 단일 책임), JM2(staff fetch는 첫 open 시 1회 lazy),
  * JM3(try/catch + 빈 결과 폴백), JM4(any 금지, ApproverPick 타입),
  * JM5(본인은 자동 제외, RLS 의존), JM6(input label 연결, button aria-label)
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { db } from '@/lib/db-client';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { StaffMember } from '@/types';
-import { isActiveStaff, isDepartmentHeadOrAbove } from '@/lib/active-staff';
+import { isDepartmentHeadOrAbove } from '@/lib/active-staff';
 import MSheet from '../공통/MSheet';
 import MIcon from '../공통/MIcon';
 import MAvatar from '../공통/MAvatar';
+import {
+  toStaffPick,
+  type ApproverPick,
+} from './staff-picker/types';
+import { useLazyActiveStaff } from './staff-picker/useLazyActiveStaff';
+import { filterStaffByQuery, groupStaffByDepartment } from './staff-picker/group-filter';
+import {
+  SectionLabel,
+  IconBtn,
+  memberRowStyle,
+  emptyStyle,
+  actionStyle,
+} from './staff-picker/ui-atoms';
 
-export type ApproverPick = {
-  id: string;
-  name: string;
-  position: string | null;
-  department: string | null;
-  company: string | null;
-};
+export type { ApproverPick } from './staff-picker/types';
 
+/** 기존 import 호환 — StaffPick 매핑 alias */
 export function toApproverPick(s: StaffMember): ApproverPick {
-  return {
-    id: String(s.id || ''),
-    name: String(s.name || ''),
-    position: s.position ?? null,
-    department: s.department ?? null,
-    company: s.company ?? null };
+  return toStaffPick(s);
 }
 
 export type SApprovalApproverPickerProps = {
@@ -53,15 +58,14 @@ export default function SApprovalApproverPicker({
   open,
   onClose,
   selfId,
-  company,
+  company: _company, // 공개 props 유지(참조 피커와 시그니처 정렬); 결재선 필터에는 미사용
   current,
   defaultLine,
-  onApply }: SApprovalApproverPickerProps) {
+  onApply,
+}: SApprovalApproverPickerProps) {
   const [line, setLine] = useState<ApproverPick[]>(current);
   const [query, setQuery] = useState('');
-  const [staffRows, setStaffRows] = useState<StaffMember[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const inflightRef = useRef(false);
+  const { staffRows, loading } = useLazyActiveStaff(open, 'mobile-approval-picker');
 
   // 열릴 때마다 현재 결재선 동기화
   useEffect(() => {
@@ -71,66 +75,24 @@ export default function SApprovalApproverPicker({
     }
   }, [open, current]);
 
-  // 첫 open 시 staff 1회 fetch — lazy
-  useEffect(() => {
-    if (!open) return;
-    if (staffRows !== null) return;
-    if (inflightRef.current) return;
-    inflightRef.current = true;
-    setLoading(true);
-    (async () => {
-      try {
-        const { data, error } = await db
-          .from('staff_members')
-          .select(
-            'id, name, company, department, position, status, hire_date, resign_date, email, phone, role, permissions'
-          );
-        if (error) throw error;
-        const rows = ((data ?? []) as StaffMember[]).filter((s) => isActiveStaff(s));
-        setStaffRows(rows);
-      } catch (err) {
-        console.error('[mobile-approval-picker] staff fetch failed', err);
-        setStaffRows([]);
-      } finally {
-        setLoading(false);
-        inflightRef.current = false;
-      }
-    })();
-  }, [open, staffRows]);
-
   const selectedIds = useMemo(() => new Set(line.map((p) => p.id)), [line]);
 
   // 검색 + 본인·기선택 제외 + 부서장 이상
-  const filtered: StaffMember[] = useMemo(() => {
-    const list = staffRows ?? [];
-    const q = query.trim().toLowerCase();
-    return list.filter((s) => {
-      const id = String(s.id || '');
-      if (selfId && id === selfId) return false; // 본인 제외
-      if (selectedIds.has(id)) return false; // 이미 결재선
-      if (!isDepartmentHeadOrAbove(s)) return false; // 부서장 이상만 표시!
-      if (!q) return true;
-      const hay = [s.name, s.department, s.position, s.company]
-        .map((v) => String(v || '').toLowerCase())
-        .join(' ');
-      return hay.includes(q);
-    });
-  }, [staffRows, query, selfId, selectedIds]);
+  const filtered: StaffMember[] = useMemo(
+    () =>
+      filterStaffByQuery(staffRows ?? [], {
+        query,
+        selfId,
+        excludeIds: selectedIds,
+        extra: (s) => isDepartmentHeadOrAbove(s),
+      }),
+    [staffRows, query, selfId, selectedIds]
+  );
 
-  // 부서별 그룹핑
-  const groups = useMemo(() => {
-    const map = new Map<string, StaffMember[]>();
-    for (const s of filtered) {
-      const key = String(s.department || '미지정').trim() || '미지정';
-      const arr = map.get(key) ?? [];
-      arr.push(s);
-      map.set(key, arr);
-    }
-    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0], 'ko'));
-  }, [filtered]);
+  const groups = useMemo(() => groupStaffByDepartment(filtered), [filtered]);
 
   const addMember = useCallback((s: StaffMember) => {
-    setLine((prev) => [...prev, toApproverPick(s)]);
+    setLine((prev) => [...prev, toStaffPick(s)]);
   }, []);
 
   const removeAt = useCallback((idx: number) => {
@@ -179,7 +141,8 @@ export default function SApprovalApproverPicker({
                 color: 'var(--z-600)',
                 background: 'rgba(255, 159, 10, 0.08)',
                 border: '1px solid rgba(255, 159, 10, 0.2)',
-                fontWeight: 800 }}
+                fontWeight: 800,
+              }}
             >
               결재자를 한 명 이상 추가해 주세요.
             </div>
@@ -201,7 +164,8 @@ export default function SApprovalApproverPicker({
                       gridTemplateColumns: '32px 1fr auto',
                       gap: 10,
                       alignItems: 'center',
-                      padding: '8px 10px' }}
+                      padding: '8px 10px',
+                    }}
                   >
                     <MAvatar tone="violet" size="sm">
                       {(a.name || '?').charAt(0)}
@@ -257,7 +221,8 @@ export default function SApprovalApproverPicker({
                 padding: 6,
                 background: 'transparent',
                 border: 'none',
-                cursor: 'pointer' }}
+                cursor: 'pointer',
+              }}
               aria-label="결재선을 기본값으로 되돌리기"
             >
               기본값으로
@@ -278,7 +243,8 @@ export default function SApprovalApproverPicker({
               alignItems: 'center',
               gap: 8,
               padding: '8px 12px',
-              borderRadius: 10 }}
+              borderRadius: 10,
+            }}
           >
             <MIcon name="search" size={14} color="var(--z-500)" />
             <input
@@ -294,14 +260,13 @@ export default function SApprovalApproverPicker({
                 background: 'transparent',
                 fontSize: 13,
                 fontWeight: 700,
-                color: 'var(--z-900)' }}
+                color: 'var(--z-900)',
+              }}
             />
           </div>
 
           <div style={{ marginTop: 8, maxHeight: '40vh', overflowY: 'auto' }}>
-            {loading && (
-              <div style={emptyStyle}>직원 목록을 불러오는 중…</div>
-            )}
+            {loading && <div style={emptyStyle}>직원 목록을 불러오는 중…</div>}
             {!loading && staffRows !== null && groups.length === 0 && (
               <div style={emptyStyle}>
                 {query ? `'${query}' 에 대한 결과가 없습니다` : '추가할 수 있는 직원이 없습니다'}
@@ -315,7 +280,8 @@ export default function SApprovalApproverPicker({
                     fontWeight: 900,
                     color: 'var(--z-500)',
                     padding: '6px 4px 4px',
-                    letterSpacing: '0.04em' }}
+                    letterSpacing: '0.04em',
+                  }}
                 >
                   {dept}
                 </div>
@@ -355,7 +321,8 @@ export default function SApprovalApproverPicker({
           display: 'flex',
           gap: 8,
           padding: '10px 16px 14px',
-          borderTop: '1px solid rgba(255,255,255,0.4)' }}
+          borderTop: '1px solid rgba(255,255,255,0.4)',
+        }}
       >
         <button
           type="button"
@@ -374,7 +341,8 @@ export default function SApprovalApproverPicker({
           style={{
             ...actionStyle('primary'),
             opacity: line.length === 0 ? 0.5 : 1,
-            cursor: line.length === 0 ? 'not-allowed' : 'pointer' }}
+            cursor: line.length === 0 ? 'not-allowed' : 'pointer',
+          }}
           aria-label="결재선 적용"
         >
           적용
@@ -382,91 +350,4 @@ export default function SApprovalApproverPicker({
       </div>
     </MSheet>
   );
-}
-
-// ─────────────────────────────────────────────
-// 하위 helpers
-// ─────────────────────────────────────────────
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        fontSize: 11,
-        fontWeight: 900,
-        color: 'var(--z-500)',
-        letterSpacing: '0.04em',
-        textTransform: 'uppercase',
-        margin: '4px 0 6px' }}
-    >
-      {children}
-    </div>
-  );
-}
-
-type IconBtnProps = {
-  ariaLabel: string;
-  onClick: () => void;
-  children: React.ReactNode;
-  disabled?: boolean;
-  tone?: 'default' | 'danger';
-};
-
-function IconBtn({ ariaLabel, onClick, children, disabled, tone = 'default' }: IconBtnProps) {
-  const color =
-    tone === 'danger' ? 'var(--m-danger)' : disabled ? 'var(--z-400)' : 'var(--z-700)';
-  return (
-    <button
-      type="button"
-      className="transition-all active:scale-90 duration-100"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={ariaLabel}
-      style={{
-        width: 26,
-        height: 26,
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 8,
-        background: 'rgba(0, 0, 0, 0.03)',
-        border: '1px solid rgba(0, 0, 0, 0.05)',
-        color,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.5 : 1 }}
-    >
-      {children}
-    </button>
-  );
-}
-
-const memberRowStyle: CSSProperties = {
-  display: 'flex',
-  width: '100%',
-  alignItems: 'center',
-  padding: '10px 8px',
-  background: 'transparent',
-  border: 'none',
-  borderBottom: '1px solid rgba(0, 0, 0, 0.04)',
-  cursor: 'pointer' };
-
-const emptyStyle: CSSProperties = {
-  textAlign: 'center',
-  padding: '20px 0',
-  fontSize: 12,
-  color: 'var(--z-500)',
-  fontWeight: 800 };
-
-function actionStyle(kind: 'primary' | 'ghost'): CSSProperties {
-  const base: CSSProperties = {
-    flex: 1,
-    height: 44,
-    fontSize: 14,
-    fontWeight: 900,
-    cursor: 'pointer',
-    border: '1px solid rgba(0, 0, 0, 0.06)' };
-  if (kind === 'primary') {
-    return { ...base, background: '#007AFF', color: '#fff', border: 'none', boxShadow: '0 2px 8px rgba(0, 122, 255, 0.2)' };
-  }
-  return { ...base, background: 'rgba(255, 255, 255, 0.6)', color: 'var(--z-700)' };
 }

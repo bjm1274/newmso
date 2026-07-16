@@ -12,6 +12,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { db } from '@/lib/db-client';
+import WelfareSummaryShell from './WelfareSummaryShell';
+import { daysUntil, expiryTone, WELFARE_TONE_CLS, type WelfareTone } from './welfare-summary-utils';
 
 interface LicenseCardData {
   id: string;
@@ -21,30 +23,7 @@ interface LicenseCardData {
   sub: string;
   exp: string;
   days: number | null;
-  tone: 'success' | 'warn' | 'danger' | 'muted';
-}
-
-const TONE_CLS: Record<LicenseCardData['tone'], string> = {
-  success: 'bg-emerald-500/15 text-emerald-700',
-  warn: 'bg-amber-500/15 text-amber-700',
-  danger: 'bg-red-500/15 text-red-700',
-  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]' };
-
-function daysUntil(dateStr: string | null): number | null {
-  if (!dateStr) return null;
-  const target = new Date(`${dateStr}T00:00:00+09:00`);
-  if (Number.isNaN(target.getTime())) return null;
-  const now = new Date();
-  const today = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
-  today.setHours(0, 0, 0, 0);
-  return Math.round((target.getTime() - today.getTime()) / 86400000);
-}
-
-function pickTone(days: number | null): LicenseCardData['tone'] {
-  if (days === null) return 'success';
-  if (days <= 7) return 'danger';
-  if (days <= 90) return 'warn';
-  return 'success';
+  tone: WelfareTone;
 }
 
 function formatExp(dateStr: string | null, days: number | null): string {
@@ -88,7 +67,8 @@ export default function WelfareLicenseSummary() {
             sub: String(r.sub_category ?? ''),
             exp: formatExp(expDateStr, days),
             days,
-            tone: pickTone(days) };
+            tone: expiryTone(days),
+          };
         });
         // 만료 임박(warn/danger) 우선 정렬, 그 다음 success/muted
         items.sort((a, b) => {
@@ -116,41 +96,39 @@ export default function WelfareLicenseSummary() {
   const hasCards = useMemo(() => cards.length > 0, [cards]);
 
   return (
-    <section className="app-card flex flex-col p-3 md:p-4" aria-labelledby="welfare-license-summary-title">
-      <header className="mb-2 flex items-center justify-between">
-        <h3 id="welfare-license-summary-title" className="text-[13px] font-bold text-[var(--foreground)]">
-          면허·자격 현황 (상위 6명)
-        </h3>
-      </header>
-      {loading ? (
-        <div className="py-6 text-center text-[12px] text-[var(--toss-gray-4)]">불러오는 중…</div>
-      ) : errMsg ? (
-        <div role="alert" className="rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
-          {errMsg}
-        </div>
-      ) : !hasCards ? (
-        <div className="py-6 text-center text-[12px] text-[var(--toss-gray-4)]">등록된 자격증이 없습니다.</div>
-      ) : (
-        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {cards.map((card) => (
-            <li key={card.id} className="flex flex-col gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] px-2.5 py-2">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent)]/10 text-[11px] font-bold text-[var(--accent)]" aria-hidden="true">
-                  {card.initial}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[12.5px] font-bold text-[var(--foreground)]">{card.staffName}</div>
-                  <div className="truncate text-[10.5px] text-[var(--toss-gray-4)]">{card.cert}</div>
-                </div>
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${TONE_CLS[card.tone]}`}>{card.exp}</span>
+    <WelfareSummaryShell
+      titleId="welfare-license-summary-title"
+      title="면허·자격 현황 (상위 6명)"
+      loading={loading}
+      error={errMsg}
+      empty={!hasCards}
+      emptyText="등록된 자격증이 없습니다."
+    >
+      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {cards.map((card) => (
+          <li
+            key={card.id}
+            className="flex flex-col gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] px-2.5 py-2"
+          >
+            <div className="flex items-center gap-2">
+              <div
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent)]/10 text-[11px] font-bold text-[var(--accent)]"
+                aria-hidden="true"
+              >
+                {card.initial}
               </div>
-              {card.sub && (
-                <div className="truncate text-[11px] text-[var(--toss-gray-4)]">{card.sub}</div>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[12.5px] font-bold text-[var(--foreground)]">{card.staffName}</div>
+                <div className="truncate text-[10.5px] text-[var(--toss-gray-4)]">{card.cert}</div>
+              </div>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${WELFARE_TONE_CLS[card.tone]}`}>
+                {card.exp}
+              </span>
+            </div>
+            {card.sub && <div className="truncate text-[11px] text-[var(--toss-gray-4)]">{card.sub}</div>}
+          </li>
+        ))}
+      </ul>
+    </WelfareSummaryShell>
   );
 }

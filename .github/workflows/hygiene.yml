@@ -1,0 +1,47 @@
+name: Code Hygiene
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: hygiene-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  jscpd:
+    name: Duplicate code report (jscpd)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Report-only: does not block merge (Phase C baseline ~3–4% on app+lib).
+      # Fail gate: raise after team accepts baseline — e.g. remove continue-on-error
+      # and rely on .jscpd.json threshold (15%).
+      - name: Run jscpd (dupcheck)
+        continue-on-error: true
+        run: npm run dupcheck
+
+      - name: Upload jscpd report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jscpd-report
+          path: .jscpd-report/
+          if-no-files-found: ignore
+          retention-days: 14

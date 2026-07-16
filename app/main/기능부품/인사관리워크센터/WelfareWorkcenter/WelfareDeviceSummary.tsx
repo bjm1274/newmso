@@ -11,6 +11,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { db } from '@/lib/db-client';
+import WelfareSummaryShell from './WelfareSummaryShell';
+import {
+  daysUntil,
+  formatDateCompact,
+  WELFARE_TONE_CLS,
+  type WelfareTone,
+} from './welfare-summary-utils';
 
 interface DeviceRow {
   id: string;
@@ -20,33 +27,16 @@ interface DeviceRow {
   next: string;
   who: string;
   status: '예정' | '지연' | '수시' | string;
-  tone: 'warn' | 'danger' | 'muted' | 'success';
-}
-
-const TONE_CLS: Record<DeviceRow['tone'], string> = {
-  warn: 'bg-amber-500/15 text-amber-700',
-  danger: 'bg-red-500/15 text-red-700',
-  muted: 'bg-[var(--muted)] text-[var(--toss-gray-4)]',
-  success: 'bg-emerald-500/15 text-emerald-700' };
-
-function daysUntil(dateStr: string | null): number | null {
-  if (!dateStr) return null;
-  const target = new Date(`${dateStr}T00:00:00+09:00`);
-  if (Number.isNaN(target.getTime())) return null;
-  const now = new Date();
-  const today = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
-  today.setHours(0, 0, 0, 0);
-  return Math.round((target.getTime() - today.getTime()) / 86400000);
+  tone: WelfareTone;
 }
 
 function formatDate(value: unknown): string {
   if (!value) return '-';
-  const d = new Date(String(value));
-  if (Number.isNaN(d.getTime())) return String(value);
-  return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
+  const compact = formatDateCompact(value);
+  return compact || '-';
 }
 
-function inferStatus(nextDate: string | null): { status: string; tone: DeviceRow['tone'] } {
+function inferStatus(nextDate: string | null): { status: string; tone: WelfareTone } {
   const days = daysUntil(nextDate);
   if (days === null) return { status: '수시', tone: 'muted' };
   if (days < 0) return { status: '지연', tone: 'danger' };
@@ -85,7 +75,8 @@ export default function WelfareDeviceSummary() {
               next: formatDate(r.next_inspection_date),
               who: String(r.manager_name ?? '내부 관리'),
               status,
-              tone };
+              tone,
+            };
           }),
         );
       } catch (error) {
@@ -106,50 +97,59 @@ export default function WelfareDeviceSummary() {
   const hasRows = useMemo(() => rows.length > 0, [rows]);
 
   return (
-    <section className="app-card flex flex-col p-3 md:p-4" aria-labelledby="welfare-device-summary-title">
-      <header className="mb-2 flex items-center justify-between">
-        <h3 id="welfare-device-summary-title" className="text-[13px] font-bold text-[var(--foreground)]">
-          의료기기 점검 일정 (다음 6건)
-        </h3>
-      </header>
-      {loading ? (
-        <div className="py-6 text-center text-[12px] text-[var(--toss-gray-4)]">불러오는 중…</div>
-      ) : errMsg ? (
-        <div role="alert" className="rounded-[var(--radius-md)] border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
-          {errMsg}
-        </div>
-      ) : !hasRows ? (
-        <div className="py-6 text-center text-[12px] text-[var(--toss-gray-4)]">등록된 장비가 없습니다.</div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] border-collapse text-[12px]">
-            <thead>
-              <tr className="border-b border-[var(--border)] text-left text-[11px] font-bold text-[var(--toss-gray-4)]">
-                <th scope="col" className="py-1.5 pr-2">장비</th>
-                <th scope="col" className="py-1.5 pr-2">설치 위치</th>
-                <th scope="col" className="py-1.5 pr-2 tnum">마지막 점검</th>
-                <th scope="col" className="py-1.5 pr-2 tnum">다음 점검</th>
-                <th scope="col" className="py-1.5 pr-2">담당</th>
-                <th scope="col" className="py-1.5">상태</th>
+    <WelfareSummaryShell
+      titleId="welfare-device-summary-title"
+      title="의료기기 점검 일정 (다음 6건)"
+      loading={loading}
+      error={errMsg}
+      empty={!hasRows}
+      emptyText="등록된 장비가 없습니다."
+    >
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] border-collapse text-[12px]">
+          <thead>
+            <tr className="border-b border-[var(--border)] text-left text-[11px] font-bold text-[var(--toss-gray-4)]">
+              <th scope="col" className="py-1.5 pr-2">
+                장비
+              </th>
+              <th scope="col" className="py-1.5 pr-2">
+                설치 위치
+              </th>
+              <th scope="col" className="py-1.5 pr-2 tnum">
+                마지막 점검
+              </th>
+              <th scope="col" className="py-1.5 pr-2 tnum">
+                다음 점검
+              </th>
+              <th scope="col" className="py-1.5 pr-2">
+                담당
+              </th>
+              <th scope="col" className="py-1.5">
+                상태
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr
+                key={row.id}
+                className="border-b border-[var(--border-subtle,var(--border))] last:border-b-0"
+              >
+                <td className="py-1.5 pr-2 font-bold text-[var(--foreground)]">{row.name}</td>
+                <td className="py-1.5 pr-2 text-[var(--toss-gray-4)]">{row.location}</td>
+                <td className="tnum py-1.5 pr-2 text-[var(--toss-gray-4)]">{row.last}</td>
+                <td className="tnum py-1.5 pr-2 text-[var(--toss-gray-4)]">{row.next}</td>
+                <td className="py-1.5 pr-2 text-[var(--toss-gray-4)]">{row.who}</td>
+                <td className="py-1.5">
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${WELFARE_TONE_CLS[row.tone]}`}>
+                    {row.status}
+                  </span>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="border-b border-[var(--border-subtle,var(--border))] last:border-b-0">
-                  <td className="py-1.5 pr-2 font-bold text-[var(--foreground)]">{row.name}</td>
-                  <td className="py-1.5 pr-2 text-[var(--toss-gray-4)]">{row.location}</td>
-                  <td className="tnum py-1.5 pr-2 text-[var(--toss-gray-4)]">{row.last}</td>
-                  <td className="tnum py-1.5 pr-2 text-[var(--toss-gray-4)]">{row.next}</td>
-                  <td className="py-1.5 pr-2 text-[var(--toss-gray-4)]">{row.who}</td>
-                  <td className="py-1.5">
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${TONE_CLS[row.tone]}`}>{row.status}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </WelfareSummaryShell>
   );
 }

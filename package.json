@@ -21,7 +21,8 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:install": "playwright install --with-deps",
     "test:a11y": "playwright test --project=a11y-chromium",
-    "analyze": "node scripts/analyze-bundle.mjs"
+    "analyze": "node scripts/analyze-bundle.mjs",
+    "dupcheck": "npx --yes jscpd@4 --config .jscpd.json"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

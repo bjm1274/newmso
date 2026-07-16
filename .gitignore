@@ -75,6 +75,8 @@ backups/
 android-twa/.gradle/
 
 # Large analysis artifacts (review locally, not in repo)
+# Phase C: entire tree — design snapshots must not pollute search/lint
+/analysis_artifacts/
 analysis_artifacts/claude_design_handoff/shots/
 analysis_artifacts/claude_design_handoff/shots2/
 analysis_artifacts/claude_design_handoff/uploads/
@@ -137,6 +139,7 @@ scripts/backfill-d1/.backfill-progress.json
 /query-prod.js
 /query_attendance.sql
 /.jscpd-report/
+/.jscpd-report-fresh/
 
 # Generated SQLite binaries (build-sqlite.mjs 산출물 — 재생성 가능)
 *.sqlite

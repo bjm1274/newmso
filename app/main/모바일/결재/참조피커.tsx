@@ -10,6 +10,8 @@
  *   - "전체 해제" / "적용" 버튼
  *
  * 결재선피커(SApprovalApproverPicker)의 UI/UX를 미러링.
+ * 공용 kit: ./staff-picker/* (타입·lazy fetch·filter/group·atoms)
+ * 공개 API(CcPick, toCcPick, default export) 유지.
  * 참조는 PC와 동일하게 meta_data.cc_users = [{id,name}] 로 저장된다(상위 폼에서 매핑).
  *
  * JM(파일당 500줄, 단일 책임), JM2(staff fetch는 첫 open 시 1회 lazy),
@@ -17,30 +19,27 @@
  * JM5(본인은 자동 제외, RLS 의존), JM6(input label 연결, button aria-label)
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { db } from '@/lib/db-client';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { StaffMember } from '@/types';
-import { isActiveStaff } from '@/lib/active-staff';
 import MSheet from '../공통/MSheet';
 import MIcon from '../공통/MIcon';
 import MAvatar from '../공통/MAvatar';
+import { toStaffPick, type CcPick } from './staff-picker/types';
+import { useLazyActiveStaff } from './staff-picker/useLazyActiveStaff';
+import { filterStaffByQuery, groupStaffByDepartment } from './staff-picker/group-filter';
+import {
+  SectionLabel,
+  IconBtn,
+  memberRowStyle,
+  emptyStyle,
+  actionStyle,
+} from './staff-picker/ui-atoms';
 
-/** 참조자 선택 항목 — PC cc_users shape({id,name})과 호환 */
-export type CcPick = {
-  id: string;
-  name: string;
-  position: string | null;
-  department: string | null;
-  company: string | null;
-};
+export type { CcPick } from './staff-picker/types';
 
+/** 기존 import 호환 — StaffPick 매핑 alias */
 export function toCcPick(s: StaffMember): CcPick {
-  return {
-    id: String(s.id || ''),
-    name: String(s.name || ''),
-    position: s.position ?? null,
-    department: s.department ?? null,
-    company: s.company ?? null };
+  return toStaffPick(s);
 }
 
 export type SApprovalCcPickerProps = {
@@ -58,12 +57,11 @@ export default function SApprovalCcPicker({
   selfId,
   company,
   current,
-  onApply }: SApprovalCcPickerProps) {
+  onApply,
+}: SApprovalCcPickerProps) {
   const [picked, setPicked] = useState<CcPick[]>(current);
   const [query, setQuery] = useState('');
-  const [staffRows, setStaffRows] = useState<StaffMember[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const inflightRef = useRef(false);
+  const { staffRows, loading } = useLazyActiveStaff(open, 'mobile-approval-cc-picker');
 
   // 열릴 때마다 현재 참조자 동기화
   useEffect(() => {
@@ -73,67 +71,25 @@ export default function SApprovalCcPicker({
     }
   }, [open, current]);
 
-  // 첫 open 시 staff 1회 fetch — lazy (결재선피커와 동일 컬럼)
-  useEffect(() => {
-    if (!open) return;
-    if (staffRows !== null) return;
-    if (inflightRef.current) return;
-    inflightRef.current = true;
-    setLoading(true);
-    (async () => {
-      try {
-        const { data, error } = await db
-          .from('staff_members')
-          .select(
-            'id, name, company, department, position, status, hire_date, resign_date, email, phone, role, permissions'
-          );
-        if (error) throw error;
-        const rows = ((data ?? []) as StaffMember[]).filter((s) => isActiveStaff(s));
-        setStaffRows(rows);
-      } catch (err) {
-        console.error('[mobile-approval-cc-picker] staff fetch failed', err);
-        setStaffRows([]);
-      } finally {
-        setLoading(false);
-        inflightRef.current = false;
-      }
-    })();
-  }, [open, staffRows]);
-
   const pickedIds = useMemo(() => new Set(picked.map((p) => p.id)), [picked]);
 
   // 검색 + 본인 제외 + 본인 회사(또는 SY INC.) 직원
-  const filtered: StaffMember[] = useMemo(() => {
-    const list = staffRows ?? [];
-    const q = query.trim().toLowerCase();
-    return list.filter((s) => {
-      const id = String(s.id || '');
-      if (selfId && id === selfId) return false; // 본인 제외
-      if (company && s.company !== company && s.company !== 'SY INC.') return false; // 회사 필터
-      if (!q) return true;
-      const hay = [s.name, s.department, s.position, s.company]
-        .map((v) => String(v || '').toLowerCase())
-        .join(' ');
-      return hay.includes(q);
-    });
-  }, [staffRows, query, selfId, company]);
+  const filtered: StaffMember[] = useMemo(
+    () =>
+      filterStaffByQuery(staffRows ?? [], {
+        query,
+        selfId,
+        company,
+      }),
+    [staffRows, query, selfId, company]
+  );
 
-  // 부서별 그룹핑
-  const groups = useMemo(() => {
-    const map = new Map<string, StaffMember[]>();
-    for (const s of filtered) {
-      const key = String(s.department || '미지정').trim() || '미지정';
-      const arr = map.get(key) ?? [];
-      arr.push(s);
-      map.set(key, arr);
-    }
-    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0], 'ko'));
-  }, [filtered]);
+  const groups = useMemo(() => groupStaffByDepartment(filtered), [filtered]);
 
   const toggleMember = useCallback((s: StaffMember) => {
     const id = String(s.id || '');
     setPicked((prev) =>
-      prev.some((p) => p.id === id) ? prev.filter((p) => p.id !== id) : [...prev, toCcPick(s)]
+      prev.some((p) => p.id === id) ? prev.filter((p) => p.id !== id) : [...prev, toStaffPick(s)]
     );
   }, []);
 
@@ -165,7 +121,8 @@ export default function SApprovalCcPicker({
                 color: 'var(--z-600)',
                 background: 'rgba(0, 0, 0, 0.02)',
                 border: '1px solid rgba(0, 0, 0, 0.04)',
-                fontWeight: 800 }}
+                fontWeight: 800,
+              }}
             >
               참조는 선택 사항입니다. 아래에서 참조자를 추가할 수 있어요.
             </div>
@@ -175,7 +132,8 @@ export default function SApprovalCcPicker({
                 listStyle: 'none',
                 display: 'flex',
                 flexWrap: 'wrap',
-                gap: 6 }}
+                gap: 6,
+              }}
             >
               {picked.map((c, i) => (
                 <li
@@ -186,7 +144,8 @@ export default function SApprovalCcPicker({
                     alignItems: 'center',
                     gap: 6,
                     padding: '6px 8px 6px 10px',
-                    borderRadius: 999 }}
+                    borderRadius: 999,
+                  }}
                 >
                   <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--z-900)' }}>{c.name}</span>
                   {(c.department || c.position) && (
@@ -194,7 +153,12 @@ export default function SApprovalCcPicker({
                       {[c.department, c.position].filter(Boolean).join(' / ')}
                     </span>
                   )}
-                  <IconBtn ariaLabel={`${c.name} 참조 제거`} tone="danger" onClick={() => removeAt(i)}>
+                  <IconBtn
+                    ariaLabel={`${c.name} 참조 제거`}
+                    tone="danger"
+                    size={22}
+                    onClick={() => removeAt(i)}
+                  >
                     <MIcon name="x" size={13} />
                   </IconBtn>
                 </li>
@@ -207,7 +171,15 @@ export default function SApprovalCcPicker({
                 type="button"
                 className="transition-all active:scale-95"
                 onClick={clearAll}
-                style={{ fontSize: 11, fontWeight: 900, color: 'var(--m-accent)', padding: 6, background: 'transparent', border: 'none', cursor: 'pointer' }}
+                style={{
+                  fontSize: 11,
+                  fontWeight: 900,
+                  color: 'var(--m-accent)',
+                  padding: 6,
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
                 aria-label="참조자 전체 해제"
               >
                 전체 해제
@@ -229,7 +201,8 @@ export default function SApprovalCcPicker({
               alignItems: 'center',
               gap: 8,
               padding: '8px 12px',
-              borderRadius: 10 }}
+              borderRadius: 10,
+            }}
           >
             <MIcon name="search" size={14} color="var(--z-500)" />
             <input
@@ -245,7 +218,8 @@ export default function SApprovalCcPicker({
                 background: 'transparent',
                 fontSize: 13,
                 fontWeight: 700,
-                color: 'var(--z-900)' }}
+                color: 'var(--z-900)',
+              }}
             />
           </div>
 
@@ -264,7 +238,8 @@ export default function SApprovalCcPicker({
                     fontWeight: 900,
                     color: 'var(--z-500)',
                     padding: '6px 4px 4px',
-                    letterSpacing: '0.04em' }}
+                    letterSpacing: '0.04em',
+                  }}
                 >
                   {dept}
                 </div>
@@ -313,7 +288,8 @@ export default function SApprovalCcPicker({
           display: 'flex',
           gap: 8,
           padding: '10px 16px 14px',
-          borderTop: '1px solid rgba(255,255,255,0.4)' }}
+          borderTop: '1px solid rgba(255,255,255,0.4)',
+        }}
       >
         <button
           type="button"
@@ -336,91 +312,4 @@ export default function SApprovalCcPicker({
       </div>
     </MSheet>
   );
-}
-
-// ─────────────────────────────────────────────
-// 하위 helpers
-// ─────────────────────────────────────────────
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        fontSize: 11,
-        fontWeight: 900,
-        color: 'var(--z-500)',
-        letterSpacing: '0.04em',
-        textTransform: 'uppercase',
-        margin: '4px 0 6px' }}
-    >
-      {children}
-    </div>
-  );
-}
-
-type IconBtnProps = {
-  ariaLabel: string;
-  onClick: () => void;
-  children: React.ReactNode;
-  disabled?: boolean;
-  tone?: 'default' | 'danger';
-};
-
-function IconBtn({ ariaLabel, onClick, children, disabled, tone = 'default' }: IconBtnProps) {
-  const color =
-    tone === 'danger' ? 'var(--m-danger)' : disabled ? 'var(--z-400)' : 'var(--z-700)';
-  return (
-    <button
-      type="button"
-      className="transition-all active:scale-90 duration-100"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={ariaLabel}
-      style={{
-        width: 22,
-        height: 22,
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 8,
-        background: 'rgba(0, 0, 0, 0.03)',
-        border: '1px solid rgba(0, 0, 0, 0.05)',
-        color,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.5 : 1 }}
-    >
-      {children}
-    </button>
-  );
-}
-
-const memberRowStyle: CSSProperties = {
-  display: 'flex',
-  width: '100%',
-  alignItems: 'center',
-  padding: '10px 8px',
-  background: 'transparent',
-  border: 'none',
-  borderBottom: '1px solid rgba(0, 0, 0, 0.04)',
-  cursor: 'pointer' };
-
-const emptyStyle: CSSProperties = {
-  textAlign: 'center',
-  padding: '20px 0',
-  fontSize: 12,
-  color: 'var(--z-500)',
-  fontWeight: 800 };
-
-function actionStyle(kind: 'primary' | 'ghost'): CSSProperties {
-  const base: CSSProperties = {
-    flex: 1,
-    height: 44,
-    fontSize: 14,
-    fontWeight: 900,
-    cursor: 'pointer',
-    border: '1px solid rgba(0, 0, 0, 0.06)' };
-  if (kind === 'primary') {
-    return { ...base, background: '#007AFF', color: '#fff', border: 'none', boxShadow: '0 2px 8px rgba(0, 122, 255, 0.2)' };
-  }
-  return { ...base, background: 'rgba(255, 255, 255, 0.6)', color: 'var(--z-700)' };
 }

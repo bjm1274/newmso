@@ -1,0 +1,23 @@
+{
+  "threshold": 15,
+  "minLines": 10,
+  "minTokens": 50,
+  "gitignore": true,
+  "absolute": true,
+  "reporters": ["console", "json"],
+  "output": ".jscpd-report",
+  "path": ["app", "lib"],
+  "ignore": [
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/analysis_artifacts/**",
+    "**/handoff/**",
+    "**/scratch/**",
+    "**/scratch_zip/**",
+    "**/tmp/**",
+    "**/backups/**",
+    "**/tests/**",
+    "**/electron-app/**",
+    "**/docs/**"
+  ]
+}
