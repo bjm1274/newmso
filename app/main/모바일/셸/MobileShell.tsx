@@ -5,9 +5,11 @@
  *   - .mso-mobile 컨테이너 (토큰 + 폰트 + 다크모드 클래스)
  *   - 9탭 라우트 상태 (tab + sub) + 바텀탭 + 화면 라우터
  * isMobile=true일 때 page.tsx가 PC 셸 대신 이걸 렌더.
- * JM: 단일 책임 (라우팅), ~120줄
- * JM2: route는 단일 useState — 불필요한 리렌더 방지
- * JM6: aria-live 등은 자식 화면에서 처리
+ *
+ * iOS 상태바(시계) 침범 원천 차단:
+ *   tokens.css 의 .mso-mobile { top: env(safe-area-inset-top); transform: translateZ(0) }
+ *   → 셸 전체가 시계 아래에서 시작, fixed 자손도 이 박스 기준.
+ *   개별 화면에 safe-area-inset-top 패딩을 또 더하지 말 것.
  */
 
 import { useEffect, useState, useCallback } from 'react';
@@ -143,7 +145,9 @@ export default function MobileShell({
           receipt_signature_data: receiptSignatureData || null,
           privacy_consent: privacyConsent === true ? 1 : (privacyConsent === false ? 0 : null)
         })
-        .eq('id', pendingContract.id);
+        .eq('id', pendingContract.id)
+        // 정책 SELF_OR_SAME_COMPANY 가 staff_id 를 보므로 본인 행임을 where 에 명시
+        .eq('staff_id', currentUserId);
 
       if (updateError) {
         throw new Error(`계약서 상태 업데이트 실패: ${updateError.message}`);

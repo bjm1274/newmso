@@ -22,10 +22,31 @@ type ScheduledControllerLike = {
   cron: string;
 };
 
-type WorkerEnv = Record<string, string | undefined>;
+type WorkerEnv = Record<string, unknown> & {
+  CRON_SECRET?: string;
+  SESSION_SECRET?: string;
+  DB?: {
+    prepare: (sql: string) => {
+      bind: (...args: unknown[]) => { run: () => Promise<unknown> };
+    };
+  };
+  REALTIME_HUB?: {
+    idFromName: (name: string) => unknown;
+    get: (id: unknown) => { fetch: (req: Request) => Promise<Response> };
+  };
+};
 
 type WorkerExecutionContext = {
   waitUntil?: (promise: Promise<unknown>) => void;
+};
+
+type CronRouteResult = {
+  route: string;
+  ok: boolean;
+  status?: number;
+  durationMs: number;
+  bodyPreview?: string;
+  error?: string;
 };
 
 const openNextHandler = handler as OpenNextHandler;
@@ -56,12 +77,54 @@ const CRON_ROUTES_BY_SCHEDULE: Record<string, string[]> = {
   '0 23 * * *': [],
 };
 
+function makeUuid() {
+  return crypto.randomUUID();
+}
+
+/** cron 실행 결과를 audit_logs 에 남겨 대시보드/D1 로 추적 가능하게 한다. */
+async function persistCronAudit(
+  env: WorkerEnv,
+  payload: {
+    cron: string;
+    route?: string;
+    ok: boolean;
+    durationMs: number;
+    detail: Record<string, unknown>;
+  },
+) {
+  const db = env.DB;
+  if (!db?.prepare) return;
+
+  const id = makeUuid();
+  const nowIso = new Date().toISOString();
+  const action = payload.ok ? 'cron_success' : 'cron_failure';
+  const details = JSON.stringify({
+    cron: payload.cron,
+    route: payload.route || null,
+    durationMs: payload.durationMs,
+    ...payload.detail,
+  });
+
+  try {
+    await db
+      .prepare(
+        `INSERT INTO audit_logs (id, user_id, user_name, action, target_type, target_id, details, actor_name, created_at)
+         VALUES (?, NULL, 'system-cron', ?, 'cron', ?, ?, 'cron', ?)`,
+      )
+      .bind(id, action, payload.route || payload.cron, details, nowIso)
+      .run();
+  } catch (err) {
+    console.error('[cron-audit] Failed to persist audit_logs:', err);
+  }
+}
+
 async function callCronRoute(
   route: string,
   cron: string,
   env: WorkerEnv,
   context: WorkerExecutionContext,
-) {
+): Promise<CronRouteResult> {
+  const startTime = Date.now();
   const cronSecret = String(env.CRON_SECRET || '').trim();
   if (!cronSecret) {
     throw new Error('CRON_SECRET is not configured.');
@@ -79,10 +142,24 @@ async function callCronRoute(
     context,
   );
 
+  const durationMs = Date.now() - startTime;
+  const bodyText = await response.text().catch(() => '');
+  const bodyPreview = bodyText.slice(0, 800);
+
   if (!response.ok) {
-    const detail = await response.text().catch(() => '');
-    throw new Error(`Cron route ${route} failed with ${response.status}: ${detail}`);
+    throw Object.assign(
+      new Error(`Cron route ${route} failed with ${response.status}: ${bodyPreview}`),
+      { status: response.status, bodyPreview, durationMs },
+    );
   }
+
+  return {
+    route,
+    ok: true,
+    status: response.status,
+    durationMs,
+    bodyPreview,
+  };
 }
 
 const worker = {
@@ -106,7 +183,7 @@ const worker = {
       const userId = String(session.user.id);
       const userName = String(session.user.name || '알 수 없음');
 
-      const hub = env.REALTIME_HUB as any;
+      const hub = env.REALTIME_HUB;
       if (!hub) {
         return new Response('REALTIME_HUB DurableObject binding not found', { status: 500 });
       }
@@ -135,6 +212,9 @@ const worker = {
     const routes = CRON_ROUTES_BY_SCHEDULE[controller.cron] || [];
     if (routes.length === 0) return;
 
+    const batchStart = Date.now();
+    const results: CronRouteResult[] = [];
+
     console.log(
       `[cron ${controller.cron}] Starting execution of ${routes.length} routes sequentially...`,
     );
@@ -143,20 +223,82 @@ const worker = {
       const startTime = Date.now();
       try {
         console.log(`[cron ${controller.cron}] Starting route: ${route}`);
-        await callCronRoute(route, controller.cron, env, context);
-        const duration = Date.now() - startTime;
+        const result = await callCronRoute(route, controller.cron, env, context);
+        results.push(result);
         console.log(
-          `[cron ${controller.cron}] Successfully finished route: ${route} (${duration}ms)`,
+          `[cron ${controller.cron}] Successfully finished route: ${route} (${result.durationMs}ms)`,
         );
+        // 고비용 5분 cron 은 성공 시 스킵 — 실패만 기록 (audit_logs 폭주 방지)
+        const isHighFrequency = controller.cron.startsWith('*/');
+        if (!isHighFrequency) {
+          context.waitUntil?.(
+            persistCronAudit(env, {
+              cron: controller.cron,
+              route,
+              ok: true,
+              durationMs: result.durationMs,
+              detail: { status: result.status, bodyPreview: result.bodyPreview },
+            }),
+          );
+        }
       } catch (err) {
         const duration = Date.now() - startTime;
+        const message = err instanceof Error ? err.message : String(err);
+        const bodyPreview =
+          err && typeof err === 'object' && 'bodyPreview' in err
+            ? String((err as { bodyPreview?: string }).bodyPreview || '')
+            : '';
+        results.push({
+          route,
+          ok: false,
+          durationMs: duration,
+          error: message,
+          bodyPreview,
+        });
         console.error(
           `[cron ${controller.cron}] Route ${route} failed after ${duration}ms:`,
           err,
         );
+        // 실패는 5분 cron 포함 항상 audit_logs 기록
+        context.waitUntil?.(
+          persistCronAudit(env, {
+            cron: controller.cron,
+            route,
+            ok: false,
+            durationMs: duration,
+            detail: { error: message, bodyPreview },
+          }),
+        );
       }
     }
-    console.log(`[cron ${controller.cron}] Finished all routes.`);
+
+    const failed = results.filter((r) => !r.ok);
+    const batchDuration = Date.now() - batchStart;
+    console.log(
+      `[cron ${controller.cron}] Finished all routes. ok=${results.length - failed.length}/${results.length} (${batchDuration}ms)`,
+    );
+
+    // 일 단위 배치 요약 (고빈도 cron 제외)
+    if (!controller.cron.startsWith('*/')) {
+      context.waitUntil?.(
+        persistCronAudit(env, {
+          cron: controller.cron,
+          ok: failed.length === 0,
+          durationMs: batchDuration,
+          detail: {
+            summary: true,
+            total: results.length,
+            failed: failed.length,
+            routes: results.map((r) => ({
+              route: r.route,
+              ok: r.ok,
+              durationMs: r.durationMs,
+              error: r.error || null,
+            })),
+          },
+        }),
+      );
+    }
   },
 };
 

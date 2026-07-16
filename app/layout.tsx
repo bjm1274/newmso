@@ -18,7 +18,8 @@ const geistMono = Geist_Mono({
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#2563eb",
+  themeColor: "#ffffff",
+  // cover: env(safe-area-inset-*) 활성화. 상태바 침범은 CSS 셸(top:sat)이 원천 차단.
   viewportFit: "cover" };
 
 export const metadata: Metadata = {
@@ -27,7 +28,9 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    // black-translucent 는 웹 콘텐츠를 시계/노치 아래로 깔아 배포마다 침범 회귀가 난다.
+    // default = 불투명 상태바 + 콘텐츠는 그 아래에서 시작 (원천 차단).
+    statusBarStyle: "default",
     title: "MSO" },
   icons: {
     icon: "/favicon-tab.png",
@@ -58,7 +61,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} font-app antialiased bg-[var(--background)] text-[var(--foreground)]`}
+        className={`${geistSans.variable} ${geistMono.variable} font-app antialiased bg-[var(--background)] text-[var(--foreground)] ios-safe-root`}
       >
         <ThemeProvider>
           <PwaBootstrap />

@@ -48,13 +48,29 @@
 
   /* iOS 노치/상태바(시계) 안전영역 — 비대응 기기는 0 */
   --m-safe-top: env(safe-area-inset-top, 0px);
+  --m-safe-right: env(safe-area-inset-right, 0px);
+  --m-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --m-safe-left: env(safe-area-inset-left, 0px);
 
   --m-bubble-in-bg: rgba(255, 255, 255, 0.75);
   --m-bubble-in-border: rgba(255, 255, 255, 0.3);
   --m-reply-bg: rgba(0, 0, 0, 0.05);
 
+  /*
+   * 원천 차단: 셸 자체를 상태바(시계) 아래로 붙인다.
+   * - inset:0 금지 → top:0 고정 자식이 시계 영역으로 올라가는 경로 제거
+   * - transform → 내부 position:fixed 자손의 containing block 을 이 박스로 고정
+   *   (없으면 fixed 가 viewport 기준이라 다시 시계 아래로 침범)
+   */
   position: fixed;
-  inset: 0;
+  top: var(--m-safe-top);
+  right: var(--m-safe-right);
+  bottom: 0;
+  left: var(--m-safe-left);
+  width: auto;
+  height: auto;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
   font-family: var(--m-font);
   font-size: 14px;
   letter-spacing: -0.012em;
@@ -110,14 +126,14 @@
 }
 
 /* ─── 셸 ─────────────────────────────────────────────────────*/
+/* safe-top 은 .mso-mobile 박스 top 으로만 처리 — 화면마다 padding 중복 금지 */
 .mso-mobile .m-screen {
   width: 100%; height: 100%; min-height: 100%;
   background: var(--m-bg);
   display: flex; flex-direction: column;
   overflow: hidden;
   position: relative;
-  /* 헤더 없는 화면(내정보 홈/허브/채팅목록 등)도 상태바 영역 침범 방지 */
-  padding-top: var(--m-safe-top);
+  padding-top: 0;
 }
 .mso-mobile .m-screen .m-screen {
   padding-top: 0;
@@ -151,10 +167,10 @@
 .mso-mobile .m-section-h .cnt { font-size: 12px; font-weight: 800; color: var(--z-400); font-feature-settings: "tnum"; }
 
 /* ─── 헤더 ───────────────────────────────────────────────────*/
+/* 상태바는 셸 top 이 이미 비킴 — 헤더는 일반 패딩만 (음수 margin/이중 sat 금지) */
 .mso-mobile .m-header {
-  /* m-screen의 safe-top 패딩만큼 위로 끌어올려 헤더가 상태바 영역까지 흰색으로 채움 */
-  margin-top: calc(-1 * var(--m-safe-top));
-  padding: calc(14px + var(--m-safe-top)) 16px 12px;
+  margin-top: 0;
+  padding: 14px 16px 12px;
   background: var(--m-card);
   border-bottom: 1px solid var(--m-border);
   display: flex; align-items: center; gap: 10px;

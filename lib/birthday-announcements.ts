@@ -5,16 +5,17 @@ import {
   messages as messagesTable,
   staff_members as staffMembersTable,
   congratulations_condolences as welfareTable,
+  chat_rooms as chatRoomsTable,
   getD1Binding,
   getD1Drizzle,
-  updateChatRoomLastMessage,
   eq,
   and,
   ne,
-  sql } from '@/lib/db';
+  sql,
+  lte,
+  or,
+  isNull } from '@/lib/db';
 import { enqueueChatPushJob } from '@/lib/chat-push-enqueue';
-
-type D1Db = ReturnType<typeof getD1Drizzle>;
 
 export type BirthdayAnnouncementsResult = {
   ok: boolean;
@@ -26,15 +27,23 @@ export type BirthdayAnnouncementsResult = {
   errors: string[];
 };
 
-export async function processBirthdayAnnouncements(now = new Date()): Promise<BirthdayAnnouncementsResult> {
+/**
+ * @param nowOrDate Date 또는 KST 기준 'YYYY-MM-DD' (소급 실행용). 기본값: 현재 시각.
+ */
+export async function processBirthdayAnnouncements(
+  nowOrDate: Date | string = new Date(),
+): Promise<BirthdayAnnouncementsResult> {
   const d1 = await getD1Binding();
   if (!d1) {
     throw new Error('[birthday-announcements] D1 binding not available');
   }
   const db = getD1Drizzle(d1);
 
-  // KST date today (정본 헬퍼 사용 — 하드코딩 +9h 오프셋 대체)
-  const kstDateStr = formatKoreanDateKey(now);
+  // KST date (정본 헬퍼 사용 — 하드코딩 +9h 오프셋 대체). 문자열이면 소급 날짜로 해석.
+  const kstDateStr =
+    typeof nowOrDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(nowOrDate.trim())
+      ? nowOrDate.trim()
+      : formatKoreanDateKey(nowOrDate instanceof Date ? nowOrDate : new Date());
   const [yearStr, monthStr, dayStr] = kstDateStr.split('-');
   const kstMonth = Number(monthStr);
   const kstDay = Number(dayStr);
@@ -139,10 +148,20 @@ ${staff.name}님, 오늘 세상에서 가장 특별하고 행복한 하루 보�
       const duplicateMessage = inserted.length === 0;
 
       if (!duplicateMessage) {
-        await updateChatRoomLastMessage(db, {
-          room_id: NOTICE_ROOM_ID,
-          created_at: nowIso,
-          content });
+        // 소급 실행 시 과거 created_at 으로 last_message 를 덮지 않도록 가드
+        await db
+          .update(chatRoomsTable)
+          .set({
+            last_message: content,
+            last_message_at: nowIso,
+            last_message_preview: content.slice(0, 80) })
+          .where(
+            and(
+              eq(chatRoomsTable.id, NOTICE_ROOM_ID),
+              or(isNull(chatRoomsTable.last_message_at), lte(chatRoomsTable.last_message_at, nowIso)),
+            ),
+          )
+          .run();
         await enqueueChatPushJob({
           messageId,
           roomId: NOTICE_ROOM_ID,
@@ -209,10 +228,19 @@ ${staff.name}님, 오늘 세상에서 가장 특별하고 행복한 하루 보�
         const duplicateMessage = inserted.length === 0;
 
         if (!duplicateMessage) {
-          await updateChatRoomLastMessage(db, {
-            room_id: NOTICE_ROOM_ID,
-            created_at: nowIso,
-            content: eventContent });
+          await db
+            .update(chatRoomsTable)
+            .set({
+              last_message: eventContent,
+              last_message_at: nowIso,
+              last_message_preview: eventContent.slice(0, 80) })
+            .where(
+              and(
+                eq(chatRoomsTable.id, NOTICE_ROOM_ID),
+                or(isNull(chatRoomsTable.last_message_at), lte(chatRoomsTable.last_message_at, nowIso)),
+              ),
+            )
+            .run();
           await enqueueChatPushJob({
             messageId: eventMessageId,
             roomId: NOTICE_ROOM_ID,

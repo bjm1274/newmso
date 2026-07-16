@@ -16,8 +16,8 @@ export default function MobileHeader({ title, sub, eyebrow, back, backIcon, acti
     <div
       className="m-header macos-glass"
       style={{
-        /* tokens .m-header safe-top 보정 유지 — 인라인 top만 덮어쓰지 않음 */
-        paddingTop: 'calc(16px + var(--m-safe-top, env(safe-area-inset-top, 0px)))',
+        /* 상태바 침범은 .mso-mobile top:sat 가 원천 차단 — 헤더는 이중 sat 패딩 금지 */
+        paddingTop: 14,
         paddingRight: 20,
         paddingBottom: 12,
         paddingLeft: 20,

@@ -210,6 +210,63 @@ function whereToRowProxy(where: { field: string; op: string; value: unknown }[])
   return proxy;
 }
 
+/** update/delete 정책이 행 소유자(staff_id 등)를 보려면 기존 행 필드가 필요. */
+const PATTERNS_NEEDING_EXISTING_ROW = new Set([
+  'SELF_ONLY',
+  'SELF_OR_SAME_COMPANY',
+  'STAFF_IN_SCOPE',
+  'APPROVAL_SCOPE',
+  'ROSTER_APPROVER_OR_SELF',
+  'MANAGE_COMPANY',
+  'MANAGE_COMPANY_OR_NULL',
+  'COMPANY_SCOPE_OR_NULL',
+  'INVENTORY_SCOPE',
+  'CHAT_ROOM_MEMBER',
+]);
+
+/**
+ * UPDATE/DELETE 시 where 가 id 만 있고 staff_id 가 없으면 policy 가 항상 deny 된다
+ * (예: 직원 본인 계약서 서명 → update employment_contracts where id=…).
+ * 기존 행을 1건 읽어 row proxy 에 병합한다.
+ */
+async function enrichRowProxyForPolicy(
+  db: ReturnType<typeof getD1Drizzle>,
+  table: string,
+  op: 'update' | 'delete',
+  where: { field: string; op: string; value: unknown }[],
+  set?: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const proxy = { ...whereToRowProxy(where), ...(set ?? {}) };
+  const cfg = POLICY_REGISTRY[table];
+  if (!cfg) return proxy;
+
+  const pattern = cfg[op];
+  if (!pattern || !PATTERNS_NEEDING_EXISTING_ROW.has(pattern)) return proxy;
+
+  const staffField = cfg.staffIdField ?? 'staff_id';
+  const companyField = cfg.companyIdField ?? 'company_id';
+  // 이미 소유자/회사 식별자가 있으면 추가 조회 불필요
+  if (proxy[staffField] != null || proxy[companyField] != null) return proxy;
+
+  const idCond = where.find((w) => w.field === 'id' && w.op === 'eq');
+  if (!idCond || idCond.value == null || idCond.value === '') return proxy;
+  if (!ALLOWED_TABLES.has(table) || !COLUMN_RE.test(table)) return proxy;
+
+  try {
+    const result = await db.run(
+      sql`SELECT * FROM ${sql.identifier(table)} WHERE id = ${normalizeBindValue(idCond.value)} LIMIT 1`,
+    );
+    const rows = ((result as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
+    const existing = rows[0];
+    if (!existing) return proxy;
+    // set/where 가 기존 행보다 우선 (서명 시 status 변경 등)
+    return { ...existing, ...proxy };
+  } catch (err) {
+    console.error(`[d1/mutate] enrichRowProxyForPolicy failed for ${table}:`, err);
+    return proxy;
+  }
+}
+
 // ─────────────────────────────────────────────────────────────
 // JSON 직렬화/역직렬화 헬퍼 (수정 2)
 // ─────────────────────────────────────────────────────────────
@@ -472,8 +529,8 @@ export async function POST(request: Request) {
     }
 
     if (payload.op === 'update') {
-      // where 조건의 eq 필드로 row proxy 만들고 정책 검사
-      const row = { ...whereToRowProxy(payload.where), ...payload.set };
+      // where 가 id 뿐이면 staff_id 등 소유 필드가 없어 SELF_* 정책이 오판 deny 됨 → 기존 행 병합
+      const row = await enrichRowProxyForPolicy(db, payload.table, 'update', payload.where, payload.set);
       await assertAccess({ db, claims, table: payload.table, op: 'update', row });
       // 객체/배열 값을 D1 bound value로 전달 가능한 TEXT로 직렬화 (수정 2)
       const serializedSet = serializeRecord(payload.set);
@@ -546,7 +603,7 @@ export async function POST(request: Request) {
     }
 
     if (payload.op === 'delete') {
-      const row = whereToRowProxy(payload.where);
+      const row = await enrichRowProxyForPolicy(db, payload.table, 'delete', payload.where);
       await assertAccess({ db, claims, table: payload.table, op: 'delete', row });
       const tableSql = sql.identifier(payload.table);
       const whereParts = buildWhereSql(payload.where);

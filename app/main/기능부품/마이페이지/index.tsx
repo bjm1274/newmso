@@ -282,7 +282,9 @@ function MyPageMain({
           receipt_signature_data: receiptSignatureData || null,
           privacy_consent: privacyConsent === true ? 1 : (privacyConsent === false ? 0 : null)
         })
-        .eq('id', pendingContract.id);
+        .eq('id', pendingContract.id)
+        // 정책 SELF_OR_SAME_COMPANY 가 staff_id 를 보므로 본인 행임을 where 에 명시
+        .eq('staff_id', currentUserId);
 
       if (updateError) {
         throw new Error(`계약서 상태 업데이트 실패: ${updateError.message}`);

@@ -19,7 +19,13 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await processBirthdayAnnouncements();
+    // ?date=YYYY-MM-DD 로 소급 실행 가능 (미지정 시 오늘 KST)
+    const url = new URL(request.url);
+    const dateParam = String(url.searchParams.get('date') || '').trim();
+    const target =
+      /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : undefined;
+
+    const result = await processBirthdayAnnouncements(target ?? new Date());
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(

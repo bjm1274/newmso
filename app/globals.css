@@ -1956,7 +1956,42 @@ button, a, [role="button"] {
   }
 }
 
-/* ── Safe area ───────────────────────────────────── */
+/* ── Safe area (iOS 원천 차단) ───────────────────────
+ * 정책:
+ *  1) layout.tsx appleWebApp.statusBarStyle = "default" (반투명 금지)
+ *  2) viewport-fit=cover 로 env(safe-area-inset-*) 활성화
+ *  3) 모바일 셸(.mso-mobile) top = sat → 시계 영역 자체에 앱 UI 진입 불가
+ *  4) 화면/헤더마다 sat 패딩을 또 더하지 말 것 (이중 여백·회귀 원인)
+ * 배포 후 침범이 보이면 개별 화면이 position:fixed; top:0 을
+ * .mso-mobile 밖(body 직속)에 둔 경우이므로 그 요소를 셸 안으로 옮기거나
+ * top: var(--sat) 로 바꿀 것.
+ */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+}
+
+/* 상태바 뒤(셸 위 띠) 색 — statusBarStyle=default 와 맞춤 */
+html {
+  background-color: var(--background);
+}
+
+body.ios-safe-root {
+  /* fixed 자손은 패딩을 무시하므로, 여기는 배경·min 높이만 */
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+  background-color: var(--background);
+}
+
+/* 로그인 등 모바일 셸 밖 페이지 공통 상단 여백 */
+body.ios-safe-root > div.min-h-screen,
+body.ios-safe-root > div[class*="min-h-screen"] {
+  padding-top: max(0px, var(--sat));
+  box-sizing: border-box;
+}
+
 .safe-pb {
   padding-bottom: env(safe-area-inset-bottom);
 }

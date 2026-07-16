@@ -64,31 +64,50 @@ export default function ContractSignatureModal({ contract, user, templateText, o
     const sigContainerRef = useRef<HTMLDivElement>(null);
     const receiptContainerRef = useRef<HTMLDivElement>(null);
     const [sigWidth, setSigWidth] = useState(400);
-    const [sigHeight, setSigHeight] = useState(180);
+    const [sigHeight, setSigHeight] = useState(220);
     const [receiptWidth, setReceiptWidth] = useState(400);
-    const [receiptHeight, setReceiptHeight] = useState(120);
+    const [receiptHeight, setReceiptHeight] = useState(160);
 
     useEffect(() => {
+        if (step !== 4) return;
+
+        const measure = (el: HTMLDivElement | null) => {
+            if (!el) return { w: 0, h: 0 };
+            // 테두리·안쪽 여백을 제외한 실제 그리기 영역
+            const pad = 4;
+            return {
+                w: Math.max(200, Math.floor(el.clientWidth - pad * 2)),
+                h: Math.max(120, Math.floor(el.clientHeight - pad * 2)),
+            };
+        };
+
         const updateSizes = () => {
-            if (sigContainerRef.current) {
-                // padding을 고려하여 크기 할당
-                setSigWidth(sigContainerRef.current.clientWidth - 16);
-                setSigHeight(sigContainerRef.current.clientHeight - 16);
+            const sig = measure(sigContainerRef.current);
+            if (sig.w > 0) {
+                setSigWidth(sig.w);
+                setSigHeight(sig.h);
             }
-            if (receiptContainerRef.current) {
-                setReceiptWidth(receiptContainerRef.current.clientWidth - 16);
-                setReceiptHeight(receiptContainerRef.current.clientHeight - 16);
+            const receipt = measure(receiptContainerRef.current);
+            if (receipt.w > 0) {
+                setReceiptWidth(receipt.w);
+                setReceiptHeight(receipt.h);
             }
         };
 
-        if (step === 4) {
-            const timer = setTimeout(updateSizes, 100);
-            window.addEventListener('resize', updateSizes);
-            return () => {
-                clearTimeout(timer);
-                window.removeEventListener('resize', updateSizes);
-            };
-        }
+        const timer = setTimeout(updateSizes, 50);
+        window.addEventListener('resize', updateSizes);
+        const ro =
+            typeof ResizeObserver !== 'undefined'
+                ? new ResizeObserver(() => updateSizes())
+                : null;
+        if (sigContainerRef.current) ro?.observe(sigContainerRef.current);
+        if (receiptContainerRef.current) ro?.observe(receiptContainerRef.current);
+
+        return () => {
+            clearTimeout(timer);
+            window.removeEventListener('resize', updateSizes);
+            ro?.disconnect();
+        };
     }, [step]);
 
     const [localTemplateText, setLocalTemplateText] = useState<string>('');
@@ -576,23 +595,34 @@ export default function ContractSignatureModal({ contract, user, templateText, o
 
     return (
         <div data-testid="contract-signature-modal" className="fixed inset-0 z-[1200] flex items-center justify-center md:p-4 p-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-[var(--card)] w-full h-[100dvh] md:h-auto md:max-h-[90vh] max-w-2xl md:border-2 md:border-[var(--border)] md:radius-toss-xl shadow-sm overflow-hidden flex flex-col">
+            <div className="bg-[var(--card)] w-full h-[100dvh] md:h-auto md:max-h-[90vh] max-w-2xl md:border-2 md:border-[var(--border)] md:rounded-2xl shadow-sm overflow-hidden flex flex-col">
 
-                <div className="p-4 border-b border-[var(--border)] flex items-center justify-between bg-[var(--tab-bg)] shrink-0">
-                    <div>
-                        <span className="px-2.5 py-1 text-[10px] font-bold text-blue-700 bg-blue-500/20 rounded-[var(--radius-md)] mb-1 inline-block">전자서명 진행 중</span>
-                        <h2 className="text-xl font-bold tracking-tight text-[var(--foreground)]">{contract?.contract_type || '표준근로계약서'}</h2>
+                <div
+                    className="px-4 pb-3 border-b border-[var(--border)] flex items-center justify-between bg-[var(--tab-bg)] shrink-0"
+                    style={{ paddingTop: 'max(12px, env(safe-area-inset-top, 0px))' }}
+                >
+                    <div className="min-w-0 pr-2">
+                        <span className="px-2.5 py-1 text-[11px] font-bold text-blue-700 bg-blue-500/20 rounded-lg mb-1.5 inline-block">
+                            전자서명 진행 중 · {step}/4
+                        </span>
+                        <h2 className="text-[18px] md:text-xl font-extrabold tracking-tight text-[var(--foreground)] truncate">
+                            {contract?.contract_type || '표준근로계약서'}
+                        </h2>
                     </div>
-                    <button onClick={onClose} className="p-2 -mr-2 text-[var(--toss-gray-4)] hover:text-red-500 transition-colors" aria-label="닫기">
+                    <button
+                        onClick={onClose}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--card)] text-[var(--toss-gray-4)] hover:text-red-500 border border-[var(--border)] transition-colors"
+                        aria-label="닫기"
+                    >
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>
 
-                <div className="flex bg-[var(--tab-bg)] h-1.5 shrink-0">
-                    <div className="bg-blue-600 transition-all duration-300" style={{ width: `${(step / 4) * 100}%` }} />
+                <div className="flex bg-[var(--tab-bg)] h-2 shrink-0">
+                    <div className="bg-blue-600 transition-all duration-300 rounded-r-full" style={{ width: `${(step / 4) * 100}%` }} />
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 md:p-4 custom-scrollbar bg-[var(--page-bg)]">
+                <div className={`flex-1 overflow-y-auto custom-scrollbar bg-[var(--page-bg)] ${step === 4 ? 'p-3 md:p-5' : 'p-4 md:p-5'}`}>
 
                     {step === 1 && (
                         <div className="space-y-4 animate-in slide-in-from-right-4">
@@ -636,25 +666,25 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                 {REQUIRED_AGREEMENTS.map((item) => (
                                     <label
                                         key={item.id}
-                                        className={`flex items-start gap-3 p-3.5 rounded-xl border-2 transition-all cursor-pointer ${agreements[item.id]
+                                        className={`flex items-start gap-3 p-4 rounded-2xl border-2 transition-all cursor-pointer active:scale-[0.995] ${agreements[item.id]
                                             ? 'bg-blue-500/10 border-blue-500 shadow-sm'
                                             : 'bg-[var(--card)] border-[var(--border-subtle)] hover:border-[var(--border)]'
                                             }`}
                                     >
-                                        <div className="pt-0.5">
+                                        <div className="pt-0.5 shrink-0">
                                             <input
                                                 data-testid={`contract-agreement-${item.id}`}
                                                 type="checkbox"
                                                 checked={!!agreements[item.id]}
                                                 onChange={(e) => setAgreements({ ...agreements, [item.id]: e.target.checked })}
-                                                className="w-4 h-4 rounded border-[var(--border)] text-blue-600 focus:ring-blue-500"
+                                                className="w-6 h-6 rounded-md border-[var(--border)] text-blue-600 focus:ring-blue-500"
                                             />
                                         </div>
-                                        <div>
-                                            <p className={`text-[12px] font-black ${agreements[item.id] ? 'text-blue-700' : 'text-[var(--foreground)]'}`}>
+                                        <div className="min-w-0">
+                                            <p className={`text-[14px] font-extrabold leading-snug ${agreements[item.id] ? 'text-blue-700' : 'text-[var(--foreground)]'}`}>
                                                 {item.title}
                                             </p>
-                                            <p className="text-[10px] font-medium text-[var(--toss-gray-4)] mt-0.5 leading-relaxed">
+                                            <p className="text-[12px] font-medium text-[var(--toss-gray-4)] mt-1 leading-relaxed">
                                                 {item.desc}
                                             </p>
                                         </div>
@@ -687,111 +717,209 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                 </div>
                             </div>
 
-                            <label className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-100 rounded-xl cursor-pointer hover:bg-emerald-100 transition-colors">
-                                <input data-testid="contract-confidentiality-checkbox" type="checkbox" checked={agreements['confidentiality'] || false} onChange={e => setAgreements({ ...agreements, confidentiality: e.target.checked })} className="w-5 h-5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500" />
-                                <span className="text-[12px] font-black text-emerald-800">{CONFIDENTIALITY_PLEDGE_AFFIRMATION}</span>
+                            <label className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl cursor-pointer hover:bg-emerald-100 transition-colors active:scale-[0.995]">
+                                <input data-testid="contract-confidentiality-checkbox" type="checkbox" checked={agreements['confidentiality'] || false} onChange={e => setAgreements({ ...agreements, confidentiality: e.target.checked })} className="w-6 h-6 shrink-0 rounded-md border-emerald-300 text-emerald-600 focus:ring-emerald-500" />
+                                <span className="text-[14px] font-extrabold text-emerald-800 leading-snug">{CONFIDENTIALITY_PLEDGE_AFFIRMATION}</span>
                             </label>
                         </div>
                     )}
 
                     {step === 4 && (
-                        <div className="space-y-4 animate-in slide-in-from-right-4">
-                            <div className="text-center mb-2">
-                                <span className="text-3xl block mb-2">✍️</span>
-                                <h3 className="text-lg font-bold text-[var(--foreground)]">최종 전자서명</h3>
-                                <p className="text-[10px] text-[var(--toss-gray-4)] font-bold mt-1">서명과 교부확인을 모두 자필로 작성해 주세요.</p>
+                        <div className="flex flex-col gap-3 md:gap-4 animate-in slide-in-from-right-4">
+                            <div className="rounded-2xl bg-[var(--card)] border border-[var(--border)] px-3.5 py-3">
+                                <p className="text-[15px] font-extrabold text-[var(--foreground)]">최종 전자서명</p>
+                                <p className="text-[12px] font-semibold text-[var(--toss-gray-4)] mt-1 leading-snug">
+                                    아래 두 칸에 손가락으로 직접 작성해 주세요. 칸이 꽉 차도록 크게 쓰시면 됩니다.
+                                </p>
                             </div>
 
-                            {/* 전자서명 */}
-                            <div>
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <span className="text-[11px] font-black text-[var(--foreground)]">전자서명 <span className="text-[var(--toss-gray-4)] font-bold">(성함을 정자로)</span></span>
-                                    <button type="button" onClick={handleClearSignature} className="text-[11px] font-bold text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] transition-colors">
+                            {/* 전자서명 — 모바일에서 넓은 터치 면적 */}
+                            <section className="rounded-2xl bg-[var(--card)] border border-[var(--border)] overflow-hidden shadow-sm">
+                                <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-blue-50/80 border-b border-blue-100">
+                                    <div className="min-w-0">
+                                        <p className="text-[14px] font-extrabold text-blue-800">1. 전자서명</p>
+                                        <p className="text-[11px] font-bold text-blue-600/90 mt-0.5">성함을 정자로 또박또박</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleClearSignature}
+                                        className="shrink-0 min-h-[40px] px-3.5 rounded-xl bg-white border border-blue-200 text-[12px] font-extrabold text-blue-700 active:scale-[0.98]"
+                                    >
                                         다시 쓰기
                                     </button>
                                 </div>
-                                <div ref={sigContainerRef} data-testid="contract-signature-canvas" className="bg-[var(--card)] border-2 border-[var(--accent)] rounded-2xl p-2 relative shadow-inner overflow-hidden h-[180px]">
+                                <div
+                                    ref={sigContainerRef}
+                                    data-testid="contract-signature-canvas"
+                                    className="relative bg-white overflow-hidden"
+                                    style={{
+                                        height: 'min(32vh, 260px)',
+                                        minHeight: 200,
+                                        backgroundImage:
+                                            'linear-gradient(to bottom, transparent 0, transparent calc(100% - 36px), rgba(37,99,235,0.12) calc(100% - 36px), rgba(37,99,235,0.12) calc(100% - 34px), transparent calc(100% - 34px))',
+                                    }}
+                                >
                                     <SignatureCanvas
                                         ref={sigCanvas}
-                                        penColor="#1e293b"
+                                        penColor="#0f172a"
+                                        minWidth={1.6}
+                                        maxWidth={3.2}
                                         canvasProps={{
                                             width: sigWidth,
                                             height: sigHeight,
-                                            className: "w-full h-full cursor-crosshair",
-                                            style: { touchAction: 'none', display: 'block' }
+                                            className: 'w-full h-full cursor-crosshair',
+                                            style: { touchAction: 'none', display: 'block', width: '100%', height: '100%' },
                                         }}
-                                        onEnd={() => setIsSigEmpty(false)}
+                                        onEnd={() => setIsSigEmpty(sigCanvas.current?.isEmpty() ?? true)}
                                     />
                                     {isSigEmpty && (
-                                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center flex-col opacity-20 text-[var(--toss-gray-3)] gap-1">
-                                            <span className="text-[10px] font-black tracking-[.2em] uppercase">Sign Here</span>
+                                        <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center gap-1.5 text-slate-300">
+                                            <span className="text-[28px] leading-none opacity-60">✍️</span>
+                                            <span className="text-[13px] font-extrabold tracking-wide">여기에 성함 서명</span>
+                                            <span className="text-[11px] font-bold opacity-80">손가락으로 천천히 그려 주세요</span>
                                         </div>
                                     )}
+                                    {!isSigEmpty && (
+                                        <span className="absolute right-2.5 top-2 rounded-md bg-blue-600/90 px-2 py-0.5 text-[10px] font-extrabold text-white pointer-events-none">
+                                            작성됨
+                                        </span>
+                                    )}
                                 </div>
-                            </div>
+                            </section>
 
-                            {/* 교부확인 자필 — 계약서 교부확인란에 삽입됨 */}
-                            <div>
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <span className="text-[11px] font-black text-[var(--foreground)]">교부확인 <span className="text-[var(--toss-gray-4)] font-bold">(‘교부 받음’ 자필 기재)</span></span>
-                                    <button type="button" onClick={handleClearReceipt} className="text-[11px] font-bold text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] transition-colors">
+                            {/* 교부확인 */}
+                            <section className="rounded-2xl bg-[var(--card)] border border-[var(--border)] overflow-hidden shadow-sm">
+                                <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-emerald-50/90 border-b border-emerald-100">
+                                    <div className="min-w-0">
+                                        <p className="text-[14px] font-extrabold text-emerald-800">2. 교부확인</p>
+                                        <p className="text-[11px] font-bold text-emerald-700/90 mt-0.5">「교부 받음」을 자필로 기재</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleClearReceipt}
+                                        className="shrink-0 min-h-[40px] px-3.5 rounded-xl bg-white border border-emerald-200 text-[12px] font-extrabold text-emerald-700 active:scale-[0.98]"
+                                    >
                                         다시 쓰기
                                     </button>
                                 </div>
-                                <div ref={receiptContainerRef} data-testid="contract-receipt-canvas" className="bg-[var(--card)] border-2 border-emerald-400 rounded-2xl p-2 relative shadow-inner overflow-hidden h-[120px]">
+                                <div
+                                    ref={receiptContainerRef}
+                                    data-testid="contract-receipt-canvas"
+                                    className="relative bg-white overflow-hidden"
+                                    style={{
+                                        height: 'min(24vh, 180px)',
+                                        minHeight: 140,
+                                        backgroundImage:
+                                            'linear-gradient(to bottom, transparent 0, transparent calc(100% - 32px), rgba(16,185,129,0.18) calc(100% - 32px), rgba(16,185,129,0.18) calc(100% - 30px), transparent calc(100% - 30px))',
+                                    }}
+                                >
                                     <SignatureCanvas
                                         ref={receiptCanvas}
-                                        penColor="#1e293b"
+                                        penColor="#0f172a"
+                                        minWidth={1.6}
+                                        maxWidth={3.2}
                                         canvasProps={{
                                             width: receiptWidth,
                                             height: receiptHeight,
-                                            className: "w-full h-full cursor-crosshair",
-                                            style: { touchAction: 'none', display: 'block' }
+                                            className: 'w-full h-full cursor-crosshair',
+                                            style: { touchAction: 'none', display: 'block', width: '100%', height: '100%' },
                                         }}
-                                        onEnd={() => setIsReceiptEmpty(false)}
+                                        onEnd={() => setIsReceiptEmpty(receiptCanvas.current?.isEmpty() ?? true)}
                                     />
                                     {isReceiptEmpty && (
-                                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-20 text-[var(--toss-gray-3)]">
-                                            <span className="text-[15px] font-black tracking-[0.3em]">교부 받음</span>
+                                        <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center gap-1 text-emerald-300/90">
+                                            <span className="text-[22px] font-black tracking-[0.18em]">교부 받음</span>
+                                            <span className="text-[11px] font-bold opacity-80">위 글자를 따라 써 주세요</span>
                                         </div>
                                     )}
+                                    {!isReceiptEmpty && (
+                                        <span className="absolute right-2.5 top-2 rounded-md bg-emerald-600/90 px-2 py-0.5 text-[10px] font-extrabold text-white pointer-events-none">
+                                            작성됨
+                                        </span>
+                                    )}
                                 </div>
-                            </div>
+                            </section>
 
-                            <div className="bg-blue-500/10 p-4 rounded-xl text-[10px] font-bold text-blue-600 text-center">
+                            <div className="rounded-xl bg-blue-50 border border-blue-100 px-3.5 py-3 text-[12px] font-bold text-blue-700 leading-relaxed text-center">
                                 이 전자 서명은 인감 날인과 동일한 법적 효력을 가집니다.
+                                {(isSigEmpty || isReceiptEmpty) && (
+                                    <span className="block mt-1 text-[11px] text-blue-600/80">
+                                        {isSigEmpty && isReceiptEmpty
+                                            ? '서명·교부확인을 모두 작성하면 저장할 수 있습니다.'
+                                            : isSigEmpty
+                                                ? '전자서명을 작성해 주세요.'
+                                                : '교부확인을 작성해 주세요.'}
+                                    </span>
+                                )}
                             </div>
                         </div>
                     )}
 
                 </div>
 
-                <div className="p-4 md:p-4 border-t border-[var(--border)] bg-[var(--card)] flex gap-3 shrink-0">
-                    {step > 1 && (
-                        <button data-testid="contract-signature-prev-button" onClick={() => setStep(s => s - 1)} className="px-5 py-3.5 rounded-xl bg-[var(--tab-bg)] text-[var(--toss-gray-4)] font-bold text-[12px] hover:bg-[var(--tab-bg)]">
-                            이전
-                        </button>
-                    )}
+                <div
+                    className="border-t border-[var(--border)] bg-[var(--card)] shrink-0"
+                    style={{
+                        padding: '12px 16px',
+                        paddingBottom: 'max(12px, env(safe-area-inset-bottom, 0px))',
+                    }}
+                >
+                    <div className="flex gap-2.5 md:gap-3">
+                        {step > 1 && (
+                            <button
+                                data-testid="contract-signature-prev-button"
+                                onClick={() => setStep((s) => s - 1)}
+                                className="min-h-[52px] md:min-h-[48px] px-4 md:px-5 rounded-2xl bg-[var(--tab-bg)] text-[var(--toss-gray-5)] font-extrabold text-[14px] md:text-[13px] border border-[var(--border)] active:scale-[0.98]"
+                            >
+                                이전
+                            </button>
+                        )}
 
-                    {step < 4 ? (
-                        <button
-                            data-testid="contract-signature-next-button"
-                            onClick={handleNext}
-                            disabled={step === 1 && (!isTemplateReady || isTemplateLoading)}
-                            className={`flex-1 px-5 py-3.5 rounded-xl text-white font-black text-[13px] shadow-md transition-all flex items-center justify-center gap-2 ${step === 1 && (!isTemplateReady || isTemplateLoading)
-                                ? 'bg-[var(--border)] cursor-not-allowed opacity-60'
-                                : 'bg-[var(--accent)] hover:bg-blue-600'
+                        {step < 4 ? (
+                            <button
+                                data-testid="contract-signature-next-button"
+                                onClick={handleNext}
+                                disabled={step === 1 && (!isTemplateReady || isTemplateLoading)}
+                                className={`flex-1 min-h-[52px] md:min-h-[48px] px-4 rounded-2xl text-white font-extrabold text-[15px] md:text-[14px] shadow-md transition-all flex items-center justify-center gap-2 active:scale-[0.98] ${
+                                    step === 1 && (!isTemplateReady || isTemplateLoading)
+                                        ? 'bg-[var(--border)] cursor-not-allowed opacity-60'
+                                        : 'bg-[var(--accent)] hover:bg-blue-600'
                                 }`}
-                        >
-                            확인 및 다음 단계 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-                        </button>
-                    ) : (
-                        <button data-testid="contract-signature-submit-button" onClick={handleSubmit} disabled={isSigEmpty || isReceiptEmpty || isGenerating} className={`flex-1 px-5 py-3.5 rounded-xl text-white font-black text-[13px] shadow-sm transition-all flex items-center justify-center gap-2 ${isSigEmpty || isReceiptEmpty || isGenerating ? 'bg-[var(--border)] cursor-not-allowed opacity-60' : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98]'}`}>
-                            {isGenerating ? '서류 생성 중...' : '최종 서명 및 저장'}
-                        </button>
-                    )}
+                            >
+                                확인 및 다음 단계
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        ) : (
+                            <button
+                                data-testid="contract-signature-submit-button"
+                                onClick={handleSubmit}
+                                disabled={isSigEmpty || isReceiptEmpty || isGenerating}
+                                className={`flex-1 min-h-[56px] md:min-h-[52px] px-4 rounded-2xl text-white font-black text-[16px] md:text-[15px] shadow-lg transition-all flex items-center justify-center gap-2 active:scale-[0.98] ${
+                                    isSigEmpty || isReceiptEmpty || isGenerating
+                                        ? 'bg-[var(--border)] cursor-not-allowed opacity-60 shadow-none'
+                                        : 'bg-emerald-600 hover:bg-emerald-700'
+                                }`}
+                            >
+                                {isGenerating ? (
+                                    <>
+                                        <span className="inline-block h-5 w-5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                                        서류 생성 중...
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        최종 서명 및 저장
+                                    </>
+                                )}
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
-        </div >
+        </div>
     );
 }
