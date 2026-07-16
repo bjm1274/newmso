@@ -25,6 +25,7 @@ import {
   resolveInventoryDepartment } from '@/app/main/inventory-utils';
 import { db, d1 } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
+import { LEAVE_TYPE, normalizeLeaveType } from '@/lib/leave-type';
 import {
   APPROVAL_OPTIONAL_INSERT_COLUMNS,
   BUILTIN_FORM_TYPE_DEFINITIONS,
@@ -567,7 +568,10 @@ export function useApprovalSubmit({
         inventory_source_department: INVENTORY_SUPPORT_DEPARTMENT };
     } else if (formType === '연차/휴가') {
       const leaveMeta = extractLeaveRequestMeta(extraData);
-      const leaveTypeValue = leaveMeta?.leaveType || String(extraData.vType || '연차 (1.0)').trim() || '연차 (1.0)';
+      const rawLeaveType =
+        leaveMeta?.leaveType || String(extraData.vType || LEAVE_TYPE.ANNUAL).trim() || LEAVE_TYPE.ANNUAL;
+      // leave_type SSOT: meta 저장 전 정규 키로 통일
+      const leaveTypeValue = normalizeLeaveType(rawLeaveType);
       nextExtraData = {
         ...extraData,
         vType: leaveTypeValue,
@@ -576,8 +580,8 @@ export function useApprovalSubmit({
         delegateName: leaveMeta?.delegateName || String(extraData.delegateName || '').trim(),
         delegateDepartment: leaveMeta?.delegateDepartment || String(extraData.delegateDepartment || '').trim(),
         delegatePosition: leaveMeta?.delegatePosition || String(extraData.delegatePosition || '').trim(),
-        // 군소집휴가 첨부파일
-        ...(leaveTypeValue === '군소집휴가' && Array.isArray(extraData.attachments) && extraData.attachments.length > 0
+        // 군소집휴가 첨부파일 (정규화 전 원문 기준 — '군소집' → 기타 로 흡수)
+        ...(String(rawLeaveType).includes('군소집') && Array.isArray(extraData.attachments) && extraData.attachments.length > 0
           ? { attachments: extraData.attachments }
           : {}) };
     } else if (formType === '공문발송' && officialDocumentRequest) {

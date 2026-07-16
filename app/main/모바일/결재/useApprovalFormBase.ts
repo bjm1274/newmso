@@ -4,7 +4,7 @@
  * 연차신청폼(SApprovalLeaveForm)과 일반기안폼(SApprovalGenericForm)에서
  * 완전히 동일하게 반복되던 아래 로직을 단일 모듈로 추출:
  *   1. 결재선/첨부/상신 상태 선언
- *   2. 결재선 자동 매핑 useEffect (staff_members fetch → 필터 → 정렬 → toApproverPick)
+ *   2. 결재선 자동 매핑 (useApproverLine → selectDefaultApproverLine SSOT)
  *   3. 첨부 파일 업로드 완료 항목 추출 (uploadedAttachments)
  *   4. approvals insert + appendApprovalHistory 패턴
  *
@@ -13,15 +13,14 @@
  * JM(파일당 500줄, 단일 책임), JM2(staff fetch 1회), JM4(any 금지)
  */
 
-import { useCallback, useEffect, useState } from 'react';
-import { db } from '@/lib/db-client';
+import { useCallback, useState } from 'react';
 import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
-import type { ErpUser, StaffMember } from '@/types';
-import { isActiveStaff, isDepartmentHeadOrAbove, getPositionOrder } from '@/lib/active-staff';
+import type { ErpUser } from '@/types';
 import { buildApprovalSubmitPayload } from '@/lib/approval-submit-payload';
-import { toApproverPick, type ApproverPick } from './결재선피커';
+import type { ApproverPick } from './결재선피커';
 import type { AttachmentEntry } from './AttachmentPicker';
 import { generateMobileDocNumber } from './data-hooks';
+import { useApproverLine } from './useApproverLine';
 
 // ─────────────────────────────────────────────
 // 타입
@@ -73,55 +72,15 @@ export type UploadedAttachment = {
 export function useApprovalFormBase({ user, staffId, company }: ApprovalFormBaseParams) {
   const [submitting, setSubmitting] = useState(false);
   const [attachments, setAttachments] = useState<AttachmentEntry[]>([]);
-  const [approverDefaults, setApproverDefaults] = useState<ApproverPick[]>([]);
-  const [approverLine, setApproverLine] = useState<ApproverPick[]>([]);
-  const [approverLoading, setApproverLoading] = useState(true);
-  const [approverManual, setApproverManual] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
-
-  // 결재선 자동 매핑 — 본인 회사의 APPROVER_POSITIONS 보유자 1~3명, 직급 위계순
-  useEffect(() => {
-    if (!staffId) {
-      setApproverLoading(false);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      setApproverLoading(true);
-      try {
-        const { data, error } = await db
-          .from('staff_members')
-          .select('id, name, company, department, position, status, hire_date, resign_date, email, phone, role, permissions');
-        if (error) throw error;
-        if (cancelled) return;
-        const candidates = ((data ?? []) as StaffMember[])
-          .filter((s) => isActiveStaff(s))
-          .filter((s) => isDepartmentHeadOrAbove(s))
-          .filter((s) => String(s.id) !== staffId)
-          .filter((s) => s.company === company || s.company === 'SY INC.')
-          .sort((a, b) => getPositionOrder(a.position, a.role) - getPositionOrder(b.position, b.role) || (a.name || '').localeCompare(b.name || ''));
-        // 자동 결재선은 1~3명 (직급 위계 상위 우선)
-        const picks = candidates.map(toApproverPick).slice(0, 3);
-        setApproverDefaults(picks);
-        // 수동 변경 전이면 기본값으로 라인 채움
-        if (!approverManual) {
-          setApproverLine(picks);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error('[mobile-approval] approver candidates load failed', err);
-          setApproverDefaults([]);
-          if (!approverManual) setApproverLine([]);
-        }
-      } finally {
-        if (!cancelled) setApproverLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // approverManual은 의도적으로 의존성 제외 — manual 토글로 재fetch하면 안 됨
-  }, [staffId, company]); // eslint-disable-line react-hooks/exhaustive-deps
+  const {
+    approverDefaults,
+    approverLine,
+    approverLoading,
+    approverManual,
+    pickerOpen,
+    setPickerOpen,
+    applyPick,
+  } = useApproverLine(staffId, company);
 
   // ── 첨부 파일 업로드 완료 항목 추출 ──
   const buildUploadedAttachments = useCallback((): UploadedAttachment[] => {
@@ -138,14 +97,9 @@ export function useApprovalFormBase({ user, staffId, company }: ApprovalFormBase
   // ── 결재선 피커 onApply 핸들러 ──
   const handleApproverApply = useCallback(
     (next: ApproverPick[]) => {
-      setApproverLine(next);
-      // 기본값과 같은지 비교 — 같으면 manual 해제
-      const sameAsDefault =
-        next.length === approverDefaults.length &&
-        next.every((p, i) => p.id === approverDefaults[i]?.id);
-      setApproverManual(!sameAsDefault);
+      applyPick(next);
     },
-    [approverDefaults],
+    [applyPick],
   );
 
   // ── approvals insert (공통 패턴) ──
@@ -216,10 +170,8 @@ export function useApprovalFormBase({ user, staffId, company }: ApprovalFormBase
     setAttachments,
     approverDefaults,
     approverLine,
-    setApproverLine,
     approverLoading,
     approverManual,
-    setApproverManual,
     pickerOpen,
     setPickerOpen,
 

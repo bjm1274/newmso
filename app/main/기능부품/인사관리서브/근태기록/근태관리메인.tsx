@@ -1,4 +1,5 @@
 'use client';
+// LEGACY — unused; AttendWorkcenter is SSOT. Safe to delete after smoke.
 import { toast } from '@/lib/toast';
 import type { StaffMember as AppStaffMember } from '@/types';
 import { useState, useEffect, useMemo } from 'react';

@@ -6,7 +6,7 @@
  *  - updateBoardPost : board_posts.update (제목/본문/첨부/투표)
  *  - deleteBoardPost : board_posts.delete (하드 삭제, PC handleDeletePost 미러)
  *  - deleteBoardComment : board_post_comments.delete (답글 먼저, PC handleDeleteComment 미러)
- *  - togglePollVote : board_posts.poll_votes JSONB 토글 (PC handlePostPollVote 미러)
+ *  - togglePollVote : re-export from 게시판서브/board-poll-vote (PC·모바일 SSOT)
  * JM: 단일 책임 (변경 계층), JM3(try/catch + toast), JM4(any 금지)
  */
 
@@ -115,50 +115,11 @@ export async function deleteBoardComment(commentId: string): Promise<boolean> {
 }
 
 // ─────────────────────────────────────────────
-// 투표 — 옵션 토글 (board_posts.poll_votes JSONB 업데이트, PC handlePostPollVote 미러)
+// 투표 — shared board-poll-vote re-export (PC·모바일 SSOT)
 // ─────────────────────────────────────────────
 
-export type PollVotes = Record<string, string[]>;
-
-/**
- * poll_votes JSONB를 낙관적으로 계산해 반환 + DB 업데이트.
- * 단일 선택(!multiple)일 경우 기존 표를 제거한 뒤 추가.
- * 이미 해당 옵션에 투표했으면 취소.
- */
-export async function togglePollVote(
-  postId: string,
-  optIdx: number,
-  userId: string,
-  currentVotes: PollVotes,
-  multiple: boolean,
-): Promise<PollVotes | null> {
-  if (!postId || !userId) return null;
-  const key = String(optIdx);
-  const next: PollVotes = {};
-  // deep copy
-  Object.keys(currentVotes || {}).forEach((k) => {
-    next[k] = Array.isArray(currentVotes[k]) ? [...currentVotes[k]] : [];
-  });
-  const already = Array.isArray(next[key]) && next[key].includes(userId);
-  if (already) {
-    next[key] = next[key].filter((id) => id !== userId);
-  } else {
-    if (!multiple) {
-      Object.keys(next).forEach((k) => {
-        next[k] = next[k].filter((id) => id !== userId);
-      });
-    }
-    next[key] = [...(next[key] || []), userId];
-  }
-  try {
-    const { error } = await db
-      .from('board_posts')
-      .update({ poll_votes: next })
-      .eq('id', postId);
-    if (error) throw error;
-    return next;
-  } catch (err) {
-    toast(`투표 실패: ${(err as Error)?.message ?? '오류'}`, 'error');
-    return null;
-  }
-}
+export {
+  togglePollVote,
+  computeNextPollVotes,
+  type PollVotes,
+} from '@/app/main/기능부품/게시판서브/board-poll-vote';

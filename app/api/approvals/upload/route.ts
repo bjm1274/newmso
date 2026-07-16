@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadToR2 } from '@/lib/object-storage';
 import { readSessionFromRequest } from '@/lib/server-session';
-
+// SSOT size: @/lib/upload-constants
+import { MAX_FILE_SIZE_BYTES, MAX_VIDEO_SIZE_BYTES } from '@/lib/upload-constants';
 
 export const dynamic = 'force-dynamic';
 
-const MAX_FILE_SIZE_BYTES = 200 * 1024 * 1024;
-const MAX_VIDEO_SIZE_BYTES = 200 * 1024 * 1024;
 const R2_BUCKET = 'pchos-files';
 
 function guessFileExtension(fileName: string, mimeType: string): string {

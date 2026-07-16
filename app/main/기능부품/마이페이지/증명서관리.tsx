@@ -162,15 +162,21 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
                 .limit(1),
               db
                 .from('companies')
-                .select('logo_url')
+                .select('logo_url, seal_url')
                 .eq('name', companyName)
                 .limit(1)
             ]);
-            const sealRow = sealRes.data?.[0];
-            if (!cancelled && !sealRes.error && sealRow?.seal_url) {
-              setSealUrl(String(sealRow.seal_url));
+            const sealRow = sealRes.data?.[0] as { seal_url?: string | null } | undefined;
+            const logoRow = companyRes.data?.[0] as
+              | { logo_url?: string | null; seal_url?: string | null }
+              | undefined;
+            const resolvedSeal =
+              (sealRow?.seal_url && String(sealRow.seal_url)) ||
+              (logoRow?.seal_url && String(logoRow.seal_url)) ||
+              '';
+            if (!cancelled && resolvedSeal) {
+              setSealUrl(resolvedSeal);
             }
-            const logoRow = companyRes.data?.[0];
             if (!cancelled && !companyRes.error && logoRow?.logo_url) {
               setCompanyLogoUrl(String(logoRow.logo_url));
             }

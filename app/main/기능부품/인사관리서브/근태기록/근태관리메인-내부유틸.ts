@@ -4,7 +4,9 @@
 //  - mapLegacyApprovalRequest: meta_data가 문자열(JSON)일 때도 파싱
 //  - resolveLeaveStatusForDate / resolveAttendanceStatusWithLeave: 호출부 동작 보존을 위해
 //    근태관리메인.tsx에 있던 원본 구현을 그대로 옮긴 것
+//  - ATTENDANCE_STATUS_META / getAttendanceStatusMeta 는 @/lib/attendance-status-meta 재export
 // 따라서 근태유틸.ts로 통합하지 않고 별도 모듈로 분리한다(동작 보존 최우선).
+// LEGACY_ROSTER_APPROVAL_TYPE 문자열은 통합 금지.
 
 import { formatKoreanDateKey } from '@/lib/seoul-time';
 
@@ -147,21 +149,11 @@ export function isWorkedAttendanceStatus(status: string) {
   return status === 'present' || status === 'late' || status === 'early_leave';
 }
 
-export const ATTENDANCE_STATUS_META = {
-  present: { label: '정상 출근', color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/30', ring: 'ring-emerald-200 dark:ring-emerald-800/50', dot: 'bg-emerald-500' },
-  late: { label: '지각', color: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-500/10 dark:bg-orange-900/30', ring: 'ring-orange-200 dark:ring-orange-800/50', dot: 'bg-orange-500' },
-  early_leave: { label: '조퇴', color: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/30', ring: 'ring-amber-200 dark:ring-amber-800/50', dot: 'bg-amber-500' },
-  absent: { label: '결근', color: 'text-rose-700 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-900/30', ring: 'ring-rose-200 dark:ring-rose-800/50', dot: 'bg-rose-500' },
-  annual_leave: { label: '연차', color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-500/10 dark:bg-blue-900/30', ring: 'ring-blue-200 dark:ring-blue-800/50', dot: 'bg-blue-500' },
-  sick_leave: { label: '병가', color: 'text-purple-700 dark:text-purple-400', bg: 'bg-purple-500/10 dark:bg-purple-900/30', ring: 'ring-purple-200 dark:ring-purple-800/50', dot: 'bg-purple-500' },
-  half_leave: { label: '반차', color: 'text-cyan-700 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-900/30', ring: 'ring-cyan-200 dark:ring-cyan-800/50', dot: 'bg-cyan-500' },
-  holiday: { label: '휴일', color: 'text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)]', bg: 'bg-[var(--tab-bg)] dark:bg-zinc-800', ring: 'ring-zinc-200 dark:ring-zinc-700', dot: 'bg-zinc-400' },
-  off: { label: 'OFF', color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-100 dark:bg-slate-800/40', ring: 'ring-slate-300 dark:ring-slate-700', dot: 'bg-slate-500' },
-  missing: { label: '기록 없음', color: 'text-[var(--toss-gray-4)] dark:text-[var(--toss-gray-3)]', bg: 'bg-[var(--page-bg)] dark:bg-zinc-800/80', ring: 'ring-zinc-200 dark:ring-zinc-700', dot: 'bg-zinc-400' } } as const;
-
-export function getAttendanceStatusMeta(status: string) {
-  return ATTENDANCE_STATUS_META[(status || 'missing') as keyof typeof ATTENDANCE_STATUS_META] || ATTENDANCE_STATUS_META.missing;
-}
+// 상태 표시 메타 — lib SSOT (off 키 포함). LEGACY_ROSTER_APPROVAL_TYPE 은 이 파일 전용('근무표') 유지.
+export {
+  ATTENDANCE_STATUS_META,
+  getAttendanceStatusMeta,
+} from '@/lib/attendance-status-meta';
 
 export function isWeekendDate(dateStr: string) {
   const dayOfWeek = new Date(dateStr).getDay();

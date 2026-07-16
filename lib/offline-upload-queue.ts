@@ -23,6 +23,7 @@
 
 import { storeBlob, getBlob, deleteBlob, cleanupOldBlobs } from './offline-blob-storage';
 import { enqueueD1Mutation } from './offline-queue-d1';
+import { isNetworkError } from './offline-network-error';
 
 // ─────────────────────────────────────────────────────────────
 // 상수
@@ -197,25 +198,6 @@ async function putToR2(
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'R2 PUT 오류' };
   }
-}
-
-// ─────────────────────────────────────────────────────────────
-// 네트워크 에러 판별
-// ─────────────────────────────────────────────────────────────
-
-function isNetworkError(err: unknown): boolean {
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
-  if (err instanceof TypeError) return true;
-  if (err instanceof Error) {
-    const msg = err.message.toLowerCase();
-    return (
-      msg.includes('failed to fetch') ||
-      msg.includes('network request failed') ||
-      msg.includes('load failed') ||
-      msg.includes('networkerror')
-    );
-  }
-  return false;
 }
 
 // ─────────────────────────────────────────────────────────────

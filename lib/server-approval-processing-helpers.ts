@@ -3,6 +3,8 @@
  * server-approval-processing.ts 비대화를 줄이기 위해 분리 (phase 8-D TODO 일부).
  */
 
+import { leaveTypeToAttendanceStatus } from '@/lib/leave-type';
+
 /** server_processing 완료 상태로 취급하는 값 (재실행 시 side effect 금지). */
 const DONE_SERVER_PROCESSING_STATUSES = new Set(['completed', 'completed_with_warnings']);
 
@@ -48,14 +50,14 @@ export function isFinalApprovalEffectsDone(metaData: unknown): {
 }
 
 export function normalizeLeaveAttendanceStatus(leaveTypeValue: unknown) {
-  const normalized = String(leaveTypeValue || '').trim().toLowerCase();
-  if (normalized.includes('병가')) {
-    return { legacy: '병가', modern: 'sick_leave' };
+  const modern = leaveTypeToAttendanceStatus(leaveTypeValue);
+  if (modern === 'sick_leave') {
+    return { legacy: '병가', modern: 'sick_leave' as const };
   }
-  if (normalized.includes('반차') || normalized.includes('0.5')) {
-    return { legacy: '반차휴가', modern: 'half_leave' };
+  if (modern === 'half_leave') {
+    return { legacy: '반차휴가', modern: 'half_leave' as const };
   }
-  return { legacy: '연차휴가', modern: 'annual_leave' };
+  return { legacy: '연차휴가', modern: 'annual_leave' as const };
 }
 
 export function resolveAttendanceCorrectionStatusPair(correctionTypeValue: string) {

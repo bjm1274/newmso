@@ -26,6 +26,7 @@ import {
   toMonthString,
   toTimeString,
   type Row } from './data-helpers';
+import { mapOrderStatus } from './order-status-map';
 
 // ─────────────────────────────────────────────────
 // Status 워크센터
@@ -206,19 +207,9 @@ function mapMoveRow(r: Row): StockMoveRow {
     tone: MOVE_KIND_TONE[kind] };
 }
 
-const ORDER_STATUS_MAP: Record<string, { status: PurchaseOrderRow['status']; tone: Tone }> = {
-  대기: { status: '발주 대기', tone: 'warn' },
-  '발주 대기': { status: '발주 대기', tone: 'warn' },
-  승인: { status: '확정', tone: 'success' },
-  확정: { status: '확정', tone: 'success' },
-  배송: { status: '배송 중', tone: 'accent' },
-  '배송 중': { status: '배송 중', tone: 'accent' },
-  완료: { status: '납품 완료', tone: 'success' },
-  '납품 완료': { status: '납품 완료', tone: 'success' } };
-
 function mapOrderRow(r: Row): PurchaseOrderRow {
   const rawStatus = asString(r['status'], '대기').trim();
-  const mapped = ORDER_STATUS_MAP[rawStatus] ?? { status: '발주 대기' as const, tone: 'warn' as const };
+  const mapped = mapOrderStatus(rawStatus);
   const rawItems = r['items'];
   let itemCount = pickNumber(r, ['item_count'], 0);
   if (Array.isArray(rawItems)) {

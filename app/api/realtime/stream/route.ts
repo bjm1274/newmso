@@ -1,49 +1,13 @@
 import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
 import { getD1Binding } from '@/lib/db';
+import {
+  REALTIME_ALLOWED_TABLE_SET as ALLOWED_TABLES,
+  REALTIME_TABLE_TIMESTAMP_COLUMN as TABLE_TIMESTAMP_COLUMN,
+  getRealtimeTimestampColumn,
+} from '@/lib/realtime/allowed-tables';
 
 export const dynamic = 'force-dynamic';
 
-const ALLOWED_TABLES = new Set<string>([
-  'messages',
-  'chat_rooms',
-  'room_read_cursors',
-  'message_reactions',
-  'message_bookmarks',
-  'pinned_messages',
-  'polls',
-  'poll_votes',
-  'notifications',
-  'board_posts',
-  'board_post_comments',
-  'board_post_reads',
-  'approvals',
-  'attendance',
-  'attendances',
-  'leave_requests',
-  'todos',
-  'todo_reminder_logs',
-  'staff_members',
-  'op_patient_checks',
-  'op_check_templates',
-  'inventory',
-  'inventory_logs',
-  'staff_evaluations',
-  'corporate_card_transactions',
-  'company_holidays',
-  'document_repository',
-  'handover_notes',
-  'payroll_records',
-  'audit_logs',
-  'work_shifts',
-  'shift_assignments',
-  'staff_shift_assignments',
-  'backup_restore_runs',
-]);
-
-const TABLE_TIMESTAMP_COLUMN: Record<string, string> = {
-  room_read_cursors: 'last_read_at',
-  pinned_messages: 'pinned_at',
-  chat_rooms: 'last_message_at' };
 
 function userId(user: SessionUser | null | undefined): string | null {
   if (!user) return null;
@@ -56,7 +20,7 @@ async function fetchMaxCreatedAtD1(
   d1: NonNullable<Awaited<ReturnType<typeof getD1Binding>>>,
   tableName: string,
 ): Promise<string | null> {
-  const column = TABLE_TIMESTAMP_COLUMN[tableName] ?? 'created_at';
+  const column = getRealtimeTimestampColumn(tableName);
   try {
     const result = await d1
       .prepare(`SELECT "${column}" AS ts FROM "${tableName}" ORDER BY "${column}" DESC LIMIT 1`)

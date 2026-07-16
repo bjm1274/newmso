@@ -14,6 +14,7 @@
 import { getOfflineQueue, type QueuedAction } from './offline-queue';
 import { db } from './db-client';
 import { resolveInjectedPayload } from './offline-queue-transaction';
+import { isNetworkError } from './offline-network-error';
 
 // ─────────────────────────────────────────────────────────────
 // 타입
@@ -51,27 +52,6 @@ type QueuedMutationPayload = {
   onConflict?: string;
   ignoreDuplicates?: boolean;
 };
-
-// ─────────────────────────────────────────────────────────────
-// 네트워크 에러 판별
-// ─────────────────────────────────────────────────────────────
-
-function isNetworkError(err: unknown): boolean {
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
-  if (err instanceof TypeError) return true; // fetch failed
-  if (err instanceof Error) {
-    const msg = err.message.toLowerCase();
-    if (
-      msg.includes('failed to fetch') ||
-      msg.includes('network request failed') ||
-      msg.includes('load failed') ||
-      msg.includes('networkerror')
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
 
 // ─────────────────────────────────────────────────────────────
 // D1 mutation 실행 (큐 replay에서도 재사용)

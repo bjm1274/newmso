@@ -173,6 +173,7 @@ export function normalizeProfileUser<T>(source: T): T {
   if (normalizedPermissions.chat_파일첨부 === undefined) normalizedPermissions.chat_파일첨부 = true;
   if (normalizedPermissions.mypage_수정 === undefined) normalizedPermissions.mypage_수정 = true;
   if (normalizedPermissions.mypage_급여조회 === undefined) normalizedPermissions.mypage_급여조회 = true;
+  if (normalizedPermissions.mypage_증명서조회 === undefined) normalizedPermissions.mypage_증명서조회 = true;
 
   // 2. HR 권한 세분화 마이그레이션
   if (normalizedPermissions.hr_구성원 === true) {

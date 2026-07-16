@@ -1,4 +1,5 @@
 import { NP_INCOME_CEILING, NP_INCOME_FLOOR } from '@/lib/tax-free-limits';
+import { isMidMonthJoin } from '@/lib/payroll-mid-month';
 
 export const EMPLOYEE_INSURANCE_RATES_2026 = {
   nationalPension: 0.0475,
@@ -82,34 +83,24 @@ export function calculateEmployeeInsuranceDeductions(
   joinedAt?: string | null
 ) {
   const taxableBase = Math.max(0, Math.floor(Number(taxableIncome) || 0));
-  
+
   // 중도입사 여부 확인 (입사연월 === 정산연월 && 입사일 !== 1일)
-  let isMidMonthJoin = false;
-  if (joinedAt && yearMonth) {
-    const joinParts = joinedAt.split('-');
-    if (joinParts.length >= 3) {
-      const joinYearMonth = `${joinParts[0]}-${joinParts[1]}`;
-      const joinDay = parseInt(joinParts[2], 10);
-      if (joinYearMonth === yearMonth && joinDay !== 1) {
-        isMidMonthJoin = true;
-      }
-    }
-  }
+  const midMonthJoin = isMidMonthJoin(joinedAt, yearMonth);
 
   const pensionBase = Math.min(Math.max(taxableBase, NP_INCOME_FLOOR), NP_INCOME_CEILING);
-  
+
   const nationalPension =
-    isMidMonthJoin || age >= 60
+    midMonthJoin || age >= 60
       ? 0
       : typeof nationalPensionAmount === 'number' && nationalPensionAmount >= 0
       ? nationalPensionAmount
       : Math.floor(pensionBase * EMPLOYEE_INSURANCE_RATES_2026.nationalPension);
-      
-  const healthInsurance = isMidMonthJoin
+
+  const healthInsurance = midMonthJoin
     ? 0
     : Math.floor(taxableBase * EMPLOYEE_INSURANCE_RATES_2026.healthInsurance);
-    
-  const longTermCare = isMidMonthJoin
+
+  const longTermCare = midMonthJoin
     ? 0
     : Math.floor(healthInsurance * LONG_TERM_CARE_HEALTH_RATIO_2026);
     

@@ -2,40 +2,21 @@
 
 import { useCallback } from 'react';
 import type { MAvatarTone } from '../공통/MAvatar';
+import { pickAvatarTone as pickAvatarToneLib, type AvatarTone } from '@/lib/avatar-tone';
+import { formatTs as formatTsLib, type FormatTsMode } from '@/lib/format-display';
 import { buildApprovalHistoryEntryCore } from '@/lib/approval-shared';
 import type { StaffMember } from '@/types';
 
-const AVATAR_TONES: MAvatarTone[] = ['blue', 'pink', 'violet', 'orange', 'cyan', 'green'];
+export type { AvatarTone, FormatTsMode };
+export { formatMoney } from '@/lib/format-display';
 
+/** Re-export: maps lib AvatarTone → MAvatarTone (same union). */
 export function pickAvatarTone(seed: string | null | undefined): MAvatarTone {
-  const s = String(seed || '');
-  let hash = 0;
-  for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
-  return AVATAR_TONES[hash % AVATAR_TONES.length];
+  return pickAvatarToneLib(seed) as MAvatarTone;
 }
 
-export function formatTs(iso?: string | null): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const now = new Date();
-  const sameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-  if (sameDay) {
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  }
-  const yest = new Date(now);
-  yest.setDate(now.getDate() - 1);
-  if (
-    d.getFullYear() === yest.getFullYear() &&
-    d.getMonth() === yest.getMonth() &&
-    d.getDate() === yest.getDate()
-  ) {
-    return '어제';
-  }
-  return `${d.getMonth() + 1}/${d.getDate()}`;
+export function formatTs(iso?: string | null, mode: FormatTsMode = 'relative'): string {
+  return formatTsLib(iso, mode);
 }
 
 export function elapsedDays(iso?: string | null): number {

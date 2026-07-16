@@ -8,6 +8,7 @@ import {
 import { syncApprovalToDocumentRepository } from '@/lib/approval-document-archive';
 import { ensureApprovedAnnualLeaveRequest, isAnnualLeaveType, syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
 import { extractLeaveRequestMeta } from '@/lib/leave-notice';
+import { LEAVE_TYPE, normalizeLeaveType } from '@/lib/leave-type';
 import { syncOfficialDocumentLogFromApproval } from '@/lib/official-document-approval';
 import { formatKoreanDateKey, getKoreanTodayString } from '@/lib/seoul-time';
 import { insertNotificationsOrThrow, type NotificationRow } from './notification-utils';
@@ -334,7 +335,7 @@ export async function processFinalApprovalEffects(
         const start = new Date(startStr);
         const end = new Date(endStr || startStr);
         const days = leaveSummary?.days ?? Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-        const leaveType = leaveSummary?.leaveType || '연차';
+        const leaveType = normalizeLeaveType(leaveSummary?.leaveType || LEAVE_TYPE.ANNUAL);
         const leaveStatus = normalizeLeaveAttendanceStatus(leaveType);
 
         await ensureApprovedAnnualLeaveRequest({
@@ -359,7 +360,7 @@ export async function processFinalApprovalEffects(
         // 잔액 SSOT 는 leave_balances — 아래에서 recalculateLeaveBalance 경로로 반영.
 
         // 연차(부여) 및 연차(과거사용)는 실제 휴가 사용이 아니므로 출결부 마킹 생략
-        if (leaveType !== '연차(부여)' && leaveType !== '연차(과거사용)') {
+        if (leaveType !== LEAVE_TYPE.GRANT && leaveType !== LEAVE_TYPE.RETRO_USE) {
           for (let index = 0; index < days; index += 1) {
             const date = new Date(start);
             date.setDate(date.getDate() + index);

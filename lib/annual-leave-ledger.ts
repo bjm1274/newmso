@@ -6,52 +6,21 @@ import {
   staff_members as staffMembersTable,
   eq,
   and,
-  desc } from '@/lib/db';
+  desc,
+  inArray,
+} from '@/lib/db';
+import {
+  isAnnualLeaveType,
+  isHalfLeaveType,
+  getLeaveUnit,
+  normalizeLeaveType,
+  leaveTypeLookupAliases,
+} from '@/lib/leave-type';
+
+// leave_type SSOT: leave-type.ts — re-export for existing importers
+export { isAnnualLeaveType, isHalfLeaveType, getLeaveUnit };
 
 const APPROVED_STATUS_LABELS = new Set(['승인', 'approved']);
-
-export function isAnnualLeaveType(value: unknown): boolean {
-  const normalized = String(value ?? '').trim().toLowerCase();
-  if (!normalized) return false;
-
-  // '연차(이력)': 과거 엑셀로 입력된 사용 내역('연차(이력)')도
-  // 현재 잔여 계산(annual_leave_used)에 정상 합산하여 잔여값을 차감하도록 변경합니다.
-  if (normalized.includes('부여')) return false;
-
-  return (
-    normalized === 'annual_leave' ||
-    normalized === 'annual' ||
-    normalized === '연차' ||
-    normalized === '연차/휴가' ||
-    normalized.includes('연차')
-  );
-}
-
-export function isHalfLeaveType(value: unknown): boolean {
-  return getLeaveUnit(value) === 0.5;
-}
-
-/**
- * 휴가 유형별 1회당 소모 일수 단위 반환
- * - 반차(오전/오후 포함): 0.5
- * - 그 외 연차/공가 등 풀데이: 1.0
- * 주의: 반반차(0.25)는 이 시스템에서 지원하지 않음
- */
-export function getLeaveUnit(value: unknown): 0.5 | 1.0 {
-  const normalized = String(value ?? '').trim().toLowerCase();
-  if (!normalized) return 1.0;
-
-  const isHalf =
-    normalized === 'half_leave' ||
-    normalized === 'half-day' ||
-    normalized === '반차' ||
-    normalized === '오전반차' ||
-    normalized === '오후반차' ||
-    normalized.startsWith('반차') ||
-    normalized.endsWith('반차');
-
-  return isHalf ? 0.5 : 1.0;
-}
 
 export function isApprovedLeaveStatus(value: unknown): boolean {
   const normalized = String(value ?? '').trim().toLowerCase();
@@ -206,21 +175,24 @@ type D1LeaveRequestInsert = {
 };
 
 export async function ensureApprovedAnnualLeaveRequest(params: EnsureApprovedAnnualLeaveRequestParams) {
-  const { staffId, leaveType, startDate, endDate } = params;
-  const payload = buildLeaveRequestPayload(params);
+  const leaveType = normalizeLeaveType(params.leaveType);
+  const { staffId, startDate, endDate } = params;
+  const payload = buildLeaveRequestPayload({ ...params, leaveType });
 
   const d1 = await getD1Binding();
   if (!d1) throw new Error('[annual-leave-ledger] D1 binding not available (ensureApprovedAnnualLeaveRequest)');
   const db = getD1Drizzle(d1);
 
   // 기존 레코드 조회 (staff_id + leave_type + start_date + end_date, 최신 순)
+  // leave_type 은 정규 키 + 레거시 별칭 (연차 (1.0) 등) 으로 조회 — 대기 row 승격
+  const typeAliases = leaveTypeLookupAliases(params.leaveType);
   const existingRows = await db
     .select({ id: leaveRequestsTable.id, status: leaveRequestsTable.status })
     .from(leaveRequestsTable)
     .where(
       and(
         eq(leaveRequestsTable.staff_id, staffId),
-        eq(leaveRequestsTable.leave_type, leaveType),
+        inArray(leaveRequestsTable.leave_type, typeAliases),
         eq(leaveRequestsTable.start_date, startDate),
         eq(leaveRequestsTable.end_date, endDate),
       ),

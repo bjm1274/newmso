@@ -1,5 +1,16 @@
 'use client';
 
+/**
+ * LEGACY — 더 이상 렌더 경로에 연결되지 않음 (Phase B #8).
+ *
+ * SSOT: `관리자워크센터/CompanyWorkcenter` (id: `company`).
+ * - open_subview=`회사관리` / 즐겨찾기 / e2e 는 admin-menu-config ADMIN_TAB_ALIASES
+ *   로 `company` 에 alias 되어 CompanyWorkcenter 를 연다.
+ * - 권한 키는 그대로 `admin_회사관리`.
+ * - 팀·근태차감 등 이 파일에만 있던 세부 UI가 필요하면 CompanyWorkcenter 탭으로
+ *   이식 후 삭제할 것. 현재는 미사용 보존.
+ */
+
 import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
 import { db } from '@/lib/db-client';
@@ -15,6 +26,7 @@ import AttendanceDeductionRules from './근태차감규칙설정';
 import LeaveManagement from '../인사관리서브/휴가신청/휴가관리메인';
 import IntegratedHRSettings from '../인사관리서브/인사통합설정';
 import PayrollComplianceCheck from '../인사관리서브/급여명세/급여기준점검';
+import CompanyBrandAssets from '@/app/components/CompanyBrandAssets';
 
 const COMPANY_COLUMNS = [
   'id',
@@ -28,9 +40,11 @@ const COMPANY_COLUMNS = [
   'phone',
   'payment_day',
   'memo',
+  'logo_url',
+  'seal_url',
   'created_at',
 ] as const;
-const COMPANY_OPTIONAL_COLUMNS = ['payment_day'];
+const COMPANY_OPTIONAL_COLUMNS = ['payment_day', 'logo_url', 'seal_url'];
 const buildCompanySelect = (omittedColumns: ReadonlySet<string> = new Set()) =>
   buildSelectClause(COMPANY_COLUMNS, omittedColumns);
 
@@ -57,6 +71,8 @@ type FormState = {
   phone: string;
   payment_day: string;
   memo: string;
+  logo_url: string;
+  seal_url: string;
 };
 
 const COMPANY_TABS: { id: CompanyManagerTabId; label: string }[] = [
@@ -77,7 +93,9 @@ function createEmptyForm(): FormState {
     address: '',
     phone: '',
     payment_day: '7',
-    memo: '' };
+    memo: '',
+    logo_url: '',
+    seal_url: '' };
 }
 
 function normalizePaymentDay(value: unknown) {
@@ -224,7 +242,30 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
       return;
     }
 
-    const companyRows = (data || []) as unknown as Company[];
+    let companyRows = (data || []) as unknown as Company[];
+
+    // contract_templates.seal_url 을 companies.seal_url 폴백으로 병합 (기존 직인 노출)
+    try {
+      const { data: tmplRows } = await db
+        .from('contract_templates')
+        .select('company_name, seal_url');
+      if (Array.isArray(tmplRows) && tmplRows.length > 0) {
+        const sealByName = new Map<string, string>();
+        for (const row of tmplRows) {
+          const name = String((row as { company_name?: string }).company_name || '').trim();
+          const seal = String((row as { seal_url?: string }).seal_url || '').trim();
+          if (name && seal) sealByName.set(name, seal);
+        }
+        companyRows = companyRows.map((company) => {
+          if (company.seal_url) return company;
+          const fallback = sealByName.get(String(company.name || '').trim());
+          return fallback ? { ...company, seal_url: fallback } : company;
+        });
+      }
+    } catch (err) {
+      console.warn('[회사관리] 직인 폴백 병합 실패', err);
+    }
+
     setCompanies(companyRows);
     setMsoId(companyRows.find((company) => company.type === 'MSO')?.id || null);
     setLoading(false);
@@ -260,7 +301,9 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
       address: form.address || null,
       phone: form.phone || null,
       payment_day: normalizePaymentDay(form.payment_day),
-      memo: form.memo || null };
+      memo: form.memo || null,
+      logo_url: form.logo_url.trim() || null,
+      seal_url: form.seal_url.trim() || null };
 
     try {
       if (editing) {
@@ -313,7 +356,9 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
       address: company.address || '',
       phone: company.phone || '',
       payment_day: String(company.payment_day || 7),
-      memo: company.memo || '' });
+      memo: company.memo || '',
+      logo_url: company.logo_url || '',
+      seal_url: company.seal_url || '' });
   };
 
   const companyColumns = useMemo((): Column<Company>[] => [
@@ -322,7 +367,20 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
       label: '회사명',
       primary: true,
       render: (company) => (
-        <span className="font-bold text-[var(--foreground)]">{company.name}</span>
+        <div className="flex items-center gap-2">
+          {company.logo_url ? (
+            <img
+              src={company.logo_url}
+              alt=""
+              className="h-7 w-7 rounded-md border border-[var(--border)] bg-white object-contain p-0.5"
+            />
+          ) : (
+            <span className="flex h-7 w-7 items-center justify-center rounded-md border border-dashed border-[var(--border)] text-[10px] font-bold text-[var(--toss-gray-3)]">
+              無
+            </span>
+          )}
+          <span className="font-bold text-[var(--foreground)]">{company.name}</span>
+        </div>
       ) },
     {
       key: 'type',
@@ -423,6 +481,35 @@ export default function CompanyManager({ user, staffs = [], onRefresh }: Props) 
             <h3 className="mb-3 text-base font-bold text-[var(--foreground)]">
               {editing ? '회사 수정' : '회사 추가'}
             </h3>
+
+            {/* 로고·직인: 폼 상단에 항상 노출 (수정 시 즉시 등록, 신규는 저장 후) */}
+            <CompanyBrandAssets
+              companyId={editing?.id}
+              companyName={form.name || editing?.name || ''}
+              logoUrl={form.logo_url || null}
+              sealUrl={form.seal_url || null}
+              persist={Boolean(editing?.id)}
+              onLogoChange={(url) => {
+                setForm((prev) => ({ ...prev, logo_url: url || '' }));
+                if (editing?.id) {
+                  setCompanies((prev) =>
+                    prev.map((c) => (c.id === editing.id ? { ...c, logo_url: url } : c)),
+                  );
+                  setEditing((prev) => (prev ? { ...prev, logo_url: url } : prev));
+                }
+              }}
+              onSealChange={(url) => {
+                setForm((prev) => ({ ...prev, seal_url: url || '' }));
+                if (editing?.id) {
+                  setCompanies((prev) =>
+                    prev.map((c) => (c.id === editing.id ? { ...c, seal_url: url } : c)),
+                  );
+                  setEditing((prev) => (prev ? { ...prev, seal_url: url } : prev));
+                }
+              }}
+              className="mb-4"
+            />
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label htmlFor="company-manager-name-input" className="mb-1.5 block text-xs font-bold text-[var(--toss-gray-3)]">

@@ -6,8 +6,9 @@ import { db } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import { isActiveStaff } from '@/lib/active-staff';
+import { LEAVE_TYPE, leaveTypeLabel, normalizeLeaveType } from '@/lib/leave-type';
 
-const DEFAULT_LEAVE_TYPE = '연차 (1.0)';
+const DEFAULT_LEAVE_TYPE = LEAVE_TYPE.ANNUAL;
 
 const formatLocalTime = (isoString: string) => {
   if (!isoString) return '';
@@ -47,7 +48,7 @@ export default function AttendanceForms({
   const [hasQueried, setHasQueried] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const leaveType = String(seedExtraData.leaveType || seedExtraData.vType || DEFAULT_LEAVE_TYPE).trim() || DEFAULT_LEAVE_TYPE;
+  const leaveType = normalizeLeaveType(seedExtraData.leaveType || seedExtraData.vType || DEFAULT_LEAVE_TYPE);
   const localStartDate = String(seedExtraData.startDate || seedExtraData.start || '').trim();
   const localEndDate = String(seedExtraData.endDate || seedExtraData.end || '').trim();
   const selectedDelegateId = String(seedExtraData.delegateId || seedExtraData.delegate_id || '').trim();
@@ -272,15 +273,15 @@ export default function AttendanceForms({
                 value={leaveType}
                 className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 text-xs font-bold shadow-sm focus:ring-2 focus:ring-[var(--accent)]/30"
                 onChange={(event) => {
-                  const nextLeaveType = event.target.value;
+                  const nextLeaveType = normalizeLeaveType(event.target.value);
                   updateExtraData(
                     buildLeaveExtraData(nextLeaveType, localStartDate, localEndDate, selectedDelegateId),
                   );
                 }}
               >
-                <option>연차 (1.0)</option>
-                <option>반차 (0.5)</option>
-                <option>병가</option>
+                <option value={LEAVE_TYPE.ANNUAL}>{leaveTypeLabel(LEAVE_TYPE.ANNUAL)}</option>
+                <option value={LEAVE_TYPE.HALF}>{leaveTypeLabel(LEAVE_TYPE.HALF)}</option>
+                <option value={LEAVE_TYPE.SICK}>{leaveTypeLabel(LEAVE_TYPE.SICK)}</option>
               </select>
             </div>
 

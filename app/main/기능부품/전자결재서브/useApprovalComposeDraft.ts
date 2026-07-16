@@ -1,8 +1,8 @@
 import { APPROVAL_VIEW_KEY } from '@/app/main/navigation-state';
 import { isApprovalLocked } from '@/lib/approval-workflow';
+import { selectDefaultApproverLine } from '@/lib/approval-routing';
 import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
-import { isActiveStaff, isDepartmentHeadOrAbove, getPositionOrder } from '@/lib/active-staff';
 import type { StaffMember } from '@/types';
 import { useCallback,useEffect,useRef,type Dispatch,type MutableRefObject,type SetStateAction } from 'react';
 import {
@@ -376,10 +376,12 @@ export function useApprovalComposeDraft({
       }
     }
 
-    if (approverLineRef.current.length === 0) {
-      const defaultApprovers = approvalDirectoryStaffs
-        .filter((s) => isActiveStaff(s) && isDepartmentHeadOrAbove(s) && String(s.id) !== user?.id)
-        .sort((a, b) => getPositionOrder(a.position, a.role) - getPositionOrder(b.position, b.role) || (a.name || '').localeCompare(b.name || ''));
+    if (approverLineRef.current.length === 0 && user?.id) {
+      const defaultApprovers = selectDefaultApproverLine(approvalDirectoryStaffs, {
+        selfId: user.id,
+        includeSyInc: false,
+        mode: 'head_or_above',
+      });
       if (defaultApprovers.length > 0) {
         setApproverLine(defaultApprovers);
       }

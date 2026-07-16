@@ -20,7 +20,7 @@ import MobileHeader from '../셸/MobileHeader';
 import { AttachmentsSection } from './첨부카드';
 import MIcon from '../공통/MIcon';
 import MChip, { type MChipTone } from '../공통/MChip';
-import MAvatar, { type MAvatarTone } from '../공통/MAvatar';
+import MAvatar from '../공통/MAvatar';
 import MCard from '../공통/MCard';
 import MBtn from '../공통/MBtn';
 import MSheet from '../공통/MSheet';
@@ -32,6 +32,7 @@ import {
   resolveLineIds,
   resolveCcUserIds,
   type ApprovalRow } from './data-hooks';
+import { pickAvatarTone } from './format-utils';
 import { buildApprovalPrintHtml } from '../../기능부품/전자결재서브/approval-print-utils';
 
 type DetailTab = 'form' | 'line' | 'comment';
@@ -44,15 +45,6 @@ type CommentEntry = {
   note?: string | null;
   at?: string | null;
 };
-
-const AVATAR_TONES: MAvatarTone[] = ['blue', 'pink', 'violet', 'orange', 'cyan', 'green'];
-
-function pickAvatarTone(seed: string | null | undefined): MAvatarTone {
-  const s = String(seed || '');
-  let hash = 0;
-  for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
-  return AVATAR_TONES[hash % AVATAR_TONES.length];
-}
 
 // MIcon span 래핑 경고 해결을 위해 helper
 function IconLabel({ name, size = 15, color }: { name: string; size?: number; color?: string }) {

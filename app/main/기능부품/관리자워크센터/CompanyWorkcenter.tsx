@@ -23,10 +23,13 @@ import CompanyTemplateTab from './CompanyWorkcenter/CompanyTemplateTab';
 import CompanyLeaveTab from './CompanyWorkcenter/CompanyLeaveTab';
 import CompanyPayrollTab from './CompanyWorkcenter/CompanyPayrollTab';
 import CompanyDocsTab from './CompanyWorkcenter/CompanyDocsTab';
+// 레거시 회사관리 leavePolicy 와 동일 — e2e leave-management + 연차 자동부여 설정
+import LeaveManagement from '../인사관리서브/휴가신청/휴가관리메인';
 
 const TABS: { id: CompanyTabId; label: string }[] = [
   { id: 'company', label: '기본 정보' },
-  { id: 'shift', label: '근무 형태' },
+  // e2e(smoke) getByRole name "근무형태" 호환 — 공백 없는 레거시 라벨 유지
+  { id: 'shift', label: '근무형태' },
   { id: 'card', label: '법인카드' },
   { id: 'contract', label: '계약 템플릿' },
   { id: 'leavePolicy', label: '휴가·경조사·공휴일' },
@@ -34,7 +37,16 @@ const TABS: { id: CompanyTabId; label: string }[] = [
   { id: 'docs', label: '문서 보관' },
 ];
 
-export default function CompanyWorkcenter() {
+type CompanyWorkcenterProps = {
+  user?: Record<string, unknown> | null;
+  staffs?: unknown[];
+  onRefresh?: () => void;
+};
+
+export default function CompanyWorkcenter({
+  user,
+  staffs = [],
+  onRefresh }: CompanyWorkcenterProps = {}) {
   const meta = ADMIN_WORKCENTERS.company;
   const [tab, setTab] = useState<CompanyTabId>('company');
 
@@ -55,7 +67,20 @@ export default function CompanyWorkcenter() {
         {tab === 'shift' && <ShiftManagement selectedCo="전체" />}
         {tab === 'card' && <CompanyCardTab />}
         {tab === 'contract' && <CompanyTemplateTab />}
-        {tab === 'leavePolicy' && <CompanyLeaveTab />}
+        {tab === 'leavePolicy' && (
+          <div className="space-y-4">
+            <LeaveManagement
+              staffs={staffs}
+              selectedCo="전체"
+              onRefresh={onRefresh}
+              user={user}
+              allowLeaveTabs
+              allowHolidayTab
+              tabMode="admin"
+            />
+            <CompanyLeaveTab />
+          </div>
+        )}
         {tab === 'payrollPolicy' && <CompanyPayrollTab />}
         {tab === 'docs' && <CompanyDocsTab />}
       </div>

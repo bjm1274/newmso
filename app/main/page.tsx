@@ -281,7 +281,7 @@ function MainPageContent() {
 
       if (menuId === '인사관리' && subViewId === '조직도') {
         return canOpenAdmin
-          ? { menuId: '관리자', subViewId: '회사관리' }
+          ? { menuId: '관리자', subViewId: 'company' }
           : { menuId: '인사관리', subViewId: '구성원' };
       }
 

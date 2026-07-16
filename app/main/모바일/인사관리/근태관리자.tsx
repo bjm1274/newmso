@@ -304,7 +304,7 @@ export default function 근태관리자({ staffs, company, user }: AdminAttendPr
         <div style={{ padding: '14px 16px 0' }}>
           <div className="m-card macos-glass macos-squircle-sm" style={{ padding: 14, marginBottom: 12, background: 'var(--m-warning-soft)', borderColor: 'transparent' }}>
             <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--m-warning)', marginBottom: 4 }}>
-              최근 30일 근태이상 자동 감지
+              최근 28일 근태이상 자동 감지
             </div>
             <p style={{ fontSize: 11, color: 'var(--z-600)', margin: 0 }}>
               지각, 조퇴, 출근/퇴근 미체크(누락) 대상자를 자동으로 탐지하여 알림 사유 요청을 보낼 수 있습니다.
@@ -317,7 +317,7 @@ export default function 근태관리자({ staffs, company, user }: AdminAttendPr
             </div>
           ) : abnormalRows.length === 0 ? (
             <div style={{ padding: 24, textAlign: 'center', color: 'var(--z-500)', fontSize: 13 }}>
-              최근 30일 동안 발생한 근태이상이 없습니다.
+              최근 28일 동안 발생한 근태이상이 없습니다.
             </div>
           ) : (
             <div className="m-card flush macos-glass macos-squircle">

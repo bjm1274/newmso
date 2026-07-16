@@ -17,12 +17,7 @@ import MIcon from '../공통/MIcon';
 import MCard from '../공통/MCard';
 import type { ApprovalRow } from './data-hooks';
 
-function formatTs(iso?: string | null): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return `${d.getMonth() + 1}/${d.getDate()}`;
-}
+import { formatTs } from './format-utils';
 
 function iconTone(status?: string | null): 'success' | 'warning' | 'danger' | 'accent' {
   if (status === '승인') return 'success';

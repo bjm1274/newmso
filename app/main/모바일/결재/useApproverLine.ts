@@ -2,8 +2,8 @@
 
 /**
  * useApproverLine — 결재선 자동 매핑 + 수동 변경 상태 훅.
- * 본인 회사의 APPROVER_POSITIONS 보유자 1~3명을 직급 위계순으로 자동 결재선 구성.
- * 여러 양식 폼이 공유.
+ * 본인 회사의 부서장 이상 1~3명을 직급 위계순으로 자동 결재선 구성.
+ * 여러 양식 폼이 공유. 후보 선택은 selectDefaultApproverLine SSOT.
  *
  * JM: 단일 책임(결재선 상태), JM2(staff fetch 1회), JM4(any 금지)
  */
@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { db } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
-import { isActiveStaff, isDepartmentHeadOrAbove, getPositionOrder } from '@/lib/active-staff';
+import { selectDefaultApproverLine } from '@/lib/approval-routing';
 import { toApproverPick, type ApproverPick } from './결재선피커';
 
 export type UseApproverLine = {
@@ -45,14 +45,14 @@ export function useApproverLine(staffId: string | null, company: string): UseApp
           .select('id, name, company, department, position, status, hire_date, resign_date, email, phone, role, permissions');
         if (error) throw error;
         if (cancelled) return;
-        const candidates = ((data ?? []) as StaffMember[])
-          .filter((s) => isActiveStaff(s))
-          .filter((s) => isDepartmentHeadOrAbove(s))
-          .filter((s) => String(s.id) !== staffId)
-          .filter((s) => s.company === company || s.company === 'SY INC.')
-          .sort((a, b) => getPositionOrder(a.position, a.role) - getPositionOrder(b.position, b.role) || (a.name || '').localeCompare(b.name || ''));
-        // 자동 결재선은 1~3명 (직급 위계 상위 우선)
-        const picks = candidates.map(toApproverPick).slice(0, 3);
+        const candidates = selectDefaultApproverLine((data ?? []) as StaffMember[], {
+          selfId: staffId,
+          company,
+          includeSyInc: true,
+          maxCount: 3,
+          mode: 'head_or_above',
+        });
+        const picks = candidates.map(toApproverPick);
         setApproverDefaults(picks);
         if (!approverManual) {
           setApproverLine(picks);

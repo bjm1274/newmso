@@ -74,22 +74,34 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
     const loadResources = async () => {
       const [sealResult, companyResult, designStore] = await Promise.all([
         d1.from('contract_templates').select('company_name, seal_url'),
-        d1.from('companies').select('name, logo_url'),
+        d1.from('companies').select('name, logo_url, seal_url'),
         fetchDocumentDesignStore(),
       ]);
 
       const sealMap: Record<string, string> = {};
       (sealResult.data || []).forEach((row: any) => {
-        if (row.company_name && row.seal_url) {
-          sealMap[row.company_name] = row.seal_url;
+        const name = String(row?.company_name || '').trim();
+        const seal = String(row?.seal_url || '').trim();
+        if (name && seal) {
+          sealMap[name] = seal;
+        }
+      });
+      // companies.seal_url 폴백 (회사관리에서 등록한 직인)
+      (companyResult.data || []).forEach((row: any) => {
+        const name = String(row?.name || '').trim();
+        const seal = String(row?.seal_url || '').trim();
+        if (name && seal && !sealMap[name]) {
+          sealMap[name] = seal;
         }
       });
       setSeals(sealMap);
 
       const logoMap: Record<string, string> = {};
       (companyResult.data || []).forEach((row: any) => {
-        if (row.name && row.logo_url) {
-          logoMap[row.name] = row.logo_url;
+        const name = String(row?.name || '').trim();
+        const logo = String(row?.logo_url || '').trim();
+        if (name && logo) {
+          logoMap[name] = logo;
         }
       });
       setLogos(logoMap);
@@ -152,12 +164,13 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
     [certType],
   );
 
-  const companyName = ((selectedStaff?.company as string) || selectedCo || 'SY INC.') as string;
+  const companyName = String((selectedStaff?.company as string) || selectedCo || 'SY INC.').trim();
   const companyLabel = design.companyLabel || companyName;
   const primaryColor = design.primaryColor;
   const borderColor = design.borderColor;
   const surface = alphaColor(primaryColor, 0.08);
-  const companyLogoUrl = logos[companyName] || '/sy-logo.png';
+  // 직원이 재직 중인 회사(병원)의 logo_url 만 사용. AllERP 제품 로고는 폴백하지 않는다.
+  const companyLogoUrl = logos[companyName] || '';
   const watermarkSrc = companyLogoUrl;
   const profilePhotoUrl = getProfilePhotoUrl(selectedStaff) || undefined;
   const joinedAt = selectedStaff?.joined_at || selectedStaff?.join_date;
@@ -319,13 +332,15 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
           minHeight: '980px',
           background: 'linear-gradient(180deg, #ffffff 0%, #fdfefe 78%, #f5f8fa 100%)' }}
       >
-        <div className="pointer-events-none absolute inset-0">
-          <img
-            src={watermarkSrc}
-            alt=""
-            className="absolute left-1/2 top-[52%] h-32 w-32 -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.06] mix-blend-multiply"
-          />
-        </div>
+        {watermarkSrc ? (
+          <div className="pointer-events-none absolute inset-0">
+            <img
+              src={watermarkSrc}
+              alt=""
+              className="absolute left-1/2 top-[52%] h-32 w-32 -translate-x-1/2 -translate-y-1/2 object-contain opacity-[0.06] mix-blend-multiply"
+            />
+          </div>
+        ) : null}
 
         <div className="relative z-10 flex h-full flex-col">
           <div className="relative flex items-center justify-center min-h-[72px] w-full">
@@ -333,7 +348,13 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
               className="absolute left-0 flex h-[72px] w-[72px] items-center justify-center rounded-[var(--radius-lg)] bg-[var(--card)]"
               style={{ border: `1px solid ${borderColor}` }}
             >
-              <img src={companyLogoUrl} alt="" className="h-11 w-11 object-contain" />
+              {companyLogoUrl ? (
+                <img src={companyLogoUrl} alt={`${companyLabel} 로고`} className="h-11 w-11 object-contain" />
+              ) : (
+                <span className="text-[22px] font-black text-[var(--toss-gray-3)]">
+                  {String(companyLabel || '회').replace(/\(.*?\)/g, '').trim().slice(0, 1) || '회'}
+                </span>
+              )}
             </div>
             <h3 className="text-[34px] font-black tracking-[-0.04em] text-[var(--foreground)] text-center w-full px-[88px]">{certificateTitle}</h3>
           </div>
@@ -590,7 +611,13 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
               >
                 <div className="flex items-center gap-4">
                   <div className="flex h-16 w-16 items-center justify-center rounded-[var(--radius-xl)] bg-[var(--card)]/95 shadow-sm">
-                    <img src="/sy-logo.png" alt="" className="h-12 w-12 object-contain" />
+                    {companyLogoUrl ? (
+                      <img src={companyLogoUrl} alt={`${companyLabel} 로고`} className="h-12 w-12 object-contain" />
+                    ) : (
+                      <span className="text-2xl font-black text-[var(--toss-gray-3)]">
+                        {String(companyLabel || '회').replace(/\(.*?\)/g, '').trim().slice(0, 1) || '회'}
+                      </span>
+                    )}
                   </div>
                   <div>
                     <p className="text-[11px] font-black tracking-[0.18em] opacity-80">{companyLabel}</p>

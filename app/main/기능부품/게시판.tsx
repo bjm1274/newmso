@@ -67,6 +67,8 @@ import {
   drawBoardPollPrize,
   type BoardPoll,
   type BoardPollPrizeWinner } from './게시판서브/board-poll-prize';
+import { togglePollVote } from './게시판서브/board-poll-vote';
+import { toggleBoardPostLike } from './게시판서브/board-post-like';
 import { insertBoardPost } from './게시판서브/create-board-post';
 
 interface BoardViewProps {
@@ -751,27 +753,23 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
     }
 
     try {
-      if (isLiked) {
-        const { error: unlikeError } = await db.from('board_post_likes').delete().eq('post_id', post.id).eq('user_id', effectiveBoardUserId);
-        if (unlikeError && !(unlikeError.code === '42P01' || unlikeError.message?.includes('does not exist'))) throw unlikeError;
+      const result = await toggleBoardPostLike(
+        effectiveBoardUserId,
+        postId,
+        isLiked,
+        post.likes_count ?? 0,
+      );
+      if (result.ok) {
+        updateLocalLikes(result.likesCount);
       } else {
-        const { error: likeError } = await db.from('board_post_likes').insert([{ post_id: post.id, user_id: effectiveBoardUserId }]);
-        if (likeError && !(likeError.code === '42P01' || likeError.message?.includes('does not exist'))) throw likeError;
-      }
-      // ── 실제 COUNT 기반으로 likes_count 동기화 (race condition 방지) ──
-      const { count, error: countError } = await db.from('board_post_likes').select('id', { count: 'exact', head: true }).eq('post_id', post.id);
-      const realCount = countError ? optimisticLikes : (count ?? optimisticLikes);
-      await db.from('board_posts').update({ likes_count: realCount }).eq('id', post.id);
-      updateLocalLikes(realCount);
-    } catch (error) {
-      // ── 실패 시 롤백 ──
-      logger.error('좋아요 처리 실패:', error);
-      toast('좋아요 처리 중 오류가 발생했습니다.', 'error');
-      updateLocalLikes(post.likes_count ?? 0);
-      if (isLiked) {
-        setMyLikedPostIds((prev) => new Set([...prev, postId]));
-      } else {
-        setMyLikedPostIds((prev) => { const next = new Set(prev); next.delete(postId); return next; });
+        logger.error('좋아요 처리 실패:', result.error);
+        toast('좋아요 처리 중 오류가 발생했습니다.', 'error');
+        updateLocalLikes(post.likes_count ?? 0);
+        if (isLiked) {
+          setMyLikedPostIds((prev) => new Set([...prev, postId]));
+        } else {
+          setMyLikedPostIds((prev) => { const next = new Set(prev); next.delete(postId); return next; });
+        }
       }
     } finally {
       likingRef.current = false;
@@ -2427,25 +2425,16 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
 
                   const handlePostPollVote = async (optIdx: number) => {
                     if (!myId) return;
-                    const key = String(optIdx);
-                    const currentVotes = { ...votes };
-                    // 이미 이 옵션에 투표했으면 취소
-                    if (Array.isArray(currentVotes[key]) && currentVotes[key].includes(String(myId))) {
-                      currentVotes[key] = currentVotes[key].filter((id: string) => id !== String(myId));
-                    } else {
-                      if (!poll.multiple) {
-                        // 단일 선택: 기존 투표 제거
-                        for (const k of Object.keys(currentVotes)) {
-                          if (Array.isArray(currentVotes[k])) {
-                            currentVotes[k] = currentVotes[k].filter((id: string) => id !== String(myId));
-                          }
-                        }
-                      }
-                      currentVotes[key] = [...(currentVotes[key] || []), String(myId)];
-                    }
-                    await db.from('board_posts').update({ poll_votes: currentVotes }).eq('id', selectedPost.id);
-                    setPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, poll_votes: currentVotes } : p));
-                    setSelectedPostDetail((prev: BoardPost | null) => prev?.id === selectedPost.id ? { ...prev, poll_votes: currentVotes } : prev);
+                    const nextVotes = await togglePollVote(
+                      selectedPost.id,
+                      optIdx,
+                      String(myId),
+                      votes,
+                      Boolean(poll.multiple),
+                    );
+                    if (!nextVotes) return;
+                    setPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, poll_votes: nextVotes } : p));
+                    setSelectedPostDetail((prev: BoardPost | null) => prev?.id === selectedPost.id ? { ...prev, poll_votes: nextVotes } : prev);
                   };
 
                   const handleDrawPrize = async () => {

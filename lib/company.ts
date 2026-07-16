@@ -19,6 +19,8 @@ export interface Company {
   phone?: string | null;
   payment_day?: number | null;
   memo?: string | null;
+  logo_url?: string | null;
+  seal_url?: string | null;
   created_at?: string;
 }
 

@@ -16,6 +16,7 @@ import MIcon from '../공통/MIcon';
 import MCard from '../공통/MCard';
 import type { ApprovalRow } from './data-hooks';
 import { resolveLineIds } from './data-hooks';
+import { formatTs } from './format-utils';
 
 type SentFilter = 'all' | 'pending' | 'approved' | 'rejected';
 
@@ -40,13 +41,6 @@ function statusInfo(row: ApprovalRow, staffId: string | null): { label: string; 
   return {
     label: total > 1 ? `${step}/${total} 결재중` : isMine ? '결재중' : '대기',
     tone: 'warning' };
-}
-
-function formatTs(iso?: string | null): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 function readAmount(row: ApprovalRow): string | null {

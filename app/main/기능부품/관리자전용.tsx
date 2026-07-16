@@ -45,7 +45,7 @@ const DataReseter = dynamic(() => import('./관리자전용서브/데이터초�
 const DataBackup = dynamic(() => import('./관리자전용서브/데이터백업'), { ssr: false, loading: AdminSubViewLoading });
 const AuditLogViewer = dynamic(() => import('./관리자전용서브/감사로그통합뷰어').then((mod) => mod.AuditLogViewer), { ssr: false, loading: AdminSubViewLoading });
 const BusinessDashboard = dynamic(() => import('./관리자전용서브/경영대시보드'), { ssr: false, loading: AdminSubViewLoading });
-const CompanyManager = dynamic(() => import('./관리자전용서브/회사관리'), { ssr: false, loading: AdminSubViewLoading });
+// Phase B #8: 회사관리 경로는 CompanyWorkcenter(SSOT)로 통일. 레거시 회사관리.tsx 는 더 이상 렌더하지 않음.
 const NotificationAutomation = dynamic(() => import('./관리자전용서브/알림자동화설정'), { ssr: false, loading: AdminSubViewLoading });
 const SurgeryExamTemplateManager = dynamic(() => import('./관리자전용서브/수술검사템플릿관리'), { ssr: false, loading: AdminSubViewLoading });
 const FormBuilder = dynamic(() => import('./전자결재서브/양식빌더'), { ssr: false, loading: AdminSubViewLoading });
@@ -237,10 +237,18 @@ export default function AdminView(props: Record<string, unknown>) {
 
   // 사이드바2 옵트인: 영문 id(`exec`, `company`, `roles`, `ops`, `forms`, `audit`)가
   // 전달되면 새 통합 워크센터로 라우팅. 기존 한글 id는 아래 기존 흐름 그대로 동작.
+  // Phase B #8: 레거시 `회사관리`(bookmarks/e2e open_subview)도 normalizeAdminEntry alias로
+  // `company` → CompanyWorkcenter(SSOT)에 합류한다.
   // hasAdminMenuAccess(메뉴 진입권)만으로 통과시키지 않고, 한글 흐름과 동일하게
   // canAccessAdminSection(세부 권한)으로 워크센터 단위 게이팅을 적용한다.
-  if (isAdminWorkcenterId(initialTab)) {
-    const sectionTab = ADMIN_WORKCENTER_SECTION[initialTab];
+  const resolvedWorkcenterId: AdminWorkcenterId | null = isAdminWorkcenterId(initialTab)
+    ? initialTab
+    : isAdminWorkcenterId(activeTab)
+      ? activeTab
+      : null;
+
+  if (resolvedWorkcenterId) {
+    const sectionTab = ADMIN_WORKCENTER_SECTION[resolvedWorkcenterId];
     if (!canAccessAdminTab(user, sectionTab)) {
       return (
         <div className="flex h-full flex-col items-center justify-center bg-[var(--muted)] p-4 text-center">
@@ -254,22 +262,24 @@ export default function AdminView(props: Record<string, unknown>) {
     }
 
     // 모바일 기기에서의 영문 워크센터 가드 적용 (exec, company, forms 차단)
-    if (isMobile && (initialTab === 'exec' || initialTab === 'company' || initialTab === 'forms')) {
-      const featureNames = {
+    if (isMobile && (resolvedWorkcenterId === 'exec' || resolvedWorkcenterId === 'company' || resolvedWorkcenterId === 'forms')) {
+      const featureNames: Partial<Record<AdminWorkcenterId, string>> = {
         exec: '경영 분석',
         company: '회사 관리',
         forms: '결재 양식 관리' };
-      return <DesktopOnlyNotice feature={featureNames[initialTab] || '관리자 워크센터'} />;
+      return <DesktopOnlyNotice feature={featureNames[resolvedWorkcenterId] || '관리자 워크센터'} />;
     }
 
-    const workcenterComponent = getAdminWorkcenter(initialTab);
+    const workcenterComponent = getAdminWorkcenter(resolvedWorkcenterId);
     return (
       <div
         className="relative flex min-h-0 flex-1 flex-col bg-[var(--page-bg)] animate-in fade-in duration-500"
         data-testid="admin-view"
       >
         <main className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto bg-[var(--page-bg)] p-3 pb-20 md:p-4">
-          {workcenterComponent ? React.createElement(workcenterComponent, { user }) : null}
+          {workcenterComponent
+            ? React.createElement(workcenterComponent, { user, staffs, onRefresh })
+            : null}
         </main>
       </div>
     );
@@ -348,7 +358,7 @@ export default function AdminView(props: Record<string, unknown>) {
           </>
         )}
 
-        {activeTab === '회사관리' && <CompanyManager user={user as Record<string, unknown> | null | undefined} staffs={staffs} onRefresh={onRefresh} />}
+        {/* 회사관리 / company 는 상단 resolvedWorkcenterId 분기에서 CompanyWorkcenter로 렌더 */}
         {activeTab === '직원권한' && <StaffPermissionManager onRefresh={onRefresh} />}
         {activeTab === '데이터백업' && <DataBackup user={user as Record<string, unknown> | null | undefined} />}
         {activeTab === '데이터초기화' && <DataReseter onRefresh={onRefresh ?? (() => {})} />}

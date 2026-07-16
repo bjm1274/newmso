@@ -21,6 +21,7 @@ import { useMemo, useState } from 'react';
 import type { ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
 import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
+import { leaveTypeLabel, normalizeLeaveType } from '@/lib/leave-type';
 import MIcon from '../공통/MIcon';
 import {
   MFormHeader,
@@ -95,6 +96,8 @@ export default function 연차신청({
     setSubmitting(true);
 
     // 1) leave_requests insert — 인사 잔여 집계용 기록 (연차신청폼.tsx와 동일 컬럼)
+    // leave_type / meta.leaveType / meta.vType 은 동일 정규 키 (leave-type SSOT)
+    const leaveTypeKey = normalizeLeaveType(kind);
     let leaveRequestInserted = false;
     let leaveQueued = false;
     try {
@@ -103,7 +106,7 @@ export default function 연차신청({
         table: 'leave_requests',
         payload: {
           staff_id: staffId,
-          leave_type: kind,
+          leave_type: leaveTypeKey,
           start_date: start,
           end_date: end,
           days,
@@ -123,9 +126,8 @@ export default function 연차신청({
     // 2) approvals 상신 — 선택된 결재선이 실제 효력을 갖도록 (연차신청폼.tsx와 동일)
     try {
       const senderName = String(user.name || '').trim() || staffName || '이름 없음';
-      const leaveTypeLabel = kind === '반차' ? '반차 (0.5)' : `${kind} (1.0)`;
       const range = start === end ? start : `${start} ~ ${end}`;
-      const title = `${senderName} ${kind} 신청 (${range})`;
+      const title = `${senderName} ${leaveTypeLabel(leaveTypeKey)} 신청 (${range})`;
 
       const { queued: apprQueued } = await submitApprovalDraft({
         user,
@@ -138,8 +140,8 @@ export default function 연차신청({
         approverLine: approver.approverLine,
         approverManual: approver.approverManual,
         extraMeta: {
-          vType: leaveTypeLabel,
-          leaveType: leaveTypeLabel,
+          vType: leaveTypeKey,
+          leaveType: leaveTypeKey,
           startDate: start,
           endDate: end,
           reason: reason || '',

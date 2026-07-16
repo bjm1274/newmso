@@ -17,6 +17,7 @@
 
 import { getOfflineQueue } from './offline-queue';
 import { db } from './db-client';
+import { isNetworkError } from './offline-network-error';
 
 // ─────────────────────────────────────────────────────────────
 // 타입
@@ -40,27 +41,6 @@ export type TransactionResult = {
   queued: boolean;
   error: string | null;
 };
-
-// ─────────────────────────────────────────────────────────────
-// 내부: 네트워크 에러 판별
-// ─────────────────────────────────────────────────────────────
-
-function isNetworkError(err: unknown): boolean {
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
-  if (err instanceof TypeError) return true;
-  if (err instanceof Error) {
-    const msg = err.message.toLowerCase();
-    if (
-      msg.includes('failed to fetch') ||
-      msg.includes('network request failed') ||
-      msg.includes('load failed') ||
-      msg.includes('networkerror')
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
 
 // ─────────────────────────────────────────────────────────────
 // 내부: 단일 step 실행

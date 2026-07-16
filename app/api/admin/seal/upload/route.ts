@@ -16,7 +16,8 @@ function getExtension(fileName: string, mimeType: string): string {
 
 function buildObjectKey(company: string, fileName: string, mimeType: string): string {
   const safeFolder = company.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'company';
-  const ext = getExtension(fileName, mimeType);
+  // 누끼 처리 결과는 투명 PNG 고정
+  const ext = mimeType === 'image/png' ? 'png' : getExtension(fileName, mimeType);
   return `seals/${safeFolder}_${Date.now()}_${crypto.randomUUID()}.${ext}`;
 }
 

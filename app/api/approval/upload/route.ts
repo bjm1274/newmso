@@ -4,6 +4,8 @@ import {
   normalizeSessionUser,
   readSessionFromRequest,
   resolveLatestSessionUser } from '@/lib/server-session';
+// SSOT size: @/lib/upload-constants
+import { MAX_FILE_SIZE_BYTES } from '@/lib/upload-constants';
 
 /**
  * POST /api/approval/upload
@@ -15,7 +17,6 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-const MAX_FILE_SIZE_BYTES = 200 * 1024 * 1024; // 200 MB
 const ALLOWED_MIME_PREFIXES = ['image/', 'application/pdf', 'text/', 'application/'];
 const BLOCKED_MIMES = new Set([
   'application/x-msdownload',

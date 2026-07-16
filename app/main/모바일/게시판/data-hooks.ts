@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
+import { pickAvatarTone as pickAvatarToneLib, type AvatarTone } from '@/lib/avatar-tone';
 import type { AttachmentItem, BoardPost } from '@/types';
 import {
   BOARD_COMMENT_SELECT,
@@ -451,14 +452,10 @@ export {
 // 작성자 아바타 톤(이름 기반 결정)
 // ─────────────────────────────────────────────
 
-const AVATAR_TONES = ['blue', 'pink', 'violet', 'orange', 'cyan', 'green'] as const;
-export type BoardAvatarTone = (typeof AVATAR_TONES)[number];
+export type BoardAvatarTone = Exclude<AvatarTone, 'gray'>;
 
 export function pickAvatarTone(seed: string | null | undefined): BoardAvatarTone {
-  const s = String(seed ?? '');
-  let h = 0;
-  for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  return AVATAR_TONES[h % AVATAR_TONES.length];
+  return pickAvatarToneLib(seed) as BoardAvatarTone;
 }
 
 // ─────────────────────────────────────────────

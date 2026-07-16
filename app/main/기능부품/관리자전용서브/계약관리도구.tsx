@@ -12,6 +12,8 @@ import {
 import type { ContractClosingData } from '@/lib/contract-template-closing';
 import ContractStandardPreview from '@/app/main/기능부품/인사관리서브/계약문서/계약서표준미리보기';
 import { fillEmploymentContractTemplate } from '@/lib/contract-template-render';
+import { processBrandImage } from '@/lib/brand-image-process';
+import { saveCompanySeal, uploadBrandAssetFile } from '@/lib/company-brand-assets';
 
 // COMPANIES 상수는 이제 DB에서 동적으로 관리됩니다.
 
@@ -223,23 +225,39 @@ export default function ContractManager({ initialCompany, onBack }: ContractMana
                     if (!file) return;
                     setUploadingSeal(true);
                     try {
-                      const formData = new FormData();
-                      formData.append('file', file);
-                      formData.append('company', selectedCo);
-                      const res = await fetch('/api/admin/seal/upload', {
-                        method: 'POST',
-                        body: formData });
-                      const payload = await res.json().catch(() => ({}));
-                      if (!res.ok || !payload?.url) {
-                        const message =
-                          (payload as { error?: string } | null)?.error ||
-                          '직인 업로드에 실패했습니다.';
-                        toast(message, 'error');
-                        return;
+                      const processed = await processBrandImage(file, { kind: 'seal' });
+                      const { url } = await uploadBrandAssetFile({
+                        file: processed.file,
+                        companyName: selectedCo,
+                        kind: 'seal',
+                      });
+                      setSealUrl(url);
+                      // companies.seal_url 동기화 (회사관리와 공유)
+                      try {
+                        const { data: co } = await d1
+                          .from('companies')
+                          .select('id')
+                          .eq('name', selectedCo)
+                          .maybeSingle();
+                        const companyId = (co as { id?: string } | null)?.id;
+                        if (companyId) {
+                          await saveCompanySeal({
+                            companyId,
+                            companyName: selectedCo,
+                            sealUrl: url,
+                          });
+                        }
+                      } catch (syncErr) {
+                        console.warn('[계약관리] companies.seal_url 동기화 실패', syncErr);
                       }
-                      setSealUrl(payload.url as string);
-                    } catch {
-                      toast('직인 업로드 중 네트워크 오류가 발생했습니다.', 'error');
+                      toast(
+                        `직인 등록 완료 (누끼·${processed.width}×${processed.height}) · 저장 버튼으로 템플릿에 반영`,
+                        'success',
+                      );
+                    } catch (err) {
+                      const message =
+                        err instanceof Error ? err.message : '직인 업로드 중 오류가 발생했습니다.';
+                      toast(message, 'error');
                     } finally {
                       setUploadingSeal(false);
                       e.target.value = '';
@@ -248,12 +266,12 @@ export default function ContractManager({ initialCompany, onBack }: ContractMana
                 />
               </label>
               <div className="flex-1 space-y-1">
-                <p className="text-[11px] font-bold text-[var(--foreground)]">공식 직인 이미지 (PNG 권장)</p>
+                <p className="text-[11px] font-bold text-[var(--foreground)]">공식 직인 이미지</p>
                 <p className="text-[10px] text-[var(--toss-gray-3)] font-semibold leading-relaxed">
-                  배경이 투명한 정방형 이미지를 권장합니다.<br />
-                  업로드 시 즉시 우측 미리보기에 반영됩니다.
+                  업로드 시 흰 배경 자동 제거(누끼)·크기 맞춤.<br />
+                  회사관리 직인과 동기화됩니다. 저장 시 계약서에 반영.
                 </p>
-                {uploadingSeal && <p className="text-[10px] text-[var(--accent)] font-bold animate-pulse">업로드 중...</p>}
+                {uploadingSeal && <p className="text-[10px] text-[var(--accent)] font-bold animate-pulse">누끼·업로드 중...</p>}
               </div>
             </div>
           </div>

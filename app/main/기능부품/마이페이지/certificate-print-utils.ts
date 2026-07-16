@@ -173,7 +173,16 @@ export function buildIssuedCertificatePrintHtml(
   const photoInitial = escapeHtml(String(context.staffName || cert.staff_members?.name || '?').slice(0, 1));
   const primaryColor = escapeHtml(context.primaryColor || '#197c86');
   const borderColor = escapeHtml(context.borderColor || '#d7dee5');
-  const logoUrl = escapeHtml(context.companyLogoUrl || '/sy-logo.png');
+  // 회사(병원)별 logo_url 만 사용. AllERP 제품 로고(/sy-logo.png)는 폴백으로 쓰지 않는다.
+  const rawLogoUrl = String(context.companyLogoUrl || '').trim();
+  const logoUrl = escapeHtml(rawLogoUrl);
+  const hasLogo = Boolean(rawLogoUrl);
+  const logoInitial = escapeHtml(
+    String(context.companyLabel || companyLabel || '회')
+      .replace(/\(.*?\)/g, '')
+      .trim()
+      .slice(0, 1) || '회',
+  );
   const closingText = escapeHtml(getClosingText(certType));
 
   // Dynamic rows based on certType
@@ -264,6 +273,7 @@ window.onload = () => window.print();
     .header{position:relative;display:flex;align-items:center;justify-content:center;min-height:72px;width:100%}
     .logo-box{position:absolute;left:0;width:72px;height:72px;border:1px solid ${borderColor};border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0}
     .logo-box img{width:44px;height:44px;object-fit:contain}
+    .logo-fallback{font-size:22px;font-weight:900;color:#94a3b8;line-height:1}
     .doc-title{font-size:34px;font-weight:900;letter-spacing:-0.04em;color:#111827;margin:0;line-height:1.1;text-align:center;width:100%;padding:0 88px}
     .accent-bar{height:3px;width:100%;background:${primaryColor};margin:16px 0 0}
     /* 사진 + 인적사항 */
@@ -304,10 +314,10 @@ window.onload = () => window.print();
 </head>
 <body>
   <main class="sheet" aria-label="${title}">
-    <img class="watermark" src="${logoUrl}" alt="" aria-hidden="true" />
+    ${hasLogo ? `<img class="watermark" src="${logoUrl}" alt="" aria-hidden="true" />` : ''}
     <div class="stack">
       <header class="header">
-        <div class="logo-box"><img src="${logoUrl}" alt="" /></div>
+        <div class="logo-box">${hasLogo ? `<img src="${logoUrl}" alt="${companyLabel} 로고" />` : `<span class="logo-fallback">${logoInitial}</span>`}</div>
         <h1 class="doc-title">${title}</h1>
       </header>
       <div class="accent-bar" aria-hidden="true"></div>

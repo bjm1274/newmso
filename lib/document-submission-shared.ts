@@ -13,11 +13,10 @@
 // ─────────────────────────────────────────────────────────────
 // 1. 업로드 검증 정책 — 단일 정책으로 통일
 //    가장 안전한 기준: MIME 화이트리스트 + 합리적 크기 한도.
-//    서버(/api/approvals/upload)는 일반 50MB·이미지 무제한을 허용하므로
-//    클라이언트 한도(30MB)는 그 안에 들어와 회귀가 없다.
+//    서버(/api/approvals/upload) 한도는 200MB — 클라이언트도 동일 한도.
 // ─────────────────────────────────────────────────────────────
 
-/** 단일 최대 파일 크기 한도 (30 MB). */
+/** 단일 최대 파일 크기 한도 (200 MB). */
 export const DOC_MAX_FILE_SIZE_BYTES = 200 * 1024 * 1024;
 
 /** 허용 MIME 화이트리스트 (이미지 + PDF). */
@@ -37,7 +36,7 @@ const ALLOWED_MIME_SET: ReadonlySet<string> = new Set(DOC_ALLOWED_MIME_TYPES);
 
 /** 사람이 읽는 허용 형식 안내 문구 (UI 가이드/에러 메시지 공용). */
 export const DOC_ALLOWED_FORMATS_LABEL = 'JPEG·PNG·WEBP·HEIC·PDF';
-export const DOC_MAX_FILE_SIZE_LABEL = '30MB';
+export const DOC_MAX_FILE_SIZE_LABEL = '200MB';
 
 /**
  * 브라우저별로 흔들리는 MIME 표기를 표준값으로 정규화한다.

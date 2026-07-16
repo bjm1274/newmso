@@ -508,8 +508,16 @@ export function canAccessMyPageTab(user: UserLike | null | undefined, tabId: str
     case 'todo':
     case 'notifications':
       return true;
-    case 'certificates':
-      return isPrivilegedUser(user) || hasPermission(user, 'hr_증명서');
+    case 'certificates': {
+      // 본인 결재 승인·발급 증명서 조회.
+      // hr_증명서 는 인사관리에서 타인 증명서를 발급하는 HR 권한이라
+      // 일반 직원 본인 조회에 쓰면 안 된다 (급여의 mypage_급여조회 패턴과 동일).
+      const own = getExplicitPermissionState(user, 'mypage_증명서조회');
+      if (own !== null) return own;
+      // 명시적으로 끄지 않은 직원은 본인 증명서 조회 허용
+      // (데이터는 staff_id / sender_id 본인 건만 조회됨)
+      return true;
+    }
     case 'salary': {
       const own = getExplicitPermissionState(user, 'mypage_급여조회');
       if (own !== null) return own;

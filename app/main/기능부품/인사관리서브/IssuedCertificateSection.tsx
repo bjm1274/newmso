@@ -176,8 +176,10 @@ export default function IssuedCertificateSection({ selectedCo, staffFilterName, 
 
         const newLogoMap: Record<string, string> = {};
         for (const row of companyRes.data || []) {
-          if (row.name && row.logo_url) {
-            newLogoMap[row.name] = row.logo_url;
+          const name = String(row?.name || '').trim();
+          const logo = String(row?.logo_url || '').trim();
+          if (name && logo) {
+            newLogoMap[name] = logo;
           }
         }
 

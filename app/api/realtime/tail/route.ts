@@ -17,57 +17,15 @@
 import { NextResponse } from 'next/server';
 import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
 import { getD1Binding } from '@/lib/db';
+import {
+  REALTIME_ALLOWED_TABLE_SET as ALLOWED_TABLES,
+  REALTIME_TABLE_TIMESTAMP_COLUMN as TABLE_TIMESTAMP_COLUMN,
+  getRealtimeTimestampColumn,
+} from '@/lib/realtime/allowed-tables';
 
 export const dynamic = 'force-dynamic';
 
 const MAX_TABLES_PER_REQUEST = 10;
-
-// 허용 테이블 — 임의 테이블 노출 방지 (whitelist).
-// 실제 polling으로 사용되는 테이블만 명시.
-const ALLOWED_TABLES = new Set<string>([
-  'messages',
-  'chat_rooms',
-  // 채팅 활성 방 폴링용 — 읽음 표시·반응·북마크·핀·투표 갱신
-  'room_read_cursors',
-  'message_reactions',
-  'message_bookmarks',
-  'pinned_messages',
-  'polls',
-  'poll_votes',
-  'notifications',
-  'board_posts',
-  'board_post_comments',
-  'board_post_reads',
-  'approvals',
-  'attendance',
-  'attendances',
-  'leave_requests',
-  'todos',
-  'todo_reminder_logs',
-  'staff_members',
-  'op_patient_checks',
-  'op_check_templates',
-  'inventory',
-  'inventory_logs',
-  'staff_evaluations',
-  'corporate_card_transactions',
-  'company_holidays',
-  'document_repository',
-  'handover_notes',
-  'payroll_records',
-  'audit_logs',
-  'work_shifts',
-  'shift_assignments',
-  'staff_shift_assignments',
-  'backup_restore_runs',
-]);
-
-// 변경 감지에 사용할 timestamp 컬럼명 — 대부분 created_at, 일부 예외.
-// 예: room_read_cursors는 INSERT가 아닌 UPSERT(읽음 위치 갱신)라 last_read_at 사용.
-const TABLE_TIMESTAMP_COLUMN: Record<string, string> = {
-  room_read_cursors: 'last_read_at',
-  pinned_messages: 'pinned_at',
-  chat_rooms: 'last_message_at' };
 
 
 function userId(user: SessionUser | null | undefined): string | null {
@@ -85,7 +43,7 @@ async function fetchMaxCreatedAtD1(
   tableSpec: string,
 ): Promise<string | null> {
   const [tableName, filterPart] = tableSpec.split(':');
-  const column = TABLE_TIMESTAMP_COLUMN[tableName] ?? 'created_at';
+  const column = getRealtimeTimestampColumn(tableName);
   
   let query = `SELECT "${column}" AS ts FROM "${tableName}"`;
   const params: unknown[] = [];

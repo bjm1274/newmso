@@ -8,7 +8,7 @@
  *   - 팀: 팀 매니저 권한이면 동일 회사의 이상 직원 요약. 일반 직원은 안내 메시지로 차단(JM5).
  *
  * 본인 데이터는 useMyAttendanceMonth → deriveAbnormalRows로 가공.
- * 팀 데이터는 staff_members + 최근 30일 attendance 집계.
+ * 팀 데이터는 staff_members + 최근 28일 attendance 집계 (lib/attendance-abnormal).
  *
  * JM5: '팀' 탭은 권한 체크. permissions.menu_인사관리 또는 mso=true 인 경우만 노출.
  */
@@ -263,7 +263,7 @@ function fmtTime(iso: string | null): string {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 팀 탭 — 최근 30일 attendances 의 (직원 × 일자) abnormal 카드
+// 팀 탭 — 최근 28일 attendances 의 (직원 × 일자) abnormal 카드
 // ─────────────────────────────────────────────────────────────
 
 /** cooldown / 상태 key: staffId + ':' + date (같은 직원·다른 날은 각각 발송 가능) */
@@ -353,7 +353,7 @@ function TeamTab({ user, company }: { user: ErpUser; company?: string }) {
       <div
         style={{ padding: 24, textAlign: 'center', color: 'var(--z-500)', fontSize: 13 }}
       >
-        최근 30일간 팀 근태이상이 없습니다.
+        최근 28일간 팀 근태이상이 없습니다.
       </div>
     );
   }

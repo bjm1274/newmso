@@ -16,6 +16,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { db } from '@/lib/db-client';
+import { pickAvatarTone as pickAvatarToneLib, type AvatarTone } from '@/lib/avatar-tone';
 import { bindMockChatMessageInsert } from '@/app/main/기능부품/메신저테스트이벤트';
 import {
   pokeChannel,
@@ -863,18 +864,11 @@ export async function sendMobileTextMessage(
 // 헬퍼: 표시명·아바타톤
 // ─────────────────────────────────────────────
 
-const AVATAR_TONES = ['blue', 'violet', 'pink', 'green', 'orange', 'cyan', 'gray'] as const;
-export type AvatarToneKey = (typeof AVATAR_TONES)[number];
+export type AvatarToneKey = AvatarTone;
 
+/** Chat includes gray so empty/neutral seeds stay distinct. */
 export function pickAvatarTone(seed: string | null | undefined): AvatarToneKey {
-  const key = String(seed || '').trim();
-  if (!key) return 'blue';
-  let hash = 0;
-  for (let i = 0; i < key.length; i += 1) {
-    hash = (hash * 31 + key.charCodeAt(i)) | 0;
-  }
-  const idx = Math.abs(hash) % AVATAR_TONES.length;
-  return AVATAR_TONES[idx];
+  return pickAvatarToneLib(seed, { includeGray: true });
 }
 
 export function getRoomTitle(

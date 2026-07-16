@@ -10,50 +10,12 @@
 import { memo, type CSSProperties } from 'react';
 import MIcon from '../공통/MIcon';
 import MChip, { type MChipTone } from '../공통/MChip';
-import MAvatar, { type MAvatarTone } from '../공통/MAvatar';
+import MAvatar from '../공통/MAvatar';
 import MCard from '../공통/MCard';
 import { resolveCurrentApproverId, type ApprovalRow } from './data-hooks';
+import { pickAvatarTone, formatTs, elapsedDays } from './format-utils';
 
-const AVATAR_TONES: MAvatarTone[] = ['blue', 'pink', 'violet', 'orange', 'cyan', 'green'];
-
-export function pickAvatarTone(seed: string | null | undefined): MAvatarTone {
-  const s = String(seed || '');
-  let hash = 0;
-  for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
-  return AVATAR_TONES[hash % AVATAR_TONES.length];
-}
-
-export function formatTs(iso?: string | null): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const now = new Date();
-  const sameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-  if (sameDay) {
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  }
-  const yest = new Date(now);
-  yest.setDate(now.getDate() - 1);
-  if (
-    d.getFullYear() === yest.getFullYear() &&
-    d.getMonth() === yest.getMonth() &&
-    d.getDate() === yest.getDate()
-  ) {
-    return '어제';
-  }
-  return `${d.getMonth() + 1}/${d.getDate()}`;
-}
-
-export function elapsedDays(iso?: string | null): number {
-  if (!iso) return 0;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return 0;
-  const diff = Date.now() - d.getTime();
-  return Math.max(0, Math.floor(diff / (24 * 60 * 60 * 1000)));
-}
+export { pickAvatarTone, formatTs, elapsedDays };
 
 export function readAmount(row: ApprovalRow): string | null {
   const meta = (row.meta_data ?? {}) as Record<string, unknown>;

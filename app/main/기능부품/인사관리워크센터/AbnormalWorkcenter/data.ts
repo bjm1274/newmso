@@ -14,6 +14,11 @@ import { db } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
+import {
+  ABNORMAL_LOOKBACK_DAYS,
+  buildLookbackDays,
+  getAbnormalLookbackSince,
+} from '@/lib/attendance-abnormal';
 
 // ─── 타입 ─────────────────────────────────────────────────────────
 export type AbnormalKind =
@@ -196,15 +201,9 @@ function detectRepeatedLatePattern(records: AttendanceRecord[]): number {
   return max;
 }
 
-// ─── 4주 일자 배열 (YYYY-MM-DD) ──────────────────────────────────
+// ─── lookback 일자 배열 (YYYY-MM-DD) — lib/attendance-abnormal SSOT (28일) ──
 function build4WeekDays(now: Date): string[] {
-  const days: string[] = [];
-  for (let i = 27; i >= 0; i -= 1) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - i);
-    days.push(formatKoreanDateKey(d));
-  }
-  return days;
+  return buildLookbackDays(ABNORMAL_LOOKBACK_DAYS, now);
 }
 
 // ─── fetch ────────────────────────────────────────────────────────
@@ -241,7 +240,7 @@ export async function fetchAbnormalData({
 
   const now = new Date();
   const allDays = build4WeekDays(now);
-  const sinceIso = allDays[0];
+  const sinceIso = getAbnormalLookbackSince(ABNORMAL_LOOKBACK_DAYS, now);
 
   const { data } = await db
     .from('attendances')
@@ -414,10 +413,9 @@ export async function resolveStaffAbnormalRecords(
   if (!staffId) return { updatedDates: [] };
 
   const now = new Date();
-  const allDays = build4WeekDays(now);
-  const sinceIso = allDays[0];
+  const sinceIso = getAbnormalLookbackSince(ABNORMAL_LOOKBACK_DAYS, now);
 
-  // 1) attendances(복수) 4주 row 조회 — 어떤 날짜가 abnormal인지 식별
+  // 1) attendances(복수) lookback(28일) row 조회 — 어떤 날짜가 abnormal인지 식별
   const { data: rawAttendances, error: fetchErr } = await db
     .from('attendances')
     .select('staff_id, work_date, status, check_in_time, check_out_time, late_minutes, early_leave_minutes')

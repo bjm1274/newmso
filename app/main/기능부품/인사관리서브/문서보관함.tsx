@@ -232,8 +232,10 @@ export default function DocumentRepository({
 
       const newLogoMap: Record<string, string> = {};
       for (const row of companyRes.data || []) {
-        if (row.name && row.logo_url) {
-          newLogoMap[String(row.name)] = String(row.logo_url);
+        const name = String((row as { name?: string })?.name || '').trim();
+        const logo = String((row as { logo_url?: string })?.logo_url || '').trim();
+        if (name && logo) {
+          newLogoMap[name] = logo;
         }
       }
       setLogoMap(newLogoMap);

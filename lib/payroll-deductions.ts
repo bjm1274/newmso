@@ -1,5 +1,6 @@
 import { calculateMonthlyIncomeTax, type TaxInsuranceRates, hasExactIncomeTaxBracket } from './use-tax-insurance-rates';
 import { NP_INCOME_CEILING, NP_INCOME_FLOOR, HEALTH_INCOME_CEILING } from './tax-free-limits';
+import { isMidMonthJoin } from './payroll-mid-month';
 
 export interface StatutoryDeductionOptions {
   applyInsurance?: boolean;
@@ -36,22 +37,12 @@ export function calcStatutoryDeductions(
   opts: StatutoryDeductionOptions = {}
 ): StatutoryDeductionResult {
   const applyInsurance = opts.applyInsurance !== false;
-  
-  // 중도입사 여부 확인 (입사연월 === 정산연월 && 입사일 !== 1일)
-  let isMidMonthJoin = false;
-  if (opts.joinedAt && opts.yearMonth) {
-    const joinParts = opts.joinedAt.split('-');
-    if (joinParts.length >= 3) {
-      const joinYearMonth = `${joinParts[0]}-${joinParts[1]}`;
-      const joinDay = parseInt(joinParts[2], 10);
-      if (joinYearMonth === opts.yearMonth && joinDay !== 1) {
-        isMidMonthJoin = true;
-      }
-    }
-  }
 
-  const applyNational = !isMidMonthJoin && opts.applyNationalPension !== false && applyInsurance;
-  const applyHealth = !isMidMonthJoin && opts.applyHealthInsurance !== false && applyInsurance;
+  // 중도입사 여부 확인 (입사연월 === 정산연월 && 입사일 !== 1일)
+  const midMonthJoin = isMidMonthJoin(opts.joinedAt, opts.yearMonth);
+
+  const applyNational = !midMonthJoin && opts.applyNationalPension !== false && applyInsurance;
+  const applyHealth = !midMonthJoin && opts.applyHealthInsurance !== false && applyInsurance;
   const applyEmployment = opts.applyEmploymentInsurance !== false && applyInsurance;
   const applyTax = opts.applyTax !== false;
   const isDuruNuriActive = !!opts.isDuruNuriActive;

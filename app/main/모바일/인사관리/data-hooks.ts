@@ -23,6 +23,12 @@ import type { ErpUser, StaffMember } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
 import { resolveIssuedPayrollRecords } from '@/lib/payroll-records';
 import { useAnnualLeaveSummary } from '@/lib/annual-leave-summary';
+import {
+  ABNORMAL_LOOKBACK_DAYS,
+  getAbnormalLookbackSince,
+} from '@/lib/attendance-abnormal';
+import { pickAvatarTone as pickAvatarToneLib, type AvatarTone } from '@/lib/avatar-tone';
+import { formatMoney as formatMoneyLib } from '@/lib/format-display';
 
 // ─────────────────────────────────────────────────────────────
 // 직원 목록
@@ -568,18 +574,10 @@ export function expiryTone(daysLeft: number | null): ToneKind {
   return 'success';
 }
 
-export function pickAvatarTone(name: string): 'blue' | 'violet' | 'pink' | 'green' | 'orange' | 'cyan' {
-  const tones: ('blue' | 'violet' | 'pink' | 'green' | 'orange' | 'cyan')[] = [
-    'blue',
-    'violet',
-    'pink',
-    'green',
-    'orange',
-    'cyan',
-  ];
-  if (!name) return 'blue';
-  const fallback = tones[0] ?? 'blue';
-  return tones[name.charCodeAt(0) % tones.length] ?? fallback;
+export type HrAvatarTone = Exclude<AvatarTone, 'gray'>;
+
+export function pickAvatarTone(name: string): HrAvatarTone {
+  return pickAvatarToneLib(name) as HrAvatarTone;
 }
 
 export function formatDateShort(dateStr: string | null | undefined): string {
@@ -590,7 +588,7 @@ export function formatDateShort(dateStr: string | null | undefined): string {
 }
 
 export function formatMoney(n: number): string {
-  return Math.floor(n).toLocaleString('ko-KR');
+  return formatMoneyLib(n);
 }
 
 export function useDerivedMonthKey(date: Date): string {
@@ -625,8 +623,8 @@ const KIND_LABEL_KO: Record<TeamAbnormalKind, string> = {
 /**
  * 다종 abnormal 알림 본문 합성.
  *
- * 입력 예: { whenLabel: '최근 30일', counts: { late: 3, early_leave: 1, missing: 2 } }
- * 출력 예: "최근 30일 근태 사유 확인 요청 — 지각 3회, 조퇴 1회, 미체크 2건. 사유를 입력해 주세요."
+ * 입력 예: { whenLabel: '최근 28일', counts: { late: 3, early_leave: 1, missing: 2 } }
+ * 출력 예: "최근 28일 근태 사유 확인 요청 — 지각 3회, 조퇴 1회, 미체크 2건. 사유를 입력해 주세요."
  *
  * - 0회인 종류는 본문에 포함하지 않는다.
  * - 모두 0이면 빈 사유 요청 본문 — 호출 측에서 가드해야 함.
@@ -729,7 +727,7 @@ export async function requestAttendanceClarification(input: {
   targetStaffId: string;
   targetStaffName: string;
   kind: TeamAbnormalKind;
-  /** 'YYYY-MM-DD' 또는 라벨('최근 30일' 등). 메시지에 그대로 들어감 */
+  /** 'YYYY-MM-DD' 또는 라벨('최근 28일' 등). 메시지에 그대로 들어감 */
   whenLabel?: string;
 }): Promise<AbnormalActionResult> {
   const { user, targetStaffId, targetStaffName, kind, whenLabel } = input;
@@ -826,8 +824,9 @@ export async function requestAttendanceClarificationMulti(input: {
  *   2) attendance(단수) status='정상'  ← 마이페이지가 보는 테이블
  *   3) 'erp-attendance-updated' CustomEvent dispatch
  *
- * 모바일은 row 단위로 단순화 — 최근 30일 abnormal row 전체를 일괄 보정한다
+ * 모바일은 row 단위로 단순화 — 최근 ABNORMAL_LOOKBACK_DAYS(28)일 abnormal row 전체를 일괄 보정한다
  * (TeamTab 카드가 staff 단위 집계이므로 정책 일치).
+ * lookback 윈도우는 lib/attendance-abnormal SSOT. clarify 쓰기 경로는 모바일 전용.
  */
 export async function resolveTeamAbnormalForStaff(input: {
   user: ErpUser | null;
@@ -840,9 +839,8 @@ export async function resolveTeamAbnormalForStaff(input: {
   if (!targetStaffId) return { ok: false, reason: 'not_found' };
 
   try {
-    const since = new Date();
-    since.setDate(since.getDate() - 30);
-    const sinceStr = since.toLocaleDateString('en-CA');
+    // PC AbnormalWorkcenter 와 동일 28일 lookback (오늘 포함)
+    const sinceStr = getAbnormalLookbackSince(ABNORMAL_LOOKBACK_DAYS);
 
     // 1) 어떤 날짜가 abnormal 인지 식별 — attendance(단수) 기준
     const { data: rawDates, error: fetchErr } = await db
@@ -900,12 +898,14 @@ export async function resolveTeamAbnormalForStaff(input: {
 // ─────────────────────────────────────────────────────────────
 // 팀 근태이상 — 일자별 row 단위 hook & 액션 (JM2, JM3, JM5)
 //
-// useTeamAbnormalByDay: 최근 30일 attendances 를 fetch → 직원·일자 조합당 1 row.
+// useTeamAbnormalByDay: 최근 ABNORMAL_LOOKBACK_DAYS(28)일 attendances 를 fetch → 직원·일자 조합당 1 row.
 //   - 분 단위로 late_minutes / early_leave_minutes 노출
 //   - missing 은 check_in/check_out 한쪽만 있을 때 1로 계산
 //   - PC AbnormalWorkcenter/data.ts 의 normalizeRecord 와 동일 규칙
+//   - lookback: lib/attendance-abnormal (PC 4주 윈도우와 정렬)
 //
 // resolveTeamAbnormalForStaffOnDate: 단일 (staff, date) row 만 정상 처리.
+// clarify(requestAttendanceClarification*) 는 모바일 전용 — PC 와 아직 미통합.
 // ─────────────────────────────────────────────────────────────
 
 export type DailyAbnormalRow = {
@@ -945,9 +945,8 @@ export function useTeamAbnormalByDay(
     const run = async () => {
       setLoading(true);
       try {
-        const since = new Date();
-        since.setDate(since.getDate() - 30);
-        const sinceStr = since.toLocaleDateString('en-CA');
+        // PC 4주 윈도우와 동일 — lib/attendance-abnormal SSOT
+        const sinceStr = getAbnormalLookbackSince(ABNORMAL_LOOKBACK_DAYS);
 
         let staffQ = db
           .from('staff_members')

@@ -5,7 +5,12 @@ import {
   uploadToR2 } from '@/lib/object-storage';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { checkRateLimit, recordFailedAttempt } from '@/lib/rate-limit';
-import { CHAT_MAX_FILE_SIZE_BYTES as MAX_FILE_SIZE_BYTES, CHAT_MAX_VIDEO_SIZE_BYTES as MAX_VIDEO_SIZE_BYTES } from '@/lib/chat-upload-constants';
+import {
+  CHAT_MAX_FILE_SIZE_BYTES as MAX_FILE_SIZE_BYTES,
+  CHAT_MAX_VIDEO_SIZE_BYTES as MAX_VIDEO_SIZE_BYTES,
+  CHAT_MAX_IMAGE_SIZE_BYTES as MAX_IMAGE_SIZE_BYTES,
+  CHAT_MAX_FILE_SIZE_LABEL as MAX_FILE_SIZE_LABEL,
+} from '@/lib/chat-upload-constants';
 import { DEFAULT_CONTENT_TYPE, normalizeUploadMimeType } from '@/lib/upload-mime';
 import { getD1Binding, getD1Drizzle } from '@/lib/db';
 import { assertChatRoomMember } from '@/lib/chat-room-membership';
@@ -76,8 +81,6 @@ function buildSafeFilePath(fileName: string, mimeType: string): string {
   return buildChatAttachmentObjectKey(normalizeUploadFileName(fileName, mimeType), mimeType);
 }
 
-const MAX_IMAGE_SIZE_BYTES = 20 * 1024 * 1024;
-
 function validateUploadTarget(fileName: string, mimeType: string, fileSize: number): void {
   if (!fileName.trim()) {
     throw new Error('업로드할 파일 이름이 없습니다.');
@@ -98,7 +101,7 @@ function validateUploadTarget(fileName: string, mimeType: string, fileSize: numb
   }
 
   if (fileSize > MAX_FILE_SIZE_BYTES) {
-    throw new Error('파일 크기는 20MB 이하여야 합니다.');
+    throw new Error(`파일 크기는 ${MAX_FILE_SIZE_LABEL} 이하여야 합니다.`);
   }
 }
 

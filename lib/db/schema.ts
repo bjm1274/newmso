@@ -392,6 +392,7 @@ export const companies = sqliteTable("companies", {
 	payment_day: integer().default(7),
 	business_number: text(),
 	seal_url: text(),
+	logo_url: text(),
 	leave_policy: text().default("입사일"),
 	unused_leave_compensation: integer().default(0),
 	fiscal_year_start_month: integer().default(1) },

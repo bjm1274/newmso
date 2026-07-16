@@ -12,6 +12,7 @@ import { db, d1 } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
+import { normalizeLeaveType } from '@/lib/leave-type';
 
 // ─── 타입 ─────────────────────────────────────────────────────────
 export type LeaveStatus = '대기' | '승인' | '반려';
@@ -260,9 +261,10 @@ export interface LeaveSubmitInput {
 }
 
 export async function submitLeaveRequest(input: LeaveSubmitInput): Promise<void> {
+  const leaveTypeKey = normalizeLeaveType(input.leaveType);
   const payload = {
     staff_id: input.staffId,
-    leave_type: input.leaveType,
+    leave_type: leaveTypeKey,
     start_date: input.startDate,
     end_date: input.endDate || input.startDate,
     days: input.days,
@@ -290,8 +292,8 @@ export async function submitLeaveRequest(input: LeaveSubmitInput): Promise<void>
     const staffName = staffData?.name || '직원';
 
     let titleType = '연차 사용 신청';
-    if (input.leaveType === '연차(부여)') titleType = '연차 신규 부여';
-    else if (input.leaveType === '연차(과거사용)') titleType = '도입 전 사용 소급';
+    if (leaveTypeKey === '연차(부여)') titleType = '연차 신규 부여';
+    else if (leaveTypeKey === '연차(과거사용)') titleType = '도입 전 사용 소급';
 
     const approvalPayload = {
       company_id: staffData?.company_id || null,
@@ -306,7 +308,7 @@ export async function submitLeaveRequest(input: LeaveSubmitInput): Promise<void>
       meta_data: {
         startDate: input.startDate,
         endDate: input.endDate || input.startDate,
-        leaveType: input.leaveType,
+        leaveType: leaveTypeKey,
         reason: input.reason || '',
         days: input.days,
         approver_line: adminId ? [adminId] : [],

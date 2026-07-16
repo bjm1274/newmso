@@ -4,6 +4,12 @@ import { toast } from '@/lib/toast';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { canAccessApprovalSection, hasPermission } from '@/lib/access-control';
 import { isActiveStaff, isDepartmentHeadOrAbove, getPositionOrder } from '@/lib/active-staff';
+import {
+  isDraftForStaff,
+  isInApproverScope,
+  isReferenceForStaff,
+  type ApprovalInboxItem,
+} from '@/lib/approval-inbox';
 import { db, d1 } from '@/lib/db-client';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import { withMissingColumnsFallback, isMissingColumnError } from '@/lib/db-compat';
@@ -30,7 +36,6 @@ import {
   BUILTIN_FORM_TYPE_DEFINITIONS,
   BUILTIN_FORM_TYPE_NAMES,
   ALL_DOCUMENT_FILTER,
-  APPROVAL_INBOX_HIDDEN_STATUSES,
   APPROVAL_REFERENCE_ALL_KEY,
   APPROVAL_REFERENCE_DEFAULTS_KEY,
   DEFAULT_APPROVAL_TEMPLATE_DESIGN,
@@ -851,28 +856,33 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
   const visibleApprovals = useMemo(() => approvals, [approvals]);
 
   const draftBaseList = useMemo(() => {
-    return visibleApprovals.filter((a) => a.sender_id === user?.id);
+    const uid = user?.id != null ? String(user.id) : '';
+    if (!uid) return [];
+    return visibleApprovals.filter((a) => isDraftForStaff(a as ApprovalInboxItem, uid));
   }, [user?.id, visibleApprovals]);
 
   const approvalBaseList = useMemo(() => {
     const uid = user?.id != null ? String(user.id) : '';
-    return visibleApprovals.filter((a) => {
-      const status = String(a.status || '').trim();
-      if (APPROVAL_INBOX_HIDDEN_STATUSES.has(status)) return false;
-      const lineIds = resolveApprovalLineIds(a);
-      const currentApproverId = resolveCurrentApproverId(a);
-      return lineIds.some((id: string) => String(id) === uid) || String(currentApproverId || '') === uid;
-    });
-  }, [resolveApprovalLineIds, resolveCurrentApproverId, user?.id, visibleApprovals]);
+    if (!uid) return [];
+    return visibleApprovals.filter((a) =>
+      isInApproverScope(a as ApprovalInboxItem, uid, (row) =>
+        resolveCurrentApproverId(row as Record<string, unknown>),
+      ),
+    );
+  }, [resolveCurrentApproverId, user?.id, visibleApprovals]);
+
   const referenceBaseList = useMemo(() => {
     const uid = user?.id != null ? String(user.id) : '';
     if (!uid) return [];
     return visibleApprovals.filter((item) => {
-      // 회수된 문서는 참조자 화면에서 비표시 (요구사항 4번)
-      if (APPROVAL_INBOX_HIDDEN_STATUSES.has(String(item?.status || ''))) return false;
+      // PC 기존 동작 유지: meta.cc_users 만 디렉터리 정규화 후 id 매칭 (회수 제외는 SSOT)
       const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
       const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, approvalDirectoryStaffs);
-      return ccUsers.some((ccUser) => String(ccUser.id) === uid);
+      return isReferenceForStaff(
+        item as ApprovalInboxItem,
+        uid,
+        ccUsers.map((ccUser) => String(ccUser.id)),
+      );
     });
   }, [approvalDirectoryStaffs, user?.id, visibleApprovals]);
 

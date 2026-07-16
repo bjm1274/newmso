@@ -7,8 +7,9 @@
 
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/db-client';
-import { Card, Chip, SmBtn } from '../admin-workcenter-common';
+import { Card, SmBtn } from '../admin-workcenter-common';
 import TeamManager from '../../관리자전용서브/팀관리';
+import CompanyBrandAssets from '@/app/components/CompanyBrandAssets';
 
 interface CompanyData {
   id: string;
@@ -19,6 +20,8 @@ interface CompanyData {
   address: string | null;
   phone: string | null;
   memo: string | null;
+  logo_url?: string | null;
+  seal_url?: string | null;
   payment_day?: number;
   leave_policy?: string;
 }
@@ -75,22 +78,48 @@ export default function CompanyBasicTab() {
           address: typeof r.address === 'string' ? r.address : null,
           phone: typeof r.phone === 'string' ? r.phone : null,
           memo: typeof r.memo === 'string' ? r.memo : null,
+          logo_url: typeof r.logo_url === 'string' ? r.logo_url : null,
+          seal_url: typeof r.seal_url === 'string' ? r.seal_url : null,
           payment_day: typeof r.payment_day === 'number' ? r.payment_day : 7,
           leave_policy: typeof r.leave_policy === 'string' ? r.leave_policy : '입사일' }));
-        setCompanies(list);
+        // contract_templates 직인 폴백 병합
+        let merged = list;
+        try {
+          const { data: tmplRows } = await db
+            .from('contract_templates')
+            .select('company_name, seal_url');
+          if (Array.isArray(tmplRows)) {
+            const sealByName = new Map<string, string>();
+            for (const row of tmplRows) {
+              if (!isRecord(row)) continue;
+              const name = String(row.company_name || '').trim();
+              const seal = String(row.seal_url || '').trim();
+              if (name && seal) sealByName.set(name, seal);
+            }
+            merged = list.map((c) => {
+              if (c.seal_url) return c;
+              const fb = sealByName.get(c.name.trim());
+              return fb ? { ...c, seal_url: fb } : c;
+            });
+          }
+        } catch {
+          // ignore
+        }
+
+        setCompanies(merged);
         
         // Keep selected company or set default
         if (selectedId) {
-          const found = list.find(c => c.id === selectedId);
+          const found = merged.find(c => c.id === selectedId);
           if (found) {
             setInfo(found);
           } else {
-            setSelectedId(list[0].id);
-            setInfo(list[0]);
+            setSelectedId(merged[0].id);
+            setInfo(merged[0]);
           }
         } else {
-          setSelectedId(list[0].id);
-          setInfo(list[0]);
+          setSelectedId(merged[0].id);
+          setInfo(merged[0]);
         }
       }
     } catch {
@@ -135,7 +164,9 @@ export default function CompanyBasicTab() {
           business_number: info.business_no,
           address: info.address,
           phone: info.phone,
-          memo: info.memo })
+          memo: info.memo,
+          logo_url: info.logo_url || null,
+          seal_url: info.seal_url || null })
         .eq('id', info.id);
         
       if (error) throw error;
@@ -273,6 +304,25 @@ export default function CompanyBasicTab() {
             <div className="py-12 text-center text-[12px] text-[var(--toss-gray-4)]">선택된 회사가 없습니다. 회사를 추가하거나 선택해주세요.</div>
           ) : (
             <div className="space-y-2.5">
+              <CompanyBrandAssets
+                companyId={info.id}
+                companyName={info.name}
+                logoUrl={info.logo_url}
+                sealUrl={info.seal_url}
+                onLogoChange={(url) => {
+                  setInfo((prev) => (prev ? { ...prev, logo_url: url } : null));
+                  setCompanies((prev) =>
+                    prev.map((c) => (c.id === info.id ? { ...c, logo_url: url } : c)),
+                  );
+                }}
+                onSealChange={(url) => {
+                  setInfo((prev) => (prev ? { ...prev, seal_url: url } : null));
+                  setCompanies((prev) =>
+                    prev.map((c) => (c.id === info.id ? { ...c, seal_url: url } : c)),
+                  );
+                }}
+              />
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <Field
                   id="ci-name"
@@ -345,15 +395,30 @@ export default function CompanyBasicTab() {
                       : 'border-[var(--border)] bg-[var(--muted)] hover:bg-[var(--border)]/30'
                   }`}
                 >
-                  <div className="flex flex-col gap-0.5">
-                    <div className="font-bold text-[12.5px] text-[var(--foreground)]">{c.name}</div>
-                    <span className="text-[10.5px] text-[var(--toss-gray-4)]">
-                      {c.type} · {c.ceo_name || '대표 미등록'} · {c.memo || '분류 없음'}
-                    </span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    {c.logo_url ? (
+                      <img
+                        src={c.logo_url}
+                        alt=""
+                        className="h-8 w-8 shrink-0 rounded-md border border-[var(--border)] bg-white object-contain p-0.5"
+                      />
+                    ) : (
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-dashed border-[var(--border)] text-[10px] font-bold text-[var(--toss-gray-3)]">
+                        로고
+                      </span>
+                    )}
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                      <div className="font-bold text-[12.5px] text-[var(--foreground)] truncate">{c.name}</div>
+                      <span className="text-[10.5px] text-[var(--toss-gray-4)] truncate">
+                        {c.type} · {c.ceo_name || '대표 미등록'}
+                        {c.seal_url ? ' · 직인✓' : ' · 직인없음'}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
+                      data-testid={`company-manager-edit-${c.id}`}
                       onClick={() => handleSelectCompany(c.id)}
                       className="p-1 rounded-[var(--radius-md)] hover:bg-black/5 text-[11px]"
                       title="수정하기"

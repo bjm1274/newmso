@@ -1,13 +1,10 @@
 import { STORAGE_KEYS } from '@/lib/storage-keys';
+// APPROVER_POSITIONS SSOT — lib/active-staff (approval-routing re-exports the same)
+export { APPROVER_POSITIONS } from '@/lib/active-staff';
 
 // 전자결재 상수 모음 — 전자결재.tsx에서 분리
 
 export const APPROVAL_VIEWS = ['기안함', '결재함', '참조 문서함', '작성하기'] as const;
-
-export const APPROVER_POSITIONS = [
-  '팀장', '간호과장', '실장', '부장', '본부장', '총무부장', '진료부장', '간호부장',
-  '이사', '병원장', '원장', '대표',
-];
 
 export const BUILTIN_FORM_TYPE_DEFINITIONS = [
   { slug: 'leave', name: '연차/휴가' },

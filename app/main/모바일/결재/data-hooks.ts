@@ -3,7 +3,8 @@
 /**
  * 결재 모바일 화면 공용 데이터 훅 + 유틸.
  *   - useApprovalList(): approvals 테이블에서 모든 결재 문서 fetch (한 번에 받고 메모리에서 분할)
- *   - resolveLineIds / resolveCurrentApproverId : PC format-utils 재사용
+ *   - classifyForStaff → lib/approval-inbox SSOT
+ *   - resolveLineIds / resolveCurrentApproverId / resolveCcUserIds → approval-inbox/shared
  *   - postTransition: /api/approvals/transition 호출 (승인/반려)
  *   - markRead: approval 알림 읽음 처리
  *
@@ -23,9 +24,13 @@ import {
   buildApprovalDocNumber,
   resolveApprovalDocNumberConfig } from '@/lib/approval-workflow';
 import {
+  classifyApprovalsForStaff,
+  resolveApprovalCcUserIds,
   normalizeApprovalLineIds,
-  resolveApprovalLineIds as resolveLineIdsPc,
-  resolveStoredCurrentApproverId } from '@/app/main/기능부품/마이페이지/역할별대시보드/format-utils';
+  resolveApprovalLineIds as resolveLineIdsShared,
+  defaultResolveStoredCurrentApproverId,
+} from '@/lib/approval-inbox';
+import { resolveStoredCurrentApproverId } from '@/lib/approval-shared';
 
 // ─────────────────────────────────────────────
 // 타입
@@ -55,38 +60,21 @@ export type ApprovalRow = {
 export type ApprovalKind = 'inbox' | 'progress' | 'done' | 'sent' | 'ref';
 
 // ─────────────────────────────────────────────
-// 유틸 — re-export PC normalize/resolve
+// 유틸 — approval-inbox / approval-shared SSOT re-export
 // ─────────────────────────────────────────────
 
 export { normalizeApprovalLineIds, resolveStoredCurrentApproverId };
 
 export function resolveLineIds(row: ApprovalRow): string[] {
-  return resolveLineIdsPc(row as unknown as Parameters<typeof resolveLineIdsPc>[0]);
+  return resolveLineIdsShared(row as unknown as Parameters<typeof resolveLineIdsShared>[0]);
 }
 
 export function resolveCurrentApproverId(row: ApprovalRow): string | null {
-  if (row?.current_approver_id != null && String(row.current_approver_id).trim() !== '') {
-    return String(row.current_approver_id);
-  }
-  const ids = resolveLineIds(row);
-  return ids[0] ?? null;
+  return defaultResolveStoredCurrentApproverId(row);
 }
 
 export function resolveCcUserIds(row: ApprovalRow): string[] {
-  const meta = (row.meta_data ?? {}) as Record<string, unknown>;
-  const cc = meta.cc_line ?? meta.cc_users ?? meta.references ?? [];
-  if (!Array.isArray(cc)) return [];
-  return cc
-    .map((entry) => {
-      if (entry == null) return null;
-      if (typeof entry === 'string' || typeof entry === 'number') return String(entry);
-      if (typeof entry === 'object' && 'id' in entry) {
-        const id = (entry as Record<string, unknown>).id;
-        return id == null ? null : String(id);
-      }
-      return null;
-    })
-    .filter((v): v is string => v !== null);
+  return resolveApprovalCcUserIds(row.meta_data);
 }
 
 // ─────────────────────────────────────────────
@@ -94,53 +82,16 @@ export function resolveCcUserIds(row: ApprovalRow): string[] {
 // ─────────────────────────────────────────────
 
 export function classifyForStaff(rows: ApprovalRow[], staffId: string) {
-  const inbox: ApprovalRow[] = [];
-  const progress: ApprovalRow[] = [];
-  const done: ApprovalRow[] = [];
-  const sent: ApprovalRow[] = [];
-  const ref: ApprovalRow[] = [];
-
-  for (const row of rows) {
-    const status = String(row.status || '');
-    const isRecalled = status === '회수';
-    const isMine = String(row.sender_id || '') === staffId;
-    const currentApprover = resolveCurrentApproverId(row);
-    const lineIds = resolveLineIds(row);
-    const ccIds = resolveCcUserIds(row);
-
-    // 기안함: 본인이 기안 (회수 포함 — 본인 기안함에서 회수 상태 확인 가능)
-    if (isMine) {
-      sent.push(row);
-      if (!isRecalled) {
-        if (status === '대기') progress.push(row);
-        else if (status === '승인' || status === '반려') done.push(row);
-      }
-    }
-
-    // 회수된 문서는 결재함/진행/완료/참조함에서 비표시 (요구사항 4번)
-    if (isRecalled) continue;
-
-    // 결재함: 본인이 현재 결재자 + 대기
-    if (status === '대기' && currentApprover === staffId && !isMine) {
-      inbox.push(row);
-    }
-
-    // 진행: 본인이 결재선에 포함 + 대기 + 본인 차례 아님
-    if (status === '대기' && lineIds.includes(staffId) && currentApprover !== staffId && !isMine) {
-      progress.push(row);
-    }
-
-    // 완료: 본인이 결재선에 포함 + 승인/반려 종결
-    if ((status === '승인' || status === '반려') && lineIds.includes(staffId) && !isMine) {
-      done.push(row);
-    }
-
-    // 참조함: cc에 본인 (회수된 문서 비표시)
-    if (ccIds.includes(staffId)) {
-      ref.push(row);
-    }
-  }
-  return { inbox, progress, done, sent, ref };
+  const classified = classifyApprovalsForStaff(rows, staffId, {
+    excludeOwnFromApproverBuckets: true,
+  });
+  return {
+    inbox: classified.inbox as ApprovalRow[],
+    progress: classified.progress as ApprovalRow[],
+    done: classified.done as ApprovalRow[],
+    sent: classified.sent as ApprovalRow[],
+    ref: classified.ref as ApprovalRow[],
+  };
 }
 
 // ─────────────────────────────────────────────

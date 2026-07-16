@@ -106,7 +106,9 @@ export const ADMIN_OUTER_TABS: AdminOuterTabId[] = ADMIN_SIDEBAR_ITEMS.filter((i
 export const ADMIN_TAB_ALIASES: Record<string, AdminOuterTabId> = {
   양식빌더: '문서양식',
   문서서식: '문서양식',
-  연차수동부여: '시스템마스터센터' };
+  연차수동부여: '시스템마스터센터',
+  // Phase B #8: 레거시 open_subview/즐겨찾기/e2e `회사관리` → SSOT CompanyWorkcenter (`company`)
+  회사관리: 'company' };
 
 export const ADMIN_PARENT_SUBVIEW_MAP: Record<string, AdminOuterTabId> = {
   ...Object.fromEntries(ADMIN_ANALYSIS_TABS.map((tab) => [tab.id, '경영분석' as const])),

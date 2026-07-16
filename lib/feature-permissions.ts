@@ -34,6 +34,11 @@ export const MAIN_MENU_PERMISSION_ITEMS: FeaturePermissionItem[] = [
 export const MYPAGE_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'mypage_수정', label: '내정보 직접 수정', hint: '비활성화 시 정보 열람만 가능합니다.' },
   { key: 'mypage_급여조회', label: '내 급여명세서 조회' },
+  {
+    key: 'mypage_증명서조회',
+    label: '내 증명서 조회',
+    hint: '전자결재 승인·인사 발급 본인 증명서 확인. 끄면 내정보에서 증명서 탭이 비활성됩니다.',
+  },
 ];
 
 export const CHAT_PERMISSION_ITEMS: FeaturePermissionItem[] = [
