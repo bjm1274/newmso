@@ -282,14 +282,21 @@ export async function submitLeaveRequest(input: LeaveSubmitInput): Promise<void>
       .eq('id', input.staffId)
       .maybeSingle();
 
-    const { data: adminData } = await db
-      .from('staff_members')
-      .select('id, name')
-      .or("role.eq.admin,permissions->>admin.eq.true")
-      .limit(1);
-
-    const adminId = adminData?.[0]?.id || null;
     const staffName = staffData?.name || '직원';
+    // 전역 admin 1명 휴리스틱 제거 — 회사 스코프 기본 결재선 SSOT
+    const { data: directoryRows } = await db
+      .from('staff_members')
+      .select('id, name, company, department, position, status, role, permissions, hire_date, resign_date');
+    const { selectDefaultApproverLine } = await import('@/lib/approval-routing');
+    const line = selectDefaultApproverLine((directoryRows ?? []) as import('@/types').StaffMember[], {
+      selfId: input.staffId,
+      company: String(staffData?.company || '').trim() || undefined,
+      includeSyInc: true,
+      maxCount: 3,
+      mode: 'head_or_above',
+    });
+    const firstApprover = line[0];
+    const approverIds = line.map((s) => String(s.id));
 
     let titleType = '연차 사용 신청';
     if (leaveTypeKey === '연차(부여)') titleType = '연차 신규 부여';
@@ -304,14 +311,14 @@ export async function submitLeaveRequest(input: LeaveSubmitInput): Promise<void>
       title: `[연차/휴가] ${staffName} - ${titleType}`,
       content: input.reason || '',
       status: '대기',
-      current_approver_id: adminId,
+      current_approver_id: firstApprover?.id || null,
       meta_data: {
         startDate: input.startDate,
         endDate: input.endDate || input.startDate,
         leaveType: leaveTypeKey,
         reason: input.reason || '',
         days: input.days,
-        approver_line: adminId ? [adminId] : [],
+        approver_line: approverIds,
         cc_departments: ['행정팀']
       },
       created_at: new Date().toISOString()

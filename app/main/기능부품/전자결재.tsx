@@ -8,6 +8,7 @@ import {
   isDraftForStaff,
   isInApproverScope,
   isReferenceForStaff,
+  resolveApprovalCcUserIds,
   type ApprovalInboxItem,
 } from '@/lib/approval-inbox';
 import { db, d1 } from '@/lib/db-client';
@@ -875,14 +876,15 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
     const uid = user?.id != null ? String(user.id) : '';
     if (!uid) return [];
     return visibleApprovals.filter((item) => {
-      // PC 기존 동작 유지: meta.cc_users 만 디렉터리 정규화 후 id 매칭 (회수 제외는 SSOT)
+      // 모바일과 동일: cc_line | cc_users | references 통합 (resolveApprovalCcUserIds)
       const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+      const fromMeta = resolveApprovalCcUserIds(metaData);
       const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, approvalDirectoryStaffs);
-      return isReferenceForStaff(
-        item as ApprovalInboxItem,
-        uid,
-        ccUsers.map((ccUser) => String(ccUser.id)),
-      );
+      const ids = [
+        ...fromMeta,
+        ...ccUsers.map((ccUser) => String(ccUser.id)),
+      ].filter(Boolean);
+      return isReferenceForStaff(item as ApprovalInboxItem, uid, ids);
     });
   }, [approvalDirectoryStaffs, user?.id, visibleApprovals]);
 

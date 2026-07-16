@@ -126,7 +126,9 @@ export async function recalculateLeaveBalance(
     throw new Error(`recalculateLeaveBalance 입력 오류: ${msg}`);
   }
 
-  const targetYear = parsed.data.year ?? new Date().getFullYear();
+  // KST 기준 연도 (UTC getFullYear 사용 시 1/1 00~09시 잔액 year 어긋남)
+  const targetYear =
+    parsed.data.year ?? Number(formatKoreanDateKey(new Date()).slice(0, 4));
 
   const d1 = await getD1Binding();
   if (!d1) throw new Error('[annual-leave-balance] D1 binding not available (recalculateLeaveBalance)');
@@ -177,6 +179,7 @@ export async function recalculateLeaveBalance(
   }
 
   // 사용: 당해 연도 승인 연차만 (leave_balances.year 스코프). 전 기간 합산 시 잔여 과소 표시됨.
+  // 동기화 실패 시 used=0 으로 remaining 을 부풀리지 않고 fail-closed.
   let usedDays: number;
   try {
     usedDays = await syncAnnualLeaveUsedForStaff(staffId, {
@@ -185,8 +188,9 @@ export async function recalculateLeaveBalance(
     });
   } catch (syncErr) {
     console.error('[recalculateLeaveBalance] syncAnnualLeaveUsedForStaff 실패:', syncErr);
-    // staff.annual_leave_used 는 다년도 누적이라 폴백 금지 — 실패 시 0 후 재시도 유도
-    usedDays = 0;
+    throw new Error(
+      `[recalculateLeaveBalance] 사용일수 동기화 실패 — 잔액 갱신 중단 (staff=${staffId}, year=${targetYear})`,
+    );
   }
 
   // 발생: 원장 우선

@@ -118,11 +118,18 @@ export class OfflineQueue {
     this.initPromise = this.load();
   }
 
-  /** IDB(또는 폴백) 에서 초기 로드 */
+  /** IDB(또는 폴백) 에서 초기 로드 — load 중 enqueue 된 항목과 merge (덮어쓰기 유실 방지) */
   private async load(): Promise<void> {
-    const items = await storageReadQueue();
-    this.items = items.filter(isQueuedAction);
+    const fromStorage = (await storageReadQueue()).filter(isQueuedAction);
+    const pendingWhileLoad = this.items;
+    const byId = new Map<string, QueuedAction>();
+    for (const item of fromStorage) byId.set(item.id, item);
+    for (const item of pendingWhileLoad) byId.set(item.id, item);
+    this.items = Array.from(byId.values()).sort((a, b) => a.createdAt - b.createdAt);
     this.loaded = true;
+    if (pendingWhileLoad.length > 0) {
+      void storageWriteQueue(this.items);
+    }
     this.emit();
   }
 

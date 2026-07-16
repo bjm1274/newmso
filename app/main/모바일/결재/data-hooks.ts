@@ -30,7 +30,7 @@ import {
   resolveApprovalLineIds as resolveLineIdsShared,
   defaultResolveStoredCurrentApproverId,
 } from '@/lib/approval-inbox';
-import { resolveStoredCurrentApproverId } from '@/lib/approval-shared';
+import { resolveStoredCurrentApproverId, resolveEffectiveApproverIdCore } from '@/lib/approval-shared';
 
 // ─────────────────────────────────────────────
 // 타입
@@ -225,12 +225,54 @@ export async function postTransition(params: {
 // ─────────────────────────────────────────────
 
 export function useClassifiedApprovals(rows: ApprovalRow[], staffId: string | null) {
+  const [approverMap, setApproverMap] = useState<Record<string, Record<string, unknown>>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    const ids = new Set<string>();
+    for (const row of rows) {
+      const cur = defaultResolveStoredCurrentApproverId(row);
+      if (cur) ids.add(String(cur));
+    }
+    if (ids.size === 0) {
+      setApproverMap({});
+      return;
+    }
+    void (async () => {
+      try {
+        const { data } = await db
+          .from('staff_members')
+          .select('id, permissions, role, position')
+          .in('id', Array.from(ids));
+        if (cancelled) return;
+        const map: Record<string, Record<string, unknown>> = {};
+        for (const s of data ?? []) {
+          map[String((s as { id?: string }).id)] = s as Record<string, unknown>;
+        }
+        setApproverMap(map);
+      } catch {
+        if (!cancelled) setApproverMap({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [rows]);
+
   return useMemo(() => {
     if (!staffId) {
       return { inbox: [], progress: [], done: [], sent: [], ref: [] };
     }
-    return classifyForStaff(rows, staffId);
-  }, [rows, staffId]);
+    // 대결 반영: 저장된 현재 결재자 → 실효 결재자
+    return classifyApprovalsForStaff(rows as unknown as Parameters<typeof classifyApprovalsForStaff>[0], staffId, {
+      excludeOwnFromApproverBuckets: true,
+      resolveCurrentApproverId: (row) => {
+        const stored = defaultResolveStoredCurrentApproverId(row);
+        if (!stored) return null;
+        return resolveEffectiveApproverIdCore(stored, approverMap[String(stored)] ?? null);
+      },
+    }) as ReturnType<typeof classifyForStaff>;
+  }, [rows, staffId, approverMap]);
 }
 
 // ─────────────────────────────────────────────

@@ -51,6 +51,19 @@ export type MobileShellProps = {
   initialOpenPostId?: string | null;
   onConsumeOpenPostId?: () => void;
   onOpenBoardPost?: (boardId: string, postId: string) => void;
+  /** 푸시/알림 딥링크 — PC 메신저와 동일 계약 */
+  initialOpenChatRoomId?: string | null;
+  initialOpenMessageId?: string | null;
+  initialOpenChatRequestToken?: number;
+  onConsumeOpenChatRoomId?: () => void;
+  shareTarget?: {
+    id: string;
+    fileCount: number;
+    text: string | null;
+    url: string | null;
+    title: string | null;
+  } | null;
+  onConsumeShareTarget?: () => void;
 };
 
 export default function MobileShell({ 
@@ -58,7 +71,13 @@ export default function MobileShell({
   onLogout,
   initialOpenPostId,
   onConsumeOpenPostId,
-  onOpenBoardPost
+  onOpenBoardPost,
+  initialOpenChatRoomId = null,
+  initialOpenMessageId = null,
+  initialOpenChatRequestToken = 0,
+  onConsumeOpenChatRoomId,
+  shareTarget = null,
+  onConsumeShareTarget,
 }: MobileShellProps) {
   const { mainMenu, setMainMenu, subView, setSubView } = useNavigation();
 
@@ -82,6 +101,29 @@ export default function MobileShell({
   }));
   const [dark, setDark] = useState(false);
   const [chatResetToken, setChatResetToken] = useState(0);
+  const [deepLinkRoomId, setDeepLinkRoomId] = useState<string | null>(null);
+  const [deepLinkMessageId, setDeepLinkMessageId] = useState<string | null>(null);
+
+  // 푸시·알림 배너 딥링크 → 채팅 탭 + room 오픈
+  useEffect(() => {
+    if (!initialOpenChatRoomId) return;
+    const roomId = String(initialOpenChatRoomId).trim();
+    if (!roomId) return;
+    const msgId = initialOpenMessageId ? String(initialOpenMessageId).trim() : '';
+    setDeepLinkRoomId(roomId);
+    setDeepLinkMessageId(msgId || null);
+    setRoute({ tab: 'chat', sub: msgId ? `room:${roomId}:${msgId}` : `room:${roomId}` } as MRoute);
+    if (setMainMenu) setMainMenu('채팅');
+    onConsumeOpenChatRoomId?.();
+  }, [initialOpenChatRoomId, initialOpenMessageId, initialOpenChatRequestToken, onConsumeOpenChatRoomId, setMainMenu]);
+
+  // share-target: 채팅 탭으로 유도 (파일 공유는 채팅 목록에서 처리)
+  useEffect(() => {
+    if (!shareTarget) return;
+    setRoute({ tab: 'chat' } as MRoute);
+    if (setMainMenu) setMainMenu('채팅');
+    onConsumeShareTarget?.();
+  }, [shareTarget, onConsumeShareTarget, setMainMenu]);
   const resolvedStaffId = useResolvedStaffId(user as Record<string, unknown>);
 
   const [pendingContract, setPendingContract] = useState<any | null>(null);
@@ -136,17 +178,32 @@ export default function MobileShell({
     const currentUserId = resolvedStaffId;
     if (!pendingContract || !currentUserId) return;
     try {
+      // 문서 보관함 선저장 → 실패 시 계약 상태 미변경 (부분 성공 트랩 방지)
+      const signedAt = new Date().toISOString();
+      const { encryptContract } = await import('@/lib/contract-crypto');
+      const encryptedContractText = await encryptContract(contractText);
+      const { error: insertDocError } = await db.from('document_repository').insert({
+        title: `${user?.name} 근로계약서 (${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })})`,
+        category: '근로계약서',
+        content: encryptedContractText,
+        company_name: (user?.company as string) || '전체',
+        created_by: currentUserId,
+        version: 1
+      });
+      if (insertDocError) {
+        throw new Error(`문서 보관함 저장 실패: ${insertDocError.message}`);
+      }
+
       const { error: updateError } = await db
         .from('employment_contracts')
         .update({
           status: '서명완료',
-          signed_at: new Date().toISOString(),
+          signed_at: signedAt,
           signature_data: signatureDataUrl,
           receipt_signature_data: receiptSignatureData || null,
           privacy_consent: privacyConsent === true ? 1 : (privacyConsent === false ? 0 : null)
         })
         .eq('id', pendingContract.id)
-        // 정책 SELF_OR_SAME_COMPANY 가 staff_id 를 보므로 본인 행임을 where 에 명시
         .eq('staff_id', currentUserId);
 
       if (updateError) {
@@ -162,7 +219,6 @@ export default function MobileShell({
       const entryChecklistRow = Array.isArray(checklistRows)
         ? checklistRows.find((row) => String(row?.checklist_type ?? '').trim() === '입사') ?? null
         : null;
-      const signedAt = new Date().toISOString();
       const syncedItems = syncChecklistWithContract(
         normalizeChecklistItems(entryChecklistRow?.items ?? null, '입사'),
         '입사',
@@ -182,24 +238,7 @@ export default function MobileShell({
       );
 
       if (checklistError) {
-        throw new Error(`온보딩 체크리스트 업데이트 실패: ${checklistError.message}`);
-      }
-
-      // 문서 보관함으로 자동 저장 (PDF는 보관함에서 열 때 생성됨)
-      const { encryptContract } = await import('@/lib/contract-crypto');
-      const encryptedContractText = await encryptContract(contractText);
-      const { error: insertDocError } = await db.from('document_repository').insert({
-        title: `${user?.name} 근로계약서 (${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })})`,
-        // 문서보관함 정식 분류 SSOT — '계약서' 별칭은 폴더 매칭 실패 원인
-        category: '근로계약서',
-        content: encryptedContractText,
-        company_name: (user?.company as string) || '전체',
-        created_by: currentUserId,
-        version: 1
-      });
-
-      if (insertDocError) {
-        throw new Error(`문서 보관함 저장 실패: ${insertDocError.message}`);
+        console.warn('[모바일셸] 온보딩 체크리스트 업데이트 실패(서명·문서는 완료):', checklistError.message);
       }
 
       // HR에게 알림 전송 — [4차 전수조사 admin-05] FK 위반하는 user_id='system_admin'
@@ -410,12 +449,12 @@ export default function MobileShell({
             const chatSub = typeof (route as { sub?: string }).sub === 'string'
               ? (route as { sub?: string }).sub
               : undefined;
-            let initialRoomId: string | null = null;
-            let initialMessageId: string | null = null;
+            let initialRoomId: string | null = deepLinkRoomId;
+            let initialMessageId: string | null = deepLinkMessageId;
             if (chatSub && chatSub.startsWith('room:')) {
               const parts = chatSub.slice('room:'.length).split(':');
-              initialRoomId = parts[0] || null;
-              initialMessageId = parts[1] || null;
+              initialRoomId = parts[0] || initialRoomId;
+              initialMessageId = parts[1] || initialMessageId;
             }
             return (
               <채팅
@@ -423,7 +462,13 @@ export default function MobileShell({
                 rooms={rooms}
                 roomsLoading={roomsLoading}
                 refreshRooms={refreshRooms}
-                onActiveRoomChange={setActiveRoomId}
+                onActiveRoomChange={(id) => {
+                  setActiveRoomId(id);
+                  if (id) {
+                    setDeepLinkRoomId(null);
+                    setDeepLinkMessageId(null);
+                  }
+                }}
                 resetToken={chatResetToken}
                 onOpenBoardPost={onOpenBoardPost}
                 initialRoomId={initialRoomId}

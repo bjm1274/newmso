@@ -34,6 +34,7 @@ import {
   type ApprovalRow } from './data-hooks';
 import { pickAvatarTone } from './format-utils';
 import { buildApprovalPrintHtml } from '../../기능부품/전자결재서브/approval-print-utils';
+import { resolveEffectiveApproverIdCore } from '@/lib/approval-shared';
 
 type DetailTab = 'form' | 'line' | 'comment';
 
@@ -195,7 +196,14 @@ export default function SApprovalDetail({
   }, [lookupIds]);
 
   const lineIds = useMemo(() => (row ? resolveLineIds(row) : []), [row]);
-  const currentApproverId = useMemo(() => (row ? resolveCurrentApproverId(row) : null), [row]);
+  // 저장된 현재 결재자 → 대결(delegation) 반영 실효 결재자
+  const currentApproverId = useMemo(() => {
+    if (!row) return null;
+    const stored = resolveCurrentApproverId(row);
+    if (!stored) return null;
+    const matched = staffMap[String(stored)] as unknown as Record<string, unknown> | undefined;
+    return resolveEffectiveApproverIdCore(stored, matched ?? null);
+  }, [row, staffMap]);
   const canApprove = Boolean(
     row && String(row.status) === '대기' && staffId && currentApproverId === staffId
   );

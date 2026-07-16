@@ -145,8 +145,8 @@
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  /* 모바일 바텀 탭바(높이 64px + 바디마진 16px = 80px) 가림을 예방하기 위한 글로벌 바텀 패딩 */
-  padding-bottom: 88px;
+  /* 플로팅 탭(64) + bottom max(16,sab) + 여유 — 마지막 행 가림 방지 */
+  padding-bottom: calc(64px + max(16px, env(safe-area-inset-bottom, 0px)) + 20px);
 }
 /* 플로팅 탭 위 오버레이/모달 — 탭(z=999)보다 항상 위 */
 .mso-mobile {

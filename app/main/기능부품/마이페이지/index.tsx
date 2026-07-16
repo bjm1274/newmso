@@ -273,17 +273,32 @@ function MyPageMain({
     const currentUserId = resolvedStaffId;
     if (!pendingContract || !currentUserId) return;
     try {
+      // 문서 보관함 선저장 → 실패 시 계약 상태 미변경
+      const signedAt = new Date().toISOString();
+      const { encryptContract } = await import('@/lib/contract-crypto');
+      const encryptedContractText = await encryptContract(contractText);
+      const { error: insertDocError } = await db.from('document_repository').insert({
+        title: `${user?.name} 근로계약서 (${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })})`,
+        category: '근로계약서',
+        content: encryptedContractText,
+        company_name: (user?.company as string) || '전체',
+        created_by: currentUserId,
+        version: 1
+      });
+      if (insertDocError) {
+        throw new Error(`문서 보관함 저장 실패: ${insertDocError.message}`);
+      }
+
       const { error: updateError } = await db
         .from('employment_contracts')
         .update({
           status: '서명완료',
-          signed_at: new Date().toISOString(),
+          signed_at: signedAt,
           signature_data: signatureDataUrl,
           receipt_signature_data: receiptSignatureData || null,
           privacy_consent: privacyConsent === true ? 1 : (privacyConsent === false ? 0 : null)
         })
         .eq('id', pendingContract.id)
-        // 정책 SELF_OR_SAME_COMPANY 가 staff_id 를 보므로 본인 행임을 where 에 명시
         .eq('staff_id', currentUserId);
 
       if (updateError) {
@@ -299,7 +314,6 @@ function MyPageMain({
       const entryChecklistRow = Array.isArray(checklistRows)
         ? checklistRows.find((row) => String(row?.checklist_type ?? '').trim() === '입사') ?? null
         : null;
-      const signedAt = new Date().toISOString();
       const syncedItems = syncChecklistWithContract(
         normalizeChecklistItems(entryChecklistRow?.items ?? null, '입사'),
         '입사',
@@ -319,25 +333,7 @@ function MyPageMain({
       );
 
       if (checklistError) {
-        throw new Error(`온보딩 체크리스트 업데이트 실패: ${checklistError.message}`);
-      }
-
-      // 문서 보관함으로 자동 저장 (PDF는 보관함에서 열 때 생성됨)
-      // 서명 이미지·주소·연락처 PII 가 포함되므로 저장 직전 암호화(키 미설정 시 평문 폴백)
-      const { encryptContract } = await import('@/lib/contract-crypto');
-      const encryptedContractText = await encryptContract(contractText);
-      const { error: insertDocError } = await db.from('document_repository').insert({
-        title: `${user?.name} 근로계약서 (${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })})`,
-        // 문서보관함 정식 분류 SSOT — '계약서' 별칭은 폴더 매칭 실패 원인
-        category: '근로계약서',
-        content: encryptedContractText,
-        company_name: (user?.company as string) || '전체',
-        created_by: currentUserId,
-        version: 1
-      });
-
-      if (insertDocError) {
-        throw new Error(`문서 보관함 저장 실패: ${insertDocError.message}`);
+        console.warn('[마이페이지] 온보딩 체크리스트 업데이트 실패(서명·문서는 완료):', checklistError.message);
       }
 
       // HR에게 알림 전송 — [4차 전수조사 admin-05] 존재하지 않는 user_id='system_admin'

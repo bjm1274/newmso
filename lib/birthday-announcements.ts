@@ -112,9 +112,10 @@ export async function processBirthdayAnnouncements(
         ) VALUES (
           ${welfareId}, ${staff.id}, ${staff.name}, ${staff.company}, ${staff.department || ''},
           '생일', ${kstDateStr}, '본인', ${staff.name},
-          50000, 0, '지급완료', '생일자 자동 등록'
+          50000, 0, '대기', '생일자 자동 등록'
         )
       `);
+      // INSERT OR IGNORE 성공 여부 판별 불가 시에도 멱등 — 중복 카운트 허용보다 상태 정합 우선
       addedToWelfare += 1;
     } catch (err) {
       errors.push(`Welfare error for ${staff.name}: ${err instanceof Error ? err.message : String(err)}`);

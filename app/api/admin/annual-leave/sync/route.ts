@@ -3,6 +3,7 @@ import { syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
 import { recalculateLeaveBalance } from '@/lib/annual-leave-balance';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { getD1Binding } from '@/lib/db';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,8 +18,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'staffId가 필요합니다.' }, { status: 400 });
     }
 
-    // leave_balances 재계산 — staff_members 명단/사용 필드는 쓰지 않음
-    const year = new Date().getFullYear();
+    // leave_balances 재계산 — KST 연도 (UTC getFullYear 금지)
+    const year = Number(formatKoreanDateKey(new Date()).slice(0, 4));
     await syncAnnualLeaveUsedForStaff(staffId, { year, writeStaffMembers: false });
     await recalculateLeaveBalance(staffId, year);
 

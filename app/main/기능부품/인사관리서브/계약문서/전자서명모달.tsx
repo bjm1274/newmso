@@ -68,20 +68,18 @@ export default function ContractSignatureModal({ contract, user, templateText, o
     const [receiptWidth, setReceiptWidth] = useState(400);
     const [receiptHeight, setReceiptHeight] = useState(160);
 
+    // step 4 진입 시 1회만 캔버스 크기 확정 — resize 시 remount로 획 소실 방지
     useEffect(() => {
         if (step !== 4) return;
-
         const measure = (el: HTMLDivElement | null) => {
             if (!el) return { w: 0, h: 0 };
-            // 테두리·안쪽 여백을 제외한 실제 그리기 영역
             const pad = 4;
             return {
                 w: Math.max(200, Math.floor(el.clientWidth - pad * 2)),
                 h: Math.max(120, Math.floor(el.clientHeight - pad * 2)),
             };
         };
-
-        const updateSizes = () => {
+        const timer = setTimeout(() => {
             const sig = measure(sigContainerRef.current);
             if (sig.w > 0) {
                 setSigWidth(sig.w);
@@ -92,22 +90,8 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                 setReceiptWidth(receipt.w);
                 setReceiptHeight(receipt.h);
             }
-        };
-
-        const timer = setTimeout(updateSizes, 50);
-        window.addEventListener('resize', updateSizes);
-        const ro =
-            typeof ResizeObserver !== 'undefined'
-                ? new ResizeObserver(() => updateSizes())
-                : null;
-        if (sigContainerRef.current) ro?.observe(sigContainerRef.current);
-        if (receiptContainerRef.current) ro?.observe(receiptContainerRef.current);
-
-        return () => {
-            clearTimeout(timer);
-            window.removeEventListener('resize', updateSizes);
-            ro?.disconnect();
-        };
+        }, 80);
+        return () => clearTimeout(timer);
     }, [step]);
 
     const [localTemplateText, setLocalTemplateText] = useState<string>('');
@@ -464,10 +448,10 @@ export default function ContractSignatureModal({ contract, user, templateText, o
     const handleSubmit = async () => {
         if (submitLockRef.current || isGenerating) return;
         if (isSigEmpty || sigCanvas.current?.isEmpty()) {
-            return toast('서명을 완료해 주세요.', 'success');
+            return toast('서명을 완료해 주세요.', 'warning');
         }
         if (isReceiptEmpty || receiptCanvas.current?.isEmpty()) {
-            return toast("교부확인란에 '교부 받음'을 자필로 작성해 주세요.");
+            return toast("교부확인란에 '교부 받음'을 자필로 작성해 주세요.", 'warning');
         }
 
         submitLockRef.current = true;
@@ -599,7 +583,10 @@ export default function ContractSignatureModal({ contract, user, templateText, o
 
                 <div
                     className="px-4 pb-3 border-b border-[var(--border)] flex items-center justify-between bg-[var(--tab-bg)] shrink-0"
-                    style={{ paddingTop: 'max(12px, env(safe-area-inset-top, 0px))' }}
+                    style={{
+                        // .mso-mobile 내부 fixed 모달은 셸이 이미 sat 반영 — 이중 padding 금지
+                        paddingTop: 12,
+                    }}
                 >
                     <div className="min-w-0 pr-2">
                         <span className="px-2.5 py-1 text-[11px] font-bold text-blue-700 bg-blue-500/20 rounded-lg mb-1.5 inline-block">
@@ -610,7 +597,13 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                         </h2>
                     </div>
                     <button
-                        onClick={onClose}
+                        onClick={() => {
+                            // 서명 대기 중 단순 닫기 시 안내 — 완전 이탈은 가능하되 재진입 유도
+                            if (step >= 1 && !isGenerating) {
+                                toast('서명을 완료해야 계약이 확정됩니다. 내정보에서 다시 열 수 있습니다.', 'warning');
+                            }
+                            onClose();
+                        }}
                         className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--card)] text-[var(--toss-gray-4)] hover:text-red-500 border border-[var(--border)] transition-colors"
                         aria-label="닫기"
                     >

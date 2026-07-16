@@ -37,7 +37,7 @@ export default function 내정보({ user, sub, onSub, onLogout, onSwitchTab }: �
   let contentElement: React.ReactNode;
 
   if (sub === 'attend') {
-    const staffId = resolvedStaffId ?? (typeof user.id === 'string' ? user.id : null);
+    const staffId = resolvedStaffId;
     const staffName = typeof user.name === 'string' ? user.name : undefined;
     const company = typeof user.company === 'string' ? user.company : undefined;
     contentElement = (

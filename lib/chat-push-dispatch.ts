@@ -21,7 +21,8 @@ import {
   isNull,
   lte,
   or,
-  lt } from '@/lib/db';
+  lt,
+  sql } from '@/lib/db';
 
 type MessageRow = {
   id: string;
@@ -417,6 +418,53 @@ async function updateChatPushJobByMessageId(
     .where(eq(chatPushJobsTable.message_id, messageId));
 }
 
+/** CAS claim — 다른 워커가 처리 중/완료면 false */
+async function claimChatPushJobByMessageId(messageId: string): Promise<boolean> {
+  const d1 = await getD1Binding();
+  if (!d1) return true; // 바인딩 없으면 기존 경로 (로컬)
+  const db = getD1Drizzle(d1);
+  const nowIso = new Date().toISOString();
+  const staleIso = new Date(Date.now() - 90_000).toISOString();
+  try {
+    const result = await db.run(sql`
+      UPDATE chat_push_jobs
+      SET processing_started_at = ${nowIso}
+      WHERE message_id = ${messageId}
+        AND processed_at IS NULL
+        AND (
+          processing_started_at IS NULL
+          OR processing_started_at < ${staleIso}
+        )
+    `);
+    const changes = Number((result as { meta?: { changes?: number }; changes?: number })?.meta?.changes
+      ?? (result as { changes?: number })?.changes
+      ?? 0);
+    // D1 결과 형태가 환경마다 달라 changes 미제공이면 진행 허용
+    if (!Number.isFinite(changes) || changes === 0) {
+      // 재조회로 이미 처리/점유 여부 확인
+      const existing = await db
+        .select({
+          processed_at: chatPushJobsTable.processed_at,
+          processing_started_at: chatPushJobsTable.processing_started_at,
+        })
+        .from(chatPushJobsTable)
+        .where(eq(chatPushJobsTable.message_id, messageId))
+        .limit(1);
+      const row = existing[0];
+      if (row?.processed_at) return false;
+      if (row?.processing_started_at) {
+        const started = Date.parse(String(row.processing_started_at));
+        if (Number.isFinite(started) && Date.now() - started < 90_000 && String(row.processing_started_at) !== nowIso) {
+          return false;
+        }
+      }
+    }
+    return true;
+  } catch {
+    return true;
+  }
+}
+
 async function updateChatPushJobById(
   jobId: string,
   patch: Record<string, unknown>,
@@ -534,10 +582,19 @@ export async function dispatchChatPushForMessage(params: {
     // 조회 실패 시 기존 경로로 진행
   }
 
-  // ── 이중 발송 방지 + 초기 데이터 병렬 로드 ──
-  const [, fetchResult, mutedIdsEarly] = await Promise.all([
-    updateChatPushJobByMessageId(params.messageId, {
-      processing_started_at: new Date().toISOString() }),
+  // ── CAS claim 후 로드 (크론·즉시 디스패치 동시 발송 방지) ──
+  const claimed = await claimChatPushJobByMessageId(params.messageId);
+  if (!claimed) {
+    return {
+      sent: 0,
+      failed: 0,
+      targets: 0,
+      notificationsCreated: 0,
+      pushDisabled: false,
+      reason: 'in-flight',
+    } satisfies ChatPushDispatchResult;
+  }
+  const [fetchResult, mutedIdsEarly] = await Promise.all([
     fetchMessageAndRoom(params.messageId, params.roomId),
     getMutedUserIds(params.roomId),
   ]);

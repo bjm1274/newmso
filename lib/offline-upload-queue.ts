@@ -253,12 +253,7 @@ async function flushOne(item: UploadQueueItem): Promise<void> {
     return;
   }
 
-  // 성공 — blob 정리 + 큐에서 제거
-  await deleteBlob(item.blobId);
-  uploadQueue = uploadQueue.filter((q) => q.id !== item.id);
-  lsSaveQueue();
-
-  // onSuccessAction 체이닝
+  // onSuccessAction 체이닝 — 메시지 insert 성공 후에만 큐/blob 제거 (유실 방지)
   if (item.onSuccessAction) {
     const { kind, table, payloadTemplate, match } = item.onSuccessAction;
     const payload = Object.fromEntries(
@@ -267,8 +262,18 @@ async function flushOne(item: UploadQueueItem): Promise<void> {
         v === '{fileUrl}' ? plan.publicUrl : v,
       ]),
     );
-    await enqueueD1Mutation({ kind, table, payload, match });
+    const result = await enqueueD1Mutation({ kind, table, payload, match });
+    if (result && typeof result === 'object' && 'error' in result && (result as { error?: unknown }).error) {
+      item.retryCount += 1;
+      item.status = item.retryCount > MAX_RETRY ? 'failed' : 'pending';
+      lsSaveQueue();
+      return;
+    }
   }
+
+  await deleteBlob(item.blobId);
+  uploadQueue = uploadQueue.filter((q) => q.id !== item.id);
+  lsSaveQueue();
 }
 
 async function flushAll(): Promise<void> {

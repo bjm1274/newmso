@@ -379,7 +379,9 @@ export function useApprovalComposeDraft({
     if (approverLineRef.current.length === 0 && user?.id) {
       const defaultApprovers = selectDefaultApproverLine(approvalDirectoryStaffs, {
         selfId: user.id,
-        includeSyInc: false,
+        company: String(user.company || '').trim() || undefined,
+        includeSyInc: true,
+        maxCount: 3,
         mode: 'head_or_above',
       });
       if (defaultApprovers.length > 0) {

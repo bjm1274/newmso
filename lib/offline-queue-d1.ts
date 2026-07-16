@@ -168,10 +168,14 @@ export function initOfflineQueueFlush(): () => void {
   const queue = getOfflineQueue();
 
   const unsubscribe = queue.startAutoFlush(async (action: QueuedAction) => {
-    if (!action.type.startsWith('db:')) return;
+    if (!action.type.startsWith('db:')) {
+      throw new Error(`[offline-queue] unsupported action type: ${action.type}`);
+    }
 
     const p = action.payload as QueuedMutationPayload;
-    if (!p || typeof p.kind !== 'string' || typeof p.table !== 'string') return;
+    if (!p || typeof p.kind !== 'string' || typeof p.table !== 'string') {
+      throw new Error('[offline-queue] invalid mutation payload');
+    }
 
     let resolvedData = p.data;
     if (action.groupId) {

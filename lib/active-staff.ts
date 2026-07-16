@@ -58,8 +58,8 @@ export function isDepartmentHeadOrAbove(staff: { position?: string | null; role?
   const position = String(staff.position || '').trim();
   if (!position) return false;
   if (position === '부서장') return true;
-  if (position === '팀장' || position === '간호과장' || position === '과장') return false;
-  return APPROVER_POSITIONS.includes(position);
+  // 팀장·간호과장·과장 포함 — 자동 결재선 공백 방지 (APPROVER_POSITIONS 와 정합)
+  return APPROVER_POSITIONS.includes(position) || position === '과장';
 }
 
 export function getPositionOrder(position: string | null | undefined, role?: string | null): number {

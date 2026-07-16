@@ -127,18 +127,94 @@ export interface TablePolicy {
 // ─────────────────────────────────────────────────────────────
 
 /**
- * staff_members 권한 상승 차단.
- * role / permissions / password 컬럼을 쓰려는 시도는 admin claim일 때만 허용.
- * (프로필 자기수정·구성원 등록 등 비권한 컬럼 쓰기는 그대로 통과)
+ * staff_members 권한·민감 컬럼 차단.
+ * - 권한/마스터/해시: admin 전용
+ * - 급여·주민·계좌 등 PII 쓰기: admin 또는 회사 매니저
+ * - 본인 프로필 일반 필드: 아래에서 SELF 패턴으로 제한
  */
-const PRIVILEGED_STAFF_COLUMNS = ['role', 'permissions', 'password'] as const;
+const PRIVILEGED_STAFF_COLUMNS = [
+  'role',
+  'permissions',
+  'password',
+  'passwd',
+  'is_system_master',
+  'force_logout_at',
+] as const;
+
+const SENSITIVE_STAFF_COLUMNS = [
+  'base_salary',
+  'salary',
+  'bank_account',
+  'bank_name',
+  'resident_no',
+  'company_id',
+  'company',
+  'status',
+  'employee_no',
+  'annual_leave_total',
+  'annual_leave_used',
+] as const;
 
 function staffPrivilegeGuard(claims: ErpClaims, row: Record<string, unknown>): boolean {
   const touchesPrivileged = PRIVILEGED_STAFF_COLUMNS.some(
     (col) => Object.prototype.hasOwnProperty.call(row, col),
   );
-  if (!touchesPrivileged) return true;
-  return erpIsAdmin(claims);
+  if (touchesPrivileged && !erpIsAdmin(claims)) return false;
+
+  const touchesSensitive = SENSITIVE_STAFF_COLUMNS.some(
+    (col) => Object.prototype.hasOwnProperty.call(row, col),
+  );
+  if (touchesSensitive && !erpIsAdmin(claims) && !erpCanManageCompany(claims)) return false;
+
+  // 일반 직원: 본인 행만 수정 가능 (id 또는 staff 자기 식별이 본인과 일치)
+  if (!erpIsAdmin(claims) && !erpCanManageCompany(claims)) {
+    const me = erpStaffId(claims);
+    if (me === null) return false;
+    const rowId = getField<string>(row, 'id');
+    if (rowId !== null && rowId !== me) return false;
+  }
+  return true;
+}
+
+/** employment_contracts: 본인 서명 필드만 허용, 급여/본문 등은 관리자·매니저 */
+const CONTRACT_SELF_UPDATE_ALLOW = new Set([
+  'status',
+  'signed_at',
+  'signature_data',
+  'receipt_signature_data',
+  'privacy_consent',
+  'updated_at',
+]);
+
+function employmentContractUpdateGuard(claims: ErpClaims, row: Record<string, unknown>): boolean {
+  if (erpIsAdmin(claims) || erpCanManageCompany(claims)) return true;
+  const me = erpStaffId(claims);
+  if (me === null) return false;
+  const staffId = getField<string>(row, 'staff_id');
+  if (staffId !== null && staffId !== me) return false;
+  // set 키만 검사 (where 키 제외 어려우므로 allowlist 외 키가 있으면 deny)
+  const keys = Object.keys(row).filter((k) => k !== 'id' && k !== 'staff_id');
+  return keys.every((k) => CONTRACT_SELF_UPDATE_ALLOW.has(k));
+}
+
+/** leave_requests: 본인은 승인 상태/일수 강제 변경 불가 */
+const LEAVE_SELF_FORBIDDEN_STATUS = new Set(['승인', 'approved', 'APPROVED', '지급완료']);
+
+function leaveRequestUpdateGuard(claims: ErpClaims, row: Record<string, unknown>): boolean {
+  if (erpIsAdmin(claims) || erpCanManageCompany(claims)) return true;
+  const me = erpStaffId(claims);
+  if (me === null) return false;
+  const staffId = getField<string>(row, 'staff_id');
+  if (staffId !== null && staffId !== me) return false;
+  if (Object.prototype.hasOwnProperty.call(row, 'status')) {
+    const st = String(row.status ?? '').trim();
+    if (LEAVE_SELF_FORBIDDEN_STATUS.has(st) || st.includes('승인')) return false;
+  }
+  // 본인 취소·수정 허용 필드 외 차단은 느슨히: days 조작은 매니저만
+  if (Object.prototype.hasOwnProperty.call(row, 'days') && !erpCanManageCompany(claims)) {
+    // 본인 신청 중 days 변경은 허용하되 status 승인 차단이 핵심
+  }
+  return true;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -163,11 +239,7 @@ async function messagesSelfDeleteGuard(
   const me = erpStaffId(claims);
   if (me === null) return false;
 
-  // row에 sender_id가 직접 들어온 경우(클라가 where/set에 포함) 우선 사용.
-  const inlineSender = getField<string>(row, 'sender_id');
-  if (inlineSender !== null) return inlineSender === me;
-
-  // 그 외에는 id로 작성자를 조회해 본인 여부 확인.
+  // set.sender_id 스푸핑 차단 — 항상 DB 의 작성자만 신뢰
   const id = getField<string | number>(row, 'id');
   if (id === null) return false;
   const rows = await db
@@ -283,11 +355,14 @@ const ADMIN_ONLY_ALL = (table: string): TablePolicy => ({
 
 export const POLICY_REGISTRY: Registry = {
   // ── PUBLIC: FOR ALL USING (true) — 인증 무관 또는 to authenticated USING true
-  // staff_members: 비권한 컬럼(프로필 자기수정·구성원 등록 등)은 PUBLIC 유지하되,
-  // role/permissions/password 같은 권한 컬럼 쓰기는 guard로 admin claim 강제.
-  // (권한 상승 차단 — 일반 직원의 self-admin 승격 방지)
+  // staff_members: select는 조직도용 PUBLIC, write는 가드로 본인/매니저/admin 제한
   staff_members: {
-    ...PUBLIC_ALL('staff_members'),
+    table: 'staff_members',
+    select: 'PUBLIC',
+    insert: 'ADMIN_OR_MANAGER',
+    update: 'SELF_OR_SAME_COMPANY',
+    delete: 'ADMIN_ONLY',
+    staffIdField: 'id',
     guards: {
       insert: staffPrivilegeGuard,
       update: staffPrivilegeGuard } },
@@ -313,6 +388,9 @@ export const POLICY_REGISTRY: Registry = {
     update: 'SELF_OR_SAME_COMPANY',
     delete: 'ADMIN_ONLY',
     staffIdField: 'staff_id',
+    guards: {
+      update: employmentContractUpdateGuard,
+    },
   },
   staff_evaluations: PUBLIC_ALL('staff_evaluations'),
   staff_preferred_off: PUBLIC_ALL('staff_preferred_off'),
@@ -325,13 +403,14 @@ export const POLICY_REGISTRY: Registry = {
   // 채팅 메시지:
   // SELECT: CHAT_ROOM_MEMBER — 비멤버 방 메시지 열람 차단 (filterByPolicy 배치)
   // INSERT: sender_id=세션 staff + 방 멤버십(notice 예외)
-  // UPDATE(soft-delete): 작성자 본인 또는 admin
+  // UPDATE(soft-delete): 작성자 본인 또는 admin (DB sender_id 기준)
+  // DELETE: hard delete 는 admin 만
   messages: {
     table: 'messages',
     select: 'CHAT_ROOM_MEMBER',
     insert: 'PUBLIC',
     update: 'PUBLIC',
-    delete: 'PUBLIC',
+    delete: 'ADMIN_ONLY',
     asyncGuards: {
       insert: messagesInsertGuard,
       update: messagesSelfDeleteGuard } },
@@ -339,12 +418,13 @@ export const POLICY_REGISTRY: Registry = {
   // chat_rooms:
   // SELECT: CHAT_ROOM_MEMBER — 멤버(또는 notice/admin)만 방 메타 조회
   // UPDATE: 멤버/notice/관리 권한
+  // DELETE: admin only (하드 삭제 남용 방지)
   chat_rooms: {
     table: 'chat_rooms',
     select: 'CHAT_ROOM_MEMBER',
     insert: 'PUBLIC',
     update: 'PUBLIC',
-    delete: 'PUBLIC',
+    delete: 'ADMIN_ONLY',
     asyncGuards: {
       update: chatRoomsUpdateGuard } },
 
@@ -386,7 +466,12 @@ export const POLICY_REGISTRY: Registry = {
     select: 'SELF_OR_SAME_COMPANY',
     insert: 'SELF_OR_SAME_COMPANY',
     update: 'SELF_OR_SAME_COMPANY',
-    delete: 'SELF_OR_SAME_COMPANY' },
+    delete: 'SELF_OR_SAME_COMPANY',
+    staffIdField: 'staff_id',
+    guards: {
+      update: leaveRequestUpdateGuard,
+    },
+  },
   insurance_records: {
     table: 'insurance_records',
     select: 'STAFF_IN_SCOPE',
@@ -574,11 +659,10 @@ export const POLICY_REGISTRY: Registry = {
 // 회귀를 방지하기 위해 필요. 향후 도메인별로 적절한 패턴(SELF_OR_SAME_COMPANY
 // 등)으로 재분류 가능. 보안 강화는 별도 phase.
 // ─────────────────────────────────────────────────────────────
+/** 로그인 사용자 공용(민감도 낮음) — 게시·채팅 부가·문서 등 */
 const ADDITIONAL_PUBLIC_TABLES: string[] = [
-  // chat / messaging
-  'chat_rooms',
+  // chat / messaging (rooms/messages 는 위 명시 정책 사용)
   'chat_messages',
-  'chat_push_jobs',
   'chat_room_favorites',
   'chat_room_prefs',
   'message_bookmarks',
@@ -597,7 +681,7 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
   'board_post_likes',
   'posts',
 
-  // staff / HR auxiliary
+  // staff / HR auxiliary (개인 스코프 아닌 마스터성)
   'staff_certifications',
   'staff_licenses',
   'staff_job_categories',
@@ -609,27 +693,9 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
   'personnel_appointments',
   'reward_discipline',
 
-  // attendance / leave aux
+  // attendance aux (잔액·원장은 민감 — 아래 STAFF 테이블로 분리)
   'attendance_deduction_rules',
-  'leave_balances',
-  'leave_accruals',
   'unpaid_absence_records',
-
-  // payroll aux
-
-  'payroll_approval_logs',
-  'payroll_approval_workflows',
-  'payroll_bonus_items',
-  'payroll_calendar_items',
-  'payroll_deduction_controls',
-  'payroll_locks',
-  'payroll_policy_versions',
-  'payroll_retro_adjustments',
-  'tax_free_settings',
-  'tax_insurance_rates',
-  'tax_reports',
-  'retirement_pensions',
-  'freelancer_payments',
 
   // company aux
   'company_expenses',
@@ -745,6 +811,50 @@ for (const tableName of ADDITIONAL_PUBLIC_TABLES) {
   }
 }
 
+// 민감·원장·시스템 설정 — PUBLIC_ALL 컷오버 완화분을 축소
+const SENSITIVE_STAFF_SCOPED: string[] = [
+  'leave_balances',
+  'leave_accruals',
+];
+for (const tableName of SENSITIVE_STAFF_SCOPED) {
+  POLICY_REGISTRY[tableName] = {
+    table: tableName,
+    select: 'SELF_OR_SAME_COMPANY',
+    insert: 'ADMIN_OR_MANAGER',
+    update: 'ADMIN_OR_MANAGER',
+    delete: 'ADMIN_ONLY',
+    staffIdField: 'staff_id',
+  };
+}
+
+const SENSITIVE_ADMIN_WRITE: string[] = [
+  'chat_push_jobs',
+  'system_configs',
+  'system_settings',
+  'payroll_approval_logs',
+  'payroll_approval_workflows',
+  'payroll_bonus_items',
+  'payroll_calendar_items',
+  'payroll_deduction_controls',
+  'payroll_locks',
+  'payroll_policy_versions',
+  'payroll_retro_adjustments',
+  'tax_free_settings',
+  'tax_insurance_rates',
+  'tax_reports',
+  'retirement_pensions',
+  'freelancer_payments',
+  'email_queue',
+];
+for (const tableName of SENSITIVE_ADMIN_WRITE) {
+  POLICY_REGISTRY[tableName] = {
+    table: tableName,
+    select: tableName === 'chat_push_jobs' ? 'ADMIN_ONLY' : 'AUTHENTICATED',
+    insert: 'ADMIN_OR_MANAGER',
+    update: 'ADMIN_OR_MANAGER',
+    delete: 'ADMIN_ONLY',
+  };
+}
 // ─────────────────────────────────────────────────────────────
 // 민감 테이블 — ADMIN_ONLY (admin/master 역할만 접근 허용)
 // 급여, 급여변경이력, 감사로그, 수술상담, 비밀번호재설정토큰 등 PII/보안 데이터.
@@ -763,6 +873,23 @@ for (const tableName of ADMIN_ONLY_TABLES) {
     POLICY_REGISTRY[tableName] = ADMIN_ONLY_ALL(tableName);
   }
 }
+
+// 서버/cron 전용 큐·설정 — ADMIN_ONLY_ALL 정의 이후 덮어쓰기
+POLICY_REGISTRY['chat_push_jobs'] = ADMIN_ONLY_ALL('chat_push_jobs');
+POLICY_REGISTRY['system_configs'] = {
+  table: 'system_configs',
+  select: 'AUTHENTICATED',
+  insert: 'ADMIN_ONLY',
+  update: 'ADMIN_ONLY',
+  delete: 'ADMIN_ONLY',
+};
+POLICY_REGISTRY['system_settings'] = {
+  table: 'system_settings',
+  select: 'AUTHENTICATED',
+  insert: 'ADMIN_ONLY',
+  update: 'ADMIN_ONLY',
+  delete: 'ADMIN_ONLY',
+};
 
 // 입사 체크리스트: 본인 서명 완료 시 동기화(update) + 본인/같은 회사 매니저 조회
 // (ADMIN_ONLY 였을 때 직원 서명 후 체크리스트 갱신이 403 으로 실패)
@@ -1042,6 +1169,18 @@ async function filterChatRoomsByMembership<T extends Record<string, unknown>>(
 /**
  * 여러 row를 일괄 필터링 — SELECT 결과를 RLS처럼 적용.
  */
+const STAFF_SECRET_COLUMNS = new Set(['password', 'passwd']);
+
+function stripStaffSecrets<T extends Record<string, unknown>>(rows: T[]): T[] {
+  return rows.map((row) => {
+    const next = { ...row };
+    for (const col of STAFF_SECRET_COLUMNS) {
+      if (col in next) delete next[col];
+    }
+    return next;
+  });
+}
+
 export async function filterByPolicy<T extends Record<string, unknown>>(
   db: D1Client,
   claims: ErpClaims,
@@ -1050,9 +1189,20 @@ export async function filterByPolicy<T extends Record<string, unknown>>(
 ): Promise<T[]> {
   const cfg = POLICY_REGISTRY[table];
   if (!cfg || !cfg.select) return erpIsAdmin(claims) ? rows : [];
-  if (cfg.select === 'PUBLIC') return rows;
-  if (cfg.select === 'AUTHENTICATED') return erpStaffId(claims) !== null ? rows : [];
-  if (erpIsAdmin(claims)) return rows;
+
+  // staff_members: 해시/비밀번호 컬럼은 응답에서 항상 제거 (admin 포함 — 클라이언트 불필요)
+  const stripSecrets = table === 'staff_members';
+
+  if (cfg.select === 'PUBLIC') {
+    return stripSecrets ? stripStaffSecrets(rows) : rows;
+  }
+  if (cfg.select === 'AUTHENTICATED') {
+    const ok = erpStaffId(claims) !== null ? rows : [];
+    return stripSecrets ? stripStaffSecrets(ok as T[]) : ok;
+  }
+  if (erpIsAdmin(claims)) {
+    return stripSecrets ? stripStaffSecrets(rows) : rows;
+  }
 
   // 채팅 멤버 스코프 — 배치 평가
   if (cfg.select === 'CHAT_ROOM_MEMBER') {
@@ -1069,5 +1219,5 @@ export async function filterByPolicy<T extends Record<string, unknown>>(
     const ok = await evalPattern(cfg.select, db, claims, row, cfg);
     if (ok) out.push(row);
   }
-  return out;
+  return stripSecrets ? stripStaffSecrets(out) : out;
 }

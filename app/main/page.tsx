@@ -1265,6 +1265,15 @@ function MainPageContent() {
                 if (boardId) setInitialBoardView(boardId);
                 setInitialOpenPostId(postId);
               }}
+              initialOpenChatRoomId={initialOpenChatRoomId}
+              initialOpenMessageId={initialOpenMessageId}
+              initialOpenChatRequestToken={initialOpenChatRequestToken}
+              onConsumeOpenChatRoomId={() => {
+                setInitialOpenChatRoomId(null);
+                setInitialOpenMessageId(null);
+              }}
+              shareTarget={shareTarget}
+              onConsumeShareTarget={() => setShareTarget(null)}
             />
           </AppDataProvider>
         </CompanyProvider>

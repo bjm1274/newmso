@@ -225,9 +225,10 @@ const PATTERNS_NEEDING_EXISTING_ROW = new Set([
 ]);
 
 /**
- * UPDATE/DELETE 시 where 가 id 만 있고 staff_id 가 없으면 policy 가 항상 deny 된다
- * (예: 직원 본인 계약서 서명 → update employment_contracts where id=…).
- * 기존 행을 1건 읽어 row proxy 에 병합한다.
+ * UPDATE/DELETE 정책용 row proxy.
+ * - where + set 을 합치되, 소유권 필드(staff_id/company_id/sender_id/id)는
+ *   가능하면 DB 기존 행을 읽어 **항상 기존 값을 강제** (set 스푸핑 차단).
+ * - 전체 행 병합은 하지 않음 → column guard 가 set 외 컬럼을 오탐 deny 하는 것 방지.
  */
 async function enrichRowProxyForPolicy(
   db: ReturnType<typeof getD1Drizzle>,
@@ -236,17 +237,22 @@ async function enrichRowProxyForPolicy(
   where: { field: string; op: string; value: unknown }[],
   set?: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const proxy = { ...whereToRowProxy(where), ...(set ?? {}) };
+  const whereProxy = whereToRowProxy(where);
+  const setProxy = set ?? {};
+  const proxy: Record<string, unknown> = { ...whereProxy, ...setProxy };
   const cfg = POLICY_REGISTRY[table];
   if (!cfg) return proxy;
 
   const pattern = cfg[op];
-  if (!pattern || !PATTERNS_NEEDING_EXISTING_ROW.has(pattern)) return proxy;
+  // 소유권 패턴 또는 컬럼 가드/async 가드가 있으면 기존 행 소유권 로드
+  const needsOwnership =
+    (pattern && PATTERNS_NEEDING_EXISTING_ROW.has(pattern)) ||
+    Boolean(cfg.guards?.[op]) ||
+    Boolean(cfg.asyncGuards?.[op]);
+  if (!needsOwnership) return proxy;
 
   const staffField = cfg.staffIdField ?? 'staff_id';
   const companyField = cfg.companyIdField ?? 'company_id';
-  // 이미 소유자/회사 식별자가 있으면 추가 조회 불필요
-  if (proxy[staffField] != null || proxy[companyField] != null) return proxy;
 
   const idCond = where.find((w) => w.field === 'id' && w.op === 'eq');
   if (!idCond || idCond.value == null || idCond.value === '') return proxy;
@@ -259,8 +265,19 @@ async function enrichRowProxyForPolicy(
     const rows = ((result as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
     const existing = rows[0];
     if (!existing) return proxy;
-    // set/where 가 기존 행보다 우선 (서명 시 status 변경 등)
-    return { ...existing, ...proxy };
+
+    // 정책 판정용 소유권은 DB 정본 (클라이언트가 set 으로 속일 수 없음)
+    const ownership: Record<string, unknown> = { id: existing.id ?? idCond.value };
+    if (existing[staffField] != null) ownership[staffField] = existing[staffField];
+    if (existing[companyField] != null) ownership[companyField] = existing[companyField];
+    if (existing.sender_id != null) ownership.sender_id = existing.sender_id;
+    if (existing.user_id != null && staffField === 'user_id') ownership.user_id = existing.user_id;
+
+    return {
+      ...whereProxy,
+      ...setProxy,
+      ...ownership,
+    };
   } catch (err) {
     console.error(`[d1/mutate] enrichRowProxyForPolicy failed for ${table}:`, err);
     return proxy;
