@@ -118,7 +118,7 @@ function MainPageContent() {
   const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
   const [companies, setCompanies] = useState<{ id: string; name: string; type: string }[]>([]);
   const [selectedCompanyId, setSelectedCompanyIdState] = useState<string | null>(null);
-  const [menuResetVersion, setMenuResetVersion] = useState(0);
+
 
   // 초기 상태를 로컬 스토리지에서 시도 (기본: 내 정보)
   const [mainMenu, setMainMenu] = useState('내정보');
@@ -1077,9 +1077,12 @@ function MainPageContent() {
       resetPersistedMenuState(menu);
       startTransition(() => {
         if (menu === '채팅') {
+          // 채팅만 목록 리셋 토큰 — 전체 MainContent remount 는 비용이 커서 생략
           setChatListResetToken((prev) => prev + 1);
         }
-        setMenuResetVersion((prev) => prev + 1);
+        // 동일 메뉴 재클릭 시 menuResetVersion 증가로 MainContent 전체를
+        // 언마운트/재마운트하면 인사·재고·게시판 등 무거운 화면이 다시 로드되어
+        // "페이지 넘어갈 때" 체감이 매우 느려진다. 서브뷰만 갱신한다.
 
         if (sub !== undefined) {
           setSubView(sub);
@@ -1472,7 +1475,6 @@ function MainPageContent() {
         <CompanyProvider value={companyContextValue}>
         <AppDataProvider value={appDataContextValue}>
         <MainContent
-          key={`main-content-${menuResetVersion}`}
           user={user}
           mainMenu={mainMenu}
           data={data}

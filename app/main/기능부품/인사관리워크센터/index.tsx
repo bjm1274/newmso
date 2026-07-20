@@ -13,16 +13,48 @@
  * JM4: any 금지, WorkcenterId union 사용
  */
 
+import dynamic from 'next/dynamic';
 import { useMemo } from 'react';
 import type { StaffMember } from '@/types';
-import MemberWorkcenter from './MemberWorkcenter';
-import AttendWorkcenter from './AttendWorkcenter';
-import LeaveWorkcenter from './LeaveWorkcenter';
-import AbnormalWorkcenter from './AbnormalWorkcenter';
-import PayrollWorkcenter from './payroll/PayrollWorkcenter';
-import WelfareWorkcenter from './WelfareWorkcenter';
-import DocsWorkcenter from './DocsWorkcenter';
 import type { WorkcenterId } from './workcenter-common';
+
+function HrSubLoading() {
+  return (
+    <div className="flex min-h-[240px] flex-1 items-center justify-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--toss-blue-light)] border-t-[var(--accent)]" />
+    </div>
+  );
+}
+
+// 워크센터 단위 code-split — 인사관리 진입 시 급여/근태/복지 전체 번들을 한꺼번에 받지 않음
+const MemberWorkcenter = dynamic(() => import('./MemberWorkcenter'), {
+  ssr: false,
+  loading: () => <HrSubLoading />,
+});
+const AttendWorkcenter = dynamic(() => import('./AttendWorkcenter'), {
+  ssr: false,
+  loading: () => <HrSubLoading />,
+});
+const LeaveWorkcenter = dynamic(() => import('./LeaveWorkcenter'), {
+  ssr: false,
+  loading: () => <HrSubLoading />,
+});
+const AbnormalWorkcenter = dynamic(() => import('./AbnormalWorkcenter'), {
+  ssr: false,
+  loading: () => <HrSubLoading />,
+});
+const PayrollWorkcenter = dynamic(() => import('./payroll/PayrollWorkcenter'), {
+  ssr: false,
+  loading: () => <HrSubLoading />,
+});
+const WelfareWorkcenter = dynamic(() => import('./WelfareWorkcenter'), {
+  ssr: false,
+  loading: () => <HrSubLoading />,
+});
+const DocsWorkcenter = dynamic(() => import('./DocsWorkcenter'), {
+  ssr: false,
+  loading: () => <HrSubLoading />,
+});
 
 // 워크센터 id (급여 포함)
 const WORKCENTER_IDS: readonly WorkcenterId[] = [
