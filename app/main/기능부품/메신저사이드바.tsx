@@ -1,6 +1,15 @@
 'use client';
 
-import { useState, memo } from 'react';
+import {
+  useState,
+  useMemo,
+  useCallback,
+  useEffect,
+  useRef,
+  memo,
+  type ReactElement,
+} from 'react';
+import { List, type RowComponentProps } from 'react-window';
 import { Bell, Pin, PinOff, EyeOff, Eye, Search } from 'lucide-react';
 import { MessengerAvatar } from './메신저공통';
 import { getGroupChatRoomBadgeText, toChatDate } from './메신저유틸';
@@ -107,6 +116,77 @@ function formatRoomTime(raw: string | null | undefined): string {
   return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// ─── 가상 스크롤 행 높이 (고정 행 + 액션 패널 예외) ──────────────────────
+const HIDDEN_TOGGLE_HEIGHT = 28;
+const SECTION_LABEL_HEIGHT = 24;
+const ROOM_ROW_HEIGHT = 52;
+const ROOM_ROW_ACTIONS_HEIGHT = 86;
+const ORG_COMPANY_HEIGHT = 30;
+const ORG_DEPT_HEIGHT = 34;
+const ORG_STAFF_HEIGHT = 48;
+
+type SidebarFlatRow =
+  | { kind: 'hidden-toggle' }
+  | { kind: 'section'; label: string; padTop?: boolean }
+  | { kind: 'room'; item: MessengerSidebarRoomItem }
+  | { kind: 'company'; name: string }
+  | { kind: 'dept'; key: string; name: string; count: number; collapsed: boolean }
+  | { kind: 'staff'; staff: StaffMember };
+
+function useElementHeight<T extends HTMLElement>() {
+  const ref = useRef<T | null>(null);
+  const [height, setHeight] = useState(0);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const update = () => {
+      const next = Math.floor(el.clientHeight);
+      setHeight((prev) => (prev === next ? prev : next));
+    };
+    update();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', update);
+      return () => window.removeEventListener('resize', update);
+    }
+
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return { ref, height };
+}
+
+function getSidebarRowHeight(
+  index: number,
+  flatRows: SidebarFlatRow[],
+  actionRoomId: string | null,
+): number {
+  const row = flatRows[index];
+  if (!row) return ROOM_ROW_HEIGHT;
+  switch (row.kind) {
+    case 'hidden-toggle':
+      return HIDDEN_TOGGLE_HEIGHT;
+    case 'section':
+      return SECTION_LABEL_HEIGHT + (row.padTop ? 6 : 0);
+    case 'room':
+      return actionRoomId === row.item.roomId && !row.item.isNoticeChannel
+        ? ROOM_ROW_ACTIONS_HEIGHT
+        : ROOM_ROW_HEIGHT;
+    case 'company':
+      return ORG_COMPANY_HEIGHT;
+    case 'dept':
+      return ORG_DEPT_HEIGHT;
+    case 'staff':
+      return ORG_STAFF_HEIGHT;
+    default:
+      return ROOM_ROW_HEIGHT;
+  }
+}
+
 export function MessengerSidebar({
   selectedRoomId,
   viewMode,
@@ -132,12 +212,88 @@ export function MessengerSidebar({
   onOpenDirectChat }: MessengerSidebarProps) {
   const [actionRoomId, setActionRoomId] = useState<string | null>(null);
   const isMobile = useIsMobile();
+  const { ref: listContainerRef, height: listHeight } = useElementHeight<HTMLDivElement>();
   // 현재 사용하지 않는 props: suppress unused-var lint
   void [onMovePinnedRoom, attentionThreadItems, mentionInboxItems, threadInboxItems,
         onOpenAttentionThreadItem, onOpenMentionItem, onOpenThreadItem];
 
-  const pinnedItems = sidebarRoomItems.filter((item) => item.isPinned);
-  const unpinnedItems = sidebarRoomItems.filter((item) => !item.isPinned);
+  const pinnedItems = useMemo(
+    () => sidebarRoomItems.filter((item) => item.isPinned),
+    [sidebarRoomItems],
+  );
+  const unpinnedItems = useMemo(
+    () => sidebarRoomItems.filter((item) => !item.isPinned),
+    [sidebarRoomItems],
+  );
+
+  const flatRows = useMemo<SidebarFlatRow[]>(() => {
+    if (viewMode === 'chat') {
+      const rows: SidebarFlatRow[] = [{ kind: 'hidden-toggle' }];
+      if (pinnedItems.length > 0) {
+        rows.push({ kind: 'section', label: '고정' });
+        for (const item of pinnedItems) {
+          rows.push({ kind: 'room', item });
+        }
+      }
+      if (unpinnedItems.length > 0) {
+        rows.push({ kind: 'section', label: '대화', padTop: pinnedItems.length > 0 });
+        for (const item of unpinnedItems) {
+          rows.push({ kind: 'room', item });
+        }
+      }
+      return rows;
+    }
+
+    // 조직도 — 펼친 부서의 직원까지 평탄화해 가상 스크롤
+    const rows: SidebarFlatRow[] = [];
+    for (const [company, depts] of Object.entries(groupedStaffs)) {
+      rows.push({ kind: 'company', name: company });
+      for (const [dept, members] of Object.entries(depts as Record<string, StaffMember[]>)) {
+        const key = `${company}::${dept}`;
+        const collapsed = !expandedDepts.has(key);
+        rows.push({ kind: 'dept', key, name: dept, count: members.length, collapsed });
+        if (!collapsed) {
+          for (const staff of members) {
+            rows.push({ kind: 'staff', staff });
+          }
+        }
+      }
+    }
+    return rows;
+  }, [viewMode, pinnedItems, unpinnedItems, groupedStaffs, expandedDepts]);
+
+  const rowHeight = useCallback(
+    (index: number) => getSidebarRowHeight(index, flatRows, actionRoomId),
+    [flatRows, actionRoomId],
+  );
+
+  const rowProps = useMemo(
+    () => ({
+      flatRows,
+      actionRoomId,
+      isMobile,
+      showHiddenRooms,
+      onToggleHiddenRooms,
+      onRoomClick,
+      onToggleRoomPinned,
+      onToggleRoomHidden,
+      setActionRoomId,
+      onToggleDept,
+      onOpenDirectChat,
+    }),
+    [
+      flatRows,
+      actionRoomId,
+      isMobile,
+      showHiddenRooms,
+      onToggleHiddenRooms,
+      onRoomClick,
+      onToggleRoomPinned,
+      onToggleRoomHidden,
+      onToggleDept,
+      onOpenDirectChat,
+    ],
+  );
 
   return (
     <aside
@@ -181,138 +337,28 @@ export function MessengerSidebar({
         </div>
       </div>
 
-      {/* 방 목록 / 조직도 */}
-      <div className="chat-side-scroll px-2 pb-2 custom-scrollbar" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 56px' }}>
-        {viewMode === 'chat' ? (
-          <>
-            {/* 숨김 토글 링크 */}
-            <div className="flex items-center justify-end px-1 py-1">
-              <button
-                type="button"
-                data-testid="chat-toggle-hidden-rooms"
-                onClick={onToggleHiddenRooms}
-                className="text-[10px] font-semibold text-[var(--accent)] hover:underline"
-              >
-                {showHiddenRooms ? '숨김방 닫기' : '숨김방 보기'}
-              </button>
-            </div>
-
-            {/* 고정 그룹 */}
-            {pinnedItems.length > 0 && (
-              <>
-                <div className="chat-side-lbl">고정</div>
-                {pinnedItems.map((item) => (
-                  <RoomRow
-                    key={item.roomId}
-                    item={item}
-                    actionRoomId={actionRoomId}
-                    isMobile={isMobile}
-                    onRoomClick={onRoomClick}
-                    onToggleRoomPinned={onToggleRoomPinned}
-                    onToggleRoomHidden={onToggleRoomHidden}
-                    setActionRoomId={setActionRoomId}
-                  />
-                ))}
-              </>
-            )}
-
-            {/* 대화 그룹 */}
-            {unpinnedItems.length > 0 && (
-              <>
-                <div className="chat-side-lbl" style={{ marginTop: 6 }}>대화</div>
-                {unpinnedItems.map((item) => (
-                  <RoomRow
-                    key={item.roomId}
-                    item={item}
-                    actionRoomId={actionRoomId}
-                    isMobile={isMobile}
-                    onRoomClick={onRoomClick}
-                    onToggleRoomPinned={onToggleRoomPinned}
-                    onToggleRoomHidden={onToggleRoomHidden}
-                    setActionRoomId={setActionRoomId}
-                  />
-                ))}
-              </>
-            )}
-          </>
-        ) : (
-          /* 조직도 뷰 */
-          <div data-testid="chat-org-list" className="space-y-3 pt-1">
-            {Object.entries(groupedStaffs).map(([company, depts]) => (
-              <div key={company} className="space-y-1">
-                <div className="flex items-center gap-2 px-1 py-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0" />
-                  <h3 className="text-[11px] font-black text-[var(--toss-gray-4)] uppercase tracking-wider truncate">
-                    {company}
-                  </h3>
-                  <div className="flex-1 h-[1px] bg-[var(--tab-bg)]" />
-                </div>
-                <div className="space-y-0.5 pl-1">
-                  {Object.entries(depts as Record<string, StaffMember[]>).map(([dept, members]) => {
-                    const key = `${company}::${dept}`;
-                    const collapsed = !expandedDepts.has(key);
-                    return (
-                      <div key={dept}>
-                        <button
-                          type="button"
-                          onClick={() => onToggleDept(key)}
-                          className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-md)] hover:bg-[var(--tab-bg)] transition-colors text-left"
-                        >
-                          <span
-                            className={`text-[9px] text-[var(--toss-gray-3)] transition-transform duration-200 ${
-                              collapsed ? '-rotate-90' : 'rotate-0'
-                            }`}
-                          >
-                            ▼
-                          </span>
-                          <span className="text-[10px] font-bold text-[var(--toss-gray-3)] flex-1 truncate">
-                            {dept}
-                          </span>
-                          <span className="text-[9px] font-semibold text-[var(--toss-gray-3)] shrink-0">
-                            {members.length}명
-                          </span>
-                        </button>
-                        {!collapsed && (
-                          <div className="space-y-0.5 pl-2 pt-0.5 pb-1">
-                            {members.map((staff: StaffMember) => (
-                              <div
-                                key={staff.id}
-                                className="flex items-center gap-2 px-2 py-2 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] hover:border-[var(--accent)]/40 transition-all"
-                              >
-                                <MessengerAvatar
-                                  name={staff.name}
-                                  photoUrl={getProfilePhotoUrl(staff)}
-                                  className="h-7 w-7 shrink-0 overflow-hidden rounded-[var(--radius-md)] bg-[var(--tab-bg)] text-[11px] font-bold text-[var(--toss-gray-3)]"
-                                  decorative
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-1">
-                                    <p className="text-[11px] font-bold text-[var(--foreground)] truncate">{staff.name}</p>
-                                    <span className="text-[9px] font-medium text-[var(--toss-gray-3)] shrink-0">
-                                      {staff.position}
-                                    </span>
-                                  </div>
-                                </div>
-                                <button
-                                  type="button"
-                                  data-testid={`chat-direct-${staff.id}`}
-                                  onClick={() => void onOpenDirectChat(staff)}
-                                  className="px-2 py-0.5 bg-[var(--accent)]/10 text-[var(--accent)] rounded-[var(--radius-sm)] text-[9px] font-bold border border-[var(--accent)]/20 shrink-0"
-                                >
-                                  대화
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+      {/* 방 목록 / 조직도 — react-window List 가상 스크롤 */}
+      <div
+        ref={listContainerRef}
+        className="chat-side-scroll px-2 pb-2 custom-scrollbar"
+        data-testid={viewMode === 'org' ? 'chat-org-list' : undefined}
+        style={{
+          overflow: 'hidden',
+          display: 'block',
+          contentVisibility: 'visible',
+        }}
+      >
+        {listHeight > 0 && flatRows.length > 0 ? (
+          <List
+            rowComponent={SidebarVirtualRow}
+            rowCount={flatRows.length}
+            rowHeight={rowHeight}
+            rowProps={rowProps}
+            overscanCount={8}
+            style={{ height: listHeight, width: '100%' }}
+            className="custom-scrollbar"
+          />
+        ) : null}
       </div>
 
       {/* 하단: 새 대화 시작 */}
@@ -320,6 +366,151 @@ export function MessengerSidebar({
         <NewConversationButton onOpenGroupModal={onOpenGroupModal} />
       )}
     </aside>
+  );
+}
+
+// ─── 가상 리스트 행 ─────────────────────────────────────────────────────
+
+type SidebarRowProps = {
+  flatRows: SidebarFlatRow[];
+  actionRoomId: string | null;
+  isMobile: boolean;
+  showHiddenRooms: boolean;
+  onToggleHiddenRooms: () => void;
+  onRoomClick: (roomId: string) => void;
+  onToggleRoomPinned: (roomId: string, shouldPin: boolean) => void;
+  onToggleRoomHidden: (roomId: string, hidden: boolean) => void;
+  setActionRoomId: React.Dispatch<React.SetStateAction<string | null>>;
+  onToggleDept: (key: string) => void;
+  onOpenDirectChat: (staff: StaffMember) => void | Promise<void>;
+};
+
+function SidebarVirtualRow({
+  index,
+  style,
+  flatRows,
+  actionRoomId,
+  isMobile,
+  showHiddenRooms,
+  onToggleHiddenRooms,
+  onRoomClick,
+  onToggleRoomPinned,
+  onToggleRoomHidden,
+  setActionRoomId,
+  onToggleDept,
+  onOpenDirectChat,
+}: RowComponentProps<SidebarRowProps>): ReactElement | null {
+  const row = flatRows[index];
+  if (!row) return null;
+
+  if (row.kind === 'hidden-toggle') {
+    return (
+      <div style={style} className="flex items-center justify-end px-1">
+        <button
+          type="button"
+          data-testid="chat-toggle-hidden-rooms"
+          onClick={onToggleHiddenRooms}
+          className="text-[10px] font-semibold text-[var(--accent)] hover:underline"
+        >
+          {showHiddenRooms ? '숨김방 닫기' : '숨김방 보기'}
+        </button>
+      </div>
+    );
+  }
+
+  if (row.kind === 'section') {
+    return (
+      <div style={style}>
+        <div className="chat-side-lbl" style={row.padTop ? { marginTop: 6 } : undefined}>
+          {row.label}
+        </div>
+      </div>
+    );
+  }
+
+  if (row.kind === 'room') {
+    return (
+      <div style={style}>
+        <RoomRow
+          item={row.item}
+          actionRoomId={actionRoomId}
+          isMobile={isMobile}
+          onRoomClick={onRoomClick}
+          onToggleRoomPinned={onToggleRoomPinned}
+          onToggleRoomHidden={onToggleRoomHidden}
+          setActionRoomId={setActionRoomId}
+        />
+      </div>
+    );
+  }
+
+  if (row.kind === 'company') {
+    return (
+      <div style={style} className="flex items-center gap-2 px-1">
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0" />
+        <h3 className="text-[11px] font-black text-[var(--toss-gray-4)] uppercase tracking-wider truncate">
+          {row.name}
+        </h3>
+        <div className="flex-1 h-[1px] bg-[var(--tab-bg)]" />
+      </div>
+    );
+  }
+
+  if (row.kind === 'dept') {
+    return (
+      <div style={style} className="pl-1">
+        <button
+          type="button"
+          onClick={() => onToggleDept(row.key)}
+          className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-[var(--radius-md)] hover:bg-[var(--tab-bg)] transition-colors text-left"
+        >
+          <span
+            className={`text-[9px] text-[var(--toss-gray-3)] transition-transform duration-200 ${
+              row.collapsed ? '-rotate-90' : 'rotate-0'
+            }`}
+          >
+            ▼
+          </span>
+          <span className="text-[10px] font-bold text-[var(--toss-gray-3)] flex-1 truncate">
+            {row.name}
+          </span>
+          <span className="text-[9px] font-semibold text-[var(--toss-gray-3)] shrink-0">
+            {row.count}명
+          </span>
+        </button>
+      </div>
+    );
+  }
+
+  // staff
+  const staff = row.staff;
+  return (
+    <div style={style} className="pl-3 pr-0">
+      <div className="flex items-center gap-2 px-2 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] hover:border-[var(--accent)]/40 transition-all">
+        <MessengerAvatar
+          name={staff.name}
+          photoUrl={getProfilePhotoUrl(staff)}
+          className="h-7 w-7 shrink-0 overflow-hidden rounded-[var(--radius-md)] bg-[var(--tab-bg)] text-[11px] font-bold text-[var(--toss-gray-3)]"
+          decorative
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1">
+            <p className="text-[11px] font-bold text-[var(--foreground)] truncate">{staff.name}</p>
+            <span className="text-[9px] font-medium text-[var(--toss-gray-3)] shrink-0">
+              {staff.position}
+            </span>
+          </div>
+        </div>
+        <button
+          type="button"
+          data-testid={`chat-direct-${staff.id}`}
+          onClick={() => void onOpenDirectChat(staff)}
+          className="px-2 py-0.5 bg-[var(--accent)]/10 text-[var(--accent)] rounded-[var(--radius-sm)] text-[9px] font-bold border border-[var(--accent)]/20 shrink-0"
+        >
+          대화
+        </button>
+      </div>
+    </div>
   );
 }
 

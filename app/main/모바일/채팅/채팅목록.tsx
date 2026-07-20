@@ -9,7 +9,16 @@
  * JM(< 500줄), JM3(silent 페치 + toast), JM4(any 금지), JM6(button 시맨틱).
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from 'react';
+import { List, useListRef, type RowComponentProps } from 'react-window';
 import type { ErpUser } from '@/types';
 
 import MIcon from '../공통/MIcon';
@@ -25,12 +34,22 @@ import {
   type ChatMessageSearchHit,
   type StaffDirectoryEntry } from './data-hooks';
 import { NOTICE_ROOM_ID, isGroupChatRoom, getGroupChatRoomBadgeText, isSelfChatRoom } from '@/app/main/기능부품/메신저유틸';
+import { useChatPresenceMap } from '@/app/main/hooks/useChatPresenceMap';
 import { usePullToRefresh } from '../공통/usePullToRefresh';
 import PullRefreshIndicator from '../공통/PullRefreshIndicator';
 import { createOrUpsertChatRoom } from '@/lib/chat-rooms-client';
 import { toast } from '@/lib/toast';
 
 const SEARCH_DEBOUNCE_MS = 150;
+/** 모바일 방 카드 행 높이 (padding 포함) — FixedSize 가상화 */
+const MOBILE_ROOM_ROW_HEIGHT = 80;
+const MOBILE_SECTION_HEIGHT = 32;
+/** 이 개수 이상일 때만 가상화 (소수 목록은 DOM 이득이 거의 없음) */
+const MOBILE_VIRTUAL_THRESHOLD = 24;
+
+type MobileRoomFlatRow =
+  | { kind: 'section'; label: string }
+  | { kind: 'room'; room: MobileChatRoom };
 
 type ChatListTab = 'chat' | 'org' | 'unread' | 'group' | 'direct' | 'channel';
 
@@ -56,6 +75,7 @@ export default function SChatList({ user, rooms, roomsLoading = false, onOpen, o
   const company = typeof user.company === 'string' ? user.company : null;
 
   const staffs = useChatStaffDirectory(company);
+  const presenceMap = useChatPresenceMap(Boolean(userId));
 
   const handleStartDirectChat = async (peerId: string, peerName: string) => {
     if (!userId) {
@@ -111,28 +131,6 @@ export default function SChatList({ user, rooms, roomsLoading = false, onOpen, o
 
   const loading = roomsLoading;
 
-  const { containerRef: scrollContainerRef, refreshing, pullProgress } = usePullToRefresh({
-    onRefresh,
-    enabled: !!userId });
-
-  // debounce 150ms — 칩 변경/탭 전환 시는 즉시 반영, 입력만 지연
-  useEffect(() => {
-    const handle = setTimeout(() => {
-      setSearchQuery(searchInput.trim().toLowerCase());
-    }, SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(handle);
-  }, [searchInput]);
-
-  // 검색바가 열릴 때 자동 포커스
-  useEffect(() => {
-    if (searchOpen) {
-      searchInputRef.current?.focus();
-    } else {
-      setSearchInput('');
-      setSearchQuery('');
-    }
-  }, [searchOpen]);
-
   const totalUnread = useMemo(
     () => rooms.reduce((sum, room) => sum + (room.unread_count || 0), 0),
     [rooms],
@@ -165,6 +163,114 @@ export default function SChatList({ user, rooms, roomsLoading = false, onOpen, o
       );
     });
   }, [tabFiltered, searchQuery, staffs, userId]);
+
+  // 검색·조직도·혼합 콘텐츠가 없을 때만 방 목록 가상화 (PTR/혼합 스크롤 안전)
+  const useVirtualRooms =
+    tab !== 'org' &&
+    !searchQuery &&
+    filtered.length >= MOBILE_VIRTUAL_THRESHOLD;
+
+  const roomFlatRows = useMemo<MobileRoomFlatRow[]>(() => {
+    if (!useVirtualRooms) return [];
+    const pinned = filtered.filter((r) => r.type === 'notice' || String(r.id) === NOTICE_ROOM_ID);
+    const rest = filtered.filter((r) => r.type !== 'notice' && String(r.id) !== NOTICE_ROOM_ID);
+    const rows: MobileRoomFlatRow[] = [];
+    if (pinned.length > 0) {
+      rows.push({ kind: 'section', label: '고정' });
+      for (const room of pinned) rows.push({ kind: 'room', room });
+    }
+    if (rest.length > 0) {
+      rows.push({ kind: 'section', label: '대화' });
+      for (const room of rest) rows.push({ kind: 'room', room });
+    }
+    return rows;
+  }, [useVirtualRooms, filtered]);
+
+  const [listViewportHeight, setListViewportHeight] = useState(0);
+  const [ptrBindKey, setPtrBindKey] = useState(0);
+  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useListRef(null);
+
+  const { containerRef: scrollContainerRef, refreshing, pullProgress } = usePullToRefresh({
+    onRefresh,
+    enabled: !!userId,
+    bindKey: ptrBindKey,
+  });
+
+  // 가상 리스트 뷰포트 높이 측정
+  useLayoutEffect(() => {
+    const el = scrollAreaRef.current;
+    if (!el) return;
+    const update = () => {
+      const next = Math.floor(el.clientHeight);
+      setListViewportHeight((prev) => (prev === next ? prev : next));
+    };
+    update();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', update);
+      return () => window.removeEventListener('resize', update);
+    }
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [useVirtualRooms, tab]);
+
+  // 가상 List 가 스크롤 주체가 되면 PTR 리스너를 List 루트에 재바인딩
+  useLayoutEffect(() => {
+    if (!useVirtualRooms) {
+      // 일반 m-scroll 에 연결
+      if (scrollAreaRef.current) {
+        (scrollContainerRef as React.MutableRefObject<HTMLDivElement | null>).current =
+          scrollAreaRef.current;
+        setPtrBindKey((k) => k + 1);
+      }
+      return;
+    }
+    const el = listRef.current?.element ?? null;
+    if (el) {
+      (scrollContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+      setPtrBindKey((k) => k + 1);
+    }
+    // listViewportHeight: List 마운트 후 element 확보
+  }, [useVirtualRooms, listViewportHeight > 0, roomFlatRows.length, listRef, scrollContainerRef]);
+
+  // debounce 150ms — 칩 변경/탭 전환 시는 즉시 반영, 입력만 지연
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setSearchQuery(searchInput.trim().toLowerCase());
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(handle);
+  }, [searchInput]);
+
+  // 검색바가 열릴 때 자동 포커스
+  useEffect(() => {
+    if (searchOpen) {
+      searchInputRef.current?.focus();
+    } else {
+      setSearchInput('');
+      setSearchQuery('');
+    }
+  }, [searchOpen]);
+
+  const mobileRoomRowHeight = useCallback(
+    (index: number) => {
+      const row = roomFlatRows[index];
+      if (!row) return MOBILE_ROOM_ROW_HEIGHT;
+      return row.kind === 'section' ? MOBILE_SECTION_HEIGHT : MOBILE_ROOM_ROW_HEIGHT;
+    },
+    [roomFlatRows],
+  );
+
+  const mobileRoomRowProps = useMemo(
+    () => ({
+      flatRows: roomFlatRows,
+      userId,
+      staffs,
+      presenceMap,
+      onOpen,
+    }),
+    [roomFlatRows, userId, staffs, presenceMap, onOpen],
+  );
 
   return (
     <div className="m-screen">
@@ -279,9 +385,32 @@ export default function SChatList({ user, rooms, roomsLoading = false, onOpen, o
           <MIcon name="search" size={20} />
         </button>
       </div>
-      <div className="m-scroll" ref={scrollContainerRef} style={{ overscrollBehaviorY: 'contain' }}>
+      <div
+        className="m-scroll"
+        ref={scrollAreaRef}
+        style={{
+          overscrollBehaviorY: 'contain',
+          ...(useVirtualRooms ? { overflow: 'hidden' as const } : null),
+        }}
+      >
         {tab === 'org' ? (
           <OrgBrowseTab groups={orgGroups} onStartChat={handleStartDirectChat} />
+        ) : useVirtualRooms ? (
+          listViewportHeight > 0 && roomFlatRows.length > 0 ? (
+            <List
+              listRef={listRef}
+              rowComponent={MobileRoomVirtualRow}
+              rowCount={roomFlatRows.length}
+              rowHeight={mobileRoomRowHeight}
+              rowProps={mobileRoomRowProps}
+              overscanCount={6}
+              style={{ height: listViewportHeight, width: '100%', paddingTop: 4 }}
+            />
+          ) : loading && rooms.length === 0 ? (
+            <EmptyState label="채팅방 목록을 불러오는 중…" />
+          ) : !loading && filtered.length === 0 ? (
+            <EmptyState label={emptyLabel(tab)} />
+          ) : null
         ) : (
           <div style={{ padding: '4px 0 24px' }}>
             {searchQuery && matchedStaffs.length > 0 && (
@@ -348,6 +477,7 @@ export default function SChatList({ user, rooms, roomsLoading = false, onOpen, o
                           room={room}
                           userId={userId}
                           staffs={staffs}
+                          presenceMap={presenceMap}
                           last={i === pinned.length - 1}
                           onClick={() => onOpen(String(room.id))}
                         />
@@ -363,6 +493,7 @@ export default function SChatList({ user, rooms, roomsLoading = false, onOpen, o
                           room={room}
                           userId={userId}
                           staffs={staffs}
+                          presenceMap={presenceMap}
                           last={i === rest.length - 1}
                           onClick={() => onOpen(String(room.id))}
                         />
@@ -398,6 +529,52 @@ export default function SChatList({ user, rooms, roomsLoading = false, onOpen, o
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── 가상 스크롤 행 ────────────────────────────────
+
+type MobileRoomVirtualRowProps = {
+  flatRows: MobileRoomFlatRow[];
+  userId: string | null;
+  staffs: ReturnType<typeof useChatStaffDirectory>;
+  presenceMap: ReturnType<typeof useChatPresenceMap>;
+  onOpen: (roomId: string, searchMessageId?: string) => void;
+};
+
+function MobileRoomVirtualRow({
+  index,
+  style,
+  flatRows,
+  userId,
+  staffs,
+  presenceMap,
+  onOpen,
+}: RowComponentProps<MobileRoomVirtualRowProps>): ReactElement | null {
+  const row = flatRows[index];
+  if (!row) return null;
+
+  if (row.kind === 'section') {
+    return (
+      <div style={style}>
+        <div className="msm-sec">
+          <div className="msm-sec-t">{row.label}</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={style}>
+      <RoomRow
+        room={row.room}
+        userId={userId}
+        staffs={staffs}
+        presenceMap={presenceMap}
+        last={false}
+        onClick={() => onOpen(String(row.room.id))}
+      />
     </div>
   );
 }
@@ -546,11 +723,12 @@ type RoomRowProps = {
   room: MobileChatRoom;
   userId: string | null;
   staffs: ReturnType<typeof useChatStaffDirectory>;
+  presenceMap: ReturnType<typeof useChatPresenceMap>;
   last: boolean;
   onClick: () => void;
 };
 
-function RoomRow({ room, userId, staffs, last, onClick }: RoomRowProps) {
+function RoomRow({ room, userId, staffs, presenceMap, last, onClick }: RoomRowProps) {
   const title = getRoomTitle(room, staffs, userId);
   const kind = getRoomKind(room);
   const tone = pickAvatarTone(String(room.id) + title);
@@ -587,6 +765,8 @@ function RoomRow({ room, userId, staffs, last, onClick }: RoomRowProps) {
       : null;
   const peerPhotoUrl = peer ? peer.photo_url || peer.avatar_url : null;
   const peerName = peer ? peer.name : '';
+  const isPeerOnline = peer?.id ? Boolean(presenceMap[String(peer.id)]) : false;
+  const showPresence = Boolean(peerName && !isGroup && !isNotice);
 
   return (
     <div style={{ padding: '0 16px 8px' }}>
@@ -607,25 +787,43 @@ function RoomRow({ room, userId, staffs, last, onClick }: RoomRowProps) {
           border: 'none',
           transition: 'transform 0.15s ease, background-color 0.15s ease' }}
       >
-        <MAvatar tone={tone} data-testid={`chat-room-icon-${room.id}`}>
-          {isNotice ? (
-            <MIcon name="bell" size={16} color="#fff" />
-          ) : peerPhotoUrl ? (
-            <img
-              src={peerPhotoUrl}
-              alt={peerName || title}
+        <div style={{ position: 'relative', width: 44, height: 44 }}>
+          <MAvatar tone={tone} data-testid={`chat-room-icon-${room.id}`}>
+            {isNotice ? (
+              <MIcon name="bell" size={16} color="#fff" />
+            ) : peerPhotoUrl ? (
+              <img
+                src={peerPhotoUrl}
+                alt={peerName || title}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  borderRadius: 'inherit' }}
+              />
+            ) : isGroup ? (
+              <span>{getGroupChatRoomBadgeText(title)}</span>
+            ) : (
+              <span>{title.charAt(0) || '방'}</span>
+            )}
+          </MAvatar>
+          {showPresence && (
+            <span
+              aria-hidden="true"
+              data-testid={`chat-room-presence-${room.id}`}
               style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                borderRadius: 'inherit' }}
+                position: 'absolute',
+                bottom: 0,
+                right: 0,
+                width: 10,
+                height: 10,
+                borderRadius: 999,
+                border: '2px solid var(--card, #fff)',
+                background: isPeerOnline ? 'var(--m-success, #10B981)' : '#FBBF24',
+              }}
             />
-          ) : isGroup ? (
-            <span>{getGroupChatRoomBadgeText(title)}</span>
-          ) : (
-            <span>{title.charAt(0) || '방'}</span>
           )}
-        </MAvatar>
+        </div>
         <div style={{ minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span

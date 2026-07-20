@@ -19,6 +19,8 @@ interface ChatRoomHeaderProps {
   selectedPeer: StaffMember | null;
   selectedRoomLabel: string;
   selectedPeerPhotoUrl: string | null | undefined;
+  /** 1:1 상대 온라인 여부 — presenceMap/heartbeat 기반 */
+  selectedPeerIsOnline?: boolean;
   roomMembers: StaffMember[];
   realtimeConnectionMeta: RealtimeConnectionMeta;
   onBack: () => void;
@@ -34,6 +36,7 @@ export function ChatRoomHeader({
   selectedPeer,
   selectedRoomLabel,
   selectedPeerPhotoUrl,
+  selectedPeerIsOnline = false,
   roomMembers,
   realtimeConnectionMeta,
   onBack,
@@ -46,7 +49,7 @@ export function ChatRoomHeader({
     <header className="px-4 py-2.5 flex items-center justify-between border-b border-[var(--border)]/50 dark:border-zinc-800/50 glass glass-border shrink-0 z-40">
       <div className="flex items-center gap-3 min-w-0">
         <button type="button" onClick={onBack} className="md:hidden text-[var(--toss-gray-3)]">뒤로</button>
-        <div data-testid="chat-room-header-avatar" className="flex h-9 w-9 shrink-0 items-center justify-center">
+        <div data-testid="chat-room-header-avatar" className="relative flex h-9 w-9 shrink-0 items-center justify-center">
           {selectedRoom.id === NOTICE_ROOM_ID ? (
             <div className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--accent-light)] text-[var(--accent)]">
               <MenuIcon name="bell" className="h-5 w-5" />
@@ -55,7 +58,7 @@ export function ChatRoomHeader({
             <button
               type="button"
               onClick={() => onOpenStaffProfile(selectedPeer)}
-              className="focus-visible:outline-none shrink-0 hover:opacity-85 transition-opacity"
+              className="focus-visible:outline-none shrink-0 hover:opacity-85 transition-opacity relative"
               title={selectedPeer.name || selectedRoomLabel || ''}
             >
               <MessengerAvatar
@@ -63,6 +66,11 @@ export function ChatRoomHeader({
                 photoUrl={selectedPeerPhotoUrl}
                 className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg bg-[var(--tab-bg)] text-[12px] font-bold text-[var(--toss-gray-4)] dark:bg-zinc-800"
                 decorative
+              />
+              <span
+                className={`chat-room-dot ${selectedPeerIsOnline ? 'on' : 'off'}`}
+                data-testid="chat-room-header-presence-dot"
+                aria-hidden="true"
               />
             </button>
           ) : (
@@ -76,16 +84,24 @@ export function ChatRoomHeader({
             {selectedRoomLabel}
           </h3>
           <div className="flex items-center gap-1.5 text-[10px] font-medium">
-            {!selectedPeer ? (
+            {selectedPeer ? (
+              <span
+                className={`inline-flex items-center gap-1 ${selectedPeerIsOnline ? 'text-emerald-500' : 'text-[var(--toss-gray-4)]'}`}
+                data-testid="chat-room-header-presence"
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${selectedPeerIsOnline ? 'bg-emerald-500' : 'bg-[var(--toss-gray-4)]'}`} />
+                <span>{selectedPeerIsOnline ? '온라인' : '자리비움'}</span>
+              </span>
+            ) : (
               <>
                 <p className="text-[var(--toss-gray-4)]">{roomMembers.length || 0}명 참여중</p>
                 <span className="text-[var(--toss-gray-4)]">·</span>
+                <span className={`inline-flex items-center gap-1 ${realtimeConnectionMeta.textClassName}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${realtimeConnectionMeta.dotClassName}`} />
+                  <span>{realtimeConnectionMeta.label}</span>
+                </span>
               </>
-            ) : null}
-            <span className={`inline-flex items-center gap-1 ${realtimeConnectionMeta.textClassName}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${realtimeConnectionMeta.dotClassName}`} />
-              <span>{realtimeConnectionMeta.label}</span>
-            </span>
+            )}
           </div>
         </div>
       </div>

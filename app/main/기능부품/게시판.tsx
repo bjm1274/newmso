@@ -16,11 +16,8 @@ import {
   shouldUseManagedBrowserDownload,
   triggerManagedBrowserDownload } from '@/lib/object-storage-url';
 import { CHAT_FOCUS_KEY, CHAT_ROOM_KEY } from '@/app/main/navigation-state';
-import SmartDatePicker from './공통/SmartDatePicker';
-import GuideLibrary from './게시판서브/업무가이드';
+import dynamic from 'next/dynamic';
 import PostTableView from './게시판서브/PostTableView';
-import BoardBodyPickerModal from './게시판서브/BoardBodyPickerModal';
-import BoardScheduleCalendar from './게시판서브/BoardScheduleCalendar';
 import BoardMobilePostCard from './게시판서브/BoardMobilePostCard';
 import { uploadBoardAttachmentFile } from './게시판업로드';
 import type { StaffMember, BoardPost, ScheduleItem, AttachmentItem } from '@/types';
@@ -60,16 +57,33 @@ import {
   type QueryResult,
   type StaffSummary } from './게시판-view-utils';
 import { isAnonymousReadStatusPost, VALID_BODY_IDS } from './게시판/post-helpers';
-import ReadStatusModal from './게시판/ReadStatusModal';
-import CommentComposerSticky from '@/app/components/CommentComposerSticky';
 import { useIsMobile } from '@/app/components/useIsMobile';
-import {
-  drawBoardPollPrize,
-  type BoardPoll,
-  type BoardPollPrizeWinner } from './게시판서브/board-poll-prize';
+import type { BoardPoll, BoardPollPrizeWinner } from './게시판서브/board-poll-prize';
 import { togglePollVote } from './게시판서브/board-poll-vote';
 import { toggleBoardPostLike } from './게시판서브/board-post-like';
 import { insertBoardPost } from './게시판서브/create-board-post';
+
+// 목록 첫 페인트에 불필요한 2차 패널 — 코드 스플릿 (ssr:false)
+const BoardSecondaryLoading = () => (
+  <div className="flex items-center justify-center py-10">
+    <div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
+  </div>
+);
+
+const GuideLibrary = dynamic(() => import('./게시판서브/업무가이드'), {
+  ssr: false,
+  loading: BoardSecondaryLoading });
+const BoardBodyPickerModal = dynamic(() => import('./게시판서브/BoardBodyPickerModal'), {
+  ssr: false });
+const BoardScheduleCalendar = dynamic(() => import('./게시판서브/BoardScheduleCalendar'), {
+  ssr: false,
+  loading: BoardSecondaryLoading });
+const ReadStatusModal = dynamic(() => import('./게시판/ReadStatusModal'), {
+  ssr: false });
+const SmartDatePicker = dynamic(() => import('./공통/SmartDatePicker'), {
+  ssr: false });
+const CommentComposerSticky = dynamic(() => import('@/app/components/CommentComposerSticky'), {
+  ssr: false });
 
 interface BoardViewProps {
   user: StaffMember | null;
@@ -2480,6 +2494,7 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
                     if (!isAuthor || !myId) return;
                     setDrawingPostId(selectedPost.id);
                     try {
+                      const { drawBoardPollPrize } = await import('./게시판서브/board-poll-prize');
                       const result = await drawBoardPollPrize({
                         postId: selectedPost.id,
                         poll,

@@ -6,6 +6,7 @@ import { db } from '@/lib/db-client';
 import { subscribeRealtime, subscribeRealtimeBatched } from '@/lib/realtime-bus';
 import { toast } from '@/lib/toast';
 import type { ChatMessage, ChatRoom } from '@/types';
+import { useChatPresencePolling, type ChatPresenceInfo } from '@/app/main/hooks/useChatPresenceMap';
 import { bindMockChatMessageInsert } from './메신저테스트이벤트';
 import { getConversationRoomIdsByRoomId } from './메신저유틸';
 
@@ -82,12 +83,7 @@ export function useRealtimeConnectionMeta(
 }
 // ────────────────────────────────────────────────────────────────────────────
 
-type PresenceInfo = {
-  userId: string;
-  name: string;
-  roomId: string | null;
-  onlineAt: string;
-};
+type PresenceInfo = ChatPresenceInfo;
 
 type UseChatRealtimeSubscriptionsParams = {
   userId: string | null | undefined;
@@ -224,12 +220,9 @@ export function useChatRealtimeSubscriptions({
     };
   }, [globalRealtimeRetryTimerRef, roomRealtimeRetryTimerRef]);
 
-  // Phase 5-C-2 — presence 채널 비활성화.
-  // polling으로는 즉각적 online/offline 추적 불가. presence 표시는 사라짐.
-  // (UI는 빈 presenceMap을 받아 자동으로 표시 안 됨)
-  useEffect(() => {
-    setPresenceMap({});
-  }, [setPresenceMap]);
+  // Presence: Supabase presence 채널 대신 GET /api/chat/presence 폴링.
+  // write는 usePresenceHeartbeat(POST/DELETE), read는 여기. 언마운트 시 폴링 중지.
+  useChatPresencePolling(setPresenceMap, Boolean(userId));
 
   // Phase 5-C-3 — global messages 채널 → polling.
   // 모든 방의 messages 변경 감지 시 fetchData refresh.

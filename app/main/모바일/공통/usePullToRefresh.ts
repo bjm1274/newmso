@@ -26,6 +26,11 @@ export type UsePullToRefreshOptions = {
   onRefresh: () => Promise<void>;
   enabled?: boolean;
   threshold?: number;
+  /**
+   * 스크롤 요소가 늦게 마운트될 때(가상 리스트 등) 리스너를 다시 붙이기 위한 키.
+   * 값이 바뀌면 touch 리스너를 재바인딩한다.
+   */
+  bindKey?: string | number | boolean;
 };
 
 export type UsePullToRefreshResult = {
@@ -37,7 +42,8 @@ export type UsePullToRefreshResult = {
 export function usePullToRefresh({
   onRefresh,
   enabled = true,
-  threshold = 60 }: UsePullToRefreshOptions): UsePullToRefreshResult {
+  threshold = 60,
+  bindKey = 0 }: UsePullToRefreshOptions): UsePullToRefreshResult {
   const containerRef = useRef<HTMLDivElement>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [pullProgress, setPullProgress] = useState(0);
@@ -143,7 +149,7 @@ export function usePullToRefresh({
       el.removeEventListener('touchmove', onTouchMove);
       el.removeEventListener('touchend', onTouchEnd);
     };
-  }, [enabled, threshold, triggerRefresh]);
+  }, [enabled, threshold, triggerRefresh, bindKey]);
 
   // 키보드 R 단축키 (JM6)
   useEffect(() => {

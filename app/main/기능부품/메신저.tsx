@@ -4,6 +4,7 @@ import { logger } from '@/lib/logger';
 import { toast } from '@/lib/toast';
 import { toDateKey } from '@/lib/date-utils';
 import { useDeferredValue, useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback, type Dispatch, type SetStateAction } from 'react';
+import dynamic from 'next/dynamic';
 import { db, d1 } from '@/lib/db-client';
 import { createOrUpsertChatRoom, patchChatRoom } from '@/lib/chat-rooms-client';
 import { triggerChatPush } from '@/lib/chat-push-client-trigger';
@@ -23,9 +24,7 @@ import {
 import { ChatAttachmentPreviewModal, useChatAttachmentPreview } from './메신저첨부미리보기';
 import { MessengerComposer, type MessengerComposerHandle } from './메신저컴포저';
 import { selectChatMessagesWithFallback } from './메신저데이터유틸';
-import { MessengerDrawer } from './메신저드로어';
 import { bindMockNotificationInsert } from './메신저테스트이벤트';
-import { ReactionDetailModal } from './메신저액션';
 import { useChatMessageActions } from './메신저액션훅';
 import { useChatGlobalSearch } from './메신저검색훅';
 import { renderMessageContent } from './메신저메시지렌더';
@@ -57,24 +56,14 @@ import { ChatRealtimeState, useRealtimeConnectionMeta, useRoomNotificationSettin
 import { useChatRoomNavigation } from './메신저방전환훅';
 import { useChatMessageEditing, useChatMobileBackLayer, useReadStatusModal } from './메신저상태훅';
 import { useChatUploads } from './메신저업로드훅';
-import { MediaArchivePanel } from './메신저미디어아카이브';
-import { GlobalSearchModal } from './메신저전역검색';
 import { MessengerSidebar, type MessengerMentionInboxItem, type MessengerThreadInboxItem } from './메신저사이드바';
-import { GroupChatModal } from './메신저그룹생성모달';
-import { AddMemberModal, ForwardMessageModal } from './메신저멤버관리모달';
-import { MessageEditModal, MessageEditHistoryModal } from './메신저수정모달';
-import { ThreadPanel } from './메신저스레드패널';
-import { PollComposerModal, SlashCommandModal } from './메신저투표모달';
-import { ReadStatusModal } from './메신저읽음모달';
-import MessengerOperationsCenter from './메신저운영센터';
 import {
   buildRetryQueueMessage,
   getDueChatRetryQueueEntries,
   readChatRetryQueue } from './메신저재시도큐';
 import { MessengerTimeline, type MessengerTimelineItem } from './메신저타임라인';
-import { StaffDetailModal, getPresenceMeta, type PresenceMeta, type AttendanceSnapshot } from './메신저섹션/StaffDetailModal';
+import { getPresenceMeta, type PresenceMeta, type AttendanceSnapshot } from './메신저섹션/presenceMeta';
 import { ChatRoomHeader } from './메신저섹션/ChatRoomHeader';
-import { DateJumpModal } from './메신저섹션/DateJumpModal';
 import { RetryQueueBanner } from './메신저섹션/RetryQueueBanner';
 import { TypingNotice } from './메신저섹션/TypingNotice';
 import {
@@ -114,6 +103,61 @@ import {
   type MessageRetryPayload,
   type RoomPreference } from './메신저유틸';
 import type { StaffMember, ChatRoom, ChatMessage } from '@/types';
+
+const MessengerOverlayLoading = () => (
+  <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center pointer-events-none">
+    <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
+  </div>
+);
+
+const MessengerDrawer = dynamic(
+  () => import('./메신저드로어').then((m) => m.MessengerDrawer),
+  { ssr: false, loading: MessengerOverlayLoading });
+const MediaArchivePanel = dynamic(
+  () => import('./메신저미디어아카이브').then((m) => m.MediaArchivePanel),
+  { ssr: false, loading: MessengerOverlayLoading });
+const GlobalSearchModal = dynamic(
+  () => import('./메신저전역검색').then((m) => m.GlobalSearchModal),
+  { ssr: false, loading: MessengerOverlayLoading });
+const GroupChatModal = dynamic(
+  () => import('./메신저그룹생성모달').then((m) => m.GroupChatModal),
+  { ssr: false, loading: MessengerOverlayLoading });
+const AddMemberModal = dynamic(
+  () => import('./메신저멤버관리모달').then((m) => m.AddMemberModal),
+  { ssr: false, loading: MessengerOverlayLoading });
+const ForwardMessageModal = dynamic(
+  () => import('./메신저멤버관리모달').then((m) => m.ForwardMessageModal),
+  { ssr: false, loading: MessengerOverlayLoading });
+const MessageEditModal = dynamic(
+  () => import('./메신저수정모달').then((m) => m.MessageEditModal),
+  { ssr: false, loading: MessengerOverlayLoading });
+const MessageEditHistoryModal = dynamic(
+  () => import('./메신저수정모달').then((m) => m.MessageEditHistoryModal),
+  { ssr: false, loading: MessengerOverlayLoading });
+const ThreadPanel = dynamic(
+  () => import('./메신저스레드패널').then((m) => m.ThreadPanel),
+  { ssr: false, loading: MessengerOverlayLoading });
+const PollComposerModal = dynamic(
+  () => import('./메신저투표모달').then((m) => m.PollComposerModal),
+  { ssr: false, loading: MessengerOverlayLoading });
+const SlashCommandModal = dynamic(
+  () => import('./메신저투표모달').then((m) => m.SlashCommandModal),
+  { ssr: false, loading: MessengerOverlayLoading });
+const ReadStatusModal = dynamic(
+  () => import('./메신저읽음모달').then((m) => m.ReadStatusModal),
+  { ssr: false, loading: MessengerOverlayLoading });
+const MessengerOperationsCenter = dynamic(
+  () => import('./메신저운영센터'),
+  { ssr: false, loading: MessengerOverlayLoading });
+const ReactionDetailModal = dynamic(
+  () => import('./메신저액션').then((m) => m.ReactionDetailModal),
+  { ssr: false, loading: MessengerOverlayLoading });
+const DateJumpModal = dynamic(
+  () => import('./메신저섹션/DateJumpModal').then((m) => m.DateJumpModal),
+  { ssr: false, loading: MessengerOverlayLoading });
+const StaffDetailModal = dynamic(
+  () => import('./메신저섹션/StaffDetailModal').then((m) => m.StaffDetailModal),
+  { ssr: false, loading: MessengerOverlayLoading });
 
 type ReactionUsersByMessage = Record<string, Record<string, StaffMember[]>>;
 
@@ -3072,6 +3116,7 @@ export default function ChatView({
             selectedPeer={selectedPeer}
             selectedRoomLabel={selectedRoomLabel}
             selectedPeerPhotoUrl={selectedPeerPhotoUrl}
+            selectedPeerIsOnline={selectedPeerIsOnline}
             roomMembers={roomMembers}
             realtimeConnectionMeta={realtimeConnectionMeta}
             onBack={() => setRoom(null)}
@@ -3189,176 +3234,198 @@ export default function ChatView({
           </>
         ) : null}
 
-        <MessengerDrawer
-          isOpen={showDrawer}
-          roomNotifyOn={roomNotifyOn}
-          currentNoticeMessage={currentNoticeMessage}
-          noticeReadCount={noticeReadStats.readCount}
-          noticeUnreadCount={noticeReadStats.unreadCount}
-          noticeRecipientCount={noticeReadStats.recipientCount}
-          noticeReminderBusy={noticeReminderBusy}
-          threadOverviews={threadOverviews}
-          followedThreadIds={followedThreadIds}
-          roomNotificationMode={roomNotifyOn ? selectedRoomNotificationMode : 'mute'}
-          roomNotificationKeyword={selectedRoomNotificationKeyword}
-          sharedMediaPreviewMessages={sharedMediaPreviewMessages}
-          sharedFilePreviewMessages={sharedFilePreviewMessages}
-          sharedLinkPreviewMessages={sharedLinkPreviewMessages}
-          bookmarkedMessages={bookmarkedMessages}
-          roomMembers={roomMembers}
-          selectedRoom={selectedRoom}
-          currentUserId={effectiveChatUserId || user?.id}
-          editingRoomName={editingRoomName}
-          roomNameDraft={roomNameDraft}
-          resolveRoomMemberProfile={resolveRoomMemberProfile}
-          onOpenStaffProfile={handleOpenStaffProfile}
-          onClose={() => setShowDrawer(false)}
-          onToggleRoomNotify={handleToggleRoomNotifyFromDrawer}
-          onSelectRoomNotificationMode={handleSelectRoomNotificationMode}
-          onRoomNotificationKeywordChange={handleRoomNotificationKeywordChange}
-          onOpenPollModal={handleOpenPollModalFromDrawer}
-          onOpenOpsCenter={canManageNoticeOps ? () => {
-            setShowDrawer(false);
-            setShowSettings(true);
-          } : null}
-          onOpenMediaArchive={openMediaArchive}
-          onPreviewMessage={openAttachmentPreviewForMessage}
-          onReplyMessage={startReplyToMessage}
-          onOpenThread={handleOpenThreadFromDrawer}
-          onToggleThreadFollow={toggleThreadFollow}
-          onScrollToMessage={scrollToMessage}
-          onJumpToNoticeMessage={handleJumpToNoticeMessage}
-          onOpenNoticeReadStatus={openCurrentNoticeReadStatus}
-          onSendNoticeReminder={handleSendNoticeReminder}
-          onOpenAddMemberModal={() => setShowAddMemberModal(true)}
-          onRemoveRoomMember={removeRoomMember}
-          onRoomNameDraftChange={setRoomNameDraft}
-          onSaveRoomName={handleSaveRoomName}
-          onCancelEditingRoomName={handleCancelEditingRoomName}
-          onStartEditingRoomName={handleStartEditingRoomName}
-          onLeaveRoom={handleLeaveRoomFromDrawer}
-        />
+        {showDrawer ? (
+          <MessengerDrawer
+            isOpen={showDrawer}
+            roomNotifyOn={roomNotifyOn}
+            currentNoticeMessage={currentNoticeMessage}
+            noticeReadCount={noticeReadStats.readCount}
+            noticeUnreadCount={noticeReadStats.unreadCount}
+            noticeRecipientCount={noticeReadStats.recipientCount}
+            noticeReminderBusy={noticeReminderBusy}
+            threadOverviews={threadOverviews}
+            followedThreadIds={followedThreadIds}
+            roomNotificationMode={roomNotifyOn ? selectedRoomNotificationMode : 'mute'}
+            roomNotificationKeyword={selectedRoomNotificationKeyword}
+            sharedMediaPreviewMessages={sharedMediaPreviewMessages}
+            sharedFilePreviewMessages={sharedFilePreviewMessages}
+            sharedLinkPreviewMessages={sharedLinkPreviewMessages}
+            bookmarkedMessages={bookmarkedMessages}
+            roomMembers={roomMembers}
+            selectedRoom={selectedRoom}
+            currentUserId={effectiveChatUserId || user?.id}
+            editingRoomName={editingRoomName}
+            roomNameDraft={roomNameDraft}
+            resolveRoomMemberProfile={resolveRoomMemberProfile}
+            onOpenStaffProfile={handleOpenStaffProfile}
+            onClose={() => setShowDrawer(false)}
+            onToggleRoomNotify={handleToggleRoomNotifyFromDrawer}
+            onSelectRoomNotificationMode={handleSelectRoomNotificationMode}
+            onRoomNotificationKeywordChange={handleRoomNotificationKeywordChange}
+            onOpenPollModal={handleOpenPollModalFromDrawer}
+            onOpenOpsCenter={canManageNoticeOps ? () => {
+              setShowDrawer(false);
+              setShowSettings(true);
+            } : null}
+            onOpenMediaArchive={openMediaArchive}
+            onPreviewMessage={openAttachmentPreviewForMessage}
+            onReplyMessage={startReplyToMessage}
+            onOpenThread={handleOpenThreadFromDrawer}
+            onToggleThreadFollow={toggleThreadFollow}
+            onScrollToMessage={scrollToMessage}
+            onJumpToNoticeMessage={handleJumpToNoticeMessage}
+            onOpenNoticeReadStatus={openCurrentNoticeReadStatus}
+            onSendNoticeReminder={handleSendNoticeReminder}
+            onOpenAddMemberModal={() => setShowAddMemberModal(true)}
+            onRemoveRoomMember={removeRoomMember}
+            onRoomNameDraftChange={setRoomNameDraft}
+            onSaveRoomName={handleSaveRoomName}
+            onCancelEditingRoomName={handleCancelEditingRoomName}
+            onStartEditingRoomName={handleStartEditingRoomName}
+            onLeaveRoom={handleLeaveRoomFromDrawer}
+          />
+        ) : null}
 
-        <MessageEditModal
-          open={Boolean(editingMessage)}
-          draft={editingMessageDraft}
-          onDraftChange={setEditingMessageDraft}
-          onClose={closeEditingMessage}
-          onSave={saveEditedMessage}
-        />
+        {editingMessage ? (
+          <MessageEditModal
+            open
+            draft={editingMessageDraft}
+            onDraftChange={setEditingMessageDraft}
+            onClose={closeEditingMessage}
+            onSave={saveEditedMessage}
+          />
+        ) : null}
 
-        <MessageEditHistoryModal
-          open={Boolean(editHistoryTarget)}
-          message={editHistoryTarget}
-          loading={editHistoryLoading}
-          entries={editHistoryEntries}
-          onClose={closeEditHistory}
-        />
+        {editHistoryTarget ? (
+          <MessageEditHistoryModal
+            open
+            message={editHistoryTarget}
+            loading={editHistoryLoading}
+            entries={editHistoryEntries}
+            onClose={closeEditHistory}
+          />
+        ) : null}
 
-        <GroupChatModal
-          open={showGroupModal}
-          groupName={groupName}
-          selectedMembers={selectedMembers}
-          selectableStaffs={groupSelectableStaffs}
-          onGroupNameChange={handleGroupNameChange}
-          onToggleMember={handleToggleGroupMember}
-          onClose={closeGroupModal}
-          onCreate={createGroupChat}
-        />
+        {showGroupModal ? (
+          <GroupChatModal
+            open={showGroupModal}
+            groupName={groupName}
+            selectedMembers={selectedMembers}
+            selectableStaffs={groupSelectableStaffs}
+            onGroupNameChange={handleGroupNameChange}
+            onToggleMember={handleToggleGroupMember}
+            onClose={closeGroupModal}
+            onCreate={createGroupChat}
+          />
+        ) : null}
       </main>
 
-      <PollComposerModal
-        open={showPollModal}
-        roomMembers={roomMembers}
-        question={pollQuestion}
-        options={pollOptions}
-        deadlineAt={pollDeadlineAt}
-        prizeEnabled={prizeEnabled}
-        prizeWinnerCount={prizeWinnerCount}
-        prizeName={prizeName}
-        isKickPoll={isKickPoll}
-        kickTargetId={kickTargetId}
-        onQuestionChange={setPollQuestion}
-        onDeadlineAtChange={setPollDeadlineAt}
-        onOptionChange={handlePollOptionChange}
-        onRemoveOption={handleRemovePollOption}
-        onAddOption={handleAddPollOption}
-        onPrizeEnabledChange={setPrizeEnabled}
-        onPrizeWinnerCountChange={setPrizeWinnerCount}
-        onPrizeNameChange={setPrizeName}
-        onIsKickPollChange={setIsKickPoll}
-        onKickTargetIdChange={setKickTargetId}
-        onClose={closePollModal}
-        onSubmit={handleCreatePoll}
-      />
+      {showPollModal ? (
+        <PollComposerModal
+          open={showPollModal}
+          roomMembers={roomMembers}
+          question={pollQuestion}
+          options={pollOptions}
+          deadlineAt={pollDeadlineAt}
+          prizeEnabled={prizeEnabled}
+          prizeWinnerCount={prizeWinnerCount}
+          prizeName={prizeName}
+          isKickPoll={isKickPoll}
+          kickTargetId={kickTargetId}
+          onQuestionChange={setPollQuestion}
+          onDeadlineAtChange={setPollDeadlineAt}
+          onOptionChange={handlePollOptionChange}
+          onRemoveOption={handleRemovePollOption}
+          onAddOption={handleAddPollOption}
+          onPrizeEnabledChange={setPrizeEnabled}
+          onPrizeWinnerCountChange={setPrizeWinnerCount}
+          onPrizeNameChange={setPrizeName}
+          onIsKickPollChange={setIsKickPoll}
+          onKickTargetIdChange={setKickTargetId}
+          onClose={closePollModal}
+          onSubmit={handleCreatePoll}
+        />
+      ) : null}
 
-      <SlashCommandModal
-        open={showSlashModal}
-        command={slashCommand}
-        form={slashForm}
-        onFieldChange={handleSlashFormFieldChange}
-        onClose={closeSlashModal}
-        onSubmitAnnualLeave={handleSubmitAnnualLeaveDraft}
-        onSubmitPurchase={handleSubmitPurchaseDraft}
-      />
+      {showSlashModal ? (
+        <SlashCommandModal
+          open={showSlashModal}
+          command={slashCommand}
+          form={slashForm}
+          onFieldChange={handleSlashFormFieldChange}
+          onClose={closeSlashModal}
+          onSubmitAnnualLeave={handleSubmitAnnualLeaveDraft}
+          onSubmitPurchase={handleSubmitPurchaseDraft}
+        />
+      ) : null}
 
-      <ThreadPanel
-        rootMessage={threadRoot}
-        messages={threadMessages}
-        resolveStaffProfile={resolveStaffProfile}
-        isFollowingThread={Boolean(threadRoot && followedThreadIds.has(String(threadRoot.id || '')))}
-        onClose={() => setThreadRoot(null)}
-        onToggleFollowThread={toggleThreadFollow}
-        onPreviewAttachment={openAttachmentPreviewForMessage}
-        onReplyMessage={startReplyToMessage}
-      />
+      {threadRoot ? (
+        <ThreadPanel
+          rootMessage={threadRoot}
+          messages={threadMessages}
+          resolveStaffProfile={resolveStaffProfile}
+          isFollowingThread={Boolean(followedThreadIds.has(String(threadRoot.id || '')))}
+          onClose={() => setThreadRoot(null)}
+          onToggleFollowThread={toggleThreadFollow}
+          onPreviewAttachment={openAttachmentPreviewForMessage}
+          onReplyMessage={startReplyToMessage}
+        />
+      ) : null}
 
-      <ReadStatusModal
-        message={unreadModalMsg}
-        loading={unreadLoading}
-        unreadUsers={unreadUsers}
-        readUsers={readUsers}
-        onClose={closeReadStatusModal}
-      />
+      {unreadModalMsg ? (
+        <ReadStatusModal
+          message={unreadModalMsg}
+          loading={unreadLoading}
+          unreadUsers={unreadUsers}
+          readUsers={readUsers}
+          onClose={closeReadStatusModal}
+        />
+      ) : null}
 
-      <ReactionDetailModal
-        target={reactionDetailTarget}
-        users={
-          reactionDetailTarget
-            ? reactionUsersByMessage[String(reactionDetailTarget.message.id)]?.[reactionDetailTarget.emoji] || []
-            : []
-        }
-        onClose={() => setReactionDetailTarget(null)}
-      />
+      {reactionDetailTarget ? (
+        <ReactionDetailModal
+          target={reactionDetailTarget}
+          users={
+            reactionUsersByMessage[String(reactionDetailTarget.message.id)]?.[reactionDetailTarget.emoji] || []
+          }
+          onClose={() => setReactionDetailTarget(null)}
+        />
+      ) : null}
 
-      <ForwardMessageModal
-        open={showForwardModal && Boolean(forwardSourceMsg)}
-        targetRooms={forwardTargetRoomItems}
-        onClose={closeForwardModal}
-        onForward={handleForwardToRoom}
-      />
+      {showForwardModal && forwardSourceMsg ? (
+        <ForwardMessageModal
+          open
+          targetRooms={forwardTargetRoomItems}
+          onClose={closeForwardModal}
+          onForward={handleForwardToRoom}
+        />
+      ) : null}
 
-      <AddMemberModal
-        open={showAddMemberModal}
-        selectedRoom={selectedRoom}
-        search={addMemberSearch}
-        addableMembers={addableMembers}
-        selectingIds={addMemberSelectingIds}
-        onSearchChange={handleAddMemberSearchChange}
-        onToggleMember={handleToggleAddMemberSelection}
-        onClose={closeAddMemberModal}
-        onSubmit={handleSubmitAddMembers}
-      />
+      {showAddMemberModal ? (
+        <AddMemberModal
+          open={showAddMemberModal}
+          selectedRoom={selectedRoom}
+          search={addMemberSearch}
+          addableMembers={addableMembers}
+          selectingIds={addMemberSelectingIds}
+          onSearchChange={handleAddMemberSearchChange}
+          onToggleMember={handleToggleAddMemberSelection}
+          onClose={closeAddMemberModal}
+          onSubmit={handleSubmitAddMembers}
+        />
+      ) : null}
 
-      <MediaArchivePanel
-        open={showMediaPanel}
-        mediaFilter={mediaFilter}
-        filteredMediaMessages={filteredMediaMessages}
-        onClose={() => setShowMediaPanel(false)}
-        onFilterChange={setMediaFilter}
-        onPreviewMessage={openAttachmentPreviewForMessage}
-        onReplyMessage={startReplyToMessage}
-      />
+      {showMediaPanel ? (
+        <MediaArchivePanel
+          open={showMediaPanel}
+          mediaFilter={mediaFilter}
+          filteredMediaMessages={filteredMediaMessages}
+          onClose={() => setShowMediaPanel(false)}
+          onFilterChange={setMediaFilter}
+          onPreviewMessage={openAttachmentPreviewForMessage}
+          onReplyMessage={startReplyToMessage}
+        />
+      ) : null}
 
       {showSettings ? (
         <MessengerOperationsCenter
@@ -3369,56 +3436,60 @@ export default function ChatView({
         />
       ) : null}
 
-      <GlobalSearchModal
-        open={showGlobalSearch}
-        query={globalSearchQuery}
-        activeTab={globalSearchTab}
-        loading={globalSearchLoading}
-        counts={globalSearchCounts}
-        memberResults={globalSearchMemberResults}
-        roomResults={globalSearchRoomResults}
-        messageResults={globalSearchMessageResults}
-        fileResults={globalSearchFileResults}
-        allResults={globalSearchResults}
-        allKnownStaffs={allKnownStaffs}
-        effectiveChatUserId={effectiveChatUserId}
-        savedSearches={savedSearches}
-        onClose={closeGlobalSearch}
-        onQueryChange={setGlobalSearchQuery}
-        onTabChange={setGlobalSearchTab}
-        onSearchSubmit={(query) => handleGlobalSearch(query)}
-        onSaveCurrentSearch={saveCurrentSearch}
-        onApplySavedSearch={applySavedSearch}
-        onRemoveSavedSearch={removeSavedSearch}
-        onOpenGroup={openGroupFromGlobalSearch}
-        onOpenMember={openMemberFromGlobalSearch}
-        onOpenRoom={openRoomFromGlobalSearch}
-        onPreviewAttachment={openAttachmentPreview}
-      />
+      {showGlobalSearch ? (
+        <GlobalSearchModal
+          open={showGlobalSearch}
+          query={globalSearchQuery}
+          activeTab={globalSearchTab}
+          loading={globalSearchLoading}
+          counts={globalSearchCounts}
+          memberResults={globalSearchMemberResults}
+          roomResults={globalSearchRoomResults}
+          messageResults={globalSearchMessageResults}
+          fileResults={globalSearchFileResults}
+          allResults={globalSearchResults}
+          allKnownStaffs={allKnownStaffs}
+          effectiveChatUserId={effectiveChatUserId}
+          savedSearches={savedSearches}
+          onClose={closeGlobalSearch}
+          onQueryChange={setGlobalSearchQuery}
+          onTabChange={setGlobalSearchTab}
+          onSearchSubmit={(query) => handleGlobalSearch(query)}
+          onSaveCurrentSearch={saveCurrentSearch}
+          onApplySavedSearch={applySavedSearch}
+          onRemoveSavedSearch={removeSavedSearch}
+          onOpenGroup={openGroupFromGlobalSearch}
+          onOpenMember={openMemberFromGlobalSearch}
+          onOpenRoom={openRoomFromGlobalSearch}
+          onPreviewAttachment={openAttachmentPreview}
+        />
+      ) : null}
 
-      <DateJumpModal
-        open={dateJumpPickerOpen}
-        value={dateJumpValue}
-        error={dateJumpError}
-        onValueChange={(value) => {
-          setDateJumpValue(value);
-          setDateJumpError('');
-        }}
-        onClose={closeDateJumpPicker}
-        onSubmit={handleDateJumpSubmit}
-      />
+      {dateJumpPickerOpen ? (
+        <DateJumpModal
+          open={dateJumpPickerOpen}
+          value={dateJumpValue}
+          error={dateJumpError}
+          onValueChange={(value) => {
+            setDateJumpValue(value);
+            setDateJumpError('');
+          }}
+          onClose={closeDateJumpPicker}
+          onSubmit={handleDateJumpSubmit}
+        />
+      ) : null}
 
-      {/* 첨부 미리보기 모달 */}
       <ChatAttachmentPreviewModal controller={attachmentPreviewController} />
 
-      {/* 상세 팝업 - 모바일 최적화 */}
-      <StaffDetailModal
-        staff={selectedStaffForModal}
-        presence={selectedStaffPresence}
-        isLoadingPresence={isLoadingPresence}
-        onClose={() => setSelectedStaffForModal(null)}
-        viewer={user}
-      />
+      {selectedStaffForModal ? (
+        <StaffDetailModal
+          staff={selectedStaffForModal}
+          presence={selectedStaffPresence}
+          isLoadingPresence={isLoadingPresence}
+          onClose={() => setSelectedStaffForModal(null)}
+          viewer={user}
+        />
+      ) : null}
     </div>
   );
 }

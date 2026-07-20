@@ -47,6 +47,7 @@ import {
   WARD_QUICK_REPLY_OPTIONS,
   extractWardMessageMeta } from '@/app/main/기능부품/메신저유틸';
 import { useRoomNotificationSetting } from '@/app/main/기능부품/메신저구독훅';
+import { useChatPresenceMap } from '@/app/main/hooks/useChatPresenceMap';
 import { patchChatRoom } from '@/lib/chat-rooms-client';
 import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
 import EmojiPicker from './이모지피커';
@@ -93,6 +94,7 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
   const userName = typeof user.name === 'string' ? user.name : '';
   const company = typeof user.company === 'string' ? user.company : null;
   const staffs = useChatStaffDirectory(company);
+  const presenceMap = useChatPresenceMap(Boolean(userId));
   // 키보드 상승: tokens .m-chat-composer + MobileShell --m-kb-offset
   const {
     messages,
@@ -138,6 +140,7 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
 
   const peerPhotoUrl = peer ? peer.photo_url || peer.avatar_url : null;
   const peerName = peer ? peer.name : '';
+  const isPeerOnline = peer?.id ? Boolean(presenceMap[String(peer.id)]) : false;
   const readCounts = useMobileChatReadCounts(String(room.id), messages, memberIds);
 
   const attachments = useMemo(() => {
@@ -827,25 +830,43 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
         >
           <MIcon name="chevL" size={18} color="var(--z-600)" />
         </button>
-        <MAvatar tone={headerTone} size="sm">
-          {isNotice ? (
-            <MIcon name="bell" size={16} color="#fff" />
-          ) : peerPhotoUrl ? (
-            <img
-              src={peerPhotoUrl}
-              alt={peerName || title}
+        <div style={{ position: 'relative', width: 32, height: 32, flexShrink: 0 }}>
+          <MAvatar tone={headerTone} size="sm">
+            {isNotice ? (
+              <MIcon name="bell" size={16} color="#fff" />
+            ) : peerPhotoUrl ? (
+              <img
+                src={peerPhotoUrl}
+                alt={peerName || title}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  borderRadius: 'inherit' }}
+              />
+            ) : isGroup ? (
+              <span>{getGroupChatRoomBadgeText(title)}</span>
+            ) : (
+              <span>{title.charAt(0) || '방'}</span>
+            )}
+          </MAvatar>
+          {peer && !isGroup && !isNotice ? (
+            <span
+              aria-hidden="true"
+              data-testid="mobile-chat-header-presence-dot"
               style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                borderRadius: 'inherit' }}
+                position: 'absolute',
+                bottom: -1,
+                right: -1,
+                width: 9,
+                height: 9,
+                borderRadius: 999,
+                border: '2px solid var(--card, #fff)',
+                background: isPeerOnline ? 'var(--m-success, #10B981)' : '#FBBF24',
+              }}
             />
-          ) : isGroup ? (
-            <span>{getGroupChatRoomBadgeText(title)}</span>
-          ) : (
-            <span>{title.charAt(0) || '방'}</span>
-          )}
-        </MAvatar>
+          ) : null}
+        </div>
         <div style={{ flex: 1, minWidth: 0, marginLeft: 4 }}>
           <div
             style={{
@@ -859,18 +880,35 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
           >
             {title}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--z-500)', fontWeight: 600, marginTop: 1.5 }}>
-            <span
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: 999,
-                background: 'var(--m-success)' }}
-              aria-hidden="true"
-            />
-            {memberCount > 0 ? `${memberCount}명` : '대화방'}
-            <span style={{ color: 'var(--z-400)' }}>·</span>
-            실시간 연결됨
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--z-500)', fontWeight: 600, marginTop: 1.5 }}
+            data-testid="mobile-chat-header-presence"
+          >
+            {peer && !isGroup && !isNotice ? (
+              <>
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 999,
+                    background: isPeerOnline ? 'var(--m-success, #10B981)' : 'var(--z-400, #94A3B8)' }}
+                  aria-hidden="true"
+                />
+                {isPeerOnline ? '온라인' : '자리비움'}
+              </>
+            ) : (
+              <>
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 999,
+                    background: 'var(--m-success)' }}
+                  aria-hidden="true"
+                />
+                {memberCount > 0 ? `${memberCount}명` : '대화방'}
+              </>
+            )}
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center' }}>
