@@ -14,6 +14,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { db } from '@/lib/db-client';
+import { CHAT_MESSAGE_SELECT } from '@/lib/chat-query-columns';
 import type { ChatMessage } from '@/types';
 import { renderMessageContent } from '@/app/main/기능부품/메신저메시지렌더';
 import MSheet from '../공통/MSheet';
@@ -159,7 +160,7 @@ export function ThreadSheet({
         setLoading(true);
         const { data, error } = await db
           .from('messages')
-          .select('*')
+          .select(CHAT_MESSAGE_SELECT)
           .eq('reply_to_id', rootMessage.id)
           .eq('is_deleted', false)
           .order('created_at', { ascending: true });

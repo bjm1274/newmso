@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import { useAppData } from '@/app/main/contexts/AppDataContext';
+import { INVENTORY_SELECT_COLUMNS } from '@/app/main/inventory-utils';
 import { InventoryModeSegment } from '../재고관리서브/InventoryComponents';
 import {
   KpiRow,
@@ -186,7 +187,7 @@ function InoutRegistrationOverlay({
 
   useEffect(() => {
     const fetchInventory = async () => {
-      const { data } = await db.from('inventory').select('*').order('name');
+      const { data } = await db.from('inventory').select(INVENTORY_SELECT_COLUMNS).order('item_name');
       if (data) setInventoryList(data);
     };
     void fetchInventory();

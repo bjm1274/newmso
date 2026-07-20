@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { db } from '@/lib/db-client';
+import { INVENTORY_SELECT_COLUMNS } from '@/app/main/inventory-utils';
 import type { StockStatusRow, Tone } from './stock-types';
 import { pickNumber, pickString, toMonthString, type Row } from './data-helpers';
 
@@ -86,7 +87,7 @@ export function useStatusData(
 
     const load = async () => {
       try {
-        const invQuery = db.from('inventory').select('*').limit(500);
+        const invQuery = db.from('inventory').select(INVENTORY_SELECT_COLUMNS).limit(500);
         let logsQuery = db
           .from('inventory_logs')
           .select('actor_name,department,quantity,change_type,created_at,company')

@@ -17,6 +17,10 @@ import { toast } from '@/lib/toast';
 import { logger } from '@/lib/logger';
 import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
 import { getKoreanTodayString } from '@/lib/seoul-time';
+import {
+  BOARD_POST_OPTIONAL_COLUMNS,
+  BOARD_POST_REQUIRED_SELECT_COLUMNS,
+  buildSelectColumns } from '@/app/main/기능부품/게시판공통';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MBtn from '../공통/MBtn';
@@ -69,8 +73,23 @@ export default function OP체크상세({
     setLoading(true);
     try {
       const queries = [
-        db.from('op_patient_checks').select('*').eq('schedule_post_id', card.scheduleId).maybeSingle(),
-        db.from('board_posts').select('*').eq('id', card.scheduleId).maybeSingle(),
+        db
+          .from('op_patient_checks')
+          .select(
+            'id, schedule_post_id, status, prep_items, consumable_items, patient_name, surgery_name, notes',
+          )
+          .eq('schedule_post_id', card.scheduleId)
+          .maybeSingle(),
+        db
+          .from('board_posts')
+          .select(
+            buildSelectColumns(
+              BOARD_POST_REQUIRED_SELECT_COLUMNS,
+              BOARD_POST_OPTIONAL_COLUMNS,
+            ),
+          )
+          .eq('id', card.scheduleId)
+          .maybeSingle(),
       ] as const;
       const [{ data: check }, { data: post }] = await Promise.all(queries);
 

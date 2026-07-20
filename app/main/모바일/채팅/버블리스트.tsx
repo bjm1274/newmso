@@ -4,9 +4,10 @@
  * 모바일 채팅방의 버블 리스트.
  * 메시지 + 날짜 구분선(system bubble)을 묶어 렌더.
  * 채팅방.tsx에서 분리 (JM: 채팅방.tsx 500줄 이내 유지).
+ * 2026-07-20: 가변 높이 안전 윈도우 렌더(슬라이스+오버스캔). FixedSizeList 미사용.
  */
 
-import { useMemo } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ChatMessage } from '@/types';
 import {
   formatBubbleDateLabel,
@@ -15,6 +16,15 @@ import {
 import MessageBubble from './메시지버블';
 import { PollCard } from './투표';
 import type { RoomPollsResult } from './메시지액션';
+
+const BUBBLE_INITIAL_WINDOW = 80;
+const BUBBLE_EXPAND_BY = 40;
+const BUBBLE_JUMP_OVERSCAN = 20;
+
+type BubbleListItem =
+  | { kind: 'date'; label: string; key: string }
+  | { kind: 'msg'; message: ChatMessage; key: string; ts: number }
+  | { kind: 'poll'; poll: RoomPollsResult['polls'][number]; key: string; ts: number };
 
 export type BubbleListProps = {
   messages: ChatMessage[];
@@ -76,13 +86,18 @@ export default function BubbleList({
     return counts;
   }, [messages]);
 
+  const messageById = useMemo(() => {
+    const map = new Map<string, ChatMessage>();
+    messages.forEach((message) => {
+      const id = String(message.id || '').trim();
+      if (id) map.set(id, message);
+    });
+    return map;
+  }, [messages]);
+
   const items = useMemo(() => {
-    const out: Array<
-      | { kind: 'date'; label: string; key: string }
-      | { kind: 'msg'; message: ChatMessage; key: string; ts: number }
-      | { kind: 'poll'; poll: RoomPollsResult['polls'][number]; key: string; ts: number }
-    > = [];
-    
+    const out: BubbleListItem[] = [];
+
     const combined: Array<
       | { type: 'msg'; data: ChatMessage; ts: number; iso: string | null }
       | { type: 'poll'; data: RoomPollsResult['polls'][number]; ts: number; iso: string | null }
@@ -121,9 +136,161 @@ export default function BubbleList({
     return out;
   }, [messages, pollData]);
 
+  const roomSignature = useMemo(() => {
+    const first = messages[0] ? String(messages[0].id) : '';
+    const last = messages.length > 0 ? String(messages[messages.length - 1]?.id || '') : '';
+    return `${messages.length}:${first}:${last}:${pollData?.polls?.length || 0}`;
+  }, [messages, pollData?.polls?.length]);
+
+  const [windowStart, setWindowStart] = useState(() =>
+    items.length <= BUBBLE_INITIAL_WINDOW ? 0 : Math.max(0, items.length - BUBBLE_INITIAL_WINDOW),
+  );
+  const prevMetaRef = useRef<{ signature: string; firstMsgId: string; length: number }>({
+    signature: roomSignature,
+    firstMsgId: messages[0] ? String(messages[0].id) : '',
+    length: items.length,
+  });
+  const pendingScrollRestoreRef = useRef<{ parent: HTMLElement; prevHeight: number } | null>(null);
+  const topSentinelRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    const prev = prevMetaRef.current;
+    const nextFirstMsgId = messages[0] ? String(messages[0].id) : '';
+    const nextLength = items.length;
+
+    if (prev.signature === roomSignature) {
+      // items 재계산만 있고 시그니처 동일하면 클램프만
+      setWindowStart((start) => {
+        if (nextLength <= BUBBLE_INITIAL_WINDOW) return 0;
+        return Math.min(start, Math.max(0, nextLength - 1));
+      });
+      return;
+    }
+
+    const firstChanged = prev.firstMsgId !== nextFirstMsgId;
+    if (firstChanged && prev.firstMsgId) {
+      const oldFirstIdx = items.findIndex(
+        (item) => item.kind === 'msg' && String(item.message.id) === prev.firstMsgId,
+      );
+      if (oldFirstIdx > 0) {
+        // loadOlder prepend — 보이는 구간 유지
+        setWindowStart((start) => Math.min(nextLength, start + oldFirstIdx));
+        prevMetaRef.current = {
+          signature: roomSignature,
+          firstMsgId: nextFirstMsgId,
+          length: nextLength,
+        };
+        return;
+      }
+    }
+
+    if (firstChanged || prev.length === 0) {
+      // 방 전환 또는 초기 로드 — 최신 쪽 윈도우
+      setWindowStart(nextLength <= BUBBLE_INITIAL_WINDOW ? 0 : Math.max(0, nextLength - BUBBLE_INITIAL_WINDOW));
+    } else {
+      // 하단 append — windowStart 유지(항상 끝까지 렌더)
+      setWindowStart((start) => {
+        if (nextLength <= BUBBLE_INITIAL_WINDOW) return 0;
+        return Math.min(start, Math.max(0, nextLength - 1));
+      });
+    }
+
+    prevMetaRef.current = {
+      signature: roomSignature,
+      firstMsgId: nextFirstMsgId,
+      length: nextLength,
+    };
+  }, [items, messages, roomSignature]);
+
+  // 검색/점프 대상이 윈도우 밖이면 확장
+  useLayoutEffect(() => {
+    const targetId = String(searchMessageId || '').trim();
+    if (!targetId || items.length === 0) return;
+    const targetIndex = items.findIndex(
+      (item) => item.kind === 'msg' && String(item.message.id) === targetId,
+    );
+    if (targetIndex < 0) return;
+    setWindowStart((start) => {
+      const next = Math.max(0, targetIndex - BUBBLE_JUMP_OVERSCAN);
+      return next < start ? next : start;
+    });
+  }, [items, searchMessageId]);
+
+  useLayoutEffect(() => {
+    const restore = pendingScrollRestoreRef.current;
+    if (!restore) return;
+    pendingScrollRestoreRef.current = null;
+    const delta = restore.parent.scrollHeight - restore.prevHeight;
+    if (delta !== 0) {
+      restore.parent.scrollTop = restore.parent.scrollTop + delta;
+    }
+  }, [windowStart]);
+
+  const effectiveWindowStart =
+    items.length <= BUBBLE_INITIAL_WINDOW ? 0 : Math.min(windowStart, Math.max(0, items.length - 1));
+  const visibleItems = useMemo(
+    () => (effectiveWindowStart > 0 ? items.slice(effectiveWindowStart) : items),
+    [effectiveWindowStart, items],
+  );
+
+  const expandWindowUp = useCallback(() => {
+    if (effectiveWindowStart <= 0) return;
+    const sentinel = topSentinelRef.current;
+    const parent = (sentinel?.closest('.m-scroll') || sentinel?.parentElement) as HTMLElement | null;
+    if (parent) {
+      pendingScrollRestoreRef.current = { parent, prevHeight: parent.scrollHeight };
+    }
+    setWindowStart((start) => Math.max(0, start - BUBBLE_EXPAND_BY));
+  }, [effectiveWindowStart]);
+
+  useEffect(() => {
+    const sentinel = topSentinelRef.current;
+    if (!sentinel || effectiveWindowStart <= 0) return;
+    const scrollRoot = sentinel.closest('.m-scroll') as Element | null;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          expandWindowUp();
+        }
+      },
+      { root: scrollRoot, rootMargin: '120px 0px 0px 0px', threshold: 0 },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [effectiveWindowStart, expandWindowUp, visibleItems.length]);
+
+  const handleJumpToMessage = useCallback(
+    (messageId: string) => {
+      const targetId = String(messageId || '').trim();
+      if (!targetId) return;
+      const targetIndex = items.findIndex(
+        (item) => item.kind === 'msg' && String(item.message.id) === targetId,
+      );
+      if (targetIndex >= 0) {
+        setWindowStart((start) => {
+          const next = Math.max(0, targetIndex - BUBBLE_JUMP_OVERSCAN);
+          return next < start ? next : start;
+        });
+      }
+      window.requestAnimationFrame(() => {
+        onJumpToMessage?.(targetId);
+      });
+    },
+    [items, onJumpToMessage],
+  );
+
   return (
-    <>
-      {items.map((item) => {
+    <div data-testid="chat-bubble-list-window">
+      {effectiveWindowStart > 0 ? (
+        <div
+          ref={topSentinelRef}
+          data-testid="chat-bubble-window-sentinel"
+          style={{ textAlign: 'center', margin: '6px 0', fontSize: 11, fontWeight: 600, color: 'rgba(0,0,0,0.4)' }}
+        >
+          이전 메시지 {effectiveWindowStart}개 · 스크롤하여 더 보기
+        </div>
+      ) : null}
+      {visibleItems.map((item) => {
         if (item.kind === 'date') {
           return <SystemBubble key={item.key} label={item.label} />;
         }
@@ -140,11 +307,12 @@ export default function BubbleList({
             </div>
           );
         }
+        const replyId = item.message.reply_to_id ? String(item.message.reply_to_id) : '';
         return (
           <MessageBubble
             key={item.key}
             message={item.message}
-            replyTarget={item.message.reply_to_id ? messages.find(m => String(m.id) === String(item.message.reply_to_id)) : undefined}
+            replyTarget={replyId ? messageById.get(replyId) : undefined}
             mine={String(item.message.sender_id || '') === String(userId || '')}
             myUserId={userId}
             staffs={staffs}
@@ -165,11 +333,11 @@ export default function BubbleList({
             onOpenThread={onOpenThread}
             threadReplyCount={threadCounts[String(item.message.id)] || 0}
             searchMessageId={searchMessageId}
-            onJumpToMessage={onJumpToMessage}
+            onJumpToMessage={handleJumpToMessage}
           />
         );
       })}
-    </>
+    </div>
   );
 }
 

@@ -13,18 +13,14 @@ import {
   isRelationMarkedMissing,
   rememberMissingRelation,
   withMissingColumnsFallback } from '@/lib/db-compat';
-import { normalizeRoomReadCursorIds } from '@/lib/chat-read-cursors';
+import { normalizeRoomReadCursorIds, toUtcSqlTimestamp } from '@/lib/chat-read-cursors';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
 import { CHAT_ACTIVE_ROOM_KEY, CHAT_FOCUS_KEY, CHAT_ROOM_KEY } from '@/app/main/navigation-state';
-import {
-  AttachmentListCard,
-  getMessageDisplayText,
-  getAttachmentDisplayName } from './메신저첨부';
-import { ChatAttachmentPreviewModal, useChatAttachmentPreview } from './메신저첨부미리보기';
+import { getMessageDisplayText } from './메신저첨부';
+import { useChatAttachmentPreview } from './메신저첨부미리보기훅';
 import { MessengerComposer, type MessengerComposerHandle } from './메신저컴포저';
 import { selectChatMessagesWithFallback } from './메신저데이터유틸';
-import { bindMockNotificationInsert } from './메신저테스트이벤트';
 import { useChatMessageActions } from './메신저액션훅';
 import { useChatGlobalSearch } from './메신저검색훅';
 import { renderMessageContent } from './메신저메시지렌더';
@@ -158,6 +154,9 @@ const DateJumpModal = dynamic(
 const StaffDetailModal = dynamic(
   () => import('./메신저섹션/StaffDetailModal').then((m) => m.StaffDetailModal),
   { ssr: false, loading: MessengerOverlayLoading });
+const ChatAttachmentPreviewModal = dynamic(
+  () => import('./메신저첨부미리보기').then((m) => m.ChatAttachmentPreviewModal),
+  { ssr: false, loading: MessengerOverlayLoading });
 
 type ReactionUsersByMessage = Record<string, Record<string, StaffMember[]>>;
 
@@ -233,6 +232,7 @@ export default function ChatView({
   const [wardQuickReplySendingMessageId, setWardQuickReplySendingMessageId] = useState<string | null>(null);
   const [deliveryStates, setDeliveryStates] = useState<Record<string, DeliveryState>>({});
   const [showScrollToLatest, setShowScrollToLatest] = useState(false);
+  const [timelineEnsureMessageId, setTimelineEnsureMessageId] = useState<string | null>(null);
   const [dateJumpPickerOpen, setDateJumpPickerOpen] = useState(false);
   const [dateJumpValue, setDateJumpValue] = useState('');
   const [dateJumpError, setDateJumpError] = useState('');
@@ -633,6 +633,7 @@ export default function ChatView({
       setBookmarkedIds(new Set());
     }
     setActiveActionMsg(null);
+    setTimelineEnsureMessageId(null);
     setThreadRoot(null);
     closeEditingMessageRef.current();
     closeEditHistoryRef.current();
@@ -715,6 +716,8 @@ export default function ChatView({
     pendingBottomAlignHoldUntilRef.current = 0;
     clearPendingBottomAlignReleaseTimer();
     isNearBottomRef.current = false;
+    // 타임라인 윈도우 밖이면 DOM에 없어 scrollIntoView 불가 → 렌더 윈도우 확장 요청
+    setTimelineEnsureMessageId(normalizedMessageId);
 
     const el = msgRefs.current[normalizedMessageId];
     if (el) {
@@ -975,7 +978,7 @@ export default function ChatView({
     if (targetRoomIds.length === 0) return;
 
     // 읽음 커서·알림 시각: SQL 포맷 우선 (D1 문자열 비교 정합)
-    const resolvedReadAt = readAt || new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const resolvedReadAt = toUtcSqlTimestamp(readAt);
     await Promise.allSettled(
       targetRoomIds.map((targetRoomId) =>
         d1.from('notifications')
@@ -1140,10 +1143,16 @@ export default function ChatView({
     };
 
     window.addEventListener('erp-notification-read', reloadMentionInbox);
-    const unbindMockNotificationInsert = bindMockNotificationInsert(reloadMentionInbox);
+    let unbindMockNotificationInsert: (() => void) | undefined;
+    // 테스트/모의 알림 바인딩은 비프로덕션 전용 — 첫 엔트리 정적 번들에서 제외
+    if (process.env.NODE_ENV !== 'production') {
+      void import('./메신저테스트이벤트').then(({ bindMockNotificationInsert }) => {
+        unbindMockNotificationInsert = bindMockNotificationInsert(reloadMentionInbox);
+      });
+    }
     return () => {
       window.removeEventListener('erp-notification-read', reloadMentionInbox);
-      unbindMockNotificationInsert();
+      unbindMockNotificationInsert?.();
     };
   }, [loadMentionInbox, loadThreadInbox]);
 
@@ -1526,7 +1535,7 @@ export default function ChatView({
       });
 
       if (!isOwnMessage && user?.id) {
-        const readAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        const readAt = toUtcSqlTimestamp();
         const targetRoomIds = conversationRoomIds.length > 0 ? conversationRoomIds : [roomId];
         void persistRoomReadCursors(targetRoomIds, readAt)
           .then(async (cursorWriteOk) => {
@@ -3183,6 +3192,7 @@ export default function ChatView({
           shouldKeepBottomAligned={shouldKeepBottomAligned}
           onMediaLoad={handleTimelineMediaLoad}
           onOpenDateJump={openDateJumpPicker}
+          ensureVisibleMessageId={timelineEnsureMessageId}
         />
 
         <TypingNotice text={typingNoticeText} />
@@ -3479,7 +3489,9 @@ export default function ChatView({
         />
       ) : null}
 
-      <ChatAttachmentPreviewModal controller={attachmentPreviewController} />
+      {attachmentPreview ? (
+        <ChatAttachmentPreviewModal controller={attachmentPreviewController} />
+      ) : null}
 
       {selectedStaffForModal ? (
         <StaffDetailModal

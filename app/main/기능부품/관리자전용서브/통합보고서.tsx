@@ -60,7 +60,9 @@ export default function IntegratedReport({ staffs = [] }: { staffs: StaffMember[
   useEffect(() => {
     const fetchInventory = async () => {
       setLoadingInventory(true);
-      const { data } = await db.from('inventory').select('*');
+      const { data } = await db
+        .from('inventory')
+        .select('id, item_name, name, quantity, stock, company, department, category, unit_price, price, min_quantity');
       if (data) setInventory(data);
       setLoadingInventory(false);
     };

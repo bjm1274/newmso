@@ -7,17 +7,18 @@
 
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/db-client';
+import { INVENTORY_SELECT_COLUMNS } from '@/app/main/inventory-utils';
 import type { AssetRow, CatalogRow, CategoryCard, Tone, UdiRow } from './stock-types';
 import { asString, pickNumber, pickString, toMonthString, type Row } from './data-helpers';
 
 function mapCatalogRow(r: Row): CatalogRow {
   return {
-    sku: pickString(r, ['code', 'sku', 'item_code'], pickString(r, ['id'], '-').slice(0, 8)),
+    sku: pickString(r, ['code', 'sku', 'item_code', 'barcode'], pickString(r, ['id'], '-').slice(0, 8)),
     name: pickString(r, ['name', 'item_name'], '(미명칭)'),
     cat: pickString(r, ['category', 'category_name'], '미분류'),
     unit: pickString(r, ['unit'], 'EA'),
     price: pickNumber(r, ['price', 'unit_price']),
-    date: toMonthString(r['created_at']),
+    date: toMonthString(r['last_updated'] ?? r['created_at']),
     who: pickString(r, ['created_by_name', 'created_by'], '-') };
 }
 
@@ -41,7 +42,7 @@ function buildCategoryCards(categories: Row[], inventory: Row[]): CategoryCard[]
 }
 
 function mapAssetRow(r: Row): AssetRow {
-  const hasQr = Boolean(r['qr_code'] ?? r['barcode']);
+  const hasQr = Boolean(r['qr_code'] ?? r['barcode'] ?? r['serial_number']);
   const broken = Boolean(r['needs_repair']);
   const status: AssetRow['status'] = broken ? '수리 필요' : !hasQr ? 'QR 미부착' : '정상';
   const tone: Tone = broken ? 'danger' : !hasQr ? 'warn' : 'success';
@@ -49,7 +50,7 @@ function mapAssetRow(r: Row): AssetRow {
     id: pickString(r, ['code', 'asset_id', 'id'], '-').slice(0, 16),
     name: pickString(r, ['name', 'item_name'], '(미명칭)'),
     loc: pickString(r, ['location', 'department'], '-'),
-    date: toMonthString(r['purchase_date'] ?? r['created_at']),
+    date: toMonthString(r['purchase_date'] ?? r['last_updated'] ?? r['created_at']),
     qr: hasQr,
     status,
     tone };
@@ -59,10 +60,10 @@ function mapUdiRow(r: Row): UdiRow {
   return {
     udi: pickString(r, ['udi', 'udi_code', 'barcode'], '-'),
     name: pickString(r, ['name', 'item_name'], '-'),
-    mfr: pickString(r, ['manufacturer', 'maker'], '-'),
-    model: pickString(r, ['model', 'model_name'], '-'),
+    mfr: pickString(r, ['manufacturer', 'maker', 'supplier_name', 'supplier'], '-'),
+    model: pickString(r, ['model', 'model_name', 'spec'], '-'),
     lot: pickString(r, ['lot_number', 'lot'], '-'),
-    date: toMonthString(r['created_at']) };
+    date: toMonthString(r['last_updated'] ?? r['created_at']) };
 }
 
 export type ItemWorkcenterData = {
@@ -101,13 +102,13 @@ export function useItemData(userCompany?: string): ItemWorkcenterData {
       try {
         let invQ = db
           .from('inventory')
-          .select('*')
-          .order('created_at', { ascending: false })
+          .select(INVENTORY_SELECT_COLUMNS)
+          .order('last_updated', { ascending: false })
           .limit(200);
         if (companyFilter) invQ = invQ.eq('company', companyFilter);
         const [invRes, catRes] = await Promise.all([
           invQ,
-          db.from('inventory_categories').select('*').order('name').limit(100),
+          db.from('inventory_categories').select('id, name, parent_id').order('name').limit(100),
         ]);
 
         if (cancelled) return;

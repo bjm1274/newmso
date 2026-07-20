@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useAppData } from '@/app/main/contexts/AppDataContext';
 import { db } from '@/lib/db-client';
+import { INVENTORY_SELECT_COLUMNS } from '@/app/main/inventory-utils';
 import {
   KpiRow,
   WorkcenterNotes,
@@ -25,7 +26,7 @@ export default function UdiWorkcenter() {
   const [inventoryList, setInventoryList] = useState<any[]>([]);
 
   const fetchInventory = useCallback(async () => {
-    const { data } = await db.from('inventory').select('*').order('name');
+    const { data } = await db.from('inventory').select(INVENTORY_SELECT_COLUMNS).order('item_name');
     if (data) setInventoryList(data);
   }, []);
 

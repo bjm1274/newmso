@@ -44,6 +44,25 @@ export const OPTIONAL_TODO_COLUMNS = [
   'source_room_id',
 ] as const;
 
+/** 할일 목록/조회용 컬럼 — select('*') 회피 */
+export const TODO_REQUIRED_SELECT_COLUMNS = [
+  'id',
+  'user_id',
+  'content',
+  'is_complete',
+  'task_date',
+  'created_at',
+] as const;
+
+export function buildTodoSelect(omittedColumns?: ReadonlySet<string>) {
+  return [
+    ...TODO_REQUIRED_SELECT_COLUMNS,
+    ...OPTIONAL_TODO_COLUMNS.filter((column) => !omittedColumns?.has(column)),
+  ].join(', ');
+}
+
+export const TODO_LIST_SELECT = buildTodoSelect();
+
 export const PRIORITY_OPTIONS: Array<{ value: TodoPriority; label: string }> = [
   { value: 'urgent', label: '긴급' },
   { value: 'high', label: '높음' },
@@ -319,18 +338,23 @@ export function useTodoWorkflow(
 
     try {
       setLoading(true);
-      let query = db
-        .from('todos')
-        .select('*')
-        .eq('user_id', userId);
+      const { data, error } = await withMissingColumnsFallback(
+        (omittedColumns) => {
+          let query = db
+            .from('todos')
+            .select(buildTodoSelect(omittedColumns))
+            .eq('user_id', userId);
 
-      if (viewRange === 'day') {
-        query = query.eq('task_date', selectedDate);
-      } else {
-        query = query.gte('task_date', start).lte('task_date', end);
-      }
+          if (viewRange === 'day') {
+            query = query.eq('task_date', selectedDate);
+          } else {
+            query = query.gte('task_date', start).lte('task_date', end);
+          }
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+          return query.order('created_at', { ascending: false });
+        },
+        [...OPTIONAL_TODO_COLUMNS],
+      );
       if (error) throw error;
       setTasks(sortTasks((data || []) as TodoRow[]));
     } catch (error) {

@@ -1,6 +1,7 @@
 'use client';
 // 2026-05-27 (14) 채팅 액션 박스 통합 — MessageActionsHost via 메신저액션서브
-import { useLayoutEffect, useEffect, useState, useRef, useCallback, memo } from 'react';
+// 2026-07-20 타임라인 윈도우 렌더(가변 높이 안전 중간단계) — full FixedSizeList 대신 슬라이스+오버스캔
+import { useLayoutEffect, useEffect, useState, useRef, useCallback, useMemo, memo } from 'react';
 import type { MutableRefObject, ReactNode, RefObject } from 'react';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import { toast } from '@/lib/toast';
@@ -20,6 +21,15 @@ import type { ThreadSummary } from './메신저파생훅';
 import { MessageActionsHost } from './메신저액션서브';
 import { MenuIcon } from './조직도서브/조직도측면창';
 import { useIsMobile } from '@/app/components/useIsMobile';
+
+/** 하단(최신) 기준으로 처음 렌더할 타임라인 항목 수. 이하면 전체 렌더. */
+const TIMELINE_INITIAL_WINDOW = 100;
+/** 상단 근처 스크롤 시 한 번에 위로 확장할 항목 수 */
+const TIMELINE_EXPAND_BY = 50;
+/** jump-to-message 시 타깃 앞뒤로 확보할 여유 항목 */
+const TIMELINE_JUMP_OVERSCAN = 25;
+/** 상단 확장/이전 메시지 로드 트리거 임계값(px) */
+const TIMELINE_TOP_THRESHOLD_PX = 120;
 
 type PollItem = {
   id: string;
@@ -50,6 +60,61 @@ type DeliveryState = {
   status: 'sending' | 'failed' | 'sent';
   error?: string | null;
 };
+
+function getTimelineItemKey(item: MessengerTimelineItem): string {
+  if (item.type === 'poll') return `poll-${String(item.id)}`;
+  if (item.type === 'album') {
+    const album = item as MessengerAlbumItem;
+    return `album-${String(album.album_id || album.id)}`;
+  }
+  return `msg-${String((item as MessengerMessageItem).id)}`;
+}
+
+function findTimelineIndexForMessageId(
+  items: MessengerTimelineItem[],
+  messageId: string,
+): number {
+  const targetId = String(messageId || '').trim();
+  if (!targetId) return -1;
+  return items.findIndex((item) => {
+    if (item.type === 'poll') return false;
+    if (item.type === 'album') {
+      const album = item as MessengerAlbumItem;
+      if (String(album.id) === targetId) return true;
+      return (album.albumMessages || []).some((message) => String(message.id) === targetId);
+    }
+    return String((item as MessengerMessageItem).id) === targetId;
+  });
+}
+
+function getItemSenderId(item: MessengerTimelineItem): string {
+  if (item.type === 'poll') return '';
+  if (item.type === 'album') return String((item as MessengerAlbumItem).sender_id || '');
+  return String((item as MessengerMessageItem).sender_id || '');
+}
+
+function getItemDateLabel(item: MessengerTimelineItem): string {
+  if (item.type === 'poll') {
+    const created = toChatDate((item as PollItem).created_at);
+    if (Number.isNaN(created.getTime())) return '';
+    return created.toLocaleDateString('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'short',
+    });
+  }
+  const created = toChatDate((item as MessengerMessageItem | MessengerAlbumItem).created_at);
+  if (Number.isNaN(created.getTime())) return '';
+  return created.toLocaleDateString('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    weekday: 'short',
+  });
+}
 
 const INLINE_ACTION_REACTIONS = ['👍', '❤️', '🙏', '👏', '😊', '👌'];
 const inlineActionButtonClass =
@@ -142,6 +207,11 @@ type MessengerTimelineProps = {
   onOpenBoardPost?: (boardType: string, postId: string) => void;
   onOpenDateJump?: (dateKey: string) => void;
   onOpenStaffProfile?: (staff: StaffMember) => void;
+  /** jump-to-message 대상 — 렌더 윈도우를 해당 항목까지 확장 */
+  ensureVisibleMessageId?: string | null;
+  hasOlderMessages?: boolean;
+  loadingOlderMessages?: boolean;
+  onLoadOlderMessages?: () => void;
 };
 
 function MessengerTimelineComponent({
@@ -197,8 +267,165 @@ function MessengerTimelineComponent({
   onMediaLoad,
   onOpenDateJump,
   onOpenStaffProfile,
-  onOpenBoardPost }: MessengerTimelineProps) {
+  onOpenBoardPost,
+  ensureVisibleMessageId = null,
+  hasOlderMessages = false,
+  loadingOlderMessages = false,
+  onLoadOlderMessages }: MessengerTimelineProps) {
   const isMobile = useIsMobile();
+  const timelineContentRef = useRef<HTMLDivElement | null>(null);
+  const pendingWindowScrollRestoreRef = useRef<{ prevHeight: number } | null>(null);
+  const windowExpandInFlightRef = useRef(false);
+  const prevTimelineMetaRef = useRef<{ roomId: string | null; firstKey: string; lastKey: string; length: number }>({
+    roomId: null,
+    firstKey: '',
+    lastKey: '',
+    length: 0,
+  });
+  const loadOlderRequestedRef = useRef(false);
+
+  const timelineLength = combinedTimeline.length;
+  const timelineFirstKey = timelineLength > 0 ? getTimelineItemKey(combinedTimeline[0]) : '';
+  const timelineLastKey = timelineLength > 0 ? getTimelineItemKey(combinedTimeline[timelineLength - 1]) : '';
+
+  const computeDefaultWindowStart = useCallback((length: number) => {
+    if (length <= TIMELINE_INITIAL_WINDOW) return 0;
+    return Math.max(0, length - TIMELINE_INITIAL_WINDOW);
+  }, []);
+
+  const [windowStart, setWindowStart] = useState(0);
+
+  // 방 전환·타임라인 구조 변화 시 윈도우 재계산 (하단 기준 / prepend 보정)
+  useLayoutEffect(() => {
+    const prev = prevTimelineMetaRef.current;
+    const roomChanged = prev.roomId !== selectedRoomId;
+
+    if (roomChanged) {
+      setWindowStart(computeDefaultWindowStart(timelineLength));
+      prevTimelineMetaRef.current = {
+        roomId: selectedRoomId,
+        firstKey: timelineFirstKey,
+        lastKey: timelineLastKey,
+        length: timelineLength,
+      };
+      loadOlderRequestedRef.current = false;
+      return;
+    }
+
+    if (timelineLength === 0) {
+      setWindowStart(0);
+      prevTimelineMetaRef.current = {
+        roomId: selectedRoomId,
+        firstKey: '',
+        lastKey: '',
+        length: 0,
+      };
+      return;
+    }
+
+    // 방 선택 직후 첫 로드(0 → N): 최신 쪽 윈도우로 시작
+    if (prev.length === 0) {
+      setWindowStart(computeDefaultWindowStart(timelineLength));
+      prevTimelineMetaRef.current = {
+        roomId: selectedRoomId,
+        firstKey: timelineFirstKey,
+        lastKey: timelineLastKey,
+        length: timelineLength,
+      };
+      return;
+    }
+
+    // 서버/클라이언트 prepend: 이전 첫 항목이 뒤로 밀린 경우 windowStart 보정
+    if (prev.firstKey && timelineFirstKey && prev.firstKey !== timelineFirstKey) {
+      const shiftedIndex = combinedTimeline.findIndex((item) => getTimelineItemKey(item) === prev.firstKey);
+      if (shiftedIndex > 0) {
+        setWindowStart((start) => Math.min(timelineLength, start + shiftedIndex));
+      } else if (shiftedIndex < 0 && timelineLength > prev.length) {
+        // 첫 키가 바뀌었지만 이전 첫 항목을 못 찾음 → 길이 차이만큼 보정
+        setWindowStart((start) => Math.min(timelineLength, start + (timelineLength - prev.length)));
+      }
+    }
+
+    // 길이 축소 시 클램프 (append 시에는 start 유지 → 항상 끝까지 렌더)
+    setWindowStart((start) => {
+      if (timelineLength <= TIMELINE_INITIAL_WINDOW) return 0;
+      return Math.min(start, Math.max(0, timelineLength - 1));
+    });
+
+    prevTimelineMetaRef.current = {
+      roomId: selectedRoomId,
+      firstKey: timelineFirstKey,
+      lastKey: timelineLastKey,
+      length: timelineLength,
+    };
+  }, [
+    combinedTimeline,
+    computeDefaultWindowStart,
+    selectedRoomId,
+    timelineFirstKey,
+    timelineLastKey,
+    timelineLength,
+  ]);
+
+  // jump-to-message: 대상이 윈도우 밖이면 상단을 확장 (하단은 항상 포함)
+  useLayoutEffect(() => {
+    const targetId = String(ensureVisibleMessageId || '').trim();
+    if (!targetId || timelineLength === 0) return;
+    const targetIndex = findTimelineIndexForMessageId(combinedTimeline, targetId);
+    if (targetIndex < 0) return;
+    setWindowStart((start) => {
+      const next = Math.max(0, targetIndex - TIMELINE_JUMP_OVERSCAN);
+      return next < start ? next : start;
+    });
+  }, [combinedTimeline, ensureVisibleMessageId, timelineLength]);
+
+  const effectiveWindowStart =
+    timelineLength <= TIMELINE_INITIAL_WINDOW ? 0 : Math.min(windowStart, Math.max(0, timelineLength - 1));
+
+  const expandWindowUp = useCallback(() => {
+    if (effectiveWindowStart <= 0 || windowExpandInFlightRef.current) return false;
+    const listElement = messageListRef.current;
+    if (listElement) {
+      pendingWindowScrollRestoreRef.current = { prevHeight: listElement.scrollHeight };
+    }
+    windowExpandInFlightRef.current = true;
+    setWindowStart((start) => Math.max(0, Math.min(start, effectiveWindowStart) - TIMELINE_EXPAND_BY));
+    return true;
+  }, [effectiveWindowStart, messageListRef]);
+
+  // 윈도우 상단 확장 후 스크롤 위치 유지 + 다음 확장 허용
+  useLayoutEffect(() => {
+    const restore = pendingWindowScrollRestoreRef.current;
+    if (restore) {
+      const listElement = messageListRef.current;
+      pendingWindowScrollRestoreRef.current = null;
+      if (listElement) {
+        const delta = listElement.scrollHeight - restore.prevHeight;
+        if (delta !== 0) {
+          listElement.scrollTop = listElement.scrollTop + delta;
+        }
+      }
+    }
+    windowExpandInFlightRef.current = false;
+  }, [messageListRef, windowStart]);
+
+  const visibleTimeline = useMemo(
+    () => (effectiveWindowStart > 0 ? combinedTimeline.slice(effectiveWindowStart) : combinedTimeline),
+    [combinedTimeline, effectiveWindowStart],
+  );
+
+  // 윈도우 경계에서도 연속 발신/날짜 구분선이 어긋나지 않도록 직전 항목 상태 시드
+  const windowBoundarySeed = useMemo(() => {
+    if (effectiveWindowStart <= 0) {
+      return { lastDateLabel: '', lastSenderId: '' };
+    }
+    const previous = combinedTimeline[effectiveWindowStart - 1];
+    if (!previous) return { lastDateLabel: '', lastSenderId: '' };
+    return {
+      lastDateLabel: getItemDateLabel(previous),
+      lastSenderId: getItemSenderId(previous),
+    };
+  }, [combinedTimeline, effectiveWindowStart]);
 
   useLayoutEffect(() => {
     if (!selectedRoomId) return;
@@ -239,7 +466,7 @@ function MessengerTimelineComponent({
       }
     });
 
-    const inner = listElement.firstElementChild;
+    const inner = timelineContentRef.current || listElement.firstElementChild;
     if (inner) observer.observe(inner);
 
     return () => {
@@ -288,7 +515,61 @@ function MessengerTimelineComponent({
   const handleMessageListScroll = useCallback(() => {
     onMessageListScroll();
     updateScrollDateIndicator();
-  }, [onMessageListScroll, updateScrollDateIndicator]);
+
+    const listElement = messageListRef.current;
+    if (!listElement) return;
+    if (listElement.scrollTop > TIMELINE_TOP_THRESHOLD_PX) {
+      loadOlderRequestedRef.current = false;
+      return;
+    }
+
+    // 1) 클라이언트 윈도우 상단 확장
+    if (expandWindowUp()) return;
+
+    // 2) 이미 윈도우가 맨 앞이면 서버 이전 메시지 로드(연결된 경우)
+    if (
+      hasOlderMessages &&
+      !loadingOlderMessages &&
+      onLoadOlderMessages &&
+      !loadOlderRequestedRef.current
+    ) {
+      loadOlderRequestedRef.current = true;
+      onLoadOlderMessages();
+    }
+  }, [
+    expandWindowUp,
+    hasOlderMessages,
+    loadingOlderMessages,
+    messageListRef,
+    onLoadOlderMessages,
+    onMessageListScroll,
+    updateScrollDateIndicator,
+  ]);
+
+  useEffect(() => {
+    if (!loadingOlderMessages) {
+      loadOlderRequestedRef.current = false;
+    }
+  }, [loadingOlderMessages]);
+
+  const handleScrollToMessage = useCallback(
+    (messageId: string) => {
+      const targetId = String(messageId || '').trim();
+      if (!targetId) return;
+      const targetIndex = findTimelineIndexForMessageId(combinedTimeline, targetId);
+      if (targetIndex >= 0) {
+        setWindowStart((start) => {
+          const next = Math.max(0, targetIndex - TIMELINE_JUMP_OVERSCAN);
+          return next < start ? next : start;
+        });
+      }
+      // 윈도우 확장 페인트 후 부모가 msgRefs로 scrollIntoView
+      window.requestAnimationFrame(() => {
+        onScrollToMessage(targetId);
+      });
+    },
+    [combinedTimeline, onScrollToMessage],
+  );
 
   useEffect(() => {
     setScrollDateShown(false);
@@ -331,25 +612,53 @@ function MessengerTimelineComponent({
         className="flex-1 min-h-0 overflow-y-auto px-2 py-0.5 pb-1 md:px-4 md:py-2 md:pb-2 space-y-0 custom-scrollbar"
       >
         {!selectedRoomId ? (
-          <div className="h-full flex flex-col items-center justify-center text-[var(--toss-gray-3)]">
-            <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent-light)] text-[var(--accent)]">
-              <MenuIcon name="chat" className="h-6 w-6" />
-            </span>
-            <p className="text-sm font-bold">채팅방을 선택하세요.</p>
-          </div>
+          <>
+            <div className="h-full flex flex-col items-center justify-center text-[var(--toss-gray-3)]">
+              <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent-light)] text-[var(--accent)]">
+                <MenuIcon name="chat" className="h-6 w-6" />
+              </span>
+              <p className="text-sm font-bold">채팅방을 선택하세요.</p>
+            </div>
+            <div ref={scrollRef} />
+          </>
         ) : messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center opacity-20">
-            <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-[var(--radius-md)] bg-[var(--tab-bg)] text-[var(--toss-gray-4)]">
-              <MenuIcon name="chat" className="h-8 w-8" />
-            </span>
-            <p className="font-semibold text-sm">대화 내용이 없습니다.</p>
-          </div>
+          <>
+            <div className="h-full flex flex-col items-center justify-center opacity-20">
+              <span className="mb-4 flex h-16 w-16 items-center justify-center rounded-[var(--radius-md)] bg-[var(--tab-bg)] text-[var(--toss-gray-4)]">
+                <MenuIcon name="chat" className="h-8 w-8" />
+              </span>
+              <p className="font-semibold text-sm">대화 내용이 없습니다.</p>
+            </div>
+            <div ref={scrollRef} />
+          </>
         ) : (
-          (() => {
-            let lastDateLabel = '';
-            let lastSenderId = '';
+          <div ref={timelineContentRef} data-testid="chat-timeline-window">
+          {effectiveWindowStart > 0 ? (
+            <div
+              data-testid="chat-timeline-window-sentinel"
+              className="my-1 flex items-center justify-center"
+              aria-hidden="true"
+            >
+              <span className="rounded-full bg-[var(--muted)] px-2.5 py-0.5 text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                이전 메시지 {effectiveWindowStart}개 · 스크롤하여 더 보기
+              </span>
+            </div>
+          ) : null}
+          {loadingOlderMessages ? (
+            <div
+              data-testid="chat-timeline-loading-older"
+              className="my-1 flex items-center justify-center"
+            >
+              <span className="text-[10px] font-semibold text-[var(--toss-gray-3)]">
+                이전 메시지 불러오는 중…
+              </span>
+            </div>
+          ) : null}
+          {(() => {
+            let lastDateLabel = windowBoundarySeed.lastDateLabel;
+            let lastSenderId = windowBoundarySeed.lastSenderId;
 
-            return combinedTimeline.map((item) => {
+            return visibleTimeline.map((item) => {
               if (item.type === 'poll') {
                 const pollItem = item as PollItem;
                 const votes = pollVotes[pollItem.id] || {};
@@ -780,7 +1089,7 @@ function MessengerTimelineComponent({
                                   className={`mb-1 p-1.5 rounded-[var(--radius-md)] text-[11px] border-l-2 cursor-pointer hover:opacity-80 transition-opacity ${replyPreviewClass}`}
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    onScrollToMessage(msg.reply_to_id!);
+                                    handleScrollToMessage(msg.reply_to_id!);
                                   }}
                                 >
                                   {parent ? (
@@ -980,10 +1289,10 @@ function MessengerTimelineComponent({
                 </MessageActionsHost>
               );
             });
-          })()
+          })()}
+          <div ref={scrollRef} />
+          </div>
         )}
-
-        <div ref={scrollRef} />
       </div>
 
       {selectedRoomId && scrollDateLabel && (

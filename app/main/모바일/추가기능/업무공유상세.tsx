@@ -13,6 +13,11 @@ import type { ErpUser } from '@/types';
 import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import { logger } from '@/lib/logger';
+import {
+  BOARD_COMMENT_SELECT,
+  BOARD_POST_OPTIONAL_COLUMNS,
+  BOARD_POST_REQUIRED_SELECT_COLUMNS,
+  buildSelectColumns } from '@/app/main/기능부품/게시판공통';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
@@ -59,10 +64,19 @@ function MobileTaskShareDetail({
     setLoading(true);
     try {
       const [{ data: post, error: postErr }, { data: comm }] = await Promise.all([
-        db.from('board_posts').select('*').eq('id', postId).maybeSingle(),
+        db
+          .from('board_posts')
+          .select(
+            buildSelectColumns(
+              BOARD_POST_REQUIRED_SELECT_COLUMNS,
+              BOARD_POST_OPTIONAL_COLUMNS,
+            ),
+          )
+          .eq('id', postId)
+          .maybeSingle(),
         db
           .from('board_post_comments')
-          .select('*')
+          .select(BOARD_COMMENT_SELECT)
           .eq('post_id', postId)
           .order('created_at', { ascending: true })
           .limit(100),

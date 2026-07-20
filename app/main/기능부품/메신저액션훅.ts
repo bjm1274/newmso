@@ -4,6 +4,7 @@ import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction 
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { db } from '@/lib/db-client';
+import { toUtcSqlTimestamp } from '@/lib/chat-read-cursors';
 import type { ChatMessage, ChatRoom } from '@/types';
 import {
   getConversationRoomIdsByRoomId,
@@ -175,7 +176,7 @@ export function useChatMessageActions({
     if (String(message.sender_id) === actorId) return;
     try {
       const targetRoomIds = getConversationRoomIdsByRoomId(message.room_id, chatRoomsRef.current as ChatRoom[]);
-      const readAt = new Date().toISOString();
+      const readAt = toUtcSqlTimestamp();
       const cursorWriteOk = await persistRoomReadCursors(
         targetRoomIds.length > 0 ? targetRoomIds : [String(message.room_id)],
         readAt,

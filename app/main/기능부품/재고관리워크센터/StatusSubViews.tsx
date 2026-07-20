@@ -9,6 +9,7 @@ import dynamic from 'next/dynamic';
 import { useState, useCallback, useEffect } from 'react';
 import { useAppData } from '@/app/main/contexts/AppDataContext';
 import { db } from '@/lib/db-client';
+import { INVENTORY_SELECT_COLUMNS } from '@/app/main/inventory-utils';
 import { StockChip } from './stock-workcenter-common';
 import type { StockStatusRow } from './stock-types';
 
@@ -36,15 +37,15 @@ function PurchaseOrderOverlay({ onClose }: { onClose: () => void }) {
   const fetchInventory = useCallback(async () => {
     const { data: inv } = await db
       .from('inventory')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select(INVENTORY_SELECT_COLUMNS)
+      .order('last_updated', { ascending: false });
     if (inv) setInventory(inv);
   }, []);
 
   const fetchSuppliers = useCallback(async () => {
     const { data: sups } = await db
       .from('suppliers')
-      .select('*')
+      .select('id, name, contact, contact_name, phone, email, category, address')
       .order('name');
     if (sups) setSuppliers(sups);
   }, []);

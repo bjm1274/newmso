@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useAppData } from '@/app/main/contexts/AppDataContext';
 import { db } from '@/lib/db-client';
+import { INVENTORY_SELECT_COLUMNS } from '@/app/main/inventory-utils';
 import {
   KpiRow,
   StockTabs,
@@ -49,7 +50,7 @@ export default function MasterWorkcenter() {
   const [suppliers, setSuppliers] = useState<any[]>([]);
 
   const fetchInventory = useCallback(async () => {
-    let q = db.from('inventory').select('*').order('name');
+    let q = db.from('inventory').select(INVENTORY_SELECT_COLUMNS).order('item_name');
     if (userCompany && userCompany !== '전체') q = q.eq('company', userCompany);
     const { data } = await q;
     if (data) setInventoryList(data);
@@ -57,7 +58,10 @@ export default function MasterWorkcenter() {
 
   const fetchSuppliers = useCallback(async () => {
     // suppliers 스키마에 company 컬럼 없음 — 전역 거래처 목록
-    const { data } = await db.from('suppliers').select('*').order('name');
+    const { data } = await db
+      .from('suppliers')
+      .select('id, name, contact, contact_name, phone, email, category, address, business_number')
+      .order('name');
     if (data) setSuppliers(data);
   }, []);
 

@@ -23,6 +23,7 @@ import {
   subscribeRealtime,
   type TableFilter } from '@/lib/realtime-bus';
 import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
+import { toUtcSqlTimestamp } from '@/lib/chat-read-cursors';
 import { fetchAllChatRooms } from '@/app/main/기능부품/chatQueryService';
 import {
   fetchChatUnreadCountsByRoom,
@@ -38,6 +39,7 @@ import {
   getGroupChatRoomBadgeText,
   toChatDate,
   getDirectRoomMembersKey,
+  getConversationRoomIdsByRoomId,
   getConversationUnreadCountForRoom,
   type MessageRetryPayload } from '@/app/main/기능부품/메신저유틸';
 import { getKoreanTodayString, formatKoreanDateKey } from '@/lib/seoul-time';
@@ -168,10 +170,12 @@ export function useChatRoomsForMobile(
 
       const dedupedList = Array.from(dedupedRooms.values());
 
+      // PC와 동일: 중복 direct 방까지 전부 집계한 뒤 표시 시 합산.
+      // dedupedList만 넘기면 형제 방 unread/활성방 zeroing이 누락된다.
       let counts: Record<string, number> = {};
       try {
         counts = await fetchChatUnreadCountsByRoom(db, {
-          rooms: dedupedList,
+          rooms: visible,
           userId: currentUserId,
           activeRoomId: activeRoomIdRef.current });
       } catch {
@@ -180,7 +184,7 @@ export function useChatRoomsForMobile(
       const sorted = sortChatRoomsWithNoticeFirst(dedupedList);
       const merged: MobileChatRoom[] = sorted.map((room) => ({
         ...room,
-        unread_count: getConversationUnreadCountForRoom(room, counts, rawRooms) }));
+        unread_count: getConversationUnreadCountForRoom(room, counts, visible) }));
       // 폴링이 file:// 로 덮어쓰면 로컬 정리값 유지.
       // 로컬이 「삭제된 메시지입니다.」이면 그것도 폴링 dirty 값보다 우선.
       // last_message_at 은 정렬 안정성을 위해 서버 값을 우선(로컬이 더 최신일 때만 유지).
@@ -569,15 +573,24 @@ export function useChatMessagesForRoom(
       return;
     }
     // 본인 마지막 메시지여도 커서 갱신 — 미읽음 배지 고착 방지
-    // SQL 포맷으로 전송 (서버도 정규화하지만, 클라·DB 혼재 방지)
-    const lastReadAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    // PC와 동일: D1 SQL 포맷 + 동일 상대 direct 형제 방까지 일괄 읽음
+    const lastReadAt = toUtcSqlTimestamp();
     let cancelled = false;
     void (async () => {
       try {
+        let targetRoomIds = [roomId];
+        try {
+          const { data: roomsData } = await fetchAllChatRooms();
+          const expanded = getConversationRoomIdsByRoomId(roomId, roomsData || []);
+          if (expanded.length > 0) targetRoomIds = expanded;
+        } catch {
+          // 캐시 조회 실패 시 현재 방만 갱신
+        }
+        if (cancelled) return;
         await fetch('/api/chat/read-cursors', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ roomIds: [roomId], readAt: lastReadAt }),
+          body: JSON.stringify({ roomIds: targetRoomIds, readAt: lastReadAt }),
           credentials: 'same-origin' });
         if (!cancelled) {
           pokeChannel('mobile-chat-rooms-list');

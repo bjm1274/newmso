@@ -258,8 +258,17 @@ export default function PurchaseOrderManagement({
         { data: purchaseOrderRows, error: purchaseOrderError },
         { data: approvalRows, error: approvalError },
       ] = await Promise.all([
-        db.from('purchase_orders').select('*').order('created_at', { ascending: false }),
-        db.from('approvals').select('*').eq('type', '비품구매').order('created_at', { ascending: false }),
+        db
+          .from('purchase_orders')
+          .select(
+            'id, created_at, supplier_name, items, status, total_amount, notes, expected_delivery_date, received_qty, inspection_status, inspected_at, inspected_by_name',
+          )
+          .order('created_at', { ascending: false }),
+        db
+          .from('approvals')
+          .select('id, created_at, status, content, meta_data, type')
+          .eq('type', '비품구매')
+          .order('created_at', { ascending: false }),
       ]);
 
       if (purchaseOrderError) throw purchaseOrderError;

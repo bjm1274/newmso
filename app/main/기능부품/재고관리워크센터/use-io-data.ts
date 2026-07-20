@@ -122,16 +122,24 @@ export function useIOData(userCompany?: string): IOWorkcenterData & { refresh: (
 
         let logsQ = db
           .from('inventory_logs')
-          .select('*')
+          .select(
+            'id, item_id, inventory_id, change_type, type, quantity, created_at, actor_name, department, location, notes, company',
+          )
           .gte('created_at', todayKey)
           .order('created_at', { ascending: false })
           .limit(50);
         let ordersQ = db
           .from('purchase_orders')
-          .select('*')
+          .select(
+            'id, supplier_name, items, status, total_amount, created_at, expected_delivery_date, requester_company',
+          )
           .order('created_at', { ascending: false })
           .limit(50);
-        let suppliersQ = db.from('suppliers').select('*').order('name').limit(30);
+        let suppliersQ = db
+          .from('suppliers')
+          .select('id, name, category, contact_name, phone')
+          .order('name')
+          .limit(30);
         let invQ = db.from('inventory').select('id, item_name, name').limit(2000);
         if (companyFilter) {
           // schema: inventory/inventory_logs.company, purchase_orders.requester_company

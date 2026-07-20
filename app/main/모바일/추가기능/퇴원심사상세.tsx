@@ -41,7 +41,9 @@ export default function 퇴원심사상세({
     try {
       const { data, error } = await db
         .from('discharge_reviews')
-        .select('*')
+        .select(
+          'id, patient_name, birth_date, gender, department, admission_date, discharge_date, diagnosis, status, reviewer_id, reviewer_name, created_at, ai_analysis, items',
+        )
         .eq('id', reviewId)
         .maybeSingle();
       if (error) throw error;

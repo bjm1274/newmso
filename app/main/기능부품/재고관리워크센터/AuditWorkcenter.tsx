@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useAppData } from '@/app/main/contexts/AppDataContext';
 import { db } from '@/lib/db-client';
+import { INVENTORY_SELECT_COLUMNS } from '@/app/main/inventory-utils';
 import {
   KpiRow,
   WorkcenterNotes,
@@ -28,7 +29,7 @@ export default function AuditWorkcenter() {
   const [inventoryList, setInventoryList] = useState<any[]>([]);
 
   const fetchInventory = useCallback(async () => {
-    let q = db.from('inventory').select('*').order('name');
+    let q = db.from('inventory').select(INVENTORY_SELECT_COLUMNS).order('item_name');
     if (userCompany && userCompany !== '전체') q = q.eq('company', userCompany);
     const { data } = await q;
     if (data) setInventoryList(data);

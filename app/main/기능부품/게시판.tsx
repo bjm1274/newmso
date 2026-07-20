@@ -11,7 +11,6 @@ import { db } from '@/lib/db-client';
 import { subscribeRealtimeBatched } from '@/lib/realtime-bus';
 import { withMissingColumnFallback, withMissingColumnsFallback } from '@/lib/db-compat';
 import {
-  buildStorageInlineUrl,
   buildStorageDownloadUrl,
   shouldUseManagedBrowserDownload,
   triggerManagedBrowserDownload } from '@/lib/object-storage-url';
@@ -31,7 +30,6 @@ import {
   BOARD_COMMENT_SELECT,
   BOARD_CHAT_ROOM_SELECT } from './게시판공통';
 import {
-  BOARD_POST_STATUSES,
   buildAttachmentMetaContent,
   buildBoardMetaContent,
   buildScheduleMetaContent,
@@ -39,7 +37,6 @@ import {
   buildSelectColumns,
   formatScheduledPublishInputValue,
   getBoardPostAuthorSignal,
-  getBoardStatusTone,
   isMissingBoardReadStorageError,
   isScheduleBoardType,
   isScheduledNoticePending,
@@ -58,8 +55,7 @@ import {
   type StaffSummary } from './게시판-view-utils';
 import { isAnonymousReadStatusPost, VALID_BODY_IDS } from './게시판/post-helpers';
 import { useIsMobile } from '@/app/components/useIsMobile';
-import type { BoardPoll, BoardPollPrizeWinner } from './게시판서브/board-poll-prize';
-import { togglePollVote } from './게시판서브/board-poll-vote';
+import type { BoardPoll } from './게시판서브/board-poll-prize';
 import { toggleBoardPostLike } from './게시판서브/board-post-like';
 import { insertBoardPost } from './게시판서브/create-board-post';
 
@@ -80,10 +76,13 @@ const BoardScheduleCalendar = dynamic(() => import('./게시판서브/BoardSched
   loading: BoardSecondaryLoading });
 const ReadStatusModal = dynamic(() => import('./게시판/ReadStatusModal'), {
   ssr: false });
-const SmartDatePicker = dynamic(() => import('./공통/SmartDatePicker'), {
-  ssr: false });
-const CommentComposerSticky = dynamic(() => import('@/app/components/CommentComposerSticky'), {
-  ssr: false });
+// compose / detail — 목록 첫 페인트에서 제외 (열릴 때만 로드)
+const BoardComposePanel = dynamic(() => import('./게시판서브/BoardComposePanel'), {
+  ssr: false,
+  loading: BoardSecondaryLoading });
+const BoardDetailPanel = dynamic(() => import('./게시판서브/BoardDetailPanel'), {
+  ssr: false,
+  loading: BoardSecondaryLoading });
 
 interface BoardViewProps {
   user: StaffMember | null;
@@ -1525,716 +1524,101 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
       ) : (
         <div className="flex-1 flex flex-col min-w-0 overflow-y-auto custom-scrollbar p-4 md:p-4 space-y-4 md:space-y-4 pb-24 md:pb-8">
           <h2 className="text-xl font-bold text-[var(--foreground)]">{activeBoard}</h2>
-          {/* 새 게시물 작성 폼 (업무가이드일 때는 표시 안함) */}
+          {/* 새 게시물 작성 폼 (업무가이드일 때는 표시 안함) — dynamic split */}
           {showNewPost && activeBoard !== '업무가이드' && (
-            <div data-testid="board-new-post-form" className="bg-[var(--card)] p-4 md:p-4 border border-[var(--border)] shadow-sm rounded-[var(--radius-lg)] space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h3 className="text-lg font-bold text-[var(--foreground)]">새 게시물 작성</h3>
-                {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!VALID_BODY_IDS.has(selectedBodyPart)) setSelectedBodyPart('all');
-                      setShowBodyPicker(true);
-                    }}
-                    className="px-4 py-2 rounded-full bg-[var(--card)] border border-[var(--border)] text-base font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)] shrink-0"
-                  >
-                    👤 사람 모형으로 선택
-                  </button>
-                )}
-              </div>
-
-              <div className="space-y-4">
-                {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
-                  <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)]/60 p-3">
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-[11px] font-black uppercase tracking-widest text-[var(--toss-gray-3)]">기본 정보</p>
-                      </div>
-                      <span className="rounded-[var(--radius-sm)] bg-[var(--accent)] px-2 py-1 text-[10px] font-black text-white">필수</span>
-                    </div>
-                    <div>
-                      <div className="space-y-3">
-                        <select
-                          value=""
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            if (!v) return;
-                            setTitle(v);
-                          }}
-                          className="w-full p-3 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
-                        >
-                          <option value="">
-                            {activeBoard === '수술일정'
-                              ? '자주 쓰는 수술명 선택 (부위 선택 또는 사람 모형에서 선택 가능)'
-                              : '자주 쓰는 검사명 선택 (부위 선택 또는 사람 모형에서 선택 가능)'}
-                          </option>
-                          {filteredTemplates.map((t) => (
-                            <option key={t.id} value={t.name}>
-                              {t.name}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="flex gap-2 items-stretch">
-                          <input
-                            data-testid="board-schedule-title"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            placeholder={
-                              activeBoard === '수술일정'
-                                ? '수술명을 입력하거나 위에서 선택하세요.'
-                                : '검사명을 입력하거나 위에서 선택하세요.'
-                            }
-                            className="flex-1 min-w-0 p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
-                          />
-                          <div className="flex rounded-[var(--radius-md)] border border-[var(--border)] overflow-hidden bg-[var(--muted)] shrink-0 min-w-[120px]">
-                            <button
-                              type="button"
-                              onClick={() => setScheduleSide(scheduleSide === '좌' ? '' : '좌')}
-                              className={`flex-1 min-w-[56px] px-4 py-3 text-sm font-bold transition-colors ${scheduleSide === '좌' ? 'bg-[var(--accent)] text-white' : 'text-[var(--toss-gray-4)] hover:bg-[var(--border)]'}`}
-                            >
-                              좌
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setScheduleSide(scheduleSide === '우' ? '' : '우')}
-                              className={`flex-1 min-w-[56px] px-4 py-3 text-sm font-bold transition-colors ${scheduleSide === '우' ? 'bg-[var(--accent)] text-white' : 'text-[var(--toss-gray-4)] hover:bg-[var(--border)]'}`}
-                            >
-                              우
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {(activeBoard === '수술일정' || activeBoard === 'MRI일정') ? (
-                  <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)]/60 p-3">
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-[11px] font-black uppercase tracking-widest text-[var(--toss-gray-3)]">일정</p>
-                      </div>
-                      <span className="rounded-[var(--radius-sm)] bg-[var(--accent)] px-2 py-1 text-[10px] font-black text-white">필수</span>
-                    </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label htmlFor="board-schedule-date" className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">날짜 (YYYY-MM-DD)</label>
-                        <SmartDatePicker
-                          data-testid="board-schedule-date"
-                          value={scheduleDate}
-                          onChange={setScheduleDate}
-                          placeholder="0000-00-00"
-                          inputClassName="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
-                        />
-                      </div>
-                      <div>
-                        <span id="board-schedule-time-label" className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">시간</span>
-                        <div className="grid grid-cols-3 gap-2" role="group" aria-labelledby="board-schedule-time-label">
-                          <select
-                            data-testid="board-schedule-period"
-                            aria-label="오전/오후"
-                            value={schedulePeriod}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              setSchedulePeriod(v);
-                              updateScheduleTime(v, scheduleHour, scheduleMinute);
-                            }}
-                            className="w-full p-3 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
-                          >
-                            <option value="">오전/오후</option>
-                            <option value="오전">오전</option>
-                            <option value="오후">오후</option>
-                          </select>
-                          <select
-                            data-testid="board-schedule-hour"
-                            aria-label="시간"
-                            value={scheduleHour}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              setScheduleHour(v);
-                              updateScheduleTime(schedulePeriod, v, scheduleMinute);
-                            }}
-                            className="w-full p-3 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
-                          >
-                            <option value="">시간</option>
-                            {Array.from({ length: 12 }).map((_, idx) => {
-                              const h = idx + 1;
-                              const v = String(h).padStart(2, '0');
-                              return (
-                                <option key={v} value={v}>{v}시</option>
-                              );
-                            })}
-                          </select>
-                          <select
-                            data-testid="board-schedule-minute"
-                            aria-label="분"
-                            value={scheduleMinute}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              setScheduleMinute(v);
-                              updateScheduleTime(schedulePeriod, scheduleHour, v);
-                            }}
-                            className="w-full p-3 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
-                          >
-                            <option value="">분</option>
-                            <option value="00">00분</option>
-                            <option value="30">30분</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label htmlFor="board-schedule-room" className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">수술실/검사실</label>
-                        <input id="board-schedule-room" value={scheduleRoom} onChange={e => setScheduleRoom(e.target.value)} placeholder="예: 수술실 1" className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20" />
-                      </div>
-                      <div>
-                        <label htmlFor="board-schedule-patient" className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">환자명</label>
-                        <input id="board-schedule-patient" value={schedulePatient} onChange={e => setSchedulePatient(e.target.value)} placeholder="환자명 입력" className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20" />
-                      </div>
-                      <div>
-                        <label htmlFor="board-schedule-chart" className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">차트번호</label>
-                        <input id="board-schedule-chart" value={scheduleChartNo} onChange={e => setScheduleChartNo(e.target.value)} placeholder="예: 12345" className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border-none outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20" />
-                      </div>
-                    </div>
-                    {(activeBoard === '수술일정' || activeBoard === 'MRI일정') && (
-                      <div className="space-y-3">
-                        <label className="text-[15px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-1.5 block">
-                          {activeBoard === '수술일정' ? '수술 관련 체크' : '촬영 관련 체크'}
-                        </label>
-                        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-base font-bold text-[var(--toss-gray-4)]">
-                          <label className="inline-flex items-center gap-3 cursor-pointer shrink-0">
-                            <input
-                              type="checkbox"
-                              checked={scheduleFasting}
-                              onChange={(e) => setScheduleFasting(e.target.checked)}
-                              className="w-6 h-6 rounded border-[var(--border)]"
-                            />
-                            <span>금식 필요</span>
-                          </label>
-                          <span className="inline-flex items-center gap-x-6 shrink-0 flex-nowrap">
-                            <label className="inline-flex items-center gap-3 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={scheduleInpatient}
-                                onChange={(e) => setScheduleInpatient(e.target.checked)}
-                                className="w-6 h-6 rounded border-[var(--border)]"
-                              />
-                              <span>입원 예정</span>
-                            </label>
-                            <label className="inline-flex items-center gap-3 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={scheduleGuardian}
-                                onChange={(e) => setScheduleGuardian(e.target.checked)}
-                                className="w-6 h-6 rounded border-[var(--border)]"
-                              />
-                              <span>보호자 동반</span>
-                            </label>
-                          </span>
-                          <label className="inline-flex items-center gap-3 cursor-pointer shrink-0">
-                            <input
-                              type="checkbox"
-                              checked={scheduleCaregiver}
-                              onChange={(e) => setScheduleCaregiver(e.target.checked)}
-                              className="w-6 h-6 rounded border-[var(--border)]"
-                            />
-                            <span>간병인 배치</span>
-                          </label>
-                          <label className="inline-flex items-center gap-3 cursor-pointer shrink-0">
-                            <input
-                              type="checkbox"
-                              checked={scheduleTransfusion}
-                              onChange={(e) => setScheduleTransfusion(e.target.checked)}
-                              className="w-6 h-6 rounded border-[var(--border)]"
-                            />
-                            <span>수혈 필요</span>
-                          </label>
-                        </div>
-                      </div>
-                    )}
-                    {activeBoard === 'MRI일정' && (
-                      <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] px-4 py-3">
-                        <label className="inline-flex items-center gap-3 cursor-pointer text-sm font-bold text-[var(--foreground)]">
-                          <input
-                            type="checkbox"
-                            checked={scheduleContrastRequired}
-                            onChange={(e) => setScheduleContrastRequired(e.target.checked)}
-                            className="h-5 w-5 rounded border-[var(--border)]"
-                          />
-                          <span>조영제 필요</span>
-                        </label>
-                      </div>
-                    )}
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <span className={`rounded-[var(--radius-md)] px-2 py-1 text-[11px] font-semibold ${getBoardStatusTone(postStatus)}`}>
-                        {normalizeBoardPostStatus(postStatus)}
-                      </span>
-                    </div>
-                  </div>
-                  </div>
-                ) : (
-                  <>
-                    {activeBoard === '경조사' ? (
-                      // ─── [경조사 소식 전용 폼] ───
-                      <div className="space-y-4">
-                        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)]/60 p-3">
-                          <div className="mb-3 flex items-center justify-between gap-2">
-                            <div>
-                              <p className="text-[11px] font-black uppercase tracking-widest text-[var(--toss-gray-3)]">경조사 소식 입력</p>
-                            </div>
-                            <span className="rounded-[var(--radius-sm)] bg-[var(--accent)] px-2 py-1 text-[10px] font-black text-white">필수</span>
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">경조사 구분</label>
-                              <select
-                                value={familyEventType}
-                                onChange={(e) => setFamilyEventType(e.target.value)}
-                                className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
-                              >
-                                <option value="결혼">결혼 (축하)</option>
-                                <option value="부고">부고 (장례/위로)</option>
-                                <option value="출산">출산 (축하)</option>
-                                <option value="승진">승진 (축하)</option>
-                                <option value="기타">기타 경조사</option>
-                              </select>
-                            </div>
-                            
-                            <div>
-                              <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">대상 직원 (부서/이름/직급)</label>
-                              <input
-                                value={familyEventTarget}
-                                onChange={(e) => setFamilyEventTarget(e.target.value)}
-                                placeholder="예: 인사팀 홍길동 대리"
-                                className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                            <div>
-                              <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">일시 및 시간</label>
-                              <input
-                                value={familyEventDate}
-                                onChange={(e) => setFamilyEventDate(e.target.value)}
-                                placeholder="예: 2026년 6월 15일 (월) 낮 12시"
-                                className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
-                              />
-                            </div>
-                            
-                            <div>
-                              <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">장소 (식장/장례식장)</label>
-                              <input
-                                value={familyEventLocation}
-                                onChange={(e) => setFamilyEventLocation(e.target.value)}
-                                placeholder="예: 행복 웨딩홀 2층 / 사랑 장례식장 특1호실"
-                                className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="mt-4">
-                            <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">마음 전하실 곳 (계좌번호/연락처 - 선택)</label>
-                            <input
-                              value={familyEventAccount}
-                              onChange={(e) => setFamilyEventAccount(e.target.value)}
-                              placeholder="예: 신한은행 110-123-456789 (홍길동)"
-                              className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)]/60 p-3">
-                          <div className="mb-3 flex items-center justify-between gap-2">
-                            <div>
-                              <p className="text-[11px] font-black uppercase tracking-widest text-[var(--toss-gray-3)]">상세 메시지</p>
-                            </div>
-                            <span className="rounded-[var(--radius-sm)] bg-[var(--muted)] px-2 py-1 text-[10px] font-black text-[var(--toss-gray-3)]">선택</span>
-                          </div>
-                          <textarea
-                            value={familyEventDetail}
-                            onChange={(e) => setFamilyEventDetail(e.target.value)}
-                            placeholder="예: 많은 축하와 따뜻한 격려 부탁드립니다."
-                            className="w-full h-32 p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none text-sm font-bold leading-relaxed focus:ring-2 focus:ring-[var(--accent)]/20 resize-none"
-                          />
-                        </div>
-
-                        <div className="flex flex-wrap gap-4 items-center py-2">
-                          <label className="inline-flex items-center gap-2 cursor-pointer text-sm font-bold text-[var(--toss-gray-4)]">
-                            <input
-                              type="checkbox"
-                              checked={hasPoll}
-                              onChange={(e) => setHasPoll(e.target.checked)}
-                              className="w-4 h-4 rounded border-[var(--border)] accent-[var(--accent)]"
-                            />
-                            <span>📊 투표 추가</span>
-                          </label>
-                        </div>
-                      </div>
-                    ) : activeBoard === '공지사항' ? (
-                      // ─── [공지사항 전용 폼] ───
-                      <div className="space-y-4">
-                        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)]/60 p-3">
-                          <div className="mb-3 flex items-center justify-between gap-2">
-                            <div>
-                              <p className="text-[11px] font-black uppercase tracking-widest text-[var(--toss-gray-3)]">공지사항 기본 정보</p>
-                            </div>
-                            <span className="rounded-[var(--radius-sm)] bg-[var(--accent)] px-2 py-1 text-[10px] font-black text-white">필수</span>
-                          </div>
-                          
-                          <div>
-                            <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">제목</label>
-                            <input
-                              data-testid="board-new-post-title"
-                              value={title}
-                              onChange={(e) => setTitle(e.target.value)}
-                              placeholder="공지사항 제목을 입력하세요."
-                              className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
-                            />
-                          </div>
-
-                          <div className="mt-4 flex flex-wrap gap-4 items-center py-2">
-                            <label className="inline-flex items-center gap-2 cursor-pointer text-sm font-bold text-[var(--toss-gray-4)]">
-                              <input
-                                type="checkbox"
-                                checked={postStatus === '중요'}
-                                onChange={(e) => setPostStatus(e.target.checked ? '중요' : '게시중')}
-                                className="w-4 h-4 rounded border-[var(--border)] accent-[var(--accent)]"
-                              />
-                              <span>📌 중요 공지로 등록 (최상단 고정 및 강조)</span>
-                            </label>
-                            <label className="inline-flex items-center gap-2 cursor-pointer text-sm font-bold text-[var(--toss-gray-4)]">
-                              <input
-                                type="checkbox"
-                                checked={hasPoll}
-                                onChange={(e) => setHasPoll(e.target.checked)}
-                                className="w-4 h-4 rounded border-[var(--border)] accent-[var(--accent)]"
-                              />
-                              <span>📊 투표 추가</span>
-                            </label>
-                          </div>
-
-                          {canScheduleNoticePost && (
-                            <div className="mt-4">
-                              <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">예약 게시 시간</label>
-                              <input
-                                type="datetime-local"
-                                value={scheduledPublishAt}
-                                onChange={(e) => setScheduledPublishAt(e.target.value)}
-                                className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
-                              />
-                              <p className="mt-2 text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                                비워두면 즉시 게시되고, 지정하면 해당 시각 전까지는 관리자 이상에게만 보입니다.
-                              </p>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)]/60 p-3">
-                          <div className="mb-3 flex items-center justify-between gap-2">
-                            <div>
-                              <p className="text-[11px] font-black uppercase tracking-widest text-[var(--toss-gray-3)]">공지 내용</p>
-                            </div>
-                            <span className="rounded-[var(--radius-sm)] bg-[var(--accent)] px-2 py-1 text-[10px] font-black text-white">필수</span>
-                          </div>
-                          <textarea
-                            data-testid="board-new-post-content"
-                            value={content}
-                            onChange={(e) => setContent(e.target.value)}
-                            placeholder="공지 내용을 입력하세요."
-                            className="w-full h-48 p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none text-sm font-bold leading-relaxed focus:ring-2 focus:ring-[var(--accent)]/20 resize-none"
-                          />
-                        </div>
-                      </div>
-                    ) : (
-                      // ─── [일반 게시판 (자유게시판 등)] ───
-                      <div className="space-y-4">
-                        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)]/60 p-3">
-                          <div className="mb-3 flex items-center justify-between gap-2">
-                            <div>
-                              <p className="text-[11px] font-black uppercase tracking-widest text-[var(--toss-gray-3)]">게시글 기본 정보</p>
-                            </div>
-                            <span className="rounded-[var(--radius-sm)] bg-[var(--accent)] px-2 py-1 text-[10px] font-black text-white">필수</span>
-                          </div>
-                          
-                          <div>
-                            <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">제목</label>
-                            <input
-                              data-testid="board-new-post-title"
-                              value={title}
-                              onChange={(e) => setTitle(e.target.value)}
-                              placeholder="제목을 입력하세요."
-                              className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
-                            />
-                          </div>
-
-                          <div className="mt-4">
-                            <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">태그 (쉼표로 구분)</label>
-                            <input
-                              value={tagsInput}
-                              onChange={(e) => setTagsInput(e.target.value)}
-                              placeholder="예: 일상, 질문, 추천"
-                              className="w-full p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)]/60 p-3">
-                          <div className="mb-3 flex items-center justify-between gap-2">
-                            <div>
-                              <p className="text-[11px] font-black uppercase tracking-widest text-[var(--toss-gray-3)]">게시글 내용</p>
-                            </div>
-                            <span className="rounded-[var(--radius-sm)] bg-[var(--accent)] px-2 py-1 text-[10px] font-black text-white">필수</span>
-                          </div>
-                          <textarea
-                            data-testid="board-new-post-content"
-                            value={content}
-                            onChange={(e) => setContent(e.target.value)}
-                            placeholder="내용을 입력하세요."
-                            className="w-full h-48 p-4 bg-[var(--muted)] rounded-[var(--radius-md)] border border-[var(--border)] outline-none text-sm font-bold leading-relaxed focus:ring-2 focus:ring-[var(--accent)]/20 resize-none"
-                          />
-                        </div>
-
-                        <div className="flex flex-wrap gap-4 items-center py-2">
-                          {activeBoard === '자유게시판' && (
-                            <label className="inline-flex items-center gap-2 cursor-pointer text-sm font-bold text-[var(--toss-gray-4)]">
-                              <input
-                                type="checkbox"
-                                checked={isAnonymous}
-                                onChange={(e) => setIsAnonymous(e.target.checked)}
-                                className="w-4 h-4 rounded border-[var(--border)] accent-[var(--accent)]"
-                              />
-                              <span>👤 익명 작성</span>
-                            </label>
-                          )}
-                          <label className="inline-flex items-center gap-2 cursor-pointer text-sm font-bold text-[var(--toss-gray-4)]">
-                            <input
-                              type="checkbox"
-                              checked={hasPoll}
-                              onChange={(e) => setHasPoll(e.target.checked)}
-                              className="w-4 h-4 rounded border-[var(--border)] accent-[var(--accent)]"
-                            />
-                            <span>📊 투표 추가</span>
-                          </label>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* 투표 설정 폼 (투표 추가가 켜진 경우에만) */}
-                    {hasPoll && !isScheduleBoardType(activeBoard) && (
-                      <div className="rounded-xl border border-[var(--accent)]/20 bg-[var(--toss-blue-light)]/30 p-4 space-y-3">
-                        <p className="text-xs font-bold text-[var(--accent)]">투표 설정</p>
-                        <input
-                          value={pollQuestion}
-                          onChange={(e) => setPollQuestion(e.target.value)}
-                          placeholder="투표 질문 (비워두면 게시글 제목 사용)"
-                          className="w-full p-3 bg-[var(--card)] rounded-lg border border-[var(--border)] outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
-                        />
-                        <div className="space-y-2">
-                          {pollOptions.map((opt, i) => (
-                            <div key={i} className="flex items-center gap-2">
-                              <span className="text-xs font-bold text-[var(--toss-gray-3)] w-5 text-center">{i + 1}</span>
-                              <input
-                                value={opt}
-                                onChange={(e) => setPollOptions((prev) => prev.map((o, idx) => idx === i ? e.target.value : o))}
-                                placeholder={`항목 ${i + 1}`}
-                                className="flex-1 p-2.5 bg-[var(--card)] rounded-lg border border-[var(--border)] outline-none text-sm font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
-                              />
-                              {pollOptions.length > 2 && (
-                                <button type="button" onClick={() => setPollOptions((prev) => prev.filter((_, idx) => idx !== i))} className="text-red-500 text-xs font-bold hover:text-red-700">삭제</button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                        {pollOptions.length < 10 && (
-                          <button type="button" onClick={() => setPollOptions((prev) => [...prev, ''])} className="text-xs font-bold text-[var(--accent)] hover:underline">+ 항목 추가</button>
-                        )}
-                        <div className="flex flex-wrap gap-4">
-                          <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-[var(--toss-gray-4)]">
-                            <input type="checkbox" checked={pollAnonymous} onChange={(e) => setPollAnonymous(e.target.checked)} className="w-4 h-4 rounded accent-[var(--accent)]" />
-                            익명 투표
-                          </label>
-                          <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-[var(--toss-gray-4)]">
-                            <input type="checkbox" checked={pollMultiple} onChange={(e) => setPollMultiple(e.target.checked)} className="w-4 h-4 rounded accent-[var(--accent)]" />
-                            복수 선택 허용
-                          </label>
-                        </div>
-                        {/* 상품 추첨 섹션 */}
-                        <div className="pt-1 border-t border-[var(--border)]">
-                          <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-[var(--toss-gray-4)]">
-                            <input
-                              type="checkbox"
-                              id="board-poll-prize-enabled"
-                              checked={pollPrizeEnabled}
-                              onChange={(e) => setPollPrizeEnabled(e.target.checked)}
-                              className="w-4 h-4 rounded accent-[var(--accent)]"
-                            />
-                            상품 추첨 진행
-                          </label>
-                          {pollPrizeEnabled && (
-                            <div className="mt-2 grid grid-cols-2 gap-2">
-                              <div>
-                                <label htmlFor="board-poll-prize-count" className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">당첨 인원</label>
-                                <input
-                                  id="board-poll-prize-count"
-                                  type="number"
-                                  min={1}
-                                  value={pollPrizeWinnerCount}
-                                  onChange={(e) => setPollPrizeWinnerCount(Math.max(1, Number(e.target.value) || 1))}
-                                  className="w-full p-2.5 bg-[var(--card)] rounded-lg border border-[var(--border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
-                                />
-                              </div>
-                              <div>
-                                <label htmlFor="board-poll-prize-name" className="block text-[11px] font-semibold text-[var(--toss-gray-3)] mb-1">상품명</label>
-                                <input
-                                  id="board-poll-prize-name"
-                                  type="text"
-                                  value={pollPrizeName}
-                                  onChange={(e) => setPollPrizeName(e.target.value)}
-                                  placeholder="예: 아메리카노 쿠폰"
-                                  className="w-full p-2.5 bg-[var(--card)] rounded-lg border border-[var(--border)] outline-none text-xs font-bold focus:ring-2 focus:ring-[var(--accent)]/20"
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    <div>
-                      <label className="text-[11px] font-semibold text-[var(--toss-gray-4)] uppercase tracking-widest mb-2 block">사진·동영상·파일 첨부</label>
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.bmp,.heic,.heif,.avif,video/*,.mp4,.mov,.webm,.m4v,.pdf,.doc,.docx,.xls,.xlsx,.hwp,.hwpx,.zip"
-                        onChange={(e) => {
-                          const files = e.target.files ? Array.from(e.target.files) : [];
-                          setAttachmentFiles((prev) => [...prev, ...files].slice(0, 10));
-                          e.target.value = '';
-                        }}
-                        className="w-full text-sm font-bold text-[var(--toss-gray-4)] file:mr-3 file:py-2 file:px-4 file:rounded-[var(--radius-md)] file:border-0 file:bg-[var(--toss-blue-light)] file:text-[var(--accent)] file:font-bold"
-                      />
-                      {(existingAttachmentItems.length > 0 || attachmentFiles.length > 0) && (
-                        <div className="mt-3 space-y-3">
-                          {existingAttachmentItems.length > 0 && (
-                            <div className="space-y-2">
-                              <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
-                                기존 첨부파일 {existingAttachmentItems.length}개
-                              </p>
-                              <div className="flex flex-wrap gap-2">
-                                {existingAttachmentItems.map((att, i) => (
-                                  <div
-                                    key={`${att.url}-${i}`}
-                                    className="flex max-w-full items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] px-3 py-2"
-                                  >
-                                    <a
-                                      href={buildStorageDownloadUrl(att.url, att.name ?? '')}
-                                      onClick={(event) => void handleAttachmentDownloadClick(event, att.url, att.name ?? '')}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      download={att.name ?? 'download'}
-                                      className="max-w-[240px] truncate text-xs font-bold text-[var(--accent)] hover:underline"
-                                      title={att.name}
-                                    >
-                                      {att.type === 'image' ? '🖼️ ' : att.type === 'video' ? '🎬 ' : '📎 '}
-                                      {att.name}
-                                    </a>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        setExistingAttachmentItems((prev) => prev.filter((_, idx) => idx !== i))
-                                      }
-                                      className="shrink-0 rounded border border-red-500/20 px-2.5 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-500/10"
-                                    >
-                                      삭제
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          <div className="flex flex-wrap gap-3">
-                            {attachmentFiles.map((f, i) => {
-                              const isImg = f.type.startsWith('image/');
-                              const isVideo = f.type.startsWith('video/');
-                              const url = typeof URL !== 'undefined' ? URL.createObjectURL(f) : '';
-                              return (
-                                <div key={i} className="relative group">
-                                  {isImg && (
-                                    <img src={url} alt={f.name} className="w-24 h-24 object-cover rounded-[var(--radius-lg)] border border-[var(--border)]" />
-                                  )}
-                                  {isVideo && (
-                                    <video src={url} className="w-40 h-24 object-cover rounded-[var(--radius-lg)] border border-[var(--border)]" muted playsInline />
-                                  )}
-                                  {!isImg && !isVideo && (
-                                    <div className="w-24 h-24 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--muted)] flex items-center justify-center text-[11px] font-bold text-[var(--toss-gray-4)] truncate px-1">
-                                      📎 {f.name}
-                                    </div>
-                                  )}
-                                  <button
-                                    type="button"
-                                    onClick={() => setAttachmentFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                                    className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-red-500/100 text-white text-xs font-semibold flex items-center justify-center shadow hover:bg-red-600"
-                                  >
-                                    ×
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                          <ul className="space-y-1">
-                            {attachmentFiles.map((f, i) => (
-                              <li key={i} className="flex items-center gap-2 text-xs font-bold text-[var(--toss-gray-4)]">
-                                <span className="truncate flex-1">{f.name}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => setAttachmentFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                                  className="shrink-0 px-2.5 py-1.5 rounded border border-red-500/20 text-red-600 hover:bg-red-500/10 text-[11px]"
-                                >
-                                  삭제
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {isScheduleBoard && !normalizedDraftScheduleDate && (
-                <p className="text-[11px] font-semibold text-red-500">
-                  날짜를 선택해야만 수술일정/MRI일정을 등록할 수 있습니다.
-                </p>
-              )}
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowNewPost(false);
-                    resetForm();
-                  }}
-                  className="flex-1 py-4 bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--toss-gray-4)] rounded-[var(--radius-md)] font-bold text-sm transition-all"
-                >
-                  취소
-                </button>
-                <button
-                  type="button"
-                  data-testid="board-new-post-submit"
-                  onClick={handleNewPost}
-                  disabled={loading || !isScheduleDraftReady}
-                  className="flex-[2] py-4 bg-[var(--accent)] text-white rounded-[var(--radius-md)] font-bold text-sm shadow-sm hover:opacity-95 active:scale-[0.99] transition-all disabled:opacity-50"
-                >
-                  {loading ? '등록 중...' : '게시물 등록'}
-                </button>
-              </div>
-            </div>
+            <BoardComposePanel
+              activeBoard={activeBoard}
+              title={title}
+              setTitle={setTitle}
+              content={content}
+              setContent={setContent}
+              familyEventType={familyEventType}
+              setFamilyEventType={setFamilyEventType}
+              familyEventTarget={familyEventTarget}
+              setFamilyEventTarget={setFamilyEventTarget}
+              familyEventDate={familyEventDate}
+              setFamilyEventDate={setFamilyEventDate}
+              familyEventLocation={familyEventLocation}
+              setFamilyEventLocation={setFamilyEventLocation}
+              familyEventAccount={familyEventAccount}
+              setFamilyEventAccount={setFamilyEventAccount}
+              familyEventDetail={familyEventDetail}
+              setFamilyEventDetail={setFamilyEventDetail}
+              tagsInput={tagsInput}
+              setTagsInput={setTagsInput}
+              scheduledPublishAt={scheduledPublishAt}
+              setScheduledPublishAt={setScheduledPublishAt}
+              postStatus={postStatus}
+              setPostStatus={setPostStatus}
+              scheduleDate={scheduleDate}
+              setScheduleDate={setScheduleDate}
+              schedulePeriod={schedulePeriod}
+              setSchedulePeriod={setSchedulePeriod}
+              scheduleHour={scheduleHour}
+              setScheduleHour={setScheduleHour}
+              scheduleMinute={scheduleMinute}
+              setScheduleMinute={setScheduleMinute}
+              scheduleRoom={scheduleRoom}
+              setScheduleRoom={setScheduleRoom}
+              schedulePatient={schedulePatient}
+              setSchedulePatient={setSchedulePatient}
+              scheduleChartNo={scheduleChartNo}
+              setScheduleChartNo={setScheduleChartNo}
+              scheduleFasting={scheduleFasting}
+              setScheduleFasting={setScheduleFasting}
+              scheduleInpatient={scheduleInpatient}
+              setScheduleInpatient={setScheduleInpatient}
+              scheduleGuardian={scheduleGuardian}
+              setScheduleGuardian={setScheduleGuardian}
+              scheduleCaregiver={scheduleCaregiver}
+              setScheduleCaregiver={setScheduleCaregiver}
+              scheduleTransfusion={scheduleTransfusion}
+              setScheduleTransfusion={setScheduleTransfusion}
+              scheduleContrastRequired={scheduleContrastRequired}
+              setScheduleContrastRequired={setScheduleContrastRequired}
+              scheduleSide={scheduleSide}
+              setScheduleSide={setScheduleSide}
+              isAnonymous={isAnonymous}
+              setIsAnonymous={setIsAnonymous}
+              hasPoll={hasPoll}
+              setHasPoll={setHasPoll}
+              pollQuestion={pollQuestion}
+              setPollQuestion={setPollQuestion}
+              pollOptions={pollOptions}
+              setPollOptions={setPollOptions}
+              pollAnonymous={pollAnonymous}
+              setPollAnonymous={setPollAnonymous}
+              pollMultiple={pollMultiple}
+              setPollMultiple={setPollMultiple}
+              pollPrizeEnabled={pollPrizeEnabled}
+              setPollPrizeEnabled={setPollPrizeEnabled}
+              pollPrizeWinnerCount={pollPrizeWinnerCount}
+              setPollPrizeWinnerCount={setPollPrizeWinnerCount}
+              pollPrizeName={pollPrizeName}
+              setPollPrizeName={setPollPrizeName}
+              attachmentFiles={attachmentFiles}
+              setAttachmentFiles={setAttachmentFiles}
+              existingAttachmentItems={existingAttachmentItems}
+              setExistingAttachmentItems={setExistingAttachmentItems}
+              selectedBodyPart={selectedBodyPart}
+              setSelectedBodyPart={setSelectedBodyPart}
+              setShowBodyPicker={setShowBodyPicker}
+              filteredTemplates={filteredTemplates}
+              canScheduleNoticePost={canScheduleNoticePost}
+              isScheduleBoard={isScheduleBoard}
+              isScheduleDraftReady={isScheduleDraftReady}
+              normalizedDraftScheduleDate={normalizedDraftScheduleDate}
+              loading={loading}
+              updateScheduleTime={updateScheduleTime}
+              onCancel={() => {
+                setShowNewPost(false);
+                resetForm();
+              }}
+              onSubmit={() => {
+                void handleNewPost();
+              }}
+              handleAttachmentDownloadClick={handleAttachmentDownloadClick}
+            />
           )}
 
           {/* 수술/MRI용 사람 모형 선택 모달 - 사람 이미지 + 부위 하이라이트 */}
@@ -2371,502 +1755,39 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
           )}
 
           {selectedPost && (
-            <div data-testid="board-post-detail-overlay" className="fixed inset-0 z-[var(--z-modal)] flex items-end md:items-center justify-center bg-black/40 p-0 md:p-5">
-              <div data-testid="board-post-detail" className="w-full max-w-4xl max-h-[90dvh] overflow-y-auto bg-[var(--card)] border-0 md:border border-[var(--border)] rounded-t-[24px] md:rounded-[var(--radius-xl)] shadow-sm p-3 md:p-4 pb-8 space-y-4 md:space-y-5 text-[13px] md:text-[14px] safe-area-pb">
-                <div className="flex flex-col items-stretch gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] md:text-[12px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">
-                      {selectedPost.board_type as string}
-                    </p>
-                    <h3 className="flex flex-wrap items-center gap-2 text-lg font-semibold text-[var(--foreground)] md:text-xl break-words">
-                      <span className="break-words">{selectedPost.title}</span>
-                      {normalizeBoardPostStatus(selectedPost.status) === '중요' && (
-                        <span className="rounded-[var(--radius-md)] bg-red-500/10 px-2 py-1 text-[11px] font-bold text-red-600">
-                          중요
-                        </span>
-                      )}
-                    </h3>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-bold text-[var(--toss-gray-3)] md:text-[12px]">
-                      <span
-                        className={`flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold ${
-                          selectedPostAuthorSignal?.isAnonymous
-                            ? 'bg-[var(--muted)] text-[var(--toss-gray-3)]'
-                            : 'bg-[var(--toss-blue-light)] text-[var(--accent)]'
-                        }`}
-                      >
-                        {selectedPostAuthorSignal?.initials || '?'}
-                      </span>
-                      <span>
-                        작성자 {selectedPostAuthorSignal?.name || selectedPost.author_name || '익명'}
-                        {selectedPostAuthorSignal?.meta ? ` · ${selectedPostAuthorSignal.meta}` : ''}
-                      </span>
-                      <span>{new Date(selectedPost.created_at ?? '').toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</span>
-                    </div>
-                    {selectedPost.board_type === '공지사항' && selectedPost.scheduled_publish_at && (
-                      <p className="mt-1 text-[11px] md:text-[12px] font-bold text-amber-700">
-                        예약 게시: {new Date(selectedPost.scheduled_publish_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
-                        {isScheduledNoticePending(selectedPost, noticeVisibilityTick) ? ' · 게시 전' : ' · 게시됨'}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 md:shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => handleLike(selectedPost)}
-                      disabled={!!likingPostId}
-                      className={`px-3 py-1.5 rounded-[var(--radius-md)] border text-[11px] font-bold transition ${
-                        myLikedPostIds.has(String(selectedPost.id ?? '').trim())
-                          ? 'border-red-500/20 text-red-500 bg-red-500/10 hover:bg-red-500/20'
-                          : 'border-[var(--border)] text-[var(--toss-gray-3)] hover:text-red-400 hover:border-red-500/20'
-                      }`}
-                    >
-                      {myLikedPostIds.has(String(selectedPost.id ?? '').trim()) ? '♥' : '♡'} 좋아요 {(selectedPost.likes_count as number) ?? 0}
-                    </button>
-                    {!isAnonymousReadStatusPost(selectedPost) && (
-                      <button
-                        type="button"
-                        onClick={() => void openReadStatusModal(selectedPost)}
-                        className="px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--border)] text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
-                      >
-                        읽음 확인
-                      </button>
-                    )}
-                    {(canEditPost(selectedPost) || canDeletePost(selectedPost)) && (
-                      <>
-                        {canEditPost(selectedPost) && (
-                          <button
-                            type="button"
-                            onClick={() => handleEditPostStart(selectedPost)}
-                            className="px-3 py-1.5 rounded-[var(--radius-md)] border border-blue-100 text-[11px] font-bold text-blue-600 hover:bg-blue-500/10"
-                          >
-                            수정
-                          </button>
-                        )}
-                        {canDeletePost(selectedPost) && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeletePost(selectedPost)}
-                            className="px-3 py-1.5 rounded-[var(--radius-md)] border border-red-100 text-[11px] font-bold text-red-600 hover:bg-red-500/10"
-                          >
-                            삭제
-                          </button>
-                        )}
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      data-testid="board-post-detail-close"
-                      onClick={() => setSelectedPostId(null)}
-                      className="px-3 py-1.5 rounded-[var(--radius-md)] border border-[var(--border)] text-[11px] font-bold text-[var(--toss-gray-3)] hover:bg-[var(--muted)]"
-                    >
-                      닫기
-                    </button>
-                  </div>
-                </div>
-
-                {/* 투표 표시 */}
-                {((selectedPost as Record<string, unknown>).poll ? (() => {
-                  const poll = (selectedPost as Record<string, unknown>).poll as BoardPoll;
-                  const votes = ((selectedPost as Record<string, unknown>).poll_votes || {}) as Record<string, string[]>;
-                  const myId = effectiveBoardUserId;
-                  const totalVotes = Object.values(votes).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
-                  const isAuthor = String((selectedPost as Record<string, unknown>).author_id ?? '') === myId && myId !== '';
-                  const hasPrize = Boolean(poll.prize);
-                  const prizeWinners: BoardPollPrizeWinner[] = Array.isArray(poll.prizeWinners) ? poll.prizeWinners : [];
-                  const alreadyDrawn = prizeWinners.length > 0;
-                  const isDrawing = drawingPostId === selectedPost.id;
-
-                  const handlePostPollVote = async (optIdx: number) => {
-                    if (!myId) return;
-                    const nextVotes = await togglePollVote(
-                      selectedPost.id,
-                      optIdx,
-                      String(myId),
-                      votes,
-                      Boolean(poll.multiple),
-                    );
-                    if (!nextVotes) return;
-                    setPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, poll_votes: nextVotes } : p));
-                    setSelectedPostDetail((prev: BoardPost | null) => prev?.id === selectedPost.id ? { ...prev, poll_votes: nextVotes } : prev);
-                  };
-
-                  const handleDrawPrize = async () => {
-                    if (!isAuthor || !myId) return;
-                    setDrawingPostId(selectedPost.id);
-                    try {
-                      const { drawBoardPollPrize } = await import('./게시판서브/board-poll-prize');
-                      const result = await drawBoardPollPrize({
-                        postId: selectedPost.id,
-                        poll,
-                        pollVotes: votes,
-                        actorId: myId,
-                        actorName: user?.name ?? '관리자' });
-                      if (!result.ok) {
-                        toast(result.message, 'warning');
-                        return;
-                      }
-                      // 낙관적 갱신: poll.prizeWinners 반영
-                      const updatedPoll: BoardPoll = { ...poll, prizeWinners: result.winners };
-                      const updatedPollVotes = votes;
-                      setPosts((prev) => prev.map((p) =>
-                        p.id === selectedPost.id ? { ...p, poll: updatedPoll } : p,
-                      ));
-                      setSelectedPostDetail((prev: BoardPost | null) =>
-                        prev?.id === selectedPost.id ? { ...prev, poll: updatedPoll, poll_votes: updatedPollVotes } : prev,
-                      );
-                      // 댓글 목록 새로고침 (추첨 결과 댓글 표시)
-                      const { data: newComments } = await db
-                        .from('board_post_comments')
-                        .select(BOARD_COMMENT_SELECT)
-                        .eq('post_id', selectedPost.id)
-                        .order('created_at', { ascending: true });
-                      if (newComments) {
-                        setComments((prev) => ({ ...prev, [selectedPost.id]: newComments as BoardCommentRow[] }));
-                      }
-                      toast(`🎉 추첨 완료! 당첨자: ${result.winners.map((w) => w.name).join(', ')}`);
-                    } finally {
-                      setDrawingPostId(null);
-                    }
-                  };
-
-                  return (
-                    <div className="rounded-xl border border-[var(--accent)]/20 bg-[var(--toss-blue-light)]/20 p-4 space-y-3">
-                      <p className="text-sm font-bold text-[var(--foreground)]">{poll.question || selectedPost.title}</p>
-                      {poll.anonymous && <p className="text-[10px] font-semibold text-[var(--toss-gray-3)]">익명 투표</p>}
-                      <div className="space-y-2">
-                        {(poll.options || []).map((opt, i) => {
-                          const optVotes = Array.isArray(votes[String(i)]) ? votes[String(i)].length : 0;
-                          const pct = totalVotes > 0 ? Math.round((optVotes / totalVotes) * 100) : 0;
-                          const myVote = Array.isArray(votes[String(i)]) && votes[String(i)].includes(String(myId));
-                          return (
-                            <button key={i} type="button" onClick={() => void handlePostPollVote(i)} className={`w-full text-left rounded-lg border p-3 transition relative overflow-hidden ${myVote ? 'border-[var(--accent)] bg-[var(--accent)]/5' : 'border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)]/30'}`}>
-                              <div className="absolute inset-y-0 left-0 bg-[var(--accent)]/10 transition-all" style={{ width: `${pct}%` }} />
-                              <div className="relative flex justify-between items-center">
-                                <span className="text-sm font-bold">{myVote ? '✓ ' : ''}{opt}</span>
-                                <span className="text-xs font-bold text-[var(--toss-gray-3)]">{optVotes}표 ({pct}%)</span>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <p className="text-[10px] text-[var(--toss-gray-3)] font-semibold">총 {totalVotes}표 · {poll.multiple ? '복수 선택' : '단일 선택'}</p>
-                      {/* 상품 추첨 영역 */}
-                      {hasPrize && (
-                        <div className="border-t border-[var(--accent)]/10 pt-3 space-y-2">
-                          {alreadyDrawn ? (
-                            <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 space-y-0.5">
-                              <p className="text-xs font-bold text-amber-700">🎁 상품: {poll.prize!.name}</p>
-                              <p className="text-xs font-bold text-amber-800">🏆 당첨: {prizeWinners.map((w) => w.name).join(', ')}</p>
-                            </div>
-                          ) : (
-                            <>
-                              <p className="text-[11px] font-semibold text-[var(--toss-gray-3)]">🎁 상품: {poll.prize!.name} (당첨 {poll.prize!.winnerCount}명)</p>
-                              {isAuthor && (
-                                <button
-                                  type="button"
-                                  onClick={() => void handleDrawPrize()}
-                                  disabled={isDrawing}
-                                  aria-label="투표 참여자 중 상품 당첨자 추첨"
-                                  className="px-4 py-2 rounded-[var(--radius-md)] bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                                >
-                                  {isDrawing ? '추첨 중...' : '🎁 추첨하기'}
-                                </button>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })() : null) as React.ReactNode}
-
-                {(selectedPost.board_type === '수술일정' || selectedPost.board_type === 'MRI일정') && (
-                  <div className="space-y-4 border-t border-[var(--border)] pt-4">
-                    {Boolean((selectedPost as Record<string, unknown>).schedule_meta_legacy_missing) && (
-                      <div
-                        data-testid="board-schedule-legacy-warning"
-                        className="rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/10 px-3 py-3 text-[11px] font-semibold text-red-700"
-                      >
-                        이 일정은 예전에 날짜/시간 없이 저장되어 달력에 표시되지 않습니다. 수정 버튼을 눌러 일정 정보를 다시 입력한 뒤 저장해 주세요.
-                      </div>
-                    )}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[11px] font-bold text-[var(--toss-gray-4)]">
-                      <div>
-                        <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">수술/검사명</p>
-                        <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">{selectedPost.title}</p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">날짜·시간</p>
-                        <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
-                          {selectedPost.schedule_date} {selectedPost.schedule_time}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">위치 / 환자명 (차트번호)</p>
-                        <p className="mt-1 text-sm font-semibold text-[var(--foreground)]">
-                          {selectedPost.schedule_room || '위치 미지정'} / {selectedPost.patient_name || '환자 미지정'} {selectedPost.content ? `(${selectedPost.content})` : ''}
-                        </p>
-                      </div>
-                    </div>
-
-                    {(selectedPost.surgery_fasting ||
-                      selectedPost.surgery_inpatient ||
-                      selectedPost.surgery_guardian ||
-                      selectedPost.surgery_caregiver ||
-                      selectedPost.surgery_transfusion) && (
-                        <div className="bg-[var(--page-bg)] border border-[var(--border)] rounded-[var(--radius-md)] p-3 space-y-1 text-[11px] font-bold text-[var(--toss-gray-4)]">
-                          <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">수술/검사 준비 상태</p>
-                          <div className="flex flex-wrap gap-1 pt-1">
-                            {selectedPost.surgery_fasting && (
-                              <span className="px-2 py-1 rounded-[var(--radius-md)] bg-red-500/10 text-red-600 text-[11px] font-semibold">
-                                금식
-                              </span>
-                            )}
-                            {selectedPost.surgery_inpatient && (
-                              <span className="px-2 py-1 rounded-[var(--radius-md)] bg-[var(--toss-blue-light)] text-[var(--accent)] text-[11px] font-semibold">
-                                입원
-                              </span>
-                            )}
-                            {selectedPost.surgery_guardian && (
-                              <span className="px-2 py-1 rounded-[var(--radius-md)] bg-emerald-50 text-emerald-600 text-[11px] font-semibold">
-                                보호자 동반
-                              </span>
-                            )}
-                            {selectedPost.surgery_caregiver && (
-                              <span className="px-2 py-1 rounded-[var(--radius-md)] bg-purple-500/10 text-purple-600 text-[11px] font-semibold">
-                                간병인
-                              </span>
-                            )}
-                            {selectedPost.surgery_transfusion && (
-                              <span className="px-2 py-1 rounded-[var(--radius-md)] bg-red-500/20 text-red-700 text-[11px] font-semibold">
-                                수혈 필요
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                    {/* 같은 날짜의 전체 일정 목록 */}
-                    {selectedPost.mri_contrast_required && (
-                      <div className="rounded-[var(--radius-md)] border border-violet-200 bg-violet-50 px-3 py-2 text-[11px] font-semibold text-violet-700">
-                        조영제 필요
-                      </div>
-                    )}
-                    <div className="bg-[var(--page-bg)] border border-[var(--border)] rounded-[var(--radius-md)] p-3 space-y-2">
-                      <p className="text-[11px] font-semibold text-[var(--toss-gray-4)] flex items-center gap-2">
-                        📅 {selectedPost.schedule_date || '날짜 미지정'} 의 전체 일정
-                      </p>
-                      <div className="max-h-40 overflow-y-auto custom-scrollbar space-y-1 text-[11px]">
-                        {posts
-                          .filter(
-                            (p: BoardPost) =>
-                              p.board_type === selectedPost.board_type &&
-                              normalizeScheduleDateValue(p.schedule_date) === normalizeScheduleDateValue(selectedPost.schedule_date)
-                          )
-                          .map((p: BoardPost) => (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => setSelectedPostId(p.id)}
-                              className={`w-full flex items-center gap-2 px-2 py-1 rounded-[var(--radius-md)] text-left hover:bg-[var(--card)] ${p.id === selectedPost.id ? 'bg-[var(--card)] shadow-sm border border-[var(--border)]' : ''
-                                }`}
-                            >
-                              <span className="text-[11px] font-bold text-[var(--toss-gray-3)] w-14 shrink-0">
-                                {p.schedule_time || ''}
-                              </span>
-                              <span className="flex-1 truncate font-bold text-[var(--foreground)]">
-                                {p.title}
-                              </span>
-                              <span className="text-[11px] font-bold text-[var(--accent)] shrink-0">
-                                {p.patient_name || ''}
-                              </span>
-                            </button>
-                          ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {selectedPost.content && (
-                  <div className="pt-4 border-t border-[var(--border)]">
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--toss-gray-4)]">
-                      {selectedPost.content}
-                    </p>
-                  </div>
-                )}
-
-                {(Array.isArray(selectedPost.attachments) ? selectedPost.attachments : []).length > 0 && (
-                  <div className="pt-4 border-t border-[var(--border)]">
-                    <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-2">첨부파일 ({(Array.isArray(selectedPost.attachments) ? selectedPost.attachments : []).length}개)</p>
-                    <div className="flex flex-wrap gap-4">
-                      {(Array.isArray(selectedPost.attachments) ? selectedPost.attachments as AttachmentItem[] : []).map((att: AttachmentItem, i: number) =>
-                        att.type === 'image' ? (
-                          <a key={i} href={buildStorageInlineUrl(att.url, att.name ?? '') || att.url} target="_blank" rel="noopener noreferrer" className="block">
-                            <img
-                              src={buildStorageInlineUrl(att.url, att.name ?? '') || att.url}
-                              alt={att.name}
-                              loading="lazy"
-                              decoding="async"
-                              referrerPolicy="no-referrer"
-                              className="max-w-[280px] max-h-[280px] rounded-[var(--radius-lg)] border border-[var(--border)] object-cover shadow-sm bg-[var(--muted)]"
-                              onError={(e) => {
-                                const el = e.target as HTMLImageElement;
-                                el.alt = '이미지를 불러올 수 없습니다.';
-                                el.classList.add('bg-red-500/10', 'border-red-500/20');
-                              }}
-                            />
-                          </a>
-                        ) : att.type === 'video' ? (
-                          <div key={i} className="rounded-[var(--radius-lg)] border border-[var(--border)] overflow-hidden bg-black max-w-[320px]">
-                            <video src={buildStorageInlineUrl(att.url, att.name ?? '') || att.url} controls className="w-full max-h-[240px]" preload="metadata" />
-                            <p className="text-[11px] font-bold text-[var(--toss-gray-4)] p-2 bg-[var(--page-bg)] truncate">{att.name}</p>
-                          </div>
-                        ) : (
-                          <a
-                            key={i}
-                            href={buildStorageDownloadUrl(att.url, att.name ?? '')}
-                            onClick={(event) => void handleAttachmentDownloadClick(event, att.url, att.name ?? '')}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            download={att.name ?? 'download'}
-                            className="inline-flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--muted)] border border-[var(--border)] text-sm font-bold text-[var(--accent)] hover:bg-[var(--toss-blue-light)]"
-                          >
-                            📎 {att.name}
-                          </a>
-                        )
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {(Array.isArray(selectedPost.tags) ? selectedPost.tags : []).length > 0 && (
-                  <div className="flex flex-wrap gap-1 pt-2">
-                    {(Array.isArray(selectedPost.tags) ? selectedPost.tags : []).map(
-                      (tag: string, i: number) => (
-                        <span
-                          key={i}
-                          className="px-2 py-0.5 bg-[var(--toss-blue-light)] text-[var(--accent)] rounded-[var(--radius-md)] text-[11px] font-bold"
-                        >
-                          #{tag}
-                        </span>
-                      ),
-                    )}
-                  </div>
-                )}
-
-                {/* 댓글 + 대댓글 */}
-                <div className="pt-4 border-t border-[var(--border)] space-y-3">
-                  <p className="text-[11px] font-semibold text-[var(--toss-gray-4)] flex items-center gap-2">
-                    💬 댓글
-                    <span className="text-[11px] text-[var(--toss-gray-3)] font-bold">
-                      {(comments[selectedPost.id] || []).length}개
-                    </span>
-                  </p>
-                  {(() => {
-                    const { roots, repliesByParent } = selectedPostCommentTree;
-                    return (
-                      <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
-                        {roots.map((c) => (
-                          <div key={c.id} className="space-y-1">
-                            <div className="text-xs text-[var(--toss-gray-4)] flex gap-2 items-center flex-wrap">
-                              <span className="font-bold">{c.author_name}:</span>
-                              <span className="flex-1 min-w-0">{c.content}</span>
-                              <span className="flex gap-1 shrink-0">
-                                {user?.id && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setReplyParentId(c.id);
-                                      setNewComment('');
-                                    }}
-                                    className="text-[11px] text-[var(--toss-gray-3)] hover:text-[var(--accent)]"
-                                  >
-                                    답글
-                                  </button>
-                                )}
-                                {((effectiveBoardUserId && String(c.author_id) === effectiveBoardUserId) || isPrivilegedUser(user)) && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteComment(selectedPost.id, c.id)}
-                                    className="text-[11px] text-[var(--toss-gray-3)] hover:text-[#F04452]"
-                                  >
-                                    삭제
-                                  </button>
-                                )}
-                              </span>
-                            </div>
-                            {(repliesByParent[String(c.id)] || []).map((r) => (
-                              <div key={r.id} className="ml-6 text-xs text-[var(--toss-gray-4)] flex gap-2 items-center flex-wrap">
-                                <span className="font-bold">{r.author_name}:</span>
-                                <span className="flex-1 min-w-0">{r.content}</span>
-                                {((effectiveBoardUserId && String(r.author_id) === effectiveBoardUserId) || isPrivilegedUser(user)) && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteComment(selectedPost.id, r.id)}
-                                    className="text-[11px] text-[var(--toss-gray-3)] hover:text-[#F04452] shrink-0"
-                                  >
-                                    삭제
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        ))}
-                        {roots.length === 0 && (
-                          <p className="text-[11px] text-[var(--toss-gray-3)] font-bold">첫 댓글을 남겨보세요.</p>
-                        )}
-                      </div>
-                    );
-                  })()}
-                  {isMobile ? (
-                    <CommentComposerSticky
-                      value={newComment}
-                      onChange={setNewComment}
-                      onSubmit={() => handleAddComment(selectedPost.id, replyParentId)}
-                      placeholder={user?.id ? (replyParentId ? '답글을 입력하세요…' : '댓글을 입력하세요.') : '로그인한 후 댓글을 입력할 수 있습니다.'}
-                      disabled={!user?.id}
-                      ariaLabel={replyParentId ? '답글 작성' : '댓글 작성'}
-                      submitLabel="등록"
-                      withSpacer={true}
-                    />
-                  ) : (
-                    <div className="flex gap-2">
-                      <label htmlFor="board-comment-input" className="sr-only">
-                        {replyParentId ? '답글 작성' : '댓글 작성'}
-                      </label>
-                      <input
-                        id="board-comment-input"
-                        data-testid="board-comment-input"
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && user?.id && newComment.trim()) {
-                            e.preventDefault();
-                            void handleAddComment(selectedPost.id, replyParentId);
-                          }
-                        }}
-                        placeholder={user?.id ? '댓글을 입력하세요.' : '로그인한 후 댓글을 입력할 수 있습니다.'}
-                        disabled={!user?.id}
-                        aria-label={replyParentId ? '답글 작성' : '댓글 작성'}
-                        maxLength={4000}
-                        className="flex-1 px-3 py-2 border border-[var(--border)] rounded-[var(--radius-md)] text-xs disabled:bg-[var(--page-bg)] disabled:text-[var(--toss-gray-3)]"
-                      />
-                      <button
-                        type="button"
-                        data-testid="board-comment-submit"
-                        onClick={() => handleAddComment(selectedPost.id, replyParentId)}
-                        disabled={!user?.id || !newComment.trim()}
-                        aria-disabled={!user?.id || !newComment.trim()}
-                        className="px-3 py-2 bg-[var(--accent)] text-white rounded-[var(--radius-md)] text-xs font-bold hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        등록
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-              </div>
-            </div>
+            <BoardDetailPanel
+              selectedPost={selectedPost}
+              selectedPostAuthorSignal={selectedPostAuthorSignal}
+              selectedPostCommentTree={selectedPostCommentTree}
+              posts={posts}
+              comments={comments}
+              myLikedPostIds={myLikedPostIds}
+              likingPostId={likingPostId}
+              drawingPostId={drawingPostId}
+              setDrawingPostId={setDrawingPostId}
+              effectiveBoardUserId={effectiveBoardUserId}
+              user={user}
+              isMobile={isMobile}
+              newComment={newComment}
+              setNewComment={setNewComment}
+              replyParentId={replyParentId}
+              setReplyParentId={setReplyParentId}
+              noticeVisibilityTick={noticeVisibilityTick}
+              canEditPost={canEditPost}
+              canDeletePost={canDeletePost}
+              onLike={(post) => { void handleLike(post); }}
+              onOpenReadStatus={(post) => { void openReadStatusModal(post); }}
+              onEdit={handleEditPostStart}
+              onDelete={(post) => { void handleDeletePost(post); }}
+              onClose={() => setSelectedPostId(null)}
+              onSelectPost={(postId) => setSelectedPostId(postId)}
+              onAddComment={(postId, parentId) => { void handleAddComment(postId, parentId); }}
+              onDeleteComment={(postId, commentId) => { void handleDeleteComment(postId, commentId); }}
+              setPosts={setPosts}
+              setSelectedPostDetail={setSelectedPostDetail}
+              setComments={setComments}
+              handleAttachmentDownloadClick={handleAttachmentDownloadClick}
+            />
           )}
           {readStatusPost && !isAnonymousReadStatusPost(readStatusPost) && (
             <ReadStatusModal

@@ -2,6 +2,7 @@
 
 import { useCallback, type Dispatch, type MutableRefObject, type RefObject, type SetStateAction } from 'react';
 import { CHAT_ACTIVE_ROOM_KEY, CHAT_ROOM_KEY } from '@/app/main/navigation-state';
+import { toUtcSqlTimestamp } from '@/lib/chat-read-cursors';
 import type { ChatRoom } from '@/types';
 import { getConversationRoomIdsByRoomId } from './메신저유틸';
 
@@ -96,7 +97,8 @@ export function useChatRoomNavigation({
     setInputMsg(savedDraft);
 
     if (roomId && effectiveChatUserId) {
-      const readAt = new Date().toISOString();
+      // D1 messages.created_at 과 동일 SQL 포맷 (ISO-Z 문자열 비교 드리프트 방지)
+      const readAt = toUtcSqlTimestamp();
       const targetRoomIds = conversationRoomIds.length > 0 ? conversationRoomIds : [String(roomId)];
 
       setRoomUnreadCounts((prev) => {

@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/db-client';
+import { INVENTORY_SELECT_COLUMNS } from '@/app/main/inventory-utils';
 import type { AbcGrade, ForecastRow, InspectRow, Tone } from './stock-types';
 import { asString, pickNumber, pickString, type Row } from './data-helpers';
 
@@ -244,7 +245,7 @@ export function useAnalyzeData(userCompany?: string): AnalyzeWorkcenterData {
 
     const load = async () => {
       try {
-        let invQ = db.from('inventory').select('*').limit(800);
+        let invQ = db.from('inventory').select(INVENTORY_SELECT_COLUMNS).limit(800);
         let logQ = db
           .from('inventory_logs')
           .select(
@@ -261,7 +262,9 @@ export function useAnalyzeData(userCompany?: string): AnalyzeWorkcenterData {
           logQ,
           db
             .from('inventory_count_sessions')
-            .select('*')
+            .select(
+              'id, conducted_by, conducted_name, total_items, discrepancy_count, created_at, company, company_id, department',
+            )
             .order('created_at', { ascending: false })
             .limit(20),
         ]);

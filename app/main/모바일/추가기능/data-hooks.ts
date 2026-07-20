@@ -28,6 +28,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { subscribeRealtime, type TableFilter } from '@/lib/realtime-bus';
 import { db } from '@/lib/db-client';
+import { INVENTORY_SELECT_COLUMNS } from '@/app/main/inventory-utils';
+import {
+  BOARD_POST_OPTIONAL_COLUMNS,
+  BOARD_POST_REQUIRED_SELECT_COLUMNS,
+  buildSelectColumns } from '@/app/main/기능부품/게시판공통';
 import { isActiveStaff } from '@/lib/active-staff';
 import type { StaffMember } from '@/types';
 import { getKoreanTodayString } from '@/lib/seoul-time';
@@ -167,8 +172,8 @@ export function useDeptInventory(opts: { company?: string; department?: string }
       try {
         let q = db
           .from('inventory')
-          .select('*')
-          .order('name')
+          .select(INVENTORY_SELECT_COLUMNS)
+          .order('item_name')
           .limit(300);
         if (company && company !== '전체') q = q.eq('company', company);
         const { data, error } = await q;
@@ -456,7 +461,7 @@ export function useHandoverNotes(opts: { company?: string; pollMs?: number }) {
       void company;
       const q = db
         .from('handover_notes')
-        .select('*')
+        .select('id, content, author_id, author_name, shift, priority, is_completed, created_at')
         .order('created_at', { ascending: false })
         .limit(50);
       const { data, error } = await q;
@@ -543,7 +548,9 @@ export function useStaffEvaluations(opts: { company?: string; selfId?: string | 
         void company;
         const q = db
           .from('staff_evaluations')
-          .select('*')
+          .select(
+            'id, evaluator_id, staff_id, category, content, score, created_at',
+          )
           .order('created_at', { ascending: false })
           .limit(200);
         const { data, error } = await q;
@@ -611,7 +618,9 @@ export function useDischargeReviews(opts: { selfId?: string | null }) {
       try {
         const { data, error } = await db
           .from('discharge_reviews')
-          .select('*')
+          .select(
+            'id, patient_name, birth_date, gender, department, admission_date, discharge_date, diagnosis, status, reviewer_id, reviewer_name, created_at, ai_analysis',
+          )
           .order('created_at', { ascending: false })
           .limit(100);
         if (error) throw error;
@@ -678,7 +687,12 @@ export function useMriSchedules(opts: { company?: string; date?: string }) {
       try {
         let q = db
           .from('board_posts')
-          .select('*')
+          .select(
+            buildSelectColumns(
+              BOARD_POST_REQUIRED_SELECT_COLUMNS,
+              BOARD_POST_OPTIONAL_COLUMNS,
+            ),
+          )
           .eq('board_type', 'MRI일정')
           .order('created_at', { ascending: false })
           .limit(100);
@@ -739,7 +753,12 @@ export function useTaskShares(opts: { company?: string; pollMs?: number }) {
     try {
       let q = db
         .from('board_posts')
-        .select('*')
+        .select(
+          buildSelectColumns(
+            BOARD_POST_REQUIRED_SELECT_COLUMNS,
+            BOARD_POST_OPTIONAL_COLUMNS,
+          ),
+        )
         // PC/게시판 정본: 업무가이드. 레거시 업무공유·task_share 도 포함
         .in('board_type', ['업무가이드', '업무공유', 'task_share', 'guide'])
         .order('created_at', { ascending: false })
@@ -806,7 +825,12 @@ export function useTaskGuides(opts: { company?: string }) {
       try {
         let q = db
           .from('board_posts')
-          .select('*')
+          .select(
+            buildSelectColumns(
+              BOARD_POST_REQUIRED_SELECT_COLUMNS,
+              BOARD_POST_OPTIONAL_COLUMNS,
+            ),
+          )
           .in('board_type', ['업무가이드', 'guide'])
           .order('created_at', { ascending: false })
           .limit(100);
@@ -883,7 +907,12 @@ export function useOpBoard(opts: { company?: string; date?: string; pollMs?: num
     try {
       let scheduleQuery = db
         .from('board_posts')
-        .select('*')
+        .select(
+          buildSelectColumns(
+            BOARD_POST_REQUIRED_SELECT_COLUMNS,
+            BOARD_POST_OPTIONAL_COLUMNS,
+          ),
+        )
         .eq('board_type', '수술일정')
         .order('created_at', { ascending: true })
         .limit(100);
@@ -892,7 +921,9 @@ export function useOpBoard(opts: { company?: string; date?: string; pollMs?: num
         scheduleQuery,
         db
           .from('op_patient_checks')
-          .select('*')
+          .select(
+            'id, schedule_post_id, schedule_date, patient_name, status, prep_items, company_id, updated_at',
+          )
           .eq('schedule_date', date)
           .limit(200),
       ]);
@@ -1033,7 +1064,9 @@ export function useDeposits(opts: { company?: string; date?: string }) {
         }
         let q = db
           .from('virtual_account_deposits')
-          .select('*')
+          .select(
+            'id, patient_name, depositor_name, customer_name, amount, method, transaction_label, deposited_at, created_at, deposit_status, match_status, company_id',
+          )
           .eq('deposit_status', 'deposited')
           .gte('created_at', `${date}T00:00:00`)
           .order('created_at', { ascending: false })
@@ -1111,7 +1144,7 @@ export function useClosingToday(opts: { company?: string; date?: string }) {
         }
         let closureQ = db
           .from('daily_closures')
-          .select('*')
+          .select('id, company_id, date, total_amount, status, created_at')
           .eq('date', date)
           .order('created_at', { ascending: false })
           .limit(1);
@@ -1136,7 +1169,7 @@ export function useClosingToday(opts: { company?: string; date?: string }) {
         try {
           const { data: itemData } = await db
             .from('daily_closure_items')
-            .select('*')
+            .select('id, patient_name, memo, payment_method, amount')
             .eq('closure_id', closureId)
             .limit(200);
           items = ((itemData ?? []) as Record<string, unknown>[]).map((r) => ({

@@ -39,13 +39,17 @@ import { STORAGE_KEYS } from '@/lib/storage-keys';
 import MainContent from './기능부품/조직도서브/조직도본문';
 import NotificationSystem from './기능부품/알림시스템';
 import ChatAlertBanner from './기능부품/채팅알림배너';
-import PermissionPromptModal from './기능부품/권한요청모달';
 import OfflineStatusBanner from '@/app/components/OfflineStatusBanner';
 import { ChevronDown } from 'lucide-react';
 import { NavigationProvider } from './contexts/NavigationContext';
 import { CompanyProvider } from './contexts/CompanyContext';
 import { AppDataProvider } from './contexts/AppDataContext';
 import type { ErpUser, ERPData, StaffMember } from '@/types';
+
+const PermissionPromptModal = dynamic(() => import('./기능부품/권한요청모달'), {
+  ssr: false,
+  loading: () => null,
+});
 
 function canAccessAdminSubMenu(user: ErpUser | null, subMenuId: string) {
   if (!canAccessMainMenu(user, '관리자')) {

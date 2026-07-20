@@ -27,9 +27,11 @@ type ApprovalLike = LooseRecord & {
   meta_data?: LooseRecord | null;
 };
 
+/** inventory 목록/상태 조회용 — schema 정본 컬럼 (select('*') 회피) */
 export const INVENTORY_SELECT_COLUMNS = [
   'id',
   'item_name',
+  'name',
   'quantity',
   'stock',
   'company',
@@ -38,16 +40,23 @@ export const INVENTORY_SELECT_COLUMNS = [
   'category',
   'spec',
   'min_quantity',
+  'min_stock',
+  'safety_stock',
   'unit_price',
   'price',
   'expiry_date',
+  'expiration_date',
   'lot_number',
+  'serial_number',
+  'barcode',
   'is_udi',
+  'udi_code',
   'location',
   'insurance_code',
-  'udi_code',
+  'supplier_id',
   'supplier_name',
   'supplier',
+  'last_updated',
 ].join(', ');
 
 export const INVENTORY_SUPPORT_COMPANY = 'SY INC.';
@@ -495,7 +504,7 @@ export async function fetchSupportInventoryRows(): Promise<{
     // 브라우저 — d1Client가 /api/d1/query로 D1을 읽는다
     const { data, error } = await d1Client
       .from('inventory')
-      .select('*')
+      .select(INVENTORY_SELECT_COLUMNS)
       .eq('company', INVENTORY_SUPPORT_COMPANY)
       .eq('department', INVENTORY_SUPPORT_DEPARTMENT);
     if (error) {
