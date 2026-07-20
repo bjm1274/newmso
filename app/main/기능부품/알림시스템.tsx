@@ -1819,7 +1819,7 @@ export default function NotificationSystem({
         void syncBadge();
         void broadcastNotificationList();
       },
-      { pollIntervalMs: 3_000 },
+      { pollIntervalMs: 15_000 },
     );
     // initial: fetch once + prime metadata + broadcast 초기 list
     void fetchUnreadNotificationsSince(mountedAt);

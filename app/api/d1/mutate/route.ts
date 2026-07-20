@@ -25,33 +25,43 @@ import {
   normalizeBindValue,
   buildWhereSql } from '@/lib/d1-api-helpers';
 
+/** Collect room_id values from insert/update/returning rows for scoped realtime channels. */
+function collectRoomIds(payload: Payload, allResults?: Record<string, unknown>[]): Set<string> {
+  const rowIds = new Set<string>();
+  if (allResults) {
+    allResults.forEach((r) => {
+      if (r.room_id) rowIds.add(String(r.room_id));
+    });
+  }
+  if (payload.op === 'insert') {
+    payload.values.forEach((v) => {
+      if (v.room_id) rowIds.add(String(v.room_id));
+    });
+  }
+  if (payload.op === 'update') {
+    payload.where.forEach((w) => {
+      if (w.field === 'room_id' && w.op === 'eq') rowIds.add(String(w.value));
+    });
+    if (payload.set.room_id) rowIds.add(String(payload.set.room_id));
+  }
+  if (payload.op === 'delete') {
+    payload.where.forEach((w) => {
+      if (w.field === 'room_id' && w.op === 'eq') rowIds.add(String(w.value));
+    });
+  }
+  return rowIds;
+}
+
 async function triggerMutationSignal(payload: Payload, allResults?: Record<string, unknown>[]) {
   try {
     const table = payload.table;
     const channels = new Set<string>();
 
     if (table === 'messages') {
+      // Bare table for global unread list; room-scoped for open conversation.
       channels.add('messages');
       channels.add('chat_rooms');
-      
-      const rowIds = new Set<string>();
-      if (allResults) {
-        allResults.forEach(r => {
-          if (r.room_id) rowIds.add(String(r.room_id));
-        });
-      }
-      if (rowIds.size === 0 && payload.op === 'insert') {
-        payload.values.forEach(v => {
-          if (v.room_id) rowIds.add(String(v.room_id));
-        });
-      }
-      if (rowIds.size === 0 && payload.op === 'update') {
-        payload.where.forEach(w => {
-          if (w.field === 'room_id' && w.op === 'eq') rowIds.add(String(w.value));
-        });
-        if (payload.set.room_id) rowIds.add(String(payload.set.room_id));
-      }
-      rowIds.forEach(rid => {
+      collectRoomIds(payload, allResults).forEach((rid) => {
         channels.add(`messages:room_id=eq.${rid}`);
       });
     } else if (table === 'chat_rooms') {
@@ -59,74 +69,46 @@ async function triggerMutationSignal(payload: Payload, allResults?: Record<strin
     } else if (table === 'room_read_cursors') {
       channels.add('room_read_cursors');
       channels.add('chat_rooms');
-      const rowIds = new Set<string>();
-      if (allResults) {
-        allResults.forEach(r => {
-          if (r.room_id) rowIds.add(String(r.room_id));
-        });
-      }
-      if (payload.op === 'insert') {
-        payload.values.forEach(v => {
-          if (v.room_id) rowIds.add(String(v.room_id));
-        });
-      }
-      if (payload.op === 'update') {
-        payload.where.forEach(w => {
-          if (w.field === 'room_id' && w.op === 'eq') rowIds.add(String(w.value));
-        });
-        if (payload.set.room_id) rowIds.add(String(payload.set.room_id));
-      }
-      rowIds.forEach(rid => {
+      collectRoomIds(payload, allResults).forEach((rid) => {
         channels.add(`room_read_cursors:room_id=eq.${rid}`);
       });
     } else if (table === 'message_reactions') {
+      // No room_id column on message_reactions — table-level only.
       channels.add('message_reactions');
-      const rowIds = new Set<string>();
-      if (payload.op === 'insert') {
-        payload.values.forEach(v => {
-          if (v.room_id) rowIds.add(String(v.room_id));
-        });
-      }
-      rowIds.forEach(rid => {
-        channels.add(`messages:room_id=eq.${rid}`);
-      });
     } else if (table === 'notifications') {
       channels.add('notifications');
       const userIds = new Set<string>();
+      if (allResults) {
+        allResults.forEach((r) => {
+          if (r.user_id) userIds.add(String(r.user_id));
+        });
+      }
       if (payload.op === 'insert') {
-        payload.values.forEach(v => {
+        payload.values.forEach((v) => {
           if (v.user_id) userIds.add(String(v.user_id));
         });
       }
-      userIds.forEach(uid => {
+      userIds.forEach((uid) => {
         channels.add(`notifications:user_id=eq.${uid}`);
       });
     } else if (table === 'message_bookmarks') {
       channels.add('message_bookmarks');
+      collectRoomIds(payload, allResults).forEach((rid) => {
+        channels.add(`message_bookmarks:room_id=eq.${rid}`);
+      });
     } else if (table === 'pinned_messages') {
       channels.add('pinned_messages');
+      collectRoomIds(payload, allResults).forEach((rid) => {
+        channels.add(`pinned_messages:room_id=eq.${rid}`);
+      });
     } else if (table === 'polls') {
       channels.add('polls');
-      const rowIds = new Set<string>();
-      if (payload.op === 'insert') {
-        payload.values.forEach(v => {
-          if (v.room_id) rowIds.add(String(v.room_id));
-        });
-      }
-      rowIds.forEach(rid => {
+      collectRoomIds(payload, allResults).forEach((rid) => {
         channels.add(`polls:room_id=eq.${rid}`);
       });
     } else if (table === 'poll_votes') {
+      // poll_votes has no room_id column — table-level for poll UI refresh.
       channels.add('poll_votes');
-      const rowIds = new Set<string>();
-      if (payload.op === 'insert') {
-        payload.values.forEach(v => {
-          if (v.room_id) rowIds.add(String(v.room_id));
-        });
-      }
-      rowIds.forEach(rid => {
-        channels.add(`poll_votes:room_id=eq.${rid}`);
-      });
     } else {
       channels.add(table);
     }

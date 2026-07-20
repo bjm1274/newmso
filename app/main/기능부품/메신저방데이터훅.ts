@@ -81,10 +81,23 @@ export function useChatRoomDataSync({
   const roomIdsToLoadRef = useRef<string[]>([]);
   const oldestLoadedMessageRef = useRef<LoadedMessageCursor | null>(null);
   const metadataRefreshCacheRef = useRef<Map<string, number>>(new Map());
+  const lastUnreadRefreshRef = useRef<{ key: string; at: number }>({ key: '', at: 0 });
 
   const updateUnreadForRooms = useCallback(
     async (rooms: ChatRoom[]) => {
       if (!effectiveChatUserId || !rooms?.length) return;
+
+      const activeRoomId = pendingBottomAlignRoomIdRef.current || selectedRoomIdRef.current || '';
+      // last_message_at 스냅샷이 같으면 중복 호출을 접는다.
+      // 다만 메모리상 last_message_at 이 아직 갱신되지 않은 신규 메시지 이벤트도
+      // 배지 갱신이 가능해야 하므로 창은 짧게(3s) 유지한다.
+      const refreshKey = rooms
+        .map((room) => `${String(room.id || '').trim()}:${String(room.last_message_at || room.created_at || '').trim()}`)
+        .join('|') + `|active:${activeRoomId}`;
+      const now = Date.now();
+      const previousRefresh = lastUnreadRefreshRef.current;
+      if (previousRefresh.key === refreshKey && now - previousRefresh.at < 3_000) return;
+      lastUnreadRefreshRef.current = { key: refreshKey, at: now };
 
       try {
         const myRooms = rooms.filter((room: ChatRoom) => {
@@ -132,7 +145,6 @@ export function useChatRoomDataSync({
           }
         });
 
-        const activeRoomId = pendingBottomAlignRoomIdRef.current || selectedRoomIdRef.current;
         const openConversationRoomIds = getConversationRoomIdSet(activeRoomId, myRooms);
         const queryRoomIds = roomIds.filter(
           (roomId) => !openConversationRoomIds.has(roomId) && roomId !== activeRoomId,
@@ -195,7 +207,7 @@ export function useChatRoomDataSync({
       });
       const nextRooms = sortChatRoomsWithNoticeFirst(mergedRooms);
       setChatRooms(nextRooms);
-      await updateUnreadForRooms(nextRooms);
+      void updateUnreadForRooms(nextRooms);
       return nextRooms;
     },
     [chatRoomsRef, setChatRooms, updateUnreadForRooms],
@@ -750,6 +762,9 @@ export function useChatRoomDataSync({
       });
 
       try {
+        // Message-level meta (cursors / bookmarks / reactions) in parallel.
+        // Room-level pins+polls follow when includeRoomLevelMeta is true.
+        // Callers should invoke this with void after setMessages so first paint is not blocked.
         const [roomReadCursorsResult, bookmarksResult, reactionsResult] = await Promise.allSettled([
           messageIds.length > 0 && roomMemberIds.length > 0
             ? db
@@ -759,17 +774,16 @@ export function useChatRoomDataSync({
                 .in('user_id', roomMemberIds)
             : Promise.resolve({ data: [], error: null }),
           effectiveTodoUserId && messageIds.length > 0
-            ? db
-                .from('message_bookmarks')
-                .select('message_id')
-                .eq('user_id', effectiveTodoUserId)
-                .in('message_id', messageIds)
+            ? selectMessageBookmarkRows(effectiveTodoUserId, messageIds).then((data) => ({
+                data,
+                error: null as unknown,
+              }))
             : Promise.resolve({ data: [], error: null }),
           messageIds.length > 0
-            ? db
-                .from('message_reactions')
-                .select('message_id, emoji, user_id')
-                .in('message_id', messageIds)
+            ? selectMessageReactionRows(messageIds).then((data) => ({
+                data,
+                error: null as unknown,
+              }))
             : Promise.resolve({ data: [], error: null }),
         ]);
         if (!isCurrentRequest()) return;
@@ -1025,10 +1039,8 @@ export function useChatRoomDataSync({
       setRoomUnreadCounts,
       setRoomReadCursorMap,
       setReadCounts,
-      isMessageReadByCursor,
       setBookmarkedIds,
       resolveStaffProfile,
-      compareStaffMembers,
       setReactions,
       setReactionUsersByMessage,
       setPinnedIds,
@@ -1233,8 +1245,8 @@ export function useChatRoomDataSync({
           return;
         }
         const repairedRooms = await repairDirectRooms(roomResult.data || []);
-        const roomList = await syncChatRoomsState(repairedRooms);
-        void updateUnreadForRooms(roomList);
+        await syncChatRoomsState(repairedRooms);
+
       } catch (error) {
         console.error('채팅방 목록 갱신 실패 (no room selected):', error);
       }
@@ -1347,285 +1359,36 @@ export function useChatRoomDataSync({
     setTimelineRoomId?.(roomIdForFetch);
     setLoadingRoomId?.(null);
 
-    const messageIds = loadedMessages.map((message: ChatMessage) => String(message.id || '')).filter(Boolean);
-    const roomMemberIds = getEffectiveRoomMemberIds(selectedRoomRecord);
-    const fetchedRoomSummary = buildRoomSummaryFromMessages(roomIdForFetch, loadedMessages);
-    applyRoomSummaryToState(roomIdForFetch, fetchedRoomSummary);
-
-    if (!isCurrentRequest()) return;
-
-    const [
-      roomReadCursorsResult,
-      bookmarksResult,
-      pinnedResult,
-      reactionsResult,
-      pollsResult,
-    ] = await Promise.allSettled([
-      messageIds.length > 0 && roomMemberIds.length > 0
-        ? db
-            .from('room_read_cursors')
-            .select('user_id, last_read_at')
-            .in('room_id', roomIdsToLoad)
-            .in('user_id', roomMemberIds)
-        : Promise.resolve({ data: [], error: null }),
-      effectiveTodoUserId && messageIds.length > 0
-        ? selectMessageBookmarkRows(effectiveTodoUserId, messageIds).then((data) => ({ data, error: null }))
-        : Promise.resolve({ data: [], error: null }),
-      db
-        .from('pinned_messages')
-        .select('message_id')
-        .eq('room_id', roomIdForFetch),
-      messageIds.length > 0
-        ? selectMessageReactionRows(messageIds).then((data) => ({ data, error: null }))
-        : Promise.resolve({ data: [], error: null }),
-      db
-        .from('polls')
-        .select(POLL_SELECT)
-        .eq('room_id', roomIdForFetch) as PromiseLike<{ data: any[] | null; error: unknown }>,
-    ]);
-    if (!isCurrentRequest()) return;
-
-    if (msgs?.length) {
-      const nextRoomReadCursorMap: Record<string, string> = {};
-      if (roomMemberIds.length > 0 && roomReadCursorsResult.status === 'fulfilled') {
-        const roomReadCursorValue = roomReadCursorsResult.value as {
-          data: Record<string, unknown>[] | null;
-          error: unknown;
-        };
-        if (roomReadCursorValue.error) {
-          console.error('채팅 읽음 커서 조회 실패:', roomReadCursorValue.error);
-        }
-        (roomReadCursorValue.data || []).forEach((cursor: Record<string, unknown>) => {
-          const memberId = String(cursor.user_id || '');
-          const lastReadAt = String(cursor.last_read_at || '');
-          if (!memberId || !lastReadAt) return;
-          const mergedReadAt = getLatestReadCursor(nextRoomReadCursorMap[memberId], lastReadAt);
-          if (mergedReadAt) {
-            nextRoomReadCursorMap[memberId] = mergedReadAt;
-          }
-        });
-      } else if (roomReadCursorsResult.status === 'rejected') {
-        console.error('채팅 읽음 커서 조회 실패:', roomReadCursorsResult.reason);
-      }
-      setRoomReadCursorMap(nextRoomReadCursorMap);
-
-      const counts: Record<string, number> = {};
-      loadedMessages.forEach((message: ChatMessage) => {
-        const messageId = String(message.id || '');
-        if (!messageId) return;
-        const recipientIds = roomMemberIds.filter((memberId) => memberId !== String(message.sender_id || ''));
-        const readersCount = recipientIds.filter((memberId) =>
-          isMessageReadByCursor(message.created_at, nextRoomReadCursorMap[memberId]),
-        ).length;
-        counts[messageId] = readersCount;
+    // Clear open-room unread badge immediately (do not wait for deferred meta).
+    const targetRoomIds = roomIdsToLoad.length > 0 ? roomIdsToLoad : [roomIdForFetch];
+    setRoomUnreadCounts((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      targetRoomIds.forEach((targetRoomId) => {
+        if (!next[targetRoomId]) return;
+        next[targetRoomId] = 0;
+        changed = true;
       });
-      setReadCounts(counts);
+      return changed ? next : prev;
+    });
 
-      if (effectiveTodoUserId) {
-        if (bookmarksResult.status === 'fulfilled') {
-          const bookmarksValue = bookmarksResult.value as {
-            data: Record<string, unknown>[] | null;
-            error: unknown;
-          };
-          if (!bookmarksValue.error) {
-            const nextBookmarkIds = (bookmarksValue.data || []).map((bookmark: Record<string, unknown>) =>
-              String(bookmark.message_id),
-            );
-            setBookmarkedIds(new Set(nextBookmarkIds));
-            writeStoredBookmarks(effectiveTodoUserId, nextBookmarkIds);
-          } else {
-            setBookmarkedIds(
-              new Set(
-                readStoredBookmarks(effectiveTodoUserId).filter((bookmarkId) => messageIds.includes(bookmarkId)),
-              ),
-            );
-          }
-        } else {
-          setBookmarkedIds(
-            new Set(
-              readStoredBookmarks(effectiveTodoUserId).filter((bookmarkId) => messageIds.includes(bookmarkId)),
-            ),
-          );
-        }
-      }
-    } else {
-      setReadCounts({});
-      setRoomReadCursorMap({});
-      setBookmarkedIds(new Set(readStoredBookmarks(effectiveTodoUserId)));
-    }
+    // Second pass after messages are in state: read cursors, bookmarks, pins, reactions, polls.
+    // void = do not block first paint / loading clear.
+    void syncVisibleMessageMetadata({
+      roomIdForFetch,
+      roomIdsToLoad,
+      selectedRoomRecord,
+      visibleMessages: loadedMessages,
+      isCurrentRequest,
+      includeRoomLevelMeta: true,
+    });
 
-    try {
-      if (pinnedResult.status === 'rejected') throw pinnedResult.reason;
-      const pinnedValue = pinnedResult.value as { data: Record<string, unknown>[] | null; error: unknown };
-      if (pinnedValue.error) throw pinnedValue.error;
-
-      const nextPinnedIds = (pinnedValue.data || [])
-        .map((item: Record<string, unknown>) => String(item.message_id))
-        .slice(-1);
-      setPinnedIds(nextPinnedIds);
-      writeStoredPinnedIds(roomIdForFetch, nextPinnedIds);
-
-      if (nextPinnedIds.length > 0) {
-        const pinnedLookup = new Map<string, ChatMessage>();
-        loadedMessages.forEach((message: ChatMessage) => {
-          const messageId = String(message.id);
-          if (!nextPinnedIds.includes(messageId)) return;
-          pinnedLookup.set(messageId, {
-            ...message,
-            staff: message.staff || resolveStaffProfile(message.sender_id, message.sender_name) });
-        });
-
-        const missingPinnedIds = nextPinnedIds.filter((messageId) => !pinnedLookup.has(messageId));
-        if (missingPinnedIds.length > 0) {
-          const { data: pinnedRows, error: pinnedRowsError } = await selectChatMessagesWithFallback<ChatMessage[]>(
-            (selectClause) =>
-              db
-                .from('messages')
-                .select(selectClause)
-                .in('id', missingPinnedIds) as PromiseLike<{
-                  data: ChatMessage[] | null;
-                  error: unknown;
-                }>,
-          );
-          if (pinnedRowsError) throw pinnedRowsError;
-          if (!isCurrentRequest()) return;
-          (pinnedRows || []).forEach((message: ChatMessage) => {
-            pinnedLookup.set(String(message.id), {
-              ...message,
-              staff: resolveStaffProfile(message.sender_id, message.sender_name) });
-          });
-        }
-
-        setPersistedPinnedMessages(
-          nextPinnedIds
-            .map((messageId) => pinnedLookup.get(messageId))
-            .filter((message): message is ChatMessage => Boolean(message)),
-        );
-      } else {
-        setPersistedPinnedMessages([]);
-      }
-    } catch (error) {
-      console.error('고정 메시지 조회 실패:', error);
-      setPinnedIds([]);
-      setPersistedPinnedMessages([]);
-    }
-
-    try {
-      if (reactionsResult.status === 'rejected') throw reactionsResult.reason;
-      const reactionsValue = reactionsResult.value as { data: Record<string, unknown>[] | null; error: unknown };
-      if (reactionsValue.error) throw reactionsValue.error;
-
-      const reactionCounts: Record<string, Record<string, number>> = {};
-      const reactionUsersMap: ReactionUsersByMessage = {};
-      reactionsValue.data?.forEach((reaction: Record<string, unknown>) => {
-        const messageId = String(reaction.message_id || '').trim();
-        const emoji = String(reaction.emoji || '').trim();
-        const reactionUserId = String(reaction.user_id || '').trim();
-        if (!messageId || !emoji) return;
-
-        if (!reactionCounts[messageId]) reactionCounts[messageId] = {};
-        reactionCounts[messageId][emoji] = (reactionCounts[messageId][emoji] || 0) + 1;
-
-        if (!reactionUsersMap[messageId]) reactionUsersMap[messageId] = {};
-        if (!reactionUsersMap[messageId][emoji]) reactionUsersMap[messageId][emoji] = [];
-        if (!reactionUserId) return;
-
-        const dbStaff = reaction.staff_members as Record<string, any> | null;
-        const resolvedReactionUser = resolveStaffProfile(reactionUserId) || {
-          id: reactionUserId,
-          name: dbStaff?.name || '알 수 없음',
-          company: dbStaff?.company || '',
-          department: dbStaff?.department || '',
-          position: dbStaff?.position || '',
-          photo_url: dbStaff?.photo_url || null };
-
-        if (!reactionUsersMap[messageId][emoji].some((staff) => String(staff.id) === reactionUserId)) {
-          reactionUsersMap[messageId][emoji].push({
-            ...resolvedReactionUser,
-            id: String(resolvedReactionUser.id || reactionUserId),
-            name: String(resolvedReactionUser.name && resolvedReactionUser.name !== '알 수 없음' && resolvedReactionUser.name !== 'Unknown'
-              ? resolvedReactionUser.name
-              : (dbStaff?.name || resolvedReactionUser.name || '알 수 없음')),
-            company: String(resolvedReactionUser.company || dbStaff?.company || ''),
-            department: String(resolvedReactionUser.department || dbStaff?.department || ''),
-            position: String(resolvedReactionUser.position || dbStaff?.position || ''),
-            photo_url: resolvedReactionUser.photo_url ?? dbStaff?.photo_url ?? null });
-        }
-      });
-
-      Object.values(reactionUsersMap).forEach((emojiMap) => {
-        Object.keys(emojiMap).forEach((emoji) => {
-          emojiMap[emoji] = [...emojiMap[emoji]].sort(compareStaffMembers);
-        });
-      });
-      setReactions(reactionCounts);
-      setReactionUsersByMessage(reactionUsersMap);
-    } catch (error) {
-      console.warn('메시지 반응 조회 실패:', describeQueryError(error));
-    }
-
-    try {
-      if (pollsResult.status === 'rejected') throw pollsResult.reason;
-      const pollsValue = pollsResult.value as { data: any[] | null; error: unknown };
-      if (pollsValue.error) throw pollsValue.error;
-
-      const dbPolls = pollsValue.data || [];
-      setPolls(dbPolls.length > 0 ? dbPolls : []);
-
-      const pollIds = dbPolls.map((poll) => String(poll.id || '')).filter(Boolean);
-      if (pollIds.length === 0) {
-        setPollVotes({});
-      } else {
-        const { data: votes, error: pollVotesError } = await db
-          .from('poll_votes')
-          .select('poll_id, option_index')
-          .in('poll_id', pollIds);
-        if (pollVotesError) throw pollVotesError;
-        if (!isCurrentRequest()) return;
-
-        const voteMap: Record<string, Record<number, number>> = {};
-        votes?.forEach((vote: Record<string, unknown>) => {
-          const pollId = String(vote.poll_id || '');
-          const optionIndex = Number(vote.option_index);
-          if (!pollId || !Number.isFinite(optionIndex)) return;
-          if (!voteMap[pollId]) voteMap[pollId] = {};
-          voteMap[pollId][optionIndex] = (voteMap[pollId][optionIndex] || 0) + 1;
-        });
-        setPollVotes(voteMap);
-      }
-    } catch (error) {
-      console.error('투표 조회 실패:', error);
-      setPolls([]);
-      setPollVotes({});
-    }
-    if (!isCurrentRequest()) return;
-
-    if (roomIdForFetch) {
-      const targetRoomIds = roomIdsToLoad.length > 0 ? roomIdsToLoad : [roomIdForFetch];
-      setRoomUnreadCounts((prev) => {
-        let changed = false;
-        const next = { ...prev };
-        targetRoomIds.forEach((targetRoomId) => {
-          if (!next[targetRoomId]) return;
-          next[targetRoomId] = 0;
-          changed = true;
-        });
-        return changed ? next : prev;
-      });
-    }
-
-    if (pendingBottomAlignRoomIdRef.current === roomIdForFetch) {
-      if (loadedMessages.length === 0) {
-        pendingBottomAlignRoomIdRef.current = null;
-      }
+    if (pendingBottomAlignRoomIdRef.current === roomIdForFetch && loadedMessages.length === 0) {
+      pendingBottomAlignRoomIdRef.current = null;
     }
   }, [
-    applyRoomSummaryToState,
-    buildRoomSummaryFromMessages,
     deliveryStatesRef,
-    effectiveTodoUserId,
     fetchDataRequestSeqRef,
-    getEffectiveRoomMemberIds,
     isRoomAccessibleToCurrentUser,
     pendingBottomAlignRoomIdRef,
     requestBottomAlignmentHold,
@@ -1634,23 +1397,13 @@ export function useChatRoomDataSync({
     selectChatMessagesWithFallback,
     selectedRoomId,
     selectedRoomIdRef,
-    setBookmarkedIds,
-    setChatRooms,
     setLoadingRoomId,
     setMessages,
-    setPinnedIds,
-    setPersistedPinnedMessages,
-    setPolls,
-    setPollVotes,
-    setReadCounts,
-    setReactionUsersByMessage,
-    setReactions,
     setRoom,
-    setRoomReadCursorMap,
     setRoomUnreadCounts,
     setTimelineRoomId,
     syncChatRoomsState,
-    updateUnreadForRooms,
+    syncVisibleMessageMetadata,
   ]);
 
   return {

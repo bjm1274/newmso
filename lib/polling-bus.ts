@@ -149,10 +149,12 @@ if (typeof window !== 'undefined') {
   // Periodically send ping heartbeats to other tabs (every 3 seconds)
   setInterval(() => {
     if (!bc) return;
+    // Full channel keys (incl. room_id filters) so leader WS can subscribe to scoped channels
+    // that only a follower tab currently has open.
     const myTables = new Set<string>();
     for (const entry of channelRegistry.values()) {
       for (const t of entry.tables) {
-        myTables.add(t.table);
+        myTables.add(toChannelKey(t));
       }
     }
     bc.postMessage({
@@ -233,11 +235,20 @@ function triggerImmediateSync() {
   }
 }
 
+/** TableFilter → DO/WS channel key (e.g. messages:room_id=eq.123) */
+function toChannelKey(tableFilter: TableFilter): string {
+  return tableFilter.table + (tableFilter.filter ? `:${tableFilter.filter}` : '');
+}
+
 function processTailData(entry: ChannelEntry, tail: Record<string, string | null>) {
   const changed: TableFilter[] = [];
   for (const tableFilter of entry.tables) {
-    const key = tableFilter.table + (tableFilter.filter ? `:${tableFilter.filter}` : '');
-    const next = tail[key] ?? null;
+    const key = toChannelKey(tableFilter);
+    // Prefer exact (possibly filtered) key; fall back to bare table only for unfiltered subs.
+    // Prevents SSE table-level `messages` ticks from waking room-scoped subscriptions.
+    const next = tableFilter.filter
+      ? (tail[key] ?? null)
+      : (tail[key] ?? tail[tableFilter.table] ?? null);
     const prev = entry.lastSeen[key] ?? null;
     if (next !== prev) {
       entry.lastSeen[key] = next;
@@ -248,7 +259,7 @@ function processTailData(entry: ChannelEntry, tail: Record<string, string | null
     }
   }
   if (changed.length === 0) return;
-  const payloads = changed.map((t) => ({ table: t.table }));
+  const payloads = changed.map((t) => ({ table: t.table, filter: t.filter }));
   for (const cb of entry.singleCallbacks) {
     try {
       cb(payloads[payloads.length - 1]);
@@ -267,17 +278,30 @@ function processTailData(entry: ChannelEntry, tail: Record<string, string | null
   }
 }
 
+/**
+ * WS change channel matching.
+ * - Filtered sub (messages:room_id=eq.X): exact key only — bare `messages` must NOT fan-out.
+ * - Unfiltered sub (messages): bare table OR any scoped `messages:…` channel.
+ * Server emits both bare + room-scoped keys so global unread and room views can diverge.
+ */
 function processTailDataWebSocket(entry: ChannelEntry, changedChannels: string[]) {
   const changed: TableFilter[] = [];
   for (const tableFilter of entry.tables) {
-    const key = tableFilter.table + (tableFilter.filter ? `:${tableFilter.filter}` : '');
-    if (changedChannels.includes(key) || changedChannels.includes(tableFilter.table)) {
+    const key = toChannelKey(tableFilter);
+    if (tableFilter.filter) {
+      if (changedChannels.includes(key)) {
+        changed.push(tableFilter);
+      }
+    } else if (
+      changedChannels.includes(tableFilter.table) ||
+      changedChannels.some((ch) => ch.startsWith(`${tableFilter.table}:`))
+    ) {
       changed.push(tableFilter);
     }
   }
 
   if (changed.length === 0) return;
-  const payloads = changed.map((t) => ({ table: t.table }));
+  const payloads = changed.map((t) => ({ table: t.table, filter: t.filter }));
   for (const cb of entry.singleCallbacks) {
     try {
       cb(payloads[payloads.length - 1]);
@@ -755,10 +779,12 @@ export function pokeChannel(channelKey: string): void {
   const entry = channelRegistry.get(channelKey);
   if (!entry) return;
 
+  // Include exact filtered keys so room-scoped listeners fire; bare table keys keep
+  // global unread / list subscribers in sync for same-tab + cross-client signals.
   const changedChannels = [channelKey];
-  entry.tables.forEach(t => {
-    changedChannels.push(t.table);
-    changedChannels.push(t.table + (t.filter ? `:${t.filter}` : ''));
+  entry.tables.forEach((t) => {
+    changedChannels.push(toChannelKey(t));
+    if (t.filter) changedChannels.push(t.table);
   });
   processTailDataWebSocket(entry, changedChannels);
 

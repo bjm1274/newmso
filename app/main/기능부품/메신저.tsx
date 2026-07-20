@@ -1963,7 +1963,7 @@ export default function ChatView({
           });
         });
       },
-      { pollIntervalMs: 5000 },
+      { pollIntervalMs: 15000 },
     );
   }, [isRoomAccessibleToCurrentUser, sortChatRoomsWithNoticeFirst]);
   useChatRealtimeSubscriptions({

@@ -421,15 +421,19 @@ export function useChatMessagesForRoom(
         setHasMore(false);
         oldestRef.current = null;
       } else {
-        // 화면은 오래된 -> 최신 순으로 정렬
+        // 화면은 오래된 -> 최신 순으로 정렬. 메시지는 먼저 그리고, 반응은 2차 패스.
         const ordered = [...data].reverse();
+        setMessages(ordered);
+        setHasMore(data.length >= MESSAGES_LIMIT);
+        oldestRef.current = ordered.length > 0
+          ? (ordered[0].created_at as string | null) || null
+          : null;
+        if (!isStaleRoom(currentRoomId, gen)) {
+          setLoading(false);
+        }
         const withReactions = await fetchAndMergeReactions(ordered);
         if (isStaleRoom(currentRoomId, gen)) return;
         setMessages(withReactions);
-        setHasMore(data.length >= MESSAGES_LIMIT);
-        oldestRef.current = withReactions.length > 0
-          ? (withReactions[0].created_at as string | null) || null
-          : null;
       }
     } catch {
       if (isStaleRoom(currentRoomId, gen)) return;
@@ -473,13 +477,20 @@ export function useChatMessagesForRoom(
         setHasMore(false);
       } else {
         const ordered = [...data].reverse();
-        const withReactions = await fetchAndMergeReactions(ordered);
-        if (isStaleRoom(currentRoomId, gen)) return;
-        setMessages((prev) => [...withReactions, ...prev]);
-        oldestRef.current = withReactions.length > 0
-          ? (withReactions[0].created_at as string | null) || null
+        setMessages((prev) => [...ordered, ...prev]);
+        oldestRef.current = ordered.length > 0
+          ? (ordered[0].created_at as string | null) || null
           : oldestRef.current;
         if (data.length < MESSAGES_LIMIT) setHasMore(false);
+        const withReactions = await fetchAndMergeReactions(ordered);
+        if (isStaleRoom(currentRoomId, gen)) return;
+        // Merge reactions into the page that was just prepended (by message id).
+        const reactionById = new Map(
+          withReactions.map((message) => [String(message.id || ''), message] as const),
+        );
+        setMessages((prev) =>
+          prev.map((message) => reactionById.get(String(message.id || '')) || message),
+        );
       }
     } catch {
       // 무한스크롤 실패는 silent — 다음 시도 가능
@@ -633,15 +644,19 @@ export function useChatMessagesForRoom(
       const afterList = Array.isArray(afterRows) ? afterRows : [];
       const merged = [...beforeList, ...afterList];
 
+      setMessages(merged);
+      setHasMore(beforeList.length >= 50);
+      oldestRef.current = merged.length > 0
+        ? (merged[0].created_at as string | null) || null
+        : null;
+      setSearchMessageId(messageId);
+      if (!isStaleRoom(currentRoomId, gen)) {
+        setLoading(false);
+      }
+
       const withReactions = await fetchAndMergeReactions(merged);
       if (isStaleRoom(currentRoomId, gen)) return;
       setMessages(withReactions);
-      setHasMore(beforeList.length >= 50);
-      oldestRef.current = withReactions.length > 0
-        ? (withReactions[0].created_at as string | null) || null
-        : null;
-
-      setSearchMessageId(messageId);
     } catch (err) {
       console.error('[jumpToMessage] Failed to jump:', err);
     } finally {

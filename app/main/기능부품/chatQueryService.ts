@@ -9,7 +9,7 @@ import type { ChatRoom } from '@/types';
 
 const CHAT_ROOMS_CACHE_KEY = 'newmso:chat-rooms:v1';
 const CHAT_ROOMS_CACHE_LIMIT = 200;
-const CHAT_ROOMS_FETCH_TTL_MS = 5_000;
+const CHAT_ROOMS_FETCH_TTL_MS = 30_000;
 
 type ChatRoomsFetchResult = { data: ChatRoom[]; error: unknown };
 type FetchAllChatRoomsOptions = {

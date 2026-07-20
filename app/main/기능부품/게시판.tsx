@@ -84,6 +84,8 @@ interface BoardViewProps {
   mris?: ScheduleItem[];
   setMainMenu?: (menu: string) => void;
 }
+const BOARD_POST_PAGE_SIZE = 100;
+
 type BoardCommentRow = {
   id: string;
   author_id?: string;
@@ -156,7 +158,9 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
   const [newComment, setNewComment] = useState('');
   const [myLikedPostIds, setMyLikedPostIds] = useState<Set<string>>(new Set());
   const [postReadMap, setPostReadMap] = useState<Record<string, Set<string>>>({});
-  const [boardAudience, setBoardAudience] = useState<StaffSummary[]>([]);
+  const [postListLimit, setPostListLimit] = useState(BOARD_POST_PAGE_SIZE);
+  const [hasMorePosts, setHasMorePosts] = useState(false);
+
   const [readStatusPost, setReadStatusPost] = useState<BoardPost | null>(null);
   const [readStatusLoading, setReadStatusLoading] = useState(false);
   const [readStatusAudience, setReadStatusAudience] = useState<StaffSummary[]>([]);
@@ -259,31 +263,11 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
     });
   }, [posts, noticeVisibilityTick, canScheduleNoticePost]);
 
-  const loadBoardAudience = useCallback(async () => {
-    if (!effectiveBoardUserId) {
-      setBoardAudience([]);
+  const loadBoardReadState = useCallback(async (postIds?: string[], includeAllReaders = false) => {
+    if (!includeAllReaders && !effectiveBoardUserId) {
+      setPostReadMap({});
       return;
     }
-
-    const loadStaff = async () => {
-      return db
-        .from('staff_members')
-        .select('id, name, company, company_id, department, position, status')
-        .neq('status', '퇴사')
-        .neq('status', '퇴직')
-        .order('company', { ascending: true })
-        .order('name', { ascending: true });
-    };
-
-    const { data, error } = await loadStaff();
-    if (error) {
-      logger.warn('board audience load failed', error);
-      return;
-    }
-    setBoardAudience((data || []) as StaffSummary[]);
-  }, [effectiveBoardUserId]);
-
-  const loadBoardReadState = useCallback(async (postIds?: string[]) => {
     const targetIds = (postIds || visiblePosts.map((post) => String(post.id ?? '').trim()).filter(Boolean))
       .filter((postId) => {
         const post = visiblePosts.find((item) => String(item.id ?? '').trim() === postId) ||
@@ -295,10 +279,13 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
       return;
     }
 
-    const { data, error } = await db
+    let query = db
       .from('board_post_reads')
-      .select('post_id, user_id, read_at')
-      .in('post_id', targetIds);
+      .select('post_id, user_id, read_at');
+    if (!includeAllReaders) {
+      query = query.eq('user_id', effectiveBoardUserId);
+    }
+    const { data, error } = await query.in('post_id', targetIds);
 
     if (error) {
       if (!isMissingBoardReadStorageError(error)) {
@@ -315,8 +302,11 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
       if (!nextMap[postId]) nextMap[postId] = new Set<string>();
       nextMap[postId].add(userId);
     });
-    setPostReadMap(nextMap);
-  }, [posts, visiblePosts]);
+    targetIds.forEach((postId) => {
+      if (!nextMap[postId]) nextMap[postId] = new Set<string>();
+    });
+    setPostReadMap((prev) => (includeAllReaders ? { ...prev, ...nextMap } : nextMap));
+  }, [effectiveBoardUserId, posts, visiblePosts]);
 
   const markBoardPostRead = useCallback(async (post: BoardPost | null) => {
     if (!post?.id || !effectiveBoardUserId) return;
@@ -350,6 +340,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
       return;
     }
     setReadStatusPost(post);
+    setReadStatusAudience([]);
     setReadStatusLoading(true);
     try {
       // 공지사항·경조사 등 전사 공지 게시판은 전 직원이 대상
@@ -362,7 +353,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
         .order('company', { ascending: true })
         .order('name', { ascending: true });
       setReadStatusAudience((audienceData || []) as StaffSummary[]);
-      await loadBoardReadState([String(post.id)]);
+      await loadBoardReadState([String(post.id)], true);
     } finally {
       setReadStatusLoading(false);
     }
@@ -441,7 +432,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
     }
   }, [activeBoard, scheduleHour, scheduleMinute, schedulePeriod]);
 
-  const fetchPosts = async () => {
+  const fetchPosts = async (requestedLimit = postListLimit) => {
     const requestedBoard = activeBoard;
     const fetchSeq = ++boardFetchSeqRef.current;
     if (!user) return;
@@ -454,12 +445,20 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
       return;
     }
 
+    const isScheduleBoard = isScheduleBoardType(requestedBoard);
+    const listRequiredColumns = isScheduleBoard
+      ? BOARD_POST_REQUIRED_SELECT_COLUMNS
+      : BOARD_POST_REQUIRED_SELECT_COLUMNS.filter(
+          (column) => column !== 'content' && column !== 'poll' && column !== 'poll_votes',
+        );
+    const queryLimit = isScheduleBoard ? 500 : requestedLimit + 1;
+
     setLoading(true);
     const { data } = await withMissingColumnsFallback<BoardPostRow[]>(
       async (omittedColumns): Promise<QueryResult<BoardPostRow[]>> => {
         let query = db
           .from('board_posts')
-          .select(buildSelectColumns(BOARD_POST_REQUIRED_SELECT_COLUMNS, BOARD_POST_OPTIONAL_COLUMNS, omittedColumns))
+          .select(buildSelectColumns(listRequiredColumns, BOARD_POST_OPTIONAL_COLUMNS, omittedColumns))
           .eq('board_type', requestedBoard);
 
         // 회사 격리: MSO는 selectedCo/selectedCompanyId, 병원 직원은 세션 company
@@ -479,7 +478,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
 
         const result = await query
           .order('created_at', { ascending: false })
-          .limit(500);
+          .limit(queryLimit);
         return result as unknown as QueryResult<BoardPostRow[]>;
       },
       [...BOARD_POST_OPTIONAL_COLUMNS]
@@ -491,11 +490,14 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
 
     if (!data) {
       setPosts([]);
+      setHasMorePosts(false);
       setLoading(false);
       return;
     }
 
-    setPosts((data as BoardPostRow[]).map((post) => normalizeBoardPost(post)));
+    const fetchedPosts = (data as BoardPostRow[]).map((post) => normalizeBoardPost(post));
+    setHasMorePosts(!isScheduleBoard && fetchedPosts.length > requestedLimit);
+    setPosts(isScheduleBoard ? fetchedPosts : fetchedPosts.slice(0, requestedLimit));
     setLoading(false);
   };
 
@@ -521,6 +523,8 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
 
   // 수술·MRI 템플릿 불러오기
   useEffect(() => {
+    if (!showBodyPicker || !isScheduleBoardType(activeBoard)) return;
+    if (surgeryTemplates.length > 0 && mriTemplates.length > 0) return;
     const loadTemplates = async () => {
       try {
         const [{ data: s }, { data: m }] = await Promise.all([
@@ -564,7 +568,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
       }
     };
     loadTemplates();
-  }, []);
+  }, [activeBoard, showBodyPicker, surgeryTemplates.length, mriTemplates.length]);
 
   const currentTemplates = useMemo(
     () =>
@@ -605,34 +609,57 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
   useEffect(() => {
     const boardChanged = previousBoardRef.current !== activeBoard;
     previousBoardRef.current = activeBoard;
+    const requestedLimit = boardChanged ? BOARD_POST_PAGE_SIZE : postListLimit;
     if (boardChanged) {
       setPosts([]);
+      setPostListLimit(BOARD_POST_PAGE_SIZE);
+      setHasMorePosts(false);
       setShowNewPost(false);
       resetForm();
     }
-    fetchPosts();
-    void loadBoardAudience();
+    void fetchPosts(requestedLimit);
+
     // 내 좋아요 목록 로드
-    if (effectiveBoardUserId) {
-      db.from('board_post_likes').select('post_id').eq('user_id', effectiveBoardUserId).then(({ data }) => {
-        setMyLikedPostIds(
-          new Set(
-            ((data || []) as BoardLikeRow[])
-              .map((row) => String(row.post_id ?? '').trim())
-              .filter(Boolean)
-          )
-        );
-      });
-    }
     // 다른 게시판에서 다시 수술/MRI 일정으로 돌아올 때는 현재 월 기준으로 달력 리셋
     if (activeBoard === '수술일정' || activeBoard === 'MRI일정') {
       setCalendarMonth(new Date());
     }
-  }, [activeBoard, effectiveBoardUserId, loadBoardAudience, selectedCo, selectedCompanyId, user]);
+  }, [activeBoard, selectedCo, selectedCompanyId, user]);
 
   useEffect(() => {
     void loadBoardReadState();
   }, [loadBoardReadState]);
+
+  useEffect(() => {
+    if (!effectiveBoardUserId) {
+      setMyLikedPostIds(new Set());
+      return;
+    }
+    const postIds = posts.map((post) => String(post.id ?? '').trim()).filter(Boolean);
+    if (postIds.length === 0) {
+      setMyLikedPostIds(new Set());
+      return;
+    }
+    let cancelled = false;
+    void db
+      .from('board_post_likes')
+      .select('post_id')
+      .eq('user_id', effectiveBoardUserId)
+      .in('post_id', postIds)
+      .then(({ data }) => {
+        if (cancelled) return;
+        setMyLikedPostIds(
+          new Set(
+            ((data || []) as BoardLikeRow[])
+              .map((row) => String(row.post_id ?? '').trim())
+              .filter(Boolean),
+          ),
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveBoardUserId, posts]);
 
   // board_posts·board_post_reads 두 테이블을 단일 채널(=단일 폴링 interval/단일
   // /api/realtime/tail 요청)로 통합 구독한다. 배치 콜백이 변경된 테이블 목록을
@@ -643,7 +670,6 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
       'board-realtime',
       [
         { table: 'board_posts', event: '*' },
-        { table: 'board_post_reads', event: '*' },
       ],
       (payloads) => {
         const changedTables = new Set(
@@ -651,16 +677,13 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
         );
         if (changedTables.has('board_posts')) {
           // 좋아요 처리 중이면 realtime fetch 건너뜀 (로컬 state 덮어쓰기 방지)
-          if (!likingRef.current) fetchPosts();
-        }
-        if (changedTables.has('board_post_reads')) {
-          void loadBoardReadState();
+          if (!likingRef.current) void fetchPosts(postListLimit);
         }
       },
-      { pollIntervalMs: 10000 },
+      { pollIntervalMs: 30000 },
     );
     return unsubscribe;
-  }, [activeBoard, user?.id, loadBoardReadState]);
+  }, [activeBoard, postListLimit, user?.id]);
 
   const fetchComments = async (postId: string) => {
     const { data } = await db
@@ -868,27 +891,27 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
     if (isAnonymousReadStatusPost(readStatusPost)) return [];
     const postId = String(readStatusPost.id ?? '').trim();
     const readSet = postReadMap[postId] || new Set<string>();
-    const audience = readStatusAudience.length > 0 ? readStatusAudience : boardAudience;
+    const audience = readStatusAudience;
     const authorId = String(readStatusPost.author_id ?? '').trim();
     return audience.filter((member) => {
       const memberId = String(member.id ?? '').trim();
       if (authorId && memberId === authorId) return true;
       return readSet.has(memberId);
     });
-  }, [boardAudience, readStatusAudience, postReadMap, readStatusPost]);
+  }, [readStatusAudience, postReadMap, readStatusPost]);
   const readStatusPendingAudience = useMemo(() => {
     if (!readStatusPost) return [];
     if (isAnonymousReadStatusPost(readStatusPost)) return [];
     const postId = String(readStatusPost.id ?? '').trim();
     const readSet = postReadMap[postId] || new Set<string>();
-    const audience = readStatusAudience.length > 0 ? readStatusAudience : boardAudience;
+    const audience = readStatusAudience;
     const authorId = String(readStatusPost.author_id ?? '').trim();
     return audience.filter((member) => {
       const memberId = String(member.id ?? '').trim();
       if (authorId && memberId === authorId) return false;
       return !readSet.has(memberId);
     });
-  }, [boardAudience, readStatusAudience, postReadMap, readStatusPost]);
+  }, [readStatusAudience, postReadMap, readStatusPost]);
 
   useEffect(() => {
     if (!selectedPost) return;
@@ -2317,6 +2340,22 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
           )}
 
           {/* 게시글 상세 보기 모달 */}
+          {hasMorePosts && !loading && !isScheduleBoardType(activeBoard) && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const nextLimit = postListLimit + BOARD_POST_PAGE_SIZE;
+                  setPostListLimit(nextLimit);
+                  void fetchPosts(nextLimit);
+                }}
+                className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-4 py-2 text-[12px] font-bold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+              >
+                더 보기
+              </button>
+            </div>
+          )}
+
           {selectedPost && (
             <div data-testid="board-post-detail-overlay" className="fixed inset-0 z-[var(--z-modal)] flex items-end md:items-center justify-center bg-black/40 p-0 md:p-5">
               <div data-testid="board-post-detail" className="w-full max-w-4xl max-h-[90dvh] overflow-y-auto bg-[var(--card)] border-0 md:border border-[var(--border)] rounded-t-[24px] md:rounded-[var(--radius-xl)] shadow-sm p-3 md:p-4 pb-8 space-y-4 md:space-y-5 text-[13px] md:text-[14px] safe-area-pb">

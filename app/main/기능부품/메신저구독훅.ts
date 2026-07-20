@@ -239,21 +239,27 @@ export function useChatRealtimeSubscriptions({
     setGlobalRealtimeState('connected');
     globalRealtimeHealthyRef.current = true;
     // 다른 방 신규 메시지 알림(배지)용 백그라운드 폴링.
-    // 2026-05-26 — 8000→2000ms. 활성 방 폴링과 별개로 다른 방 알림 도착 지연을 줄임.
+    // 활성 방이 없으면 fetchData(force)로 방 목록 last_message + unread 를 함께 갱신.
+    // 활성 방이 있으면 room 채널이 현재 방 메시지를 처리하므로 unread 배지만 갱신하고,
+    // 다른 방 last_message 는 chat_rooms 구독/알림 경로에 맡긴다.
     // 본인 send 시 pokeChannel('chat-global-messages')로 즉시 트리거.
     const unsubscribe = subscribeRealtime(
       'chat-global-messages',
       [{ table: 'messages' }],
       () => {
-        void fetchDataLatestRef.current({ force: true });
+        if (!selectedRoomIdRef.current) {
+          void fetchDataLatestRef.current({ force: true });
+          return;
+        }
+        void updateUnreadForRooms(chatRoomsRef.current);
       },
-      { pollIntervalMs: 2000 },
+      { pollIntervalMs: 15000 },
     );
     return () => {
       globalRealtimeHealthyRef.current = false;
       unsubscribe();
     };
-  }, [globalRealtimeRetryToken, setGlobalRealtimeState, userId]);
+  }, [globalRealtimeRetryToken, setGlobalRealtimeState, updateUnreadForRooms, userId]);
 
   useEffect(() => {
     if (!selectedRoomId) {
@@ -285,21 +291,23 @@ export function useChatRealtimeSubscriptions({
       void fetchDataLatestRef.current();
     }
 
-    // Phase 5-C-3 — room realtime 채널 → polling.
-    // tail endpoint는 room별 filter를 지원하지 않으므로 messages 전체 변경 감지
-    // (다른 방 변경에도 반응하나 fetchDataLatestRef.current가 selectedRoomId 기준이라 무해).
-    // 메시지/메타 테이블 변경 감지 시 해당 refresh 함수 호출.
+    // Room-scoped realtime: only this selected room's channels.
+    // Server emits both bare `messages` (global unread) and `messages:room_id=eq.X`.
+    // Filtered keys ensure other-room traffic does not full-refetch open conversation.
+    // message_reactions / poll_votes lack reliable room_id on every write path → table-level
+    // (metadata-only refresh, not full message list).
     roomRealtimeHealthyRef.current = true;
     setRoomRealtimeState('connected');
+    const roomFilter = `room_id=eq.${selectedRoomId}`;
     const unsubscribe = subscribeRealtimeBatched(
       `chat-realtime-${selectedRoomId}`,
       [
-        { table: 'messages' },
-        { table: 'room_read_cursors' },
+        { table: 'messages', filter: roomFilter },
+        { table: 'room_read_cursors', filter: roomFilter },
         { table: 'message_reactions' },
-        { table: 'message_bookmarks' },
-        { table: 'pinned_messages' },
-        { table: 'polls' },
+        { table: 'message_bookmarks', filter: roomFilter },
+        { table: 'pinned_messages', filter: roomFilter },
+        { table: 'polls', filter: roomFilter },
         { table: 'poll_votes' },
       ],
       (payloads) => {
@@ -330,11 +338,9 @@ export function useChatRealtimeSubscriptions({
           triggerDebouncedMetadataRefresh(refreshRoomPollsRef.current);
         }
       },
-      // 2026-05-26 — Phase 5-D의 2500ms는 ALLOWED_TABLES whitelist 누락(7개)으로
-      // 메시지 외 갱신이 사실상 polling으로 안 흐르던 상태였음. whitelist 복구
-      // 후엔 1000ms로 환원해 읽음 표시·반응·핀·투표 갱신 체감 즉시.
       // 본인 send 시 pokeChannel로 즉시 트리거하므로 주기에 의존하지 않음.
-      { pollIntervalMs: 1000 },
+      // WS 활성 시 폴링 자체는 꺼지며, 여기 값은 fallback 하한용.
+      { pollIntervalMs: 5000 },
     );
 
     return () => {
