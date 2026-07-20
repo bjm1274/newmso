@@ -485,59 +485,94 @@ export async function POST(request: Request) {
       // 채팅 메시지 INSERT 시:
       // 1) chat_rooms.last_message_at/last_message_preview를 갱신 (D1 trigger 대체)
       // 2) chat_push_jobs 큐에 적재 (푸시 알림)
+      // 3) 즉시 디스패치는 응답 경로 밖에서 처리 (모바일 전송 지연/타임아웃 방지)
       //
-      // 서버리스 환경(Cloudflare Pages 등)에서는 비동기 작업이 응답 직후 강제 종료될 수 있으므로,
-      // 반드시 await 처리하여 DB 갱신과 큐 적재가 완료된 후 응답을 반환해야 합니다.
+      // 핫패스(응답 전 await): room preview + enqueue 만 보장.
+      // FCM/WebPush 실발송은 느리고 큐 적체 시 전송 자체를 실패로 보이게 하므로
+      // waitUntil(가능 시) 또는 fire-and-forget + client trigger/cron 폴백으로 분리한다.
       if (payload.table === 'messages' && allResults.length > 0) {
         const bgResults = [...allResults];
-        await (async () => {
-          // (1) chat_rooms 갱신
-          try {
-            const { updateChatRoomLastMessage } = await import('@/lib/db/functions/triggers');
-            const seenRoomIds = new Set<string>();
-            for (const r of bgResults) {
+        // (1)+(2) 응답 전 완료 — 목록 preview·큐 영속성
+        try {
+          const { updateChatRoomLastMessage } = await import('@/lib/db/functions/triggers');
+          const seenRoomIds = new Set<string>();
+          for (const r of bgResults) {
+            const row = r as Record<string, unknown>;
+            const roomId = String(row.room_id ?? '').trim();
+            if (!roomId || seenRoomIds.has(roomId)) continue;
+            seenRoomIds.add(roomId);
+            await updateChatRoomLastMessage(db, {
+              room_id: roomId,
+              created_at: String(row.created_at ?? new Date().toISOString()),
+              content: row.content != null ? String(row.content) : null,
+              file_name: row.file_name != null ? String(row.file_name) : null });
+          }
+        } catch (triggerErr) {
+          console.error('[d1/mutate] chat_rooms last_message update failed (non-fatal):', triggerErr);
+        }
+        try {
+          const { enqueueChatPushJob } = await import('@/lib/chat-push-enqueue');
+          await Promise.all(
+            bgResults.map((r) => {
               const row = r as Record<string, unknown>;
-              const roomId = String(row.room_id ?? '').trim();
-              if (!roomId || seenRoomIds.has(roomId)) continue;
-              seenRoomIds.add(roomId);
-              await updateChatRoomLastMessage(db, {
-                room_id: roomId,
-                created_at: String(row.created_at ?? new Date().toISOString()),
-                content: row.content != null ? String(row.content) : null,
-                file_name: row.file_name != null ? String(row.file_name) : null });
-            }
-          } catch (triggerErr) {
-            console.error('[d1/mutate] chat_rooms last_message update failed (non-fatal):', triggerErr);
-          }
-          // (2) 푸시 알림 큐 적재
-          try {
-            const { enqueueChatPushJob } = await import('@/lib/chat-push-enqueue');
-            await Promise.all(
-              bgResults.map((r) => {
-                const row = r as Record<string, unknown>;
-                const messageId = String(row.id ?? '');
-                const roomId = String(row.room_id ?? '');
-                if (!messageId || !roomId) return Promise.resolve();
-                return enqueueChatPushJob({
-                  messageId,
-                  roomId,
-                  senderId: (row.sender_id as string | null) ?? null });
-              }),
-            );
-          } catch (enqueueErr) {
-            console.error('[d1/mutate] chat_push_jobs 적재 실패 (non-fatal):', enqueueErr);
-          }
+              const messageId = String(row.id ?? '');
+              const roomId = String(row.room_id ?? '');
+              if (!messageId || !roomId) return Promise.resolve();
+              return enqueueChatPushJob({
+                messageId,
+                roomId,
+                senderId: (row.sender_id as string | null) ?? null });
+            }),
+          );
+        } catch (enqueueErr) {
+          console.error('[d1/mutate] chat_push_jobs 적재 실패 (non-fatal):', enqueueErr);
+        }
 
-          // (3) 카톡급 즉시 발송 — 클라이언트 chat-push 트리거 실패/앱 백그라운드여도 서버가 바로 처리.
-          // 비용 가드: 이번 INSERT 건수와 10건 중 작은 값만 즉시 처리. 나머지는 5분 cron/flush.
+        // (3) 이번 INSERT 메시지에 한해 즉시 디스패치 — 전체 pending 큐 drain 금지.
+        // processPendingChatPushJobs(N) 은 오래된 job 부터 N건을 처리해 전송 RTT를 폭증시켰다.
+        const dispatchInsertedPushes = async () => {
           try {
-            const { processPendingChatPushJobs } = await import('@/lib/chat-push-dispatch');
-            const immediateLimit = Math.min(Math.max(bgResults.length, 1), 10);
-            await processPendingChatPushJobs(immediateLimit);
+            const { dispatchChatPushForMessage } = await import('@/lib/chat-push-dispatch');
+            const targets = bgResults
+              .map((r) => {
+                const row = r as Record<string, unknown>;
+                return {
+                  messageId: String(row.id ?? '').trim(),
+                  roomId: String(row.room_id ?? '').trim() };
+              })
+              .filter((t) => t.messageId && t.roomId)
+              .slice(0, 10);
+            await Promise.all(
+              targets.map((t) =>
+                dispatchChatPushForMessage({
+                  roomId: t.roomId,
+                  messageId: t.messageId }).catch((err) => {
+                  console.error('[d1/mutate] immediate chat-push failed (non-fatal):', err);
+                }),
+              ),
+            );
           } catch (dispatchErr) {
             console.error('[d1/mutate] 즉시 chat-push 디스패치 실패 (non-fatal, cron 회수):', dispatchErr);
           }
-        })();
+        };
+
+        // Cloudflare Workers: waitUntil 로 응답 후 작업 보장. 로컬/미지원 시 fire-and-forget.
+        // (클라이언트 triggerChatPush + 5분 cron 이 최종 폴백)
+        let scheduled = false;
+        try {
+          const { getCloudflareContext } = await import('@opennextjs/cloudflare');
+          const cf = getCloudflareContext();
+          const waitUntil = (cf as { ctx?: { waitUntil?: (p: Promise<unknown>) => void } })?.ctx?.waitUntil;
+          if (typeof waitUntil === 'function') {
+            waitUntil(dispatchInsertedPushes());
+            scheduled = true;
+          }
+        } catch {
+          // getCloudflareContext 불가(로컬 next dev 등)
+        }
+        if (!scheduled) {
+          void dispatchInsertedPushes();
+        }
       }
 
       // RETURNING 결과의 JSON 컬럼 역직렬화 (수정 2)

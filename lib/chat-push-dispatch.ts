@@ -905,42 +905,32 @@ export async function dispatchChatPushForMessage(params: {
     pushDisabled = true;
   }
 
-  // FCM 토큰이 있는 staff_id 집합 — 이 기기에는 FCM만 발송, Web Push 제외 (이중 발송 방지)
-  // FCM 토큰이 있는 staff_id 집합 — 이 기기에는 FCM만 발송, Web Push 제외 (이중 발송 방지)
-  const staffIdsWithFcmToken = new Set<string>(
-    subscriptions
-      .filter((row) => row.fcm_token && row.staff_id && row.staff_id !== senderId)
-      .map((row) => String(row.staff_id))
-  );
-
+  // 기기(구독 행) 단위로 채널을 분리한다.
+  // 과거: staff 에 FCM 토큰이 하나라도 있으면 그 staff 의 모든 Web Push 를 스킵 →
+  // 모바일(FCM) + PC 브라우저(Web Push) 동시 사용 시 PC 알림이 영구 미발송됐다.
+  // 현재: 같은 행에 fcm_token 이 있으면 그 endpoint 웹푸시만 스킵(동일 기기 이중 방지).
+  // FCM 없는 PC/다른 기기 Web Push 는 그대로 발송.
   const uniqueSubscriptions = new Map<string, PushSubscriptionRow>();
   for (const row of subscriptions) {
     if (!row.endpoint || !row.staff_id || row.staff_id === senderId) continue;
     if (!row.p256dh || !row.auth || !/^https?:\/\//i.test(String(row.endpoint))) continue;
-    // FCM 토큰이 있는 사용자는 Web Push 제외 (FCM으로만 발송)
-    if (staffIdsWithFcmToken.has(row.staff_id)) continue;
+    // 동일 구독 행에 FCM 이 있으면 이 endpoint 는 FCM 전용 (기기 단위 이중 발송 방지)
+    if (String(row.fcm_token || '').trim()) continue;
     if (!uniqueSubscriptions.has(row.endpoint)) {
       uniqueSubscriptions.set(row.endpoint, row);
     }
   }
 
-  // 같은 staff_id에 잔재 fcm_token이 여러 개 남아있을 수 있으므로
-  // 사용자당 가장 최근(created_at 내림차순) 토큰 1개만 사용해 이중 발송 차단.
-  const latestFcmTokenByStaffId = new Map<string, { token: string; createdAt: number }>();
-  for (const row of subscriptions) {
-    if (!row.fcm_token || !row.staff_id || row.staff_id === senderId) continue;
-    const token = String(row.fcm_token).trim();
-    if (!token) continue;
-    const createdAt = row.created_at ? Date.parse(String(row.created_at)) : 0;
-    const prev = latestFcmTokenByStaffId.get(row.staff_id);
-    if (!prev || (Number.isFinite(createdAt) ? createdAt : 0) > prev.createdAt) {
-      latestFcmTokenByStaffId.set(row.staff_id, {
-        token,
-        createdAt: Number.isFinite(createdAt) ? createdAt : 0 });
-    }
-  }
+  // 모든 고유 FCM 토큰 발송 (기기 여러 대 지원).
+  // 과거: staff 당 최신 1개만 → 두 번째 폰/태블릿 알림 누락.
+  // 만료 토큰은 sendFcmBatch expired 경로에서 null 처리.
   const uniqueFcmTokens = Array.from(
-    new Set(Array.from(latestFcmTokenByStaffId.values()).map((entry) => entry.token))
+    new Set(
+      subscriptions
+        .filter((row) => row.fcm_token && row.staff_id && row.staff_id !== senderId)
+        .map((row) => String(row.fcm_token).trim())
+        .filter(Boolean),
+    ),
   );
 
   if (uniqueSubscriptions.size === 0 && uniqueFcmTokens.length === 0) {
@@ -961,7 +951,7 @@ export async function dispatchChatPushForMessage(params: {
       reason: 'no-active-subscriptions' } satisfies ChatPushDispatchResult;
   }
 
-  // staff_id 기준으로 FCM 토큰이 있는 사용자 집합 구성 — Web Push + FCM 이중 발송 방지
+  // 기기별 채널 선택 완료 — FCM 행 / Web Push 전용 행 각각 발송
   let sent = 0;
   let failed = 0;
   const expiredIds: string[] = [];

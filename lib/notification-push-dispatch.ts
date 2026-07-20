@@ -9,10 +9,9 @@
  * 혹은 서버 라우트에서 알림 row를 직접 만든 직후.
  *
  * 정책:
- *   - 같은 staff_id가 push_subscriptions에 여러 행 갖고 있을 수 있음 →
- *     fcm_token은 created_at 내림차순 가장 최신 1개만 사용 (이중 발송 차단).
- *   - FCM 토큰이 있는 사용자에게는 FCM만 발송하고 Web Push는 건너뜀
- *     (동일 기기 이중 알림 방지 — 기존 chat-push-dispatch 정책과 동일).
+ *   - 기기(구독 행) 단위: FCM 토큰이 있는 행은 FCM, 없는 행은 Web Push.
+ *     (과거 staff 단위 FCM 우선 → 모바일 있으면 PC Web Push 미발송 버그 수정)
+ *   - 동일 staff 의 모든 고유 FCM 토큰 발송 (멀티 디바이스).
  *   - WebPush 만료(404/410) endpoint는 push_subscriptions에서 즉시 삭제.
  *   - FCM 만료 토큰은 fcm_token=null로 무효화.
  *   - 푸시 실패 row가 있어도 전체를 중단하지 않고 로그만 남긴다.
@@ -23,7 +22,7 @@ import { sendFcmBatch } from '@/lib/fcm-http';
 import { isWithinPushQuietHours } from '@/lib/push-quiet-hours';
 import {
   toStringRecord,
-  selectLatestFcmToken,
+  collectUniqueFcmTokens,
   dedupeWebPushSubscriptions,
   invalidateExpiredFcmTokens,
   deleteExpiredWebPushSubscriptions } from '@/lib/notification-shared';
@@ -143,34 +142,35 @@ async function dispatchSingleUser(
   const userSubs = subscriptions.filter((s) => String(s.staff_id || '') === row.user_id);
   if (userSubs.length === 0) return;
 
-  const fcmToken = selectLatestFcmToken(userSubs) ?? '';
+  const fcmTokens = collectUniqueFcmTokens(userSubs);
   const tag = buildTagFor(row);
   const data = toStringRecord({
     ...(row.metadata ?? {}),
     notification_type: row.type,
     tag });
 
-  if (fcmToken) {
-    let fcmDelivered = false;
+  const undeliveredFcmTokens = new Set<string>();
+  if (fcmTokens.length > 0) {
     try {
-      const fcmResult = await sendFcmBatch([fcmToken], {
+      const fcmResult = await sendFcmBatch(fcmTokens, {
         title: row.title,
         body: row.body,
         data });
       result.fcmSent += fcmResult.success.length;
-      fcmDelivered = fcmResult.success.length > 0;
       if (fcmResult.expired.length > 0) {
         result.fcmExpired += fcmResult.expired.length;
         await invalidateExpiredFcmTokens(d1, fcmResult.expired);
+      }
+      for (const token of [...fcmResult.error, ...fcmResult.expired]) {
+        undeliveredFcmTokens.add(token);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       result.errors.push(`fcm:${row.user_id}:${msg}`);
       console.error('[notification-push-dispatch] FCM send failed for', row.user_id, err);
+      // batch 자체 실패 시 전 토큰 미전달로 보고 WebPush 폴백 허용
+      for (const token of fcmTokens) undeliveredFcmTokens.add(token);
     }
-    // FCM 으로 실제 전달됐으면 WebPush 생략(동일 기기 이중 발송 방지).
-    // FCM 이 일시 실패/만료했으면 같은 사용자의 WebPush 구독으로 폴백한다(아래로 진행).
-    if (fcmDelivered) return;
   }
 
   if (!webPushEnabled) return;
@@ -181,8 +181,13 @@ async function dispatchSingleUser(
     tag,
     data: { ...(row.metadata ?? {}), notification_type: row.type, tag } });
 
-  // endpoint dedupe (같은 사용자의 잔재 구독 중복 발송 방지)
-  const targets = dedupeWebPushSubscriptions(userSubs);
+  // WebPush 전용 기기 + FCM 미전달 기기의 같은 행 WebPush 폴백
+  const webPushCandidates = userSubs.filter((sub) => {
+    const token = String(sub.fcm_token || '').trim();
+    if (!token) return true;
+    return undeliveredFcmTokens.has(token);
+  });
+  const targets = dedupeWebPushSubscriptions(webPushCandidates, { excludeFcmRows: false });
   if (targets.length === 0) return;
 
   const expiredIds: string[] = [];

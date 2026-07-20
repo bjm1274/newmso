@@ -5,7 +5,7 @@ import { NOTICE_ROOM_ID } from '@/lib/constants';
 import {
   toStringRecord,
   toMetadataRecord,
-  selectLatestFcmToken,
+  collectUniqueFcmTokens,
   dedupeWebPushSubscriptions,
   invalidateExpiredFcmTokens,
   deleteExpiredWebPushSubscriptions } from '@/lib/notification-shared';
@@ -271,14 +271,9 @@ export async function processUnreadNotificationRepushServer(
 
     const userSubscriptions = subscriptionsByUser.get(String(row.user_id || '').trim()) || [];
 
-    // 같은 사용자의 잔재 fcm_token이 여러 개 남아있을 수 있으므로
-    // 가장 최신(created_at 내림차순) 토큰 1개만 사용해 이중 발송 차단.
-    const latestFcmToken = selectLatestFcmToken(userSubscriptions);
-    const uniqueFcmTokens = latestFcmToken ? [latestFcmToken] : [];
-    const hasFcmToken = uniqueFcmTokens.length > 0;
-
-    // FCM 토큰이 있는 사용자는 Web Push 제외 — FCM·Web Push 이중 발송 방지
-    const webPushTargets = hasFcmToken ? [] : dedupeWebPushSubscriptions(userSubscriptions);
+    // 기기 단위: 모든 고유 FCM + FCM 없는 행의 Web Push (모바일+PC 동시 지원)
+    const uniqueFcmTokens = collectUniqueFcmTokens(userSubscriptions);
+    const webPushTargets = dedupeWebPushSubscriptions(userSubscriptions);
 
     if (webPushTargets.length === 0 && uniqueFcmTokens.length === 0) {
       skipped += 1;

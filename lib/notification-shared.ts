@@ -49,43 +49,61 @@ type SubscriptionLike = {
 };
 
 /**
- * 같은 사용자의 잔재 fcm_token이 여러 개일 수 있으므로
- * created_at 내림차순 가장 최신 토큰 1개만 선택해 이중 발송을 차단한다.
- * 유효 토큰이 없으면 null.
+ * @deprecated 멀티 디바이스 미지원 — collectUniqueFcmTokens 사용.
+ * 같은 사용자의 잔재 fcm_token이 여러 개일 때 최신 1개만 반환(레거시 호환).
  */
 export function selectLatestFcmToken(
   subscriptions: SubscriptionLike[],
 ): string | null {
-  let latestToken: string | null = null;
-  let latestCreatedAt = -Infinity;
+  const tokens = collectUniqueFcmTokens(subscriptions);
+  return tokens[0] ?? null;
+}
+
+/**
+ * 사용자 구독 목록에서 고유 FCM 토큰 전부 수집 (기기 여러 대 지원).
+ * created_at 최신 순으로 정렬해 첫 토큰이 최신이 되도록 한다(레거시 selectLatest 호환).
+ */
+export function collectUniqueFcmTokens(
+  subscriptions: SubscriptionLike[],
+): string[] {
+  const byToken = new Map<string, number>();
   for (const subscription of subscriptions) {
     const token = String(subscription.fcm_token || '').trim();
     if (!token) continue;
     const parsed = subscription.created_at ? Date.parse(String(subscription.created_at)) : 0;
     const createdAt = Number.isFinite(parsed) ? parsed : 0;
-    if (createdAt > latestCreatedAt) {
-      latestCreatedAt = createdAt;
-      latestToken = token;
+    const prev = byToken.get(token);
+    if (prev === undefined || createdAt > prev) {
+      byToken.set(token, createdAt);
     }
   }
-  return latestToken;
+  return Array.from(byToken.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([token]) => token);
 }
 
 type EndpointSubscriptionLike = {
   endpoint?: string | null;
   p256dh?: string | null;
   auth?: string | null;
+  fcm_token?: string | null;
 };
 
 /**
  * 유효한(https + p256dh/auth 보유) WebPush 구독을 endpoint 기준으로 dedupe.
  * 같은 사용자의 잔재 구독이 같은 endpoint로 여러 개여도 1건만 남긴다.
+ *
+ * 기본(excludeFcmRows=true): 같은 행에 fcm_token 이 있으면 스킵.
+ *  → 동일 기기 FCM+WebPush 이중 발송 방지, PC 전용 WebPush 구독은 유지.
  */
 export function dedupeWebPushSubscriptions<T extends EndpointSubscriptionLike>(
   subscriptions: T[],
+  options?: { excludeFcmRows?: boolean },
 ): T[] {
+  const excludeFcmRows = options?.excludeFcmRows !== false;
   const unique = new Map<string, T>();
   for (const subscription of subscriptions) {
+    if (excludeFcmRows && String(subscription.fcm_token || '').trim()) continue;
     const endpoint = String(subscription.endpoint || '').trim();
     if (!endpoint || !/^https?:\/\//i.test(endpoint)) continue;
     if (!subscription.p256dh || !subscription.auth) continue;
