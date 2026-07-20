@@ -1319,43 +1319,65 @@ export function useChatRoomDataSync({
       ),
     );
 
-    const { data: msgs, error: messagesError } = await selectChatMessagesWithFallback<ChatMessage[]>(
-      (selectClause) =>
-        db
-          .from('messages')
-          .select(selectClause)
-          .in('room_id', roomIdsToLoad)
-          .order('created_at', { ascending: false })
-          .limit(200) as PromiseLike<{
-            data: ChatMessage[] | null;
-            error: unknown;
-          }>,
-    );
-    if (messagesError) {
+    // 방 오픈: 최근 MESSAGE_PAGE_SIZE(20)건만. 과거는 loadOlderMessages.
+    const isRoomSwitch = paginationRoomIdRef.current !== roomIdForFetch;
+    const pageResult = await fetchMessagePage({
+      roomIdsToLoad,
+      pageSize: MESSAGE_PAGE_SIZE,
+    });
+    if (pageResult.error) {
       setLoadingRoomId?.(null);
-      console.error('채팅 메시지 조회 실패:', messagesError);
+      console.error('채팅 메시지 조회 실패:', pageResult.error);
       return;
     }
     if (!isCurrentRequest()) return;
 
-    const loadedMessages = Array.isArray(msgs) ? msgs : [];
-    if (msgs) {
-      // limit(200) + descending → reverse to chronological order
-      loadedMessages.reverse();
-      const enrichedMessages = loadedMessages.map((message: ChatMessage) => ({
-        ...message,
-        staff: message.staff || resolveStaffProfile(message.sender_id, message.sender_name) }));
-      setMessages((prev) => {
-        const localOnly = prev.filter((message: ChatMessage) => {
-          const messageId = String(message.id || '');
-          return messageId.startsWith('temp-') && deliveryStatesRef.current[messageId]?.status !== 'sent';
-        });
-        return [...enrichedMessages, ...localOnly].sort(
+    const loadedMessages = enrichMessages(pageResult.messages);
+    paginationRoomIdRef.current = roomIdForFetch;
+    roomIdsToLoadRef.current = roomIdsToLoad;
+    loadedPersistedMessageCountRef.current = loadedMessages.length;
+    oldestLoadedMessageRef.current =
+      loadedMessages.length > 0
+        ? {
+            id: String(loadedMessages[0].id || ''),
+            createdAt: String(loadedMessages[0].created_at || ''),
+          }
+        : null;
+    // 방 전환 시에만 hasOlder 리셋. 실시간 갱신(merge) 때는 load-older 로 쌓인 과거 유지.
+    if (isRoomSwitch) {
+      setHasOlderMessages(pageResult.hasOlder);
+    } else if (pageResult.hasOlder) {
+      setHasOlderMessages(true);
+    }
+
+    setMessages((prev) => {
+      const localOnly = prev.filter((message: ChatMessage) => {
+        const messageId = String(message.id || '');
+        return messageId.startsWith('temp-') && deliveryStatesRef.current[messageId]?.status !== 'sent';
+      });
+      // 같은 방 실시간 갱신: 이미 load-older 로 쌓인 과거 메시지는 유지하고 최근 페이지만 병합
+      if (!isRoomSwitch && prev.length > 0) {
+        const byId = new Map<string, ChatMessage>();
+        for (const message of prev) {
+          const id = String(message.id || '');
+          if (!id || id.startsWith('temp-')) continue;
+          if (!roomIdsToLoad.includes(String(message.room_id || ''))) continue;
+          byId.set(id, message);
+        }
+        for (const message of loadedMessages) {
+          const id = String(message.id || '');
+          if (id) byId.set(id, message);
+        }
+        return [...Array.from(byId.values()), ...localOnly].sort(
           (left: ChatMessage, right: ChatMessage) =>
             toChatDate(left.created_at || 0).getTime() - toChatDate(right.created_at || 0).getTime(),
         );
-      });
-    }
+      }
+      return [...loadedMessages, ...localOnly].sort(
+        (left: ChatMessage, right: ChatMessage) =>
+          toChatDate(left.created_at || 0).getTime() - toChatDate(right.created_at || 0).getTime(),
+      );
+    });
     setTimelineRoomId?.(roomIdForFetch);
     setLoadingRoomId?.(null);
 
@@ -1373,7 +1395,7 @@ export function useChatRoomDataSync({
     });
 
     // Second pass after messages are in state: read cursors, bookmarks, pins, reactions, polls.
-    // void = do not block first paint / loading clear.
+    // void = do not block first paint / loading clear. 메타는 화면에 보이는 최근 페이지만.
     void syncVisibleMessageMetadata({
       roomIdForFetch,
       roomIdsToLoad,
@@ -1388,13 +1410,14 @@ export function useChatRoomDataSync({
     }
   }, [
     deliveryStatesRef,
+    enrichMessages,
     fetchDataRequestSeqRef,
+    fetchMessagePage,
     isRoomAccessibleToCurrentUser,
     pendingBottomAlignRoomIdRef,
     requestBottomAlignmentHold,
     repairDirectRooms,
     resolveStaffProfile,
-    selectChatMessagesWithFallback,
     selectedRoomId,
     selectedRoomIdRef,
     setLoadingRoomId,
@@ -1403,6 +1426,90 @@ export function useChatRoomDataSync({
     setRoomUnreadCounts,
     setTimelineRoomId,
     syncChatRoomsState,
+    syncVisibleMessageMetadata,
+  ]);
+
+  /** 타임라인 상단 스크롤 시 과거 메시지 추가 페이지 */
+  const loadOlderMessages = useCallback(async () => {
+    const roomIdForFetch = String(selectedRoomIdRef.current || '').trim();
+    if (!roomIdForFetch || loadingOlderMessagesRef.current) return;
+    if (paginationRoomIdRef.current !== roomIdForFetch) return;
+    if (!hasOlderMessages) return;
+
+    const roomIdsToLoad =
+      roomIdsToLoadRef.current.length > 0 ? roomIdsToLoadRef.current : [roomIdForFetch];
+    const beforeMessage = oldestLoadedMessageRef.current;
+    if (!beforeMessage?.createdAt) {
+      setHasOlderMessages(false);
+      return;
+    }
+
+    loadingOlderMessagesRef.current = true;
+    setLoadingOlderMessages(true);
+    try {
+      const pageResult = await fetchMessagePage({
+        roomIdsToLoad,
+        pageSize: MESSAGE_PAGE_SIZE,
+        beforeMessage,
+      });
+      if (pageResult.error) {
+        console.error('채팅 이전 메시지 조회 실패:', pageResult.error);
+        return;
+      }
+      if (String(selectedRoomIdRef.current || '') !== roomIdForFetch) return;
+
+      const older = enrichMessages(pageResult.messages);
+      setHasOlderMessages(pageResult.hasOlder);
+      if (older.length === 0) {
+        setHasOlderMessages(false);
+        return;
+      }
+      oldestLoadedMessageRef.current = {
+        id: String(older[0].id || ''),
+        createdAt: String(older[0].created_at || ''),
+      };
+      loadedPersistedMessageCountRef.current += older.length;
+
+      setMessages((prev) => {
+        const byId = new Map<string, ChatMessage>();
+        for (const message of older) {
+          const id = String(message.id || '');
+          if (id) byId.set(id, message);
+        }
+        for (const message of prev) {
+          const id = String(message.id || '');
+          if (id && !byId.has(id)) byId.set(id, message);
+        }
+        return Array.from(byId.values()).sort(
+          (left: ChatMessage, right: ChatMessage) =>
+            toChatDate(left.created_at || 0).getTime() - toChatDate(right.created_at || 0).getTime(),
+        );
+      });
+
+      // 새로 로드된 구간 메타만 보강 (방 레벨 pin/poll 은 생략)
+      const selectedRoomRecord =
+        chatRoomsRef.current.find((room) => String(room.id) === roomIdForFetch) || null;
+      if (selectedRoomRecord) {
+        void syncVisibleMessageMetadata({
+          roomIdForFetch,
+          roomIdsToLoad,
+          selectedRoomRecord,
+          visibleMessages: older,
+          isCurrentRequest: () => String(selectedRoomIdRef.current || '') === roomIdForFetch,
+          includeRoomLevelMeta: false,
+        });
+      }
+    } finally {
+      loadingOlderMessagesRef.current = false;
+      setLoadingOlderMessages(false);
+    }
+  }, [
+    chatRoomsRef,
+    enrichMessages,
+    fetchMessagePage,
+    hasOlderMessages,
+    selectedRoomIdRef,
+    setMessages,
     syncVisibleMessageMetadata,
   ]);
 
@@ -1417,5 +1524,9 @@ export function useChatRoomDataSync({
     refreshVisibleMessageBookmarks,
     refreshRoomPinnedMessages,
     refreshRoomPolls,
-    loadMessagesAroundMessage };
+    loadMessagesAroundMessage,
+    hasOlderMessages,
+    loadingOlderMessages,
+    loadOlderMessages,
+  };
 }

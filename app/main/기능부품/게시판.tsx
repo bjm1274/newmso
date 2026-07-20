@@ -97,7 +97,8 @@ interface BoardViewProps {
   mris?: ScheduleItem[];
   setMainMenu?: (menu: string) => void;
 }
-const BOARD_POST_PAGE_SIZE = 100;
+/** 게시판 첫 진입 목록 건수. 본문/투표 본문은 목록 select에서 제외됨. 더 보기로 확장. */
+const BOARD_POST_PAGE_SIZE = 30;
 
 type BoardCommentRow = {
   id: string;

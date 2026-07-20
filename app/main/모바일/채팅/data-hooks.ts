@@ -270,10 +270,11 @@ export function useChatRoomsForMobile(
 }
 
 // ─────────────────────────────────────────────
-// 단일 방 메시지 — 최근 100건 + tail polling
+// 단일 방 메시지 — 최근 20건 + loadOlder + tail polling
+// (목록 진입은 방 목록만; 방 오픈 시에만 이 훅이 메시지를 조회)
 // ─────────────────────────────────────────────
 
-const MESSAGES_LIMIT = 100;
+const MESSAGES_LIMIT = 20;
 const ROOM_MESSAGE_POLL_INTERVAL_MS = 1000;
 
 type UseChatMessagesResult = {

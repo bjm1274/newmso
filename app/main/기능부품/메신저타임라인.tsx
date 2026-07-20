@@ -23,7 +23,8 @@ import { MenuIcon } from './조직도서브/조직도측면창';
 import { useIsMobile } from '@/app/components/useIsMobile';
 
 /** 하단(최신) 기준으로 처음 렌더할 타임라인 항목 수. 이하면 전체 렌더. */
-const TIMELINE_INITIAL_WINDOW = 100;
+/** 서버 페이지(~20)보다 약간 크게 — load-older 로 쌓인 구간 중 최근만 우선 마운트 */
+const TIMELINE_INITIAL_WINDOW = 40;
 /** 상단 근처 스크롤 시 한 번에 위로 확장할 항목 수 */
 const TIMELINE_EXPAND_BY = 50;
 /** jump-to-message 시 타깃 앞뒤로 확보할 여유 항목 */

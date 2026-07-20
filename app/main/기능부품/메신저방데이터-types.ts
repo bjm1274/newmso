@@ -59,7 +59,8 @@ export type UseChatRoomDataSyncParams = {
 // D1(SQLite) bound parameter 한도는 100. IN절 외에 eq/gt 등 추가 WHERE 파라미터를
 // 감안하여 5개 여유분 확보 — 100 → 95.
 export const CHAT_METADATA_QUERY_CHUNK_SIZE = 95;
-export const MESSAGE_PAGE_SIZE = 50;
+/** 채팅방 첫 진입·실시간 갱신 시 가져오는 최근 메시지 수. 과거는 loadOlder로 추가. */
+export const MESSAGE_PAGE_SIZE = 20;
 export const DATE_JUMP_CONTEXT_BEFORE = 24;
 export const DATE_JUMP_CONTEXT_AFTER = 36;
 export const CHAT_METADATA_REFRESH_TTL_MS = 60_000;

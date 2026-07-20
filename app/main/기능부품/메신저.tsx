@@ -1384,7 +1384,10 @@ export default function ChatView({
     refreshVisibleMessageBookmarks,
     refreshRoomPinnedMessages,
     refreshRoomPolls,
-    loadMessagesAroundMessage } = useChatRoomDataSync({
+    loadMessagesAroundMessage,
+    hasOlderMessages,
+    loadingOlderMessages,
+    loadOlderMessages } = useChatRoomDataSync({
     selectedRoomId,
     selectedRoomIdRef,
     chatRoomsRef,
@@ -3193,6 +3196,9 @@ export default function ChatView({
           onMediaLoad={handleTimelineMediaLoad}
           onOpenDateJump={openDateJumpPicker}
           ensureVisibleMessageId={timelineEnsureMessageId}
+          hasOlderMessages={hasOlderMessages}
+          loadingOlderMessages={loadingOlderMessages}
+          onLoadOlderMessages={() => { void loadOlderMessages(); }}
         />
 
         <TypingNotice text={typingNoticeText} />
