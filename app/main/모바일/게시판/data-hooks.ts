@@ -172,9 +172,16 @@ export function useBoardPosts(
 
     const run = async (): Promise<BoardListPost[]> => {
       const fetchOneType = async (boardType: string): Promise<BoardPost[]> => {
+        const types =
+          boardType === 'MRI일정'
+            ? ['MRI일정', 'MRI일정표', 'mri']
+            : boardType === '수술일정'
+            ? ['수술일정', '수술']
+            : [boardType];
+
         const { data, error } = await withMissingColumnsFallback<BoardPost[]>(
           async (omittedColumns) => {
-            let q = db
+            const q = db
               .from('board_posts')
               .select(
                 buildSelectColumns(
@@ -183,11 +190,8 @@ export function useBoardPosts(
                   omittedColumns,
                 ),
               )
-              .eq('board_type', boardType);
-            // 회사 격리 — 세션 user.company (이름). company_id 우선 시 상위 훅에서 company_id 전달 확장 가능
-            if (company && company !== '전체') {
-              q = q.eq('company', company);
-            }
+              .in('board_type', types);
+
             const result = await q
               .order('created_at', { ascending: false })
               .limit(1000);
@@ -204,7 +208,15 @@ export function useBoardPosts(
                   : '게시판 조회 실패',
               );
         }
-        return Array.isArray(data) ? data.map((p) => normalizeBoardPost(p)) : [];
+        if (!Array.isArray(data)) return [];
+        return data.map((p) => {
+          const normalized = normalizeBoardPost(p);
+          // 레거시 board_type (mri -> MRI일정 등) 정규화
+          if (types.includes(String(normalized.board_type))) {
+            normalized.board_type = boardType;
+          }
+          return normalized;
+        });
       };
 
       const batches = await Promise.all(LIST_BOARD_TYPES.map((t) => fetchOneType(t)));
