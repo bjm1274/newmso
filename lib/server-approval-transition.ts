@@ -456,7 +456,7 @@ async function transitionSingleApproval(params: {
     }
 
     // 출결정정 문서인 경우 attendance_corrections 테이블의 '대기' 항목을 '반려'로 갱신 (재신청 허용)
-    const correctionDates = Array.isArray(baseMetaData?.correction_dates) ? (baseMetaData.correction_dates as string[]) : [];
+    const correctionDates = Array.isArray((baseMetaData as Record<string, unknown> | null)?.correction_dates) ? ((baseMetaData as Record<string, unknown>).correction_dates as string[]) : [];
     const senderIdForCorrection = String(item.sender_id || '').trim();
     if (correctionDates.length > 0 && senderIdForCorrection) {
       try {
