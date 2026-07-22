@@ -594,20 +594,18 @@ export default function ChatView({
     if (!room) return false;
     if (String(room.id) === NOTICE_ROOM_ID) return true;
     const me = String(effectiveChatUserId || '').trim();
-    if (!me) return false;
-    return getEffectiveRoomMemberIds(room).some((memberId) => String(memberId) === me);
+    if (!me) return true;
+    if (isSelfChatRoom(room, me) || room.name === SELF_ROOM_NAME) return true;
+    const memberIds = getEffectiveRoomMemberIds(room);
+    if (memberIds.length === 0) return true;
+    return memberIds.some((memberId) => String(memberId) === me);
   }, [effectiveChatUserId, getEffectiveRoomMemberIds]);
 
   const selectedRoom = useMemo(() => {
-    const room = chatRooms.find((candidate: ChatRoom) => candidate.id === selectedRoomId) || null;
+    const room = chatRooms.find((candidate: ChatRoom) => String(candidate.id) === String(selectedRoomId || '')) || null;
     if (!room) return null;
-    if (isRoomAccessibleToCurrentUser(room)) return room;
-
-    const hasAnyAccessibleConversation = chatRooms.some((candidate: ChatRoom) =>
-      String(candidate.id) !== NOTICE_ROOM_ID && isRoomAccessibleToCurrentUser(candidate),
-    );
-    return hasAnyAccessibleConversation ? null : room;
-  }, [chatRooms, isRoomAccessibleToCurrentUser, selectedRoomId]);
+    return room;
+  }, [chatRooms, selectedRoomId]);
 
   const {
     unreadModalMsg,

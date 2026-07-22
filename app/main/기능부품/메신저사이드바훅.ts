@@ -99,6 +99,9 @@ export function useChatSidebarState({
     if (!selectedRoomId || chatRooms.length === 0) return;
     if (selectedRoom) return;
 
+    const existsInRooms = chatRooms.some((r) => String(r.id) === String(selectedRoomId));
+    if (existsInRooms) return;
+
     const fallbackRoomId =
       visibleRooms.find((room) => String(room.id) === NOTICE_ROOM_ID)?.id ||
       visibleRooms[0]?.id ||
@@ -109,7 +112,7 @@ export function useChatSidebarState({
     } else if (!fallbackRoomId) {
       setRoom(null);
     }
-  }, [chatRooms.length, selectedRoom, selectedRoomId, setRoom, visibleRooms]);
+  }, [chatRooms, selectedRoom, selectedRoomId, setRoom, visibleRooms]);
 
   const roomLabelMap = useMemo(() => {
     const next = new Map<string, string>();

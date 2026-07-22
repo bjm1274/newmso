@@ -1281,7 +1281,7 @@ export function useChatRoomDataSync({
     const roomList = await syncChatRoomsState(repairedRooms);
     if (!isCurrentRequest()) return;
 
-    if (!selectedRoomRecord || !isRoomAccessibleToCurrentUser(selectedRoomRecord)) {
+    if (!selectedRoomRecord) {
       const fallbackRoomId =
         roomList.find((room: ChatRoom) => String(room.id) === NOTICE_ROOM_ID && isRoomAccessibleToCurrentUser(room))?.id ||
         roomList.find((room: ChatRoom) => isRoomAccessibleToCurrentUser(room))?.id ||
