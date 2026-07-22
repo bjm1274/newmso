@@ -2730,6 +2730,7 @@ export default function ChatView({
   }, [selectedRoomId, updateRoomPreference]);
   const { handleSendMessage, sendWardQuickReply, retryFailedMessage, retryAllFailedMessages } = useChatMessageSending({
     selectedRoomId,
+    selectedRoom,
     visibleRoomIds,
     effectiveChatUserId,
     user,

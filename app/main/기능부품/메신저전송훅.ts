@@ -11,8 +11,10 @@ import { db } from '@/lib/db-client';
 import type { SendMessageOptions } from './메신저메시지서비스';
 import {
   NOTICE_ROOM_ID,
+  SELF_ROOM_NAME,
   buildChatMessageInsertPayload,
   getConversationRoomIdsByRoomId,
+  isSelfChatRoom,
   shouldTriggerImmediateChatPush,
   sortChatRoomsWithNoticeFirst,
   type MessageRetryPayload } from './메신저유틸';
@@ -30,6 +32,7 @@ type DeliveryStateLike = {
 
 type UseChatMessageSendingParams = {
   selectedRoomId: string | null;
+  selectedRoom?: ChatRoom | null;
   visibleRoomIds: string[];
   effectiveChatUserId: string | null | undefined;
   user: StaffMember | null;
@@ -57,6 +60,7 @@ type UseChatMessageSendingParams = {
 
 export function useChatMessageSending({
   selectedRoomId,
+  selectedRoom,
   visibleRoomIds,
   effectiveChatUserId,
   user,
@@ -121,7 +125,8 @@ export function useChatMessageSending({
     if (!content && !resolvedFileUrl) return false;
     if (!roomId) return false;
 
-    if (roomId !== NOTICE_ROOM_ID && !visibleRoomIds.includes(String(roomId))) {
+    const isSelf = isSelfChatRoom(selectedRoom, effectiveChatUserId) || selectedRoom?.name === SELF_ROOM_NAME;
+    if (roomId !== NOTICE_ROOM_ID && !isSelf && !visibleRoomIds.includes(String(roomId))) {
       toast('참여 중인 채팅방에서만 메시지를 보낼 수 있습니다.', 'warning');
       setRoom(selectedRoomId || NOTICE_ROOM_ID);
       return false;
