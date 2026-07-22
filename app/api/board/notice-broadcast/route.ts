@@ -133,30 +133,34 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 작성자 본인 또는 관리자만 발송 가능 — sender_id 일관성 확보
+    // 전사 공지 broadcast 푸시는 오직 관리자(Admin/MSO/HR)만 발송 가능 — 일반 직원 무단 전사 푸시 차단
     const sessionUserId = String(session.user.id);
-    const isAuthor = String(post.author_id || '') === sessionUserId;
-    let allowed = isAuthor;
     let sessionStaff: StaffSummary | null = null;
-    if (!allowed) {
-      try {
-        const rows = await db
-          .select({
-            id: staffMembersTable.id,
-            name: staffMembersTable.name,
-            role: staffMembersTable.role })
-          .from(staffMembersTable)
-          .where(eq(staffMembersTable.id, sessionUserId))
-          .limit(1);
-        sessionStaff = (rows[0] as StaffSummary | undefined) ?? null;
-      } catch {
-        sessionStaff = null;
-      }
-      allowed = isAdminRole(sessionStaff?.role);
+    try {
+      const rows = await db
+        .select({
+          id: staffMembersTable.id,
+          name: staffMembersTable.name,
+          role: staffMembersTable.role,
+        })
+        .from(staffMembersTable)
+        .where(eq(staffMembersTable.id, sessionUserId))
+        .limit(1);
+      sessionStaff = (rows[0] as StaffSummary | undefined) ?? null;
+    } catch {
+      sessionStaff = null;
     }
+
+    const isMasterOrAdmin = Boolean(
+      (session.user as Record<string, unknown>).is_master ||
+        (session.user as Record<string, unknown>).is_admin,
+    );
+    const isManagerRole = isAdminRole(sessionStaff?.role);
+    const allowed = isMasterOrAdmin || isManagerRole;
+
     if (!allowed) {
       return NextResponse.json(
-        { error: '본인이 작성한 게시글이거나 관리자만 발송할 수 있습니다.' },
+        { error: '전사 공지 알림 발송 권한이 없습니다. (관리자 전용)' },
         { status: 403 },
       );
     }

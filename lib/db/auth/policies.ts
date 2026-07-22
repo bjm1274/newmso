@@ -465,8 +465,8 @@ export const POLICY_REGISTRY: Registry = {
     table: 'leave_requests',
     select: 'SELF_OR_SAME_COMPANY',
     insert: 'SELF_OR_SAME_COMPANY',
-    update: 'SELF_OR_SAME_COMPANY',
-    delete: 'SELF_OR_SAME_COMPANY',
+    update: 'ADMIN_OR_MANAGER',
+    delete: 'ADMIN_OR_MANAGER',
     staffIdField: 'staff_id',
     guards: {
       update: leaveRequestUpdateGuard,
@@ -475,22 +475,16 @@ export const POLICY_REGISTRY: Registry = {
   insurance_records: {
     table: 'insurance_records',
     select: 'STAFF_IN_SCOPE',
-    insert: 'STAFF_IN_SCOPE',
-    update: 'STAFF_IN_SCOPE',
-    delete: 'STAFF_IN_SCOPE' },
+    insert: 'ADMIN_OR_MANAGER',
+    update: 'ADMIN_OR_MANAGER',
+    delete: 'ADMIN_ONLY' },
 
-  // ── PAYROLL_MANAGE는 별도 패턴이 아니라 select=STAFF_IN_SCOPE,
-  //    write=MANAGE_COMPANY + staff_id same_company 조건은 evalPattern에서 처리.
-  //    원본 RLS는 admin OR (can_manage_company AND target_staff_same_company)인데
-  //    target_staff_same_company는 row.staff_id 기반 DB 조회 필요.
-  //    여기서는 MANAGE_COMPANY 패턴 사용 + companyIdField 없음 가정 →
-  //    SELF_OR_SAME_COMPANY 패턴 + staffIdField로 처리 (가장 가까운 의미).
   payroll_records: {
     table: 'payroll_records',
-    select: 'STAFF_IN_SCOPE',
-    insert: 'SELF_OR_SAME_COMPANY',
-    update: 'SELF_OR_SAME_COMPANY',
-    delete: 'SELF_OR_SAME_COMPANY' },
+    select: 'SELF_OR_SAME_COMPANY',
+    insert: 'ADMIN_OR_MANAGER',
+    update: 'ADMIN_OR_MANAGER',
+    delete: 'ADMIN_ONLY' },
 
   // ── AUTHENTICATED + ADMIN_OR_MANAGER (회사 단위 단순 회사 관리)
   corporate_cards: {
@@ -807,7 +801,8 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
 
 for (const tableName of ADDITIONAL_PUBLIC_TABLES) {
   if (!POLICY_REGISTRY[tableName]) {
-    POLICY_REGISTRY[tableName] = PUBLIC_ALL(tableName);
+    // 자동 PUBLIC_ALL 부여 제거 — 미등록 테이블은 Default Deny (ADMIN_ONLY 또는 403)
+    POLICY_REGISTRY[tableName] = ADMIN_ONLY_ALL(tableName);
   }
 }
 
@@ -1171,14 +1166,42 @@ async function filterChatRoomsByMembership<T extends Record<string, unknown>>(
 /**
  * 여러 row를 일괄 필터링 — SELECT 결과를 RLS처럼 적용.
  */
-const STAFF_SECRET_COLUMNS = new Set(['password', 'passwd']);
+const STAFF_SECRET_ALWAYS_COLUMNS = new Set(['password', 'passwd']);
+const STAFF_PII_SENSITIVE_COLUMNS = new Set([
+  'resident_no',
+  'account_number',
+  'bank_name',
+  'base_salary',
+  'hourly_rate',
+  'address',
+  'detail_address',
+  'salary_type',
+  'national_pension',
+  'health_insurance',
+  'employment_insurance',
+  'long_term_care',
+]);
 
-function stripStaffSecrets<T extends Record<string, unknown>>(rows: T[]): T[] {
+function stripStaffSecrets<T extends Record<string, unknown>>(rows: T[], claims?: ErpClaims): T[] {
+  const isAdmin = claims ? erpIsAdmin(claims) : false;
+  const myStaffId = claims?.staffId ? String(claims.staffId).trim() : '';
+
   return rows.map((row) => {
     const next = { ...row };
-    for (const col of STAFF_SECRET_COLUMNS) {
+    for (const col of STAFF_SECRET_ALWAYS_COLUMNS) {
       if (col in next) delete next[col];
     }
+
+    const rowId = String(next.id || next.staff_id || '').trim();
+    const isSelf = myStaffId !== '' && rowId === myStaffId;
+
+    // 본인도 아니고 관리자도 아니면 타인의 민감 PII 컬럼(주민번호/계좌/급여/주소) 제거
+    if (!isAdmin && !isSelf) {
+      for (const col of STAFF_PII_SENSITIVE_COLUMNS) {
+        if (col in next) delete next[col];
+      }
+    }
+
     return next;
   });
 }
@@ -1196,14 +1219,14 @@ export async function filterByPolicy<T extends Record<string, unknown>>(
   const stripSecrets = table === 'staff_members';
 
   if (cfg.select === 'PUBLIC') {
-    return stripSecrets ? stripStaffSecrets(rows) : rows;
+    return stripSecrets ? stripStaffSecrets(rows, claims) : rows;
   }
   if (cfg.select === 'AUTHENTICATED') {
     const ok = erpStaffId(claims) !== null ? rows : [];
-    return stripSecrets ? stripStaffSecrets(ok as T[]) : ok;
+    return stripSecrets ? stripStaffSecrets(ok as T[], claims) : ok;
   }
   if (erpIsAdmin(claims)) {
-    return stripSecrets ? stripStaffSecrets(rows) : rows;
+    return stripSecrets ? stripStaffSecrets(rows, claims) : rows;
   }
 
   // 채팅 멤버 스코프 — 배치 평가
@@ -1221,5 +1244,5 @@ export async function filterByPolicy<T extends Record<string, unknown>>(
     const ok = await evalPattern(cfg.select, db, claims, row, cfg);
     if (ok) out.push(row);
   }
-  return stripSecrets ? stripStaffSecrets(out) : out;
+  return stripSecrets ? stripStaffSecrets(out, claims) : out;
 }

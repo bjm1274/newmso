@@ -34,6 +34,15 @@ export async function POST(req: NextRequest) {
     if (!d1) return NextResponse.json({ error: 'D1 binding not available' }, { status: 500 });
     const db = getD1Drizzle(d1);
 
+    // 공지방 쓰기는 관리자 전용
+    if (String(room_id) === '00000000-0000-0000-0000-000000000000') {
+      const userRole = String((session.user as Record<string, unknown>).role || '').toLowerCase();
+      const isMaster = Boolean((session.user as Record<string, unknown>).is_master || (session.user as Record<string, unknown>).is_admin);
+      if (!isMaster && userRole !== 'admin' && userRole !== 'mso' && userRole !== 'hr') {
+        return NextResponse.json({ error: '공지 채널 메시지 작성 권한이 없습니다.' }, { status: 403 });
+      }
+    }
+
     // 방 존재 + 멤버십(notice 예외) — 공용 헬퍼
     const membership = await assertChatRoomMember(db, room_id, senderId);
     if (!membership.ok) {

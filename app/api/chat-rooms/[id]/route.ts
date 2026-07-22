@@ -106,7 +106,15 @@ export async function PATCH(
     }
 
     const privileged = isPrivilegedSession(session?.user);
-    const notice = isNoticeRoomType(room.type) || isNoticeRoomType(parsed.data.type);
+    const existingNotice = isNoticeRoomType(room.type);
+    const requestedNotice = isNoticeRoomType(parsed.data.type);
+
+    // 일반 사용자가 기존 일반 방의 type을 notice로 전환하거나 우회하려는 시도 차단
+    if (requestedNotice && !existingNotice && !privileged) {
+      return NextResponse.json({ ok: false, error: 'Only admins can convert room to notice type' }, { status: 403 });
+    }
+
+    const notice = existingNotice;
 
     if (!privileged && !notice) {
       if (!isRoomMember(room.members, currentUserId)) {
