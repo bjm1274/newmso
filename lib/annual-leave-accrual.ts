@@ -14,6 +14,7 @@
  */
 
 import { recalculateLeaveBalance } from '@/lib/annual-leave-balance';
+import { isGroupAccount } from '@/types';
 import {
   getD1Binding,
   getD1Drizzle,
@@ -213,6 +214,11 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
 
   for (const s of staffs) {
     result.scanned += 1;
+    // 단체 계정(공용 아이디)은 연차 자동 발생 대상에서 제외
+    if (isGroupAccount(s)) {
+      result.skipped += 1;
+      continue;
+    }
     // 재직자만 (공백·null 은 재직으로 간주, '퇴사'/'inactive' 등만 제외)
     const statusNorm = String(s.status ?? '').trim();
     if (

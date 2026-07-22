@@ -14,7 +14,7 @@
 
 import { db } from '@/lib/db-client';
 import { isActiveStaff } from '@/lib/active-staff';
-import type { StaffMember } from '@/types';
+import { isGroupAccount, type StaffMember } from '@/types';
 import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
 import { withMissingColumnsFallback } from '@/lib/db-compat';
 import {
@@ -271,6 +271,7 @@ export async function fetchPayrollWorkcenterData({
           shift_id: row.shift_id == null ? null : str(row.shift_id) };
       })
       .filter((s) => {
+        if (isGroupAccount(s)) return false;
         if (selectedCo && selectedCo !== '전체' && s.company !== selectedCo) return false;
         if (isActiveStaff(s)) return true;
         // R-1: 중도퇴사자도 정산월에 재직했다면 최종 월급·중간정산 대상에 포함한다.

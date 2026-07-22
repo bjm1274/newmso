@@ -228,7 +228,7 @@ export function useChatSidebarState({
         isGroupRoom,
         participantCount: getChatRoomParticipantCount(room),
         label: roomLabelMap.get(roomId) || '',
-        preview: getRoomPreviewText(room),
+        preview: getRoomPreviewText(room, effectiveChatUserId),
         peerName: peer?.name || '',
         peerPhotoUrl: peer ? getProfilePhotoUrl(peer) : null,
         isPeerOnline: peer ? isStaffCurrentlyOnline(peer) : false,

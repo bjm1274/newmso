@@ -60,7 +60,19 @@ export interface StaffMember {
   bank_account?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  is_group_account?: number | boolean | null;
+  account_type?: 'personal' | 'team_group' | string | null;
   [key: string]: unknown;
+}
+
+export function isGroupAccount(staff: Partial<StaffMember> | Record<string, unknown> | null | undefined): boolean {
+  if (!staff) return false;
+  if (staff.is_group_account === 1 || staff.is_group_account === true) return true;
+  if (staff.account_type === 'team_group' || staff.account_type === 'group') return true;
+  const perms = staff.permissions as Record<string, unknown> | null | undefined;
+  if (perms?.is_group_account === 1 || perms?.is_group_account === true) return true;
+  if (perms?.account_type === 'team_group' || perms?.account_type === 'group') return true;
+  return false;
 }
 
 // ─────────────────────────────────────────────

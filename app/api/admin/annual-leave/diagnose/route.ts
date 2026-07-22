@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { recalculateLeaveBalance, resolveGrantedDaysFromAccruals } from '@/lib/annual-leave-balance';
 import { syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
+import { isGroupAccount } from '@/types';
 import {
   getD1Binding,
   getD1Drizzle,
@@ -182,10 +183,10 @@ export async function POST(req: NextRequest) {
     let ids = Array.isArray(body.staffIds) ? body.staffIds.map(String) : [];
     if (body.allActive || ids.length === 0) {
       const staffs = await db
-        .select({ id: staffMembersTable.id, status: staffMembersTable.status })
+        .select({ id: staffMembersTable.id, status: staffMembersTable.status, permissions: staffMembersTable.permissions })
         .from(staffMembersTable);
       ids = staffs
-        .filter((s) => !s.status || s.status === '재직')
+        .filter((s) => (!s.status || s.status === '재직') && !isGroupAccount(s as any))
         .map((s) => String(s.id));
     }
 

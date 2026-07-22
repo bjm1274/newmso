@@ -625,14 +625,15 @@ export function extractPollMetaFromQuestion(value: unknown): {
   }
 }
 
-export function getRoomPreviewText(room: ChatRoom): string {
+export function getRoomPreviewText(room: ChatRoom, currentUserId?: string | null): string {
   // 순환 import 방지: 지연 require 대신 인라인 sanitize (메신저첨부와 동일 규칙)
   const raw =
     (room?.last_message_preview as string | null | undefined) ||
     (room?.last_message as string | null | undefined) ||
     '';
   const t = String(raw || '').trim();
-  if (!t) return '대화가 없습니다.';
+  const isSelf = isSelfChatRoom(room, currentUserId) || room?.name === SELF_ROOM_NAME;
+  if (!t) return isSelf ? '나와의 대화' : '대화가 없습니다.';
   if (t === '삭제된 메시지입니다.' || t.startsWith('삭제된 메시지')) return '삭제된 메시지입니다.';
   if (/^file:\/\//i.test(t) || /^blob:/i.test(t) || /^[A-Za-z]:[\\/]/.test(t)) return '파일';
   if (/^https?:\/\//i.test(t) && /\.(png|jpe?g|gif|webp|pdf|docx?|xlsx?|zip|hwp)(\?|#|$)/i.test(t)) {

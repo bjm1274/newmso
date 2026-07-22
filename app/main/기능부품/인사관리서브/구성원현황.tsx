@@ -4,7 +4,8 @@ import { getKoreanTodayString } from '@/lib/seoul-time';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import ProfilePhotoThumbnail from '@/app/components/ProfilePhotoThumbnail';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
-import type { StaffMember } from '@/types';
+import { type StaffMember } from '@/types';
+import { isGroupAccount } from '@/types';
 import { db } from '@/lib/db-client';
 import { isActiveStaff } from '@/lib/active-staff';
 import { isMissingColumnError, withMissingColumnsFallback } from '@/lib/db-compat';
@@ -59,6 +60,8 @@ function createEmptyStaffForm(selectedCompany?: string) {
     주민번호: '', 이메일: '', 주소: '', 면허사항: '', 면허번호: '', 취득일자: '', 면허기타내용: '', 계좌정보: '', 임금정보: '', 상태: '재직',
     연차총개수: 0, 연차사용개수: 0, 근무형태ID: '', 근무형태IDs: [] as string[],
     고용형태: '정규직' as string, 계약종료일: '' as string,
+    is_group_account: false as boolean,
+    account_type: 'personal' as 'personal' | 'team_group',
     probation_months: 0,
     probation_percent: 90,
     base_salary: 0,
@@ -1284,8 +1287,12 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         joined_at: dateOrNull(신규직원.입사일),
         resigned_at: dateOrNull(신규직원.퇴사일),
         status: 신규직원.상태,
+        is_group_account: 신규직원.is_group_account ? 1 : 0,
+        account_type: 신규직원.is_group_account ? 'team_group' : 'personal',
         permissions: {
           ...existingPermissions,
+          is_group_account: 신규직원.is_group_account ? 1 : 0,
+          account_type: 신규직원.is_group_account ? 'team_group' : 'personal',
           extension: 신규직원.내선번호 || null,
           employment_type: 신규직원.고용형태 || '정규직',
           contract_end_date: 신규직원.고용형태 === '계약직' ? dateOrNull(신규직원.계약종료일) : null,
@@ -1571,6 +1578,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       연차사용개수: (직원.annual_leave_used as number) || 0,
       근무형태ID: 직원근무형태IDs[0] || (직원.shift_id as string) || '',
       근무형태IDs: 직원근무형태IDs,
+      is_group_account: isGroupAccount(직원),
+      account_type: isGroupAccount(직원) ? ('team_group' as const) : ('personal' as const),
       base_salary: (직원.base_salary as number) || 0,
       // DB 컬럼이 없어 permissions.payroll_allowances(JSON)에 저장된 경우도 폴백으로 읽는다.
       // (직접 컬럼만 읽으면 저장 후 재편집 시 0으로 보여 "저장 안 됨"처럼 나타남)
@@ -1787,7 +1796,14 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       primary: true,
       render: (직원) => (
         <div>
-          <p className="text-sm font-semibold text-[var(--foreground)]">{직원.name}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-semibold text-[var(--foreground)]">{직원.name}</p>
+            {isGroupAccount(직원) && (
+              <span className="px-1.5 py-0.5 text-[9px] font-extrabold bg-blue-500/15 text-blue-600 dark:text-blue-400 rounded">
+                👥 단체용
+              </span>
+            )}
+          </div>
           <p className="text-[11px] font-bold text-[var(--toss-gray-3)]">{직원.position || '-'}</p>
           <p className="mt-1 text-[10px] font-semibold text-[var(--toss-gray-3)]">
             {직원.resident_no ? '주민번호 등록' : '주민번호 미등록'}
