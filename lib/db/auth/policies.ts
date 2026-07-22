@@ -1184,7 +1184,7 @@ const STAFF_PII_SENSITIVE_COLUMNS = new Set([
 
 function stripStaffSecrets<T extends Record<string, unknown>>(rows: T[], claims?: ErpClaims): T[] {
   const isAdmin = claims ? erpIsAdmin(claims) : false;
-  const myStaffId = claims?.staffId ? String(claims.staffId).trim() : '';
+  const myStaffId = claims ? String(erpStaffId(claims) || '').trim() : '';
 
   return rows.map((row) => {
     const next = { ...row };
