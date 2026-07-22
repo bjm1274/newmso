@@ -35,6 +35,8 @@ export interface MessageContextMenuProps {
   onForward: () => void;
   onBookmark: () => void;
   onTask: () => void;
+  onPin?: () => void;
+  isPinned?: boolean;
   onDelete?: () => void;
   canDelete?: boolean;
   canEdit?: boolean;
@@ -55,6 +57,8 @@ export default function MessageContextMenu({
   onForward,
   onBookmark,
   onTask,
+  onPin,
+  isPinned = false,
   onDelete,
   canDelete = false,
   canEdit = false,
@@ -289,6 +293,21 @@ export default function MessageContextMenu({
               <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">🔖</span>
               <span>북마크에 저장</span>
             </button>
+
+            {onPin && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  onPin();
+                  onClose();
+                }}
+                className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.08)] dark:active:bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
+              >
+                <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">📌</span>
+                <span>{isPinned ? '공지 해제' : '공지로 등록'}</span>
+              </button>
+            )}
 
             <button
               type="button"

@@ -938,6 +938,8 @@ function MessengerTimelineComponent({
                   onForward={hostForward}
                   onBookmark={hostBookmark}
                   onTask={hostTask}
+                  onPin={() => void onTogglePin(msg)}
+                  isPinned={pinnedIds.includes(String(msg.id))}
                   onDelete={hostDelete}
                 >
                   {showDateDivider && (

@@ -44,6 +44,8 @@ interface MessageActionsHostProps {
   onForward: () => void;
   onBookmark: () => void;
   onTask: () => void;
+  onPin?: () => void;
+  isPinned?: boolean;
   onDelete?: () => void;
   onReadDetail?: () => void;
   onOpenThread?: () => void;
@@ -66,6 +68,8 @@ export default function MessageActionsHost({
   onForward,
   onBookmark,
   onTask,
+  onPin,
+  isPinned = false,
   onDelete,
   onReadDetail,
   onOpenThread,
@@ -244,6 +248,8 @@ export default function MessageActionsHost({
           onForward={onForward}
           onBookmark={onBookmark}
           onTask={onTask}
+          onPin={onPin}
+          isPinned={isPinned}
           onDelete={onDelete}
           canDelete={canDelete ?? mine}
           canEdit={Boolean(onEdit) && (canDelete ?? mine)}
