@@ -596,9 +596,12 @@ export default function ChatView({
     const me = String(effectiveChatUserId || '').trim();
     if (!me) return false;
     if (isSelfChatRoom(room, me)) return true;
-    const memberIds = getEffectiveRoomMemberIds(room);
-    return memberIds.some((memberId) => String(memberId) === me);
-  }, [effectiveChatUserId, getEffectiveRoomMemberIds]);
+
+    // 퇴장하기(나가기)를 통해 DB chat_rooms.members 에서 본인이 제외되었거나
+    // 본인이 멤버가 아닌 타인의 방은 사이드바 목록 및 대화 접근에서 100% 차단
+    const rawMembers = normalizeMemberIds(room.members);
+    return rawMembers.includes(me);
+  }, [effectiveChatUserId]);
 
   const selectedRoom = useMemo(() => {
     const room = chatRooms.find((candidate: ChatRoom) => String(candidate.id) === String(selectedRoomId || '')) || null;
@@ -817,65 +820,8 @@ export default function ChatView({
   }, [setRoom, tryScrollToLoadedMessage]);
 
   const repairDirectRooms = useCallback(async (rooms: ChatRoom[]) => {
-    const sourceRooms = Array.isArray(rooms) ? rooms : [];
-    const orphanRooms = sourceRooms.filter(( room: ChatRoom) =>
-      room?.type === 'direct' && normalizeMemberIds(room.members).length === 0
-    );
-    if (orphanRooms.length === 0) {
-      return sourceRooms;
-    }
-
-    try {
-      const orphanRoomIds = orphanRooms
-        .map(( room: ChatRoom) => String(room?.id || '').trim())
-        .filter(Boolean);
-      if (orphanRoomIds.length === 0) {
-        return sourceRooms;
-      }
-
-      const { data: roomMessages, error } = await db
-        .from('messages')
-        .select('room_id, sender_id, created_at')
-        .in('room_id', orphanRoomIds)
-        .not('sender_id', 'is', null)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-
-      const senderIdsByRoom = new Map<string, Set<string>>();
-      (roomMessages || []).forEach(( message: Record<string, unknown>) => {
-        const roomId = String(message?.room_id || '').trim();
-        const senderId = String(message?.sender_id || '').trim();
-        if (!roomId || !senderId || senderId === 'null' || senderId === 'undefined') return;
-        const senders = senderIdsByRoom.get(roomId) || new Set<string>();
-        senders.add(senderId);
-        senderIdsByRoom.set(roomId, senders);
-      });
-
-      const repairedRooms = [...sourceRooms];
-      for (const room of orphanRooms) {
-        const roomId = String(room?.id || '').trim();
-        const inferredMembers = Array.from(senderIdsByRoom.get(roomId) || []);
-        if (inferredMembers.length !== 2) continue;
-
-        const { error: updateError } = await db
-          .from('chat_rooms')
-          .update({ members: inferredMembers })
-          .eq('id', roomId);
-        if (updateError) throw updateError;
-
-        const roomIndex = repairedRooms.findIndex((candidate: ChatRoom) => String(candidate?.id) === roomId);
-        if (roomIndex >= 0) {
-          repairedRooms[roomIndex] = {
-            ...repairedRooms[roomIndex],
-            members: inferredMembers };
-        }
-      }
-
-      return repairedRooms;
-    } catch (error) {
-      logger.error('repairDirectRooms failed', error);
-      return sourceRooms;
-    }
+    // 퇴장한 대화방을 과거 메시지 작성자 기록으로 억지 부활시키지 않도록 원본 유지
+    return Array.isArray(rooms) ? rooms : [];
   }, []);
 
   useEffect(() => {
