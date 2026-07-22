@@ -145,6 +145,7 @@ function renderInline(tokens: InlineToken[]): ReactNode[] {
           {tok.value}
         </code>
       );
+    }
     if (tok.kind === 'image') {
       return (
         <img
