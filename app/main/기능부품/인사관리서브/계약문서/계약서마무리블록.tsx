@@ -43,7 +43,17 @@ export default function ContractClosingBlock(props: Props) {
     };
 
     return (
-        <div className="mt-5 space-y-3 break-inside-avoid print:mt-2.5 print:space-y-1.5">
+        <div
+            className="mt-5 space-y-3 break-inside-avoid print:mt-2.5 print:space-y-2 print:break-inside-avoid"
+            style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}
+        >
+            <div className="text-center pb-0.5">
+                <p className="text-[13px] text-[var(--toss-gray-4)] print:text-[11.5px] font-medium">
+                    계약 체결일:{' '}
+                    <span className="font-bold text-[var(--foreground)]">{contractDate}</span>
+                </p>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-3 break-inside-avoid print:gap-2.5">
                 <div className="rounded-xl border border-[var(--border)] bg-[var(--card)]">
                     <div className="px-3 py-2 bg-slate-800 text-white text-center rounded-t-xl">
@@ -128,13 +138,6 @@ export default function ContractClosingBlock(props: Props) {
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <div className="text-center break-inside-avoid break-before-avoid">
-                <p className="text-[12.5px] text-[var(--toss-gray-4)] print:text-[11px]">
-                    계약 체결일:{' '}
-                    <span className="font-bold text-[var(--foreground)]">{contractDate}</span>
-                </p>
             </div>
         </div>
     );

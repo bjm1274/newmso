@@ -229,7 +229,10 @@ export function buildClosingPrintHTML(opts: ContractClosingData): string {
   };
 
   return `
-<div style="margin-top:24px;font-family:'Noto Sans KR', sans-serif;">
+<div style="margin-top:20px;font-family:'Noto Sans KR', sans-serif;page-break-inside:avoid;break-inside:avoid;">
+  <div style="text-align:center;margin-bottom:10px;">
+    <p style="margin:0;font-size:13px;color:#6b7280;">계약 체결일: <span style="font-weight:700;color:#111827;">${escapeHTML(contractDate)}</span></p>
+  </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
     <div style="border:1px solid #d1d5db;border-radius:10px;overflow:hidden;">
       <div style="background:#1f2937;color:#fff;padding:8px 12px;font-weight:800;letter-spacing:0.18em;font-size:11px;text-align:center;">사 용 자</div>
@@ -250,9 +253,6 @@ export function buildClosingPrintHTML(opts: ContractClosingData): string {
         <tr><td style="padding:5px 10px;background:#eff6ff;color:#1d4ed8;font-weight:600;width:88px;white-space:nowrap;vertical-align:middle;">교부확인</td><td style="padding:8px 10px;text-align:center;">${receiptHTML}</td></tr>
       </table>
     </div>
-  </div>
-  <div style="margin-top:14px;text-align:center;">
-    <p style="margin:0;font-size:12.5px;color:#6b7280;">계약 체결일: <span style="font-weight:700;color:#111827;">${escapeHTML(contractDate)}</span></p>
   </div>
 </div>
 `;
