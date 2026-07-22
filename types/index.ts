@@ -199,7 +199,7 @@ export interface ApprovalDocument {
 export interface ChatRoom {
   id: string;
   name?: string | null;
-  type?: 'direct' | 'group' | 'notice' | null;
+  type?: 'direct' | 'group' | 'notice' | 'self' | null;
   company?: string | null;
   company_id?: string | null;
   member_ids?: string[] | null;
