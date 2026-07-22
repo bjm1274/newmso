@@ -213,10 +213,15 @@ export function useChatRoomDataSync({
 
   const syncChatRoomsState = useCallback(
     async (rooms: ChatRoom[]) => {
-      const repairedRooms = await repairDirectRooms(rooms);
+      // 서버 필터가 일시적으로 느슨해지거나 다른 계정의 로컬 캐시가 남아 있어도
+      // 현재 사용자가 멤버가 아닌 방은 목록 상태·후속 메시지 조회에 넣지 않는다.
+      const accessibleRooms = (rooms || []).filter((room: ChatRoom) =>
+        isRoomAccessibleToCurrentUser(room),
+      );
+      const repairedRooms = await repairDirectRooms(accessibleRooms);
       return applyChatRoomsState(repairedRooms);
     },
-    [applyChatRoomsState, repairDirectRooms],
+    [applyChatRoomsState, isRoomAccessibleToCurrentUser, repairDirectRooms],
   );
 
   const buildRoomSummaryFromMessages = useCallback(
@@ -1246,8 +1251,7 @@ export function useChatRoomDataSync({
           console.error('채팅방 목록 조회 실패 (no room selected):', roomResult.error);
           return;
         }
-        const repairedRooms = await repairDirectRooms(roomResult.data || []);
-        await syncChatRoomsState(repairedRooms);
+        await syncChatRoomsState(roomResult.data || []);
 
       } catch (error) {
         console.error('채팅방 목록 갱신 실패 (no room selected):', error);
@@ -1274,13 +1278,12 @@ export function useChatRoomDataSync({
     }
     if (!isCurrentRequest()) return;
 
-    const repairedRooms = await repairDirectRooms(roomResult.data || []);
+    const roomList = await syncChatRoomsState(roomResult.data || []);
     if (!isCurrentRequest()) return;
 
+    // 동기화 단계에서 멤버십 필터를 통과한 방만 선택·메시지 조회 대상으로 사용한다.
     const selectedRoomRecord =
-      repairedRooms.find((room: ChatRoom) => String(room.id) === roomIdForFetch) || null;
-    const roomList = await syncChatRoomsState(repairedRooms);
-    if (!isCurrentRequest()) return;
+      roomList.find((room: ChatRoom) => String(room.id) === roomIdForFetch) || null;
 
     if (!selectedRoomRecord) {
       const fallbackRoomId =
@@ -1298,7 +1301,7 @@ export function useChatRoomDataSync({
 
     const selectedRoomKey = getDirectRoomMembersKey(selectedRoomRecord);
     const canonicalDirectRoom = selectedRoomKey
-      ? repairedRooms
+      ? roomList
           .filter((room: ChatRoom) => getDirectRoomMembersKey(room) === selectedRoomKey)
           .sort(
             (left: ChatRoom, right: ChatRoom) =>
@@ -1314,7 +1317,7 @@ export function useChatRoomDataSync({
     const roomIdsToLoad = Array.from(
       new Set(
         selectedRoomKey
-          ? repairedRooms
+          ? roomList
               .filter((room: ChatRoom) => getDirectRoomMembersKey(room) === selectedRoomKey)
               .map((room: ChatRoom) => String(room.id))
           : [roomIdForFetch],

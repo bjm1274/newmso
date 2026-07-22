@@ -1113,7 +1113,8 @@ async function filterMessagesByChatRoomMembership<T extends Record<string, unkno
   claims: ErpClaims,
   rows: T[],
 ): Promise<T[]> {
-  if (erpIsAdmin(claims) || erpCanManageCompany(claims)) return rows;
+  // 회사 관리 권한은 채팅 열람 권한이 아니다. 시스템 관리자만 멤버십 검사 예외를 둔다.
+  if (erpIsAdmin(claims)) return rows;
   const me = claimsStaffIdRaw(claims);
   if (me === null) return [];
 
@@ -1143,7 +1144,8 @@ async function filterChatRoomsByMembership<T extends Record<string, unknown>>(
   claims: ErpClaims,
   rows: T[],
 ): Promise<T[]> {
-  if (erpIsAdmin(claims) || erpCanManageCompany(claims)) return rows;
+  // 회사 관리 권한은 채팅 열람 권한이 아니다. 시스템 관리자만 멤버십 검사 예외를 둔다.
+  if (erpIsAdmin(claims)) return rows;
   const me = claimsStaffIdRaw(claims);
   if (me === null) return [];
 
