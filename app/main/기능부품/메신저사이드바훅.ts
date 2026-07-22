@@ -61,6 +61,19 @@ export function useChatSidebarState({
     const dedupedRooms = new Map<string, ChatRoom>();
     chatRooms.forEach((room) => {
       if (!isRoomAccessibleToCurrentUser(room)) return;
+
+      const isNotice = String(room.id) === NOTICE_ROOM_ID;
+      const isSelf = isSelfChatRoom(room, effectiveChatUserId);
+      const isSelected = String(room.id) === String(selectedRoomId || '');
+      const hasMessageHistory = Boolean(
+        String(room.last_message_at || room.last_message || room.last_message_preview || '').trim()
+      );
+
+      // 공지방, 나와의 대화방, 현재 선택 중인 방, 또는 메시지 대화 내역이 있는 방만 사이드바에 표시
+      if (!isNotice && !isSelf && !isSelected && !hasMessageHistory) {
+        return;
+      }
+
       const roomKey = getDirectRoomMembersKey(room) || `room:${room.id}`;
       const previousRoom = dedupedRooms.get(roomKey);
       const previousTime = new Date(previousRoom?.last_message_at || previousRoom?.created_at || 0).getTime();
@@ -77,23 +90,8 @@ export function useChatSidebarState({
       }
     }
 
-    const accessibleRooms = Array.from(dedupedRooms.values());
-    const hasAccessibleConversation = accessibleRooms.some((room) => String(room.id) !== NOTICE_ROOM_ID);
-    const hasAnyConversation = chatRooms.some((room) => room?.id && String(room.id) !== NOTICE_ROOM_ID);
-    if (hasAccessibleConversation || !hasAnyConversation || chatRooms.length === 0) {
-      return accessibleRooms;
-    }
-
-    const fallbackRooms = new Map<string, ChatRoom>();
-    chatRooms.forEach((room) => {
-      if (!room?.id || !isRoomAccessibleToCurrentUser(room)) return;
-      const roomKey = getDirectRoomMembersKey(room) || `room:${room.id}`;
-      if (!fallbackRooms.has(roomKey)) {
-        fallbackRooms.set(roomKey, room);
-      }
-    });
-    return Array.from(fallbackRooms.values());
-  }, [chatRooms, isRoomAccessibleToCurrentUser]);
+    return Array.from(dedupedRooms.values());
+  }, [chatRooms, effectiveChatUserId, isRoomAccessibleToCurrentUser, selectedRoomId]);
 
   useEffect(() => {
     if (!selectedRoomId || chatRooms.length === 0) return;

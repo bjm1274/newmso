@@ -632,8 +632,8 @@ export function getRoomPreviewText(room: ChatRoom, currentUserId?: string | null
     (room?.last_message as string | null | undefined) ||
     '';
   const t = String(raw || '').trim();
-  const isSelf = isSelfChatRoom(room, currentUserId) || room?.name === SELF_ROOM_NAME;
-  if (!t) return isSelf ? '나와의 대화' : '대화가 없습니다.';
+  const isRealSelf = isSelfChatRoom(room, currentUserId);
+  if (!t) return isRealSelf ? '나와의 대화' : '대화가 없습니다.';
   if (t === '삭제된 메시지입니다.' || t.startsWith('삭제된 메시지')) return '삭제된 메시지입니다.';
   if (/^file:\/\//i.test(t) || /^blob:/i.test(t) || /^[A-Za-z]:[\\/]/.test(t)) return '파일';
   if (/^https?:\/\//i.test(t) && /\.(png|jpe?g|gif|webp|pdf|docx?|xlsx?|zip|hwp)(\?|#|$)/i.test(t)) {
