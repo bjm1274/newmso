@@ -20,6 +20,7 @@ import {
   getLatestReadCursor,
   isMessageReadByCursor,
   NOTICE_ROOM_ID,
+  normalizeMemberIds,
   readStoredBookmarks,
   sortChatRoomsWithNoticeFirst,
   toChatDate,
@@ -102,10 +103,9 @@ export function useChatRoomDataSync({
       try {
         const myRooms = rooms.filter((room: ChatRoom) => {
           if (room.id === NOTICE_ROOM_ID) return true;
-          if (Array.isArray(room.members)) {
-            return room.members.some((id: unknown) => String(id) === effectiveChatUserId);
-          }
-          return false;
+          const me = String(effectiveChatUserId || '').trim();
+          if (!me) return false;
+          return normalizeMemberIds(room.members).some((id) => String(id) === me);
         });
         if (!myRooms.length) return;
 
@@ -172,10 +172,8 @@ export function useChatRoomDataSync({
         setRoomUnreadCounts((prev) => {
           const next = { ...counts };
           Object.keys(prev).forEach((roomId) => {
-            if (prev[roomId] === 0 && next[roomId] !== undefined && next[roomId] !== 0) {
-              if (openConversationRoomIds.has(roomId) || roomId === activeRoomId) {
-                next[roomId] = 0;
-              }
+            if (prev[roomId] === 0 || openConversationRoomIds.has(roomId) || roomId === activeRoomId) {
+              next[roomId] = 0;
             }
           });
           return next;
@@ -671,13 +669,12 @@ export function useChatRoomDataSync({
             .in('room_id', roomIdsToLoad);
 
           if (beforeMessage?.createdAt) {
+            // D1 저장 포맷(SQL UTC)으로 비교. ISO 커서는 같은 시각도 누락/공집합 유발.
             const normalizedCursorTime = normalizeMessageCursorTime(beforeMessage.createdAt);
-            const normalizedCursorId = String(beforeMessage.id || '').trim();
-            query = normalizedCursorId
-              ? query.or(
-                  `created_at.lt.${normalizedCursorTime},and(created_at.eq.${normalizedCursorTime},id.lt.${normalizedCursorId})`,
-                )
-              : query.lt('created_at', normalizedCursorTime);
+            if (normalizedCursorTime) {
+              // 복합 or() 타임스탬프 파싱 이슈 회피 — created_at 단독 lt 로 페이지네이션
+              query = query.lt('created_at', normalizedCursorTime);
+            }
           }
 
           return query
@@ -1153,18 +1150,22 @@ export function useChatRoomDataSync({
 
         const targetCreatedAt = normalizeMessageCursorTime(targetMessage.created_at);
         const { data: afterRows, error: afterError } = await selectChatMessagesWithFallback<ChatMessage[]>(
-          (selectClause) =>
-            db
+          (selectClause) => {
+            let afterQuery = db
               .from('messages')
               .select(selectClause)
-              .in('room_id', roomIdsToLoad)
-              .gt('created_at', targetCreatedAt)
+              .in('room_id', roomIdsToLoad);
+            if (targetCreatedAt) {
+              afterQuery = afterQuery.gt('created_at', targetCreatedAt);
+            }
+            return afterQuery
               .order('created_at', { ascending: true })
               .order('id', { ascending: true })
               .limit(DATE_JUMP_CONTEXT_AFTER) as PromiseLike<{
                 data: ChatMessage[] | null;
                 error: unknown;
-              }>,
+              }>;
+          },
         );
         if (afterError) throw afterError;
         if (!isCurrentRequest()) return { ok: false, reason: 'failed' };
@@ -1453,17 +1454,18 @@ export function useChatRoomDataSync({
         beforeMessage,
       });
       if (pageResult.error) {
+        // 일시 오류 시 hasOlder 를 끄지 않아 재시도 가능
         console.error('채팅 이전 메시지 조회 실패:', pageResult.error);
         return;
       }
       if (String(selectedRoomIdRef.current || '') !== roomIdForFetch) return;
 
       const older = enrichMessages(pageResult.messages);
-      setHasOlderMessages(pageResult.hasOlder);
       if (older.length === 0) {
         setHasOlderMessages(false);
         return;
       }
+      setHasOlderMessages(pageResult.hasOlder);
       oldestLoadedMessageRef.current = {
         id: String(older[0].id || ''),
         createdAt: String(older[0].created_at || ''),

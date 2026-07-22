@@ -74,54 +74,75 @@ export type InnerTabCatalogEntry = {
   tabs: { id: string; label: string }[];
 };
 
+// 워크센터 영문 id 기준. 한글 레거시 키는 alias 로 동일 entry 재사용.
+const PAYROLL_INNER: InnerTabCatalogEntry = {
+  pendingKey: 'payroll',
+  tabs: [
+    { id: '대시보드', label: '대시보드' },
+    { id: '급여정산', label: '급여정산' },
+    { id: '급여대장', label: '급여대장' },
+    { id: '연말퇴직정산', label: '연말퇴직정산' },
+    { id: '원천징수파일', label: '원천징수파일' },
+    { id: '4대보험EDI', label: '4대보험 / EDI' },
+    { id: '급여시뮬레이터', label: '급여 시뮬레이터' },
+    { id: '퇴직연금', label: '퇴직연금' },
+    { id: '임금피크제', label: '임금피크제' },
+    { id: '통상임금', label: '통상임금 계산기' },
+    { id: '미지급수당', label: '미지급 수당 알림' },
+    { id: '무급결근차감', label: '무급 결근 차감' },
+  ],
+};
+
+const ATTEND_INNER: InnerTabCatalogEntry = {
+  pendingKey: 'attendance',
+  tabs: [
+    { id: 'dashboard', label: '근태 대시보드' },
+    { id: 'schedule', label: '근무표' },
+    { id: 'calendar', label: '근태 달력' },
+    { id: 'abnormal', label: '근태이상' },
+  ],
+};
+
+const DOCS_INNER: InnerTabCatalogEntry = {
+  pendingKey: 'contract',
+  tabs: [
+    { id: '기본', label: '계약서 관리' },
+    { id: '계약서생성기', label: '계약서 생성기' },
+  ],
+};
+
+const IO_INNER: InnerTabCatalogEntry = {
+  pendingKey: 'inventory',
+  tabs: [
+    { id: '발주', label: '구매/발주' },
+    { id: '거래처', label: '거래처/명세서' },
+    { id: '납품확인서', label: '납품확인서' },
+  ],
+};
+
+const ITEM_INNER: InnerTabCatalogEntry = {
+  pendingKey: 'inventory',
+  tabs: [
+    { id: '자산', label: '품목/자산' },
+    { id: '카테고리', label: '카테고리' },
+    { id: 'UDI', label: 'UDI' },
+  ],
+};
+
 export const INNER_TAB_CATALOG: Record<string, InnerTabCatalogEntry> = {
-  '인사관리/급여': {
-    pendingKey: 'payroll',
-    tabs: [
-      { id: '대시보드', label: '대시보드' },
-      { id: '급여정산', label: '급여정산' },
-      { id: '급여대장', label: '급여대장' },
-      { id: '연말퇴직정산', label: '연말퇴직정산' },
-      { id: '원천징수파일', label: '원천징수파일' },
-      { id: '4대보험EDI', label: '4대보험 / EDI' },
-      { id: '급여시뮬레이터', label: '급여 시뮬레이터' },
-      { id: '퇴직연금', label: '퇴직연금' },
-      { id: '임금피크제', label: '임금피크제' },
-      { id: '통상임금', label: '통상임금 계산기' },
-      { id: '미지급수당', label: '미지급 수당 알림' },
-      { id: '무급결근차감', label: '무급 결근 차감' },
-    ] },
-  '인사관리/근태': {
-    pendingKey: 'attendance',
-    tabs: [
-      { id: '근태관리', label: '근태관리' },
-      { id: '연차휴가', label: '연차/휴가' },
-      { id: '간호근무표', label: '근무표 자동편성' },
-      { id: '근태이상차감', label: '지각·조퇴 / 근태이상' },
-      { id: '근태이상분석', label: '근태이상 분석' },
-      { id: '근태차감시뮬레이터', label: '근태 차감 시뮬레이터' },
-      { id: '근무형태이력', label: '근무형태 이력' },
-    ] },
-  '인사관리/계약': {
-    pendingKey: 'contract',
-    tabs: [
-      { id: '기본', label: '계약서 관리' },
-      { id: '계약서생성기', label: '계약서 생성기' },
-    ] },
-  '재고관리/발주': {
-    pendingKey: 'inventory',
-    tabs: [
-      { id: '발주', label: '구매/발주' },
-      { id: '거래처', label: '거래처/명세서' },
-      { id: '납품확인서', label: '납품확인서' },
-    ] },
-  '재고관리/자산': {
-    pendingKey: 'inventory',
-    tabs: [
-      { id: '자산', label: '품목/자산' },
-      { id: '카테고리', label: '카테고리' },
-      { id: 'UDI', label: 'UDI' },
-    ] } };
+  // 영문 워크센터 (현재 SUB_MENUS)
+  '인사관리/payroll': PAYROLL_INNER,
+  '인사관리/attend': ATTEND_INNER,
+  '인사관리/docs': DOCS_INNER,
+  '재고관리/io': IO_INNER,
+  '재고관리/item': ITEM_INNER,
+  // 한글 레거시 즐겨찾기 호환
+  '인사관리/급여': PAYROLL_INNER,
+  '인사관리/근태': ATTEND_INNER,
+  '인사관리/계약': DOCS_INNER,
+  '재고관리/발주': IO_INNER,
+  '재고관리/자산': ITEM_INNER,
+};
 
 export function getSubMenuOptions(mainMenu: MainMenuId): { subView: string; label: string; icon?: string }[] {
   const items = (SUB_MENUS as Record<string, { id: string; label: string; icon?: string; hidden?: boolean }[]>)[mainMenu];

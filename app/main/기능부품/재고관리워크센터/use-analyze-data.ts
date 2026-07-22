@@ -236,9 +236,14 @@ const EMPTY: AnalyzeWorkcenterData = {
   loading: true,
   error: null };
 
-export function useAnalyzeData(userCompany?: string): AnalyzeWorkcenterData {
+export function useAnalyzeData(
+  userCompany?: string,
+  reloadToken = 0,
+): AnalyzeWorkcenterData & { refresh: () => void } {
   const [state, setState] = useState<AnalyzeWorkcenterData>(EMPTY);
+  const [tick, setTick] = useState(0);
   const companyFilter = userCompany && userCompany !== '전체' ? userCompany : null;
+  const refresh = () => setTick((n) => n + 1);
 
   useEffect(() => {
     let cancelled = false;
@@ -309,7 +314,7 @@ export function useAnalyzeData(userCompany?: string): AnalyzeWorkcenterData {
     return () => {
       cancelled = true;
     };
-  }, [companyFilter]);
+  }, [companyFilter, reloadToken, tick]);
 
-  return state;
+  return { ...state, refresh };
 }

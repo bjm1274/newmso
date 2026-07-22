@@ -163,16 +163,33 @@ export function isInApproverScope(
   return current != null && String(current) === me;
 }
 
+export function resolveApprovalCcDepartments(meta: unknown): string[] {
+  if (!meta || typeof meta !== 'object') return [];
+  const m = meta as Record<string, unknown>;
+  const depts = m.cc_departments;
+  if (!Array.isArray(depts)) return [];
+  return depts.map((d) => String(d || '').trim()).filter(Boolean);
+}
+
 /** PC 참조함 */
 export function isReferenceForStaff(
   row: ApprovalInboxItem,
   staffId: string,
   ccUserIds?: string[],
+  staffDepartment?: string | null,
 ): boolean {
   if (isRecalledStatus(row.status)) return false;
   const me = String(staffId ?? '').trim();
   const ids = ccUserIds ?? resolveApprovalCcUserIds(row.meta_data);
-  return ids.includes(me);
+  if (me && ids.includes(me)) return true;
+
+  if (staffDepartment) {
+    const targetDept = String(staffDepartment).trim();
+    const depts = resolveApprovalCcDepartments(row.meta_data);
+    if (targetDept && depts.includes(targetDept)) return true;
+  }
+
+  return false;
 }
 
 export function canApproveAsCurrent(

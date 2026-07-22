@@ -210,6 +210,7 @@ export default function AttachmentPicker({ approvalId, onChange }: AttachmentPic
                   display: 'grid',
                   placeItems: 'center',
                   borderRadius: 8,
+                  overflow: 'hidden',
                   background:
                     entry.state === 'done'
                       ? 'var(--m-success-soft)'
@@ -228,18 +229,26 @@ export default function AttachmentPicker({ approvalId, onChange }: AttachmentPic
                           : 'var(--m-accent)' }}
                 aria-hidden="true"
               >
-                <MIcon
-                  name={
-                    entry.state === 'done'
-                      ? 'checkCircle'
-                      : entry.state === 'error'
-                        ? 'fileWarning'
-                        : entry.state === 'queued'
-                          ? 'upload'
-                          : 'paperclip'
-                  }
-                  size={15}
-                />
+                {entry.file.type.startsWith('image/') ? (
+                  <img
+                    src={URL.createObjectURL(entry.file)}
+                    alt={entry.file.name}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <MIcon
+                    name={
+                      entry.state === 'done'
+                        ? 'checkCircle'
+                        : entry.state === 'error'
+                          ? 'fileWarning'
+                          : entry.state === 'queued'
+                            ? 'upload'
+                            : 'paperclip'
+                    }
+                    size={15}
+                  />
+                )}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div

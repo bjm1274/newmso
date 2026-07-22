@@ -36,6 +36,17 @@ function userId(user: SessionUser | null | undefined): string | null {
 }
 
 export async function POST(request: Request) {
+  // 호환 유지: 신규 클라이언트는 stock-post 사용. 호출 시 410으로 안내.
+  if (request.headers.get('x-allow-deprecated-stock-consume') !== '1') {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: 'Deprecated: use POST /api/inventory/stock-post instead',
+        code: 'STOCK_CONSUME_DEPRECATED',
+      },
+      { status: 410 },
+    );
+  }
   try {
     const session = await readSessionFromRequest(request);
     const user = session?.user;

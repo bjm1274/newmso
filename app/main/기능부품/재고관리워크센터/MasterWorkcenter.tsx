@@ -34,18 +34,32 @@ const LegacyQRAssetManager = dynamic(
     ssr: false },
 );
 
-type MasterTab = 'product' | 'asset' | 'supplier';
+const UdiWorkcenter = dynamic(() => import('./UdiWorkcenter'), {
+  loading: () => (
+    <div className="flex min-h-[260px] items-center justify-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--toss-blue-light)] border-t-[var(--accent)]" />
+    </div>
+  ),
+  ssr: false,
+});
+
+type MasterTab = 'product' | 'asset' | 'supplier' | 'udi';
 
 const TABS: TabItem<MasterTab>[] = [
   { id: 'product', label: '물품 등록' },
   { id: 'asset', label: '자산 QR 관리' },
-  { id: 'supplier', label: '거래처 정보' }
+  { id: 'supplier', label: '거래처 정보' },
+  { id: 'udi', label: 'UDI' },
 ];
 
-export default function MasterWorkcenter() {
+export default function MasterWorkcenter({ initialTab }: { initialTab?: MasterTab | null } = {}) {
   const { user } = useAppData();
   const userCompany = typeof user?.company === 'string' ? user.company : undefined;
-  const [tab, setTab] = useState<MasterTab>('product');
+  const [tab, setTab] = useState<MasterTab>(
+    initialTab && (['product', 'asset', 'supplier', 'udi'] as MasterTab[]).includes(initialTab)
+      ? initialTab
+      : 'product',
+  );
   const [inventoryList, setInventoryList] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
 
@@ -137,6 +151,7 @@ export default function MasterWorkcenter() {
               </div>
             </div>
           )}
+          {tab === 'udi' && <UdiWorkcenter />}
         </section>
 
         <WorkcenterNotes

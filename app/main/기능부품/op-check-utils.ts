@@ -152,14 +152,27 @@ export function getWardRecentStorageKey(userId: unknown, companyId: unknown) {
   return getWardScopedStorageKey(WARD_MESSAGE_RECENTS_STORAGE_PREFIX, userId, companyId);
 }
 
-export function getChatRoomMemberIds(room: { members?: unknown[] | null; member_ids?: unknown[] | null }) {
-  if (Array.isArray(room.members)) {
-    return room.members.map((memberId) => String(memberId || '').trim()).filter(Boolean);
+export function getChatRoomMemberIds(room: { members?: unknown; member_ids?: unknown }) {
+  const fromMembers = coerceMemberIds(room.members);
+  if (fromMembers.length > 0) return fromMembers;
+  return coerceMemberIds(room.member_ids);
+}
+
+function coerceMemberIds(raw: unknown): string[] {
+  let parsed: unknown = raw;
+  if (typeof parsed === 'string') {
+    const trimmed = parsed.trim();
+    if (!trimmed) return [];
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      return trimmed ? [trimmed] : [];
+    }
   }
-  if (Array.isArray(room.member_ids)) {
-    return room.member_ids.map((memberId) => String(memberId || '').trim()).filter(Boolean);
+  if (Array.isArray(parsed)) {
+    return parsed.map((memberId) => String(memberId || '').trim()).filter(Boolean);
   }
-  return [] as string[];
+  return [];
 }
 
 export function isInteractiveKeyboardTarget(target: EventTarget | null) {

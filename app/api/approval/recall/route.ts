@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: already }, { status: 400 });
     }
 
-    // ── 5. meta_data 이력 append ──
+    // ── 5. meta_data 이력 파싱 및 결재 진행 여부 검증 ──
     let existingMeta: Record<string, unknown> | null = null;
     if (typeof approvalRow.meta_data === 'string' && approvalRow.meta_data.length > 0) {
       try {
@@ -93,9 +93,24 @@ export async function POST(request: NextRequest) {
       existingMeta = approvalRow.meta_data as Record<string, unknown>;
     }
 
+    const editHistory = Array.isArray(existingMeta?.edit_history) ? existingMeta.edit_history : [];
+    const hasApprovedStep = editHistory.some(
+      (entry: unknown) =>
+        entry &&
+        typeof entry === 'object' &&
+        ((entry as Record<string, unknown>).action === 'approved_step' ||
+          (entry as Record<string, unknown>).action === 'approved_final'),
+    );
+    if (hasApprovedStep) {
+      return NextResponse.json(
+        { ok: false, error: '이미 결재 진행(승인)이 시작된 문서는 회수할 수 없습니다.' },
+        { status: 400 },
+      );
+    }
+
     const nextMeta = appendApprovalHistory(
       { ...(existingMeta ?? {}), recalled_at: new Date().toISOString(), recalled_by: actorStaffId },
-      { action: 'recalled', actor_id: actorStaffId, actor_name: actorName, note: note || '회수' }
+      { action: 'recalled', actor_id: actorStaffId, actor_name: actorName, note: note || '회수' },
     );
 
     // ── 6. status 업데이트 (기안자 본인 조건 2중 보호) ──
@@ -108,6 +123,28 @@ export async function POST(request: NextRequest) {
         updated_at: new Date().toISOString() })
       .where(and(eq(approvalsTable.id, approvalId), eq(approvalsTable.sender_id, rowSenderId)))
       .run();
+
+    // 출결정정 문서인 경우 attendance_corrections 테이블의 '대기' 항목을 '회수'로 갱신 (재신청 허용)
+    const correctionDates = Array.isArray(existingMeta?.correction_dates) ? (existingMeta.correction_dates as string[]) : [];
+    if (correctionDates.length > 0 && rowSenderId) {
+      try {
+        const { attendance_corrections } = await import('@/lib/db/schema');
+        const { inArray: drizzleInArray } = await import('drizzle-orm');
+        await db
+          .update(attendance_corrections)
+          .set({ status: '회수' })
+          .where(
+            and(
+              eq(attendance_corrections.staff_id, rowSenderId),
+              drizzleInArray(attendance_corrections.attendance_date, correctionDates),
+              eq(attendance_corrections.status, '대기'),
+            ),
+          )
+          .run();
+      } catch (attErr) {
+        console.error('[api/approval/recall] attendance_corrections 회수 상태 갱신 실패:', attErr);
+      }
+    }
 
     // ── 7. 관련 알림 읽음 처리 (실패해도 메인 응답에 영향 없음) ──
     // 정본 notifications 스키마: user_id / read_at / metadata (approval_id·read·staff_id 컬럼 없음)

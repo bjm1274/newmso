@@ -18,6 +18,7 @@ import SFormChat from './새대화';
 import { useChatRoomsForMobile, type MobileChatRoom } from './data-hooks';
 import { useSheetHistory } from '@/app/hooks/useSheetHistory';
 import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
+import { normalizeMemberIds } from '@/app/main/기능부품/메신저유틸';
 
 type ChatView = 'list' | 'room' | 'new';
 
@@ -153,7 +154,7 @@ function MobileChat({
       null;
     const roomForRender: ChatRoom = matchedRoom ??
       ({ id: selectedRoomId, name: '대화방', type: null, members: [] } as ChatRoom);
-    const membersReady = Array.isArray(roomForRender.members) && roomForRender.members.length > 0;
+    const membersReady = normalizeMemberIds(roomForRender.members).length > 0;
     contentElement = (
       <SChatRoom
         key={selectedRoomId}

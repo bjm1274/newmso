@@ -188,7 +188,8 @@ export function useApprovalRouting({
             delay_hours: delayConfig.thresholdHours,
             delay_repeat_hours: delayConfig.repeatHours,
             delay_max_notifications: delayConfig.maxNotifications,
-            delay_count: nextCount },
+            delay_count: nextCount,
+            dedupe_key: `approval-delay:${String(item.id)}:${currentApproverId}:${nextCount}` },
           dedupeKey: `approval-delay:${String(item.id)}:${currentApproverId}:${nextCount}` });
         await db.from('approvals').update({ meta_data: nextMetaData }).eq('id', item.id);
       } catch (delayError) {

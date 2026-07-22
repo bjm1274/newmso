@@ -239,6 +239,8 @@ export default function HrWorkcenterRouter({
     onOpenDocumentRepoForStaff,
     linkedTarget,
     canManageDocuments,
+    statusFilter,
+    initialMenu,
   ]);
 
   return view;

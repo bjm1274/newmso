@@ -21,7 +21,7 @@ export type ChatRoomMembership = {
   created_by: string | null;
 };
 
-/** D1 text(JSON) 또는 이미 파싱된 배열 → string[] */
+/** D1 text(JSON) 또는 이미 파싱된 배열 → string[] (클라이언트 normalizeMemberIds 와 정합) */
 export function parseMembersField(raw: unknown): string[] {
   let parsed: unknown = raw;
   if (typeof raw === 'string') {
@@ -30,11 +30,19 @@ export function parseMembersField(raw: unknown): string[] {
     try {
       parsed = JSON.parse(trimmed);
     } catch {
-      return [];
+      // 단일 UUID 문자열
+      return [trimmed];
     }
   }
-  if (!Array.isArray(parsed)) return [];
-  return parsed.map((m) => String(m ?? '').trim()).filter(Boolean);
+  if (Array.isArray(parsed)) {
+    return parsed.map((m) => String(m ?? '').trim()).filter(Boolean);
+  }
+  if (parsed && typeof parsed === 'object') {
+    return Object.values(parsed as Record<string, unknown>)
+      .map((m) => String(m ?? '').trim())
+      .filter(Boolean);
+  }
+  return [];
 }
 
 export function isNoticeRoomType(type: string | null | undefined): boolean {

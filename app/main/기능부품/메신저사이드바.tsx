@@ -217,13 +217,17 @@ export function MessengerSidebar({
   void [onMovePinnedRoom, attentionThreadItems, mentionInboxItems, threadInboxItems,
         onOpenAttentionThreadItem, onOpenMentionItem, onOpenThreadItem];
 
+  const filteredSidebarItems = useMemo(
+    () => (showHiddenRooms ? sidebarRoomItems : sidebarRoomItems.filter((item) => !item.isHidden)),
+    [sidebarRoomItems, showHiddenRooms],
+  );
   const pinnedItems = useMemo(
-    () => sidebarRoomItems.filter((item) => item.isPinned),
-    [sidebarRoomItems],
+    () => filteredSidebarItems.filter((item) => item.isPinned),
+    [filteredSidebarItems],
   );
   const unpinnedItems = useMemo(
-    () => sidebarRoomItems.filter((item) => !item.isPinned),
-    [sidebarRoomItems],
+    () => filteredSidebarItems.filter((item) => !item.isPinned),
+    [filteredSidebarItems],
   );
 
   const flatRows = useMemo<SidebarFlatRow[]>(() => {
@@ -343,21 +347,54 @@ export function MessengerSidebar({
         className="chat-side-scroll px-2 pb-2 custom-scrollbar"
         data-testid={viewMode === 'org' ? 'chat-org-list' : undefined}
         style={{
-          overflow: 'hidden',
-          display: 'block',
-          contentVisibility: 'visible',
+          // flex:1 높이를 유지해야 listHeight 측정이 0 으로 고착되지 않는다.
+          // display:block 으로 덮어쓰면 flex item 높이가 깨져 목록이 안 보이는 사례가 있었다.
+          overflow: 'auto',
+          minHeight: 0,
+          flex: 1,
         }}
       >
-        {listHeight > 0 && flatRows.length > 0 ? (
-          <List
-            rowComponent={SidebarVirtualRow}
-            rowCount={flatRows.length}
-            rowHeight={rowHeight}
-            rowProps={rowProps}
-            overscanCount={8}
-            style={{ height: listHeight, width: '100%' }}
-            className="custom-scrollbar"
-          />
+        {flatRows.length > 0 ? (
+          listHeight > 0 ? (
+            <List
+              rowComponent={SidebarVirtualRow}
+              rowCount={flatRows.length}
+              rowHeight={rowHeight}
+              rowProps={rowProps}
+              overscanCount={8}
+              style={{ height: Math.max(listHeight, 120), width: '100%' }}
+              className="custom-scrollbar"
+            />
+          ) : (
+            // ResizeObserver 첫 프레임 전 폴백 — 숨김토글만이라도 보이게
+            <div className="flex flex-col">
+              {flatRows.slice(0, 40).map((row, index) => (
+                <SidebarVirtualRow
+                  key={
+                    row.kind === 'room'
+                      ? row.item.roomId
+                      : row.kind === 'staff'
+                        ? row.staff.id
+                        : row.kind === 'dept'
+                          ? row.key
+                          : row.kind === 'company'
+                            ? `c-${row.name}`
+                            : row.kind === 'section'
+                              ? `s-${row.label}`
+                              : `r-${index}`
+                  }
+                  index={index}
+                  style={{ height: getSidebarRowHeight(index, flatRows, actionRoomId) }}
+                  ariaAttributes={{
+                    'aria-posinset': index + 1,
+                    'aria-setsize': flatRows.length,
+                    role: 'listitem',
+                  }}
+                  {...rowProps}
+                />
+              ))}
+            </div>
+          )
         ) : null}
       </div>
 
@@ -678,14 +715,10 @@ const RoomRow = memo(function RoomRow({
               onToggleRoomPinned(room.id, !isPinned);
               setActionRoomId(null);
             }}
-            className={`flex min-h-[28px] min-w-[40px] items-center justify-center rounded-[var(--radius-sm)] px-2 py-1 text-[10px] font-bold ${
-              isSelected
-                ? 'bg-white/20 text-white hover:bg-white/30'
-                : 'bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20'
-            }`}
+            className="flex min-h-[28px] items-center justify-center rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all bg-slate-900 text-white hover:bg-slate-800 active:scale-95 shadow-sm border border-slate-700/50"
             title={isPinned ? '고정 해제' : '상단 고정'}
           >
-            {isPinned ? '해제' : '고정'}
+            {isPinned ? '고정 해제' : '상단 고정'}
           </button>
           <button
             type="button"

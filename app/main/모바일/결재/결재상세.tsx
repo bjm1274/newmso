@@ -387,7 +387,7 @@ export default function SApprovalDetail({
         </div>
       </div>
 
-      <div className="m-scroll" style={{ background: 'transparent' }}>
+      <div className="m-scroll" style={{ background: 'transparent', paddingBottom: 'calc(120px + env(safe-area-inset-bottom, 12px))' }}>
         {tab === 'form' && (
           <FormTab row={row} title={title} formName={formName} staffMap={staffMap} />
         )}

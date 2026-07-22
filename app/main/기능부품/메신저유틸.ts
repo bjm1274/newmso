@@ -31,9 +31,11 @@ export function toChatDate(value?: string | number | null): Date {
   if (typeof value === 'number') return new Date(value);
   const raw = String(value).trim();
   if (!raw) return new Date(0);
+  if (/^\d{10,13}$/.test(raw)) {
+    const num = Number(raw);
+    return new Date(raw.length === 10 ? num * 1000 : num);
+  }
   if (/[zZ]$/.test(raw) || /[+-]\d{2}:?\d{2}$/.test(raw)) return new Date(raw);
-  // D1(SQLite) CURRENT_TIMESTAMP는 timezone 표기 없는 UTC 문자열
-  // → +00:00 오프셋을 붙여 UTC 기준으로 파싱한다.
   if (/\d{2}:\d{2}/.test(raw)) return new Date(`${raw.replace(' ', 'T')}+00:00`);
   return new Date(raw);
 }
@@ -142,8 +144,32 @@ export function sortChatRoomsWithNoticeFirst(rooms: ChatRoom[]): ChatRoom[] {
   return notice ? [notice, ...others] : others;
 }
 
+/**
+ * chat_rooms.members / member_ids 정규화.
+ * D1 역직렬화 실패·캐시·mutate 경로에서 string(JSON) 또는 단일 id 가 올 수 있어
+ * Array.isArray 만 보면 멤버십 검사가 전부 false → 방 목록이 비게 된다.
+ */
 export function normalizeMemberIds(members: unknown): string[] {
-  return Array.isArray(members) ? members.map((id: unknown) => String(id)) : [];
+  let parsed: unknown = members;
+  if (typeof parsed === 'string') {
+    const trimmed = parsed.trim();
+    if (!trimmed) return [];
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      // 단일 UUID 문자열 등
+      return trimmed ? [trimmed] : [];
+    }
+  }
+  if (Array.isArray(parsed)) {
+    return parsed.map((id: unknown) => String(id ?? '').trim()).filter(Boolean);
+  }
+  if (parsed && typeof parsed === 'object') {
+    // member_ids 기본값이 "{}" 인 스키마 호환 — 값 배열만 사용
+    const values = Object.values(parsed as Record<string, unknown>);
+    return values.map((id) => String(id ?? '').trim()).filter(Boolean);
+  }
+  return [];
 }
 
 export function getChatRoomParticipantCount(room: ChatRoom | null | undefined): number {
@@ -181,11 +207,24 @@ export function isGroupChatRoom(room: ChatRoom | null | undefined): boolean {
 }
 
 export function isSelfChatRoom(room: ChatRoom | null | undefined, currentUserId: string | null | undefined): boolean {
-  if (room?.type !== 'direct') return false;
+  if (!room) return false;
   const normalizedCurrentUserId = String(currentUserId || '').trim();
   if (!normalizedCurrentUserId) return false;
-  const members = normalizeMemberIds(room?.members);
-  return members.length === 1 && members[0] === normalizedCurrentUserId;
+  const members = normalizeMemberIds(room.members);
+
+  if (room.type === 'self') {
+    return members.length === 1 && members[0] === normalizedCurrentUserId;
+  }
+
+  if (room.type === 'direct') {
+    const creator = String(room.created_by || '').trim();
+    if (room.name === SELF_ROOM_NAME && (creator === '' || creator === normalizedCurrentUserId)) {
+      return members.length === 1 && members[0] === normalizedCurrentUserId;
+    }
+    return false;
+  }
+
+  return false;
 }
 
 export function isActiveChatMember(staff: StaffMember | null | undefined): boolean {
@@ -206,13 +245,10 @@ export function isActiveChatMember(staff: StaffMember | null | undefined): boole
 
 export function isMessageReadByCursor(messageCreatedAt: string | null | undefined, lastReadAt: string | null | undefined): boolean {
   if (!messageCreatedAt || !lastReadAt) return false;
-  // toChatDate로 양변을 동일 규칙(UTC)으로 파싱한다. D1의 공백 형식과
-  // optimistic 메시지의 ISO-Z 형식이 섞이면 raw new Date()는 한쪽만 9시간
-  // 어긋나 비교가 깨지고 읽음 표시("1")가 사라지지 않는다.
   const messageTime = toChatDate(messageCreatedAt).getTime();
   const cursorTime = toChatDate(lastReadAt).getTime();
   if (!Number.isFinite(messageTime) || !Number.isFinite(cursorTime)) return false;
-  return cursorTime + 1000 >= messageTime;
+  return cursorTime + 3000 >= messageTime;
 }
 
 export function getLatestReadCursor(
@@ -493,9 +529,16 @@ export function getRoomDisplayName(room: ChatRoom | null | undefined, staffs: St
   if (!isGroupChatRoom(room) && members.length > 0 && members.length <= 2) {
     const normalizedCurrentUserId = String(currentUserId || '');
     const otherId =
-      members.find((memberId) => memberId !== normalizedCurrentUserId) ?? members[0];
-    const otherStaff = staffs.find((staff: StaffMember) => String(staff.id) === String(otherId));
-    if (otherStaff?.name) return otherStaff.name;
+      members.find((memberId) => memberId !== normalizedCurrentUserId);
+    if (otherId) {
+      const otherStaff = staffs.find((staff: StaffMember) => String(staff.id) === String(otherId));
+      if (otherStaff?.name) return otherStaff.name;
+    } else if (members.length === 1 && members[0] === normalizedCurrentUserId) {
+      if (room.name && room.name !== SELF_ROOM_NAME && room.name !== '채팅방') {
+        return `${room.name} (퇴장)`;
+      }
+      return '대화상대 없음 (퇴장)';
+    }
   }
   return room.name || '채팅방';
 }

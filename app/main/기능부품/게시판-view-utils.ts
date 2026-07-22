@@ -79,12 +79,21 @@ export function getBoardPostAuthorSignal(post: Partial<BoardPost>) {
 }
 
 export function getBoardPostPreview(post: Partial<BoardPost>, maxLength = 120) {
-  const content = String(post.content ?? '').replace(/\s+/g, ' ').trim();
+  let rawContent = String(post.content ?? '');
+  // 메타데이터 블록 및 마크다운 특수문자 제거
+  rawContent = rawContent
+    .replace(/\[\[.*?\]\][\s\S]*?\[\[\/.*?\]\]/g, '')
+    .replace(/!\[.*?\]\(.*?\)/g, '')
+    .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+    .replace(/[#*`>|-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
   const tags = Array.isArray(post.tags)
     ? post.tags.map((tag) => String(tag ?? '').trim()).filter(Boolean)
     : [];
   const attachmentsCount = Array.isArray(post.attachments) ? post.attachments.length : 0;
-  const rawPreview = content || (tags.length > 0 ? tags.map((tag) => `#${tag}`).join(' ') : '') ||
+  const rawPreview = rawContent || (tags.length > 0 ? tags.map((tag) => `#${tag}`).join(' ') : '') ||
     (attachmentsCount > 0 ? `첨부파일 ${attachmentsCount}개` : '');
 
   if (!rawPreview) return '';

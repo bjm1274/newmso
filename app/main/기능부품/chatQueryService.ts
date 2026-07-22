@@ -30,6 +30,29 @@ function sanitizePreviewField(raw: unknown): string | null {
   return t;
 }
 
+function coerceMembersField(raw: unknown): string[] | null {
+  if (raw == null) return null;
+  let parsed: unknown = raw;
+  if (typeof parsed === 'string') {
+    const trimmed = parsed.trim();
+    if (!trimmed) return [];
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      return trimmed ? [trimmed] : [];
+    }
+  }
+  if (Array.isArray(parsed)) {
+    return parsed.map((id) => String(id ?? '').trim()).filter(Boolean);
+  }
+  if (parsed && typeof parsed === 'object') {
+    return Object.values(parsed as Record<string, unknown>)
+      .map((id) => String(id ?? '').trim())
+      .filter(Boolean);
+  }
+  return null;
+}
+
 function normalizeChatRoomForClient(room: ChatRoom): ChatRoom {
   const dynamicRoom = room as ChatRoom & { members?: unknown; member_ids?: unknown };
   const preview = sanitizePreviewField(dynamicRoom.last_message_preview);
@@ -39,11 +62,16 @@ function normalizeChatRoomForClient(room: ChatRoom): ChatRoom {
     last_message_preview: preview ?? (last as string | null),
     last_message: last ?? (preview as string | null),
   };
-  if (Array.isArray(dynamicRoom.members)) return withPreview;
-  if (!Array.isArray(dynamicRoom.member_ids)) return withPreview;
-  return {
-    ...withPreview,
-    members: dynamicRoom.member_ids };
+
+  const fromMembers = coerceMembersField(dynamicRoom.members);
+  if (fromMembers) {
+    return { ...withPreview, members: fromMembers };
+  }
+  const fromMemberIds = coerceMembersField(dynamicRoom.member_ids);
+  if (fromMemberIds) {
+    return { ...withPreview, members: fromMemberIds };
+  }
+  return withPreview;
 }
 
 export function normalizeChatRoomsForClient(rooms: ChatRoom[]): ChatRoom[] {

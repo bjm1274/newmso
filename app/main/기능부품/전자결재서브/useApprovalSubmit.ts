@@ -26,6 +26,7 @@ import {
 import { db, d1 } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import { LEAVE_TYPE, normalizeLeaveType } from '@/lib/leave-type';
+import { buildApprovalSubmitPayload } from '@/lib/approval-submit-payload';
 import {
   APPROVAL_OPTIONAL_INSERT_COLUMNS,
   BUILTIN_FORM_TYPE_DEFINITIONS,
@@ -625,40 +626,54 @@ export function useApprovalSubmit({
     const firstApproverId = String(approverLine[0]?.id || '');
     const initialApproverId = resolveEffectiveApproverId(firstApproverId) || firstApproverId;
 
-    const row: ApprovalRecord = {
-      sender_id: user.id,
-      sender_name: user.name || '이름 없음',
-      sender_company: companyName,
-      current_approver_id: initialApproverId,
-      approver_line: approverLine.map((a) => a.id),
-      type: formType,
+    // 모바일 기안상신과 동일 SSOT (buildApprovalSubmitPayload)
+    const { row: builtRow } = buildApprovalSubmitPayload({
+      staffId: String(user.id),
+      senderName: user.name || '이름 없음',
+      senderCompany: companyName,
+      senderDepartment: user.department || null,
+      companyId: companyId ?? null,
+      typeName: formType,
       title: formTitle,
       content: formContent || '',
-      meta_data: {
+      formSlug: resolvedFormSlug,
+      formDisplayName: resolvedFormName,
+      approverLine: approverLine.map((a) => ({
+        id: String(a.id || ''),
+        name: a.name || '',
+        position: a.position || null,
+        department: a.department || null,
+        company: a.company || null,
+      })),
+      approverLineSource: 'compose',
+      docNumber: structuredDocNumber,
+      ccDepartments: cc_departments,
+      ccUsers: ccLine.map((c) => ({ id: c.id, name: c.name })),
+      extraMeta: {
         ...nextExtraData,
         ...(formType === '연차/휴가' ? { reason: formContent || '' } : {}),
-        form_slug: resolvedFormSlug,
-        form_name: resolvedFormName,
-        cc_departments,
-        cc_users: ccLine.map(c => ({ id: c.id, name: c.name })),
-        approver_line: approverLine.map((a) => a.id),
-        approver_line_details: approverLine.map((approver) => ({
-          id: String(approver.id || ''),
-          name: approver.name || '',
-          position: approver.position || null,
-          department: approver.department || null,
-          company: approver.company || null })),
-        doc_number: structuredDocNumber,
-        revision,
         source_approval_id: composeSeedApproval?.id || null,
-        previous_doc_number: sourceDocNumber },
-      doc_number: structuredDocNumber,
-      status: '대기' };
-    row.meta_data = appendApprovalHistory(row.meta_data as ApprovalRecord | null | undefined, {
-      ...buildApprovalHistoryEntry(composeSeedApproval?.id ? 'resubmitted' : 'created', composeSeedApproval?.id ? '회수 후 재상신' : '최초 상신'),
-      current_approver_id: initialApproverId || null,
-      revision });
-    if (companyId != null) row.company_id = companyId;
+        previous_doc_number: sourceDocNumber,
+        revision,
+      },
+      historyNote: composeSeedApproval?.id ? '회수 후 재상신' : '최초 상신',
+      revision,
+      actorId: String(user.id),
+      actorName: user.name || '이름 없음',
+    });
+
+    const row: ApprovalRecord = {
+      ...builtRow,
+      current_approver_id: initialApproverId,
+    };
+    // resubmit 시 history action 보정
+    if (composeSeedApproval?.id) {
+      row.meta_data = appendApprovalHistory(row.meta_data as ApprovalRecord | null | undefined, {
+        ...buildApprovalHistoryEntry('resubmitted', '회수 후 재상신'),
+        current_approver_id: initialApproverId || null,
+        revision,
+      });
+    }
 
     const { error, data: insertedApproval } = await insertApprovalWithLegacyFallback(row);
 

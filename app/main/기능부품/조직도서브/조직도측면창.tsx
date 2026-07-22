@@ -26,6 +26,7 @@ import { prefetchMenuModule } from './조직도본문';
 import {
   getConversationRoomIdSet,
   getRoomPrefsStorageKey,
+  normalizeMemberIds,
   NOTICE_ROOM_ID } from '@/app/main/기능부품/메신저유틸';
 
 const MYPAGE_TAB_KEY = 'erp_mypage_tab';
@@ -41,10 +42,13 @@ type SubMenuItem = {
 export const SUB_MENUS: Record<string, SubMenuItem[]> = {
   재고관리: [
     // 결정 #44: 7장 → 4 워크센터 (status / io / item / analyze)
+    // audit/udi 는 딥링크·즐겨찾기 호환용 hidden (화면은 item/analyze 탭 또는 전용 라우트)
     { id: 'status', label: '재고 현황', group: '재고관리', icon: 'inventory-status' },
     { id: 'io', label: '입출고·발주', group: '재고관리', icon: 'inventory-flow' },
     { id: 'item', label: '물품·자산', group: '재고관리', icon: 'asset' },
     { id: 'analyze', label: '분석·마감', group: '재고관리', icon: 'analytics' },
+    { id: 'audit', label: '실사·이관', group: '재고관리', icon: 'inventory-status', hidden: true },
+    { id: 'udi', label: 'UDI', group: '재고관리', icon: 'asset', hidden: true },
   ],
   게시판: [
     { id: '공지사항', label: '공지사항', group: '게시판', icon: 'bell' },
@@ -834,7 +838,8 @@ function Sidebar({ user, mainMenu, onMenuChange }: { user?: SidebarUser | null; 
 
       const myRooms = ((rooms || []) as ChatRoom[]).filter((room) => {
         if (room.id === NOTICE_ROOM_ID) return true;
-        return Array.isArray(room.members) && room.members.some((id) => String(id) === effectiveUserId);
+        const members = normalizeMemberIds((room as ChatRoom & { members?: unknown }).members);
+        return members.some((id) => String(id) === effectiveUserId);
       });
 
       const hiddenRoomIds = readHiddenRoomIds();

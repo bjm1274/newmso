@@ -28,7 +28,7 @@ import { useChatMessageWorkflow } from './메신저메시지액션워크플로�
 import { useChatRoomManagement } from './메신저방관리훅';
 import { useChatRoomDataSync } from './메신저방데이터훅';
 import { useChatSidebarState } from './메신저사이드바훅';
-import { fetchAllChatRooms, writeCachedChatRooms } from './chatQueryService';
+import { fetchAllChatRooms, readCachedChatRooms, writeCachedChatRooms } from './chatQueryService';
 import { useChatMessageSending } from './메신저전송훅';
 import { useScheduledNoticeDispatcher } from './메신저예약공지훅';
 import { useChatRoomPreferences } from './메신저방환경설정훅';
@@ -593,7 +593,9 @@ export default function ChatView({
   const isRoomAccessibleToCurrentUser = useCallback((room: ChatRoom | null | undefined) => {
     if (!room) return false;
     if (String(room.id) === NOTICE_ROOM_ID) return true;
-    return getEffectiveRoomMemberIds(room).includes(effectiveChatUserId);
+    const me = String(effectiveChatUserId || '').trim();
+    if (!me) return false;
+    return getEffectiveRoomMemberIds(room).some((memberId) => String(memberId) === me);
   }, [effectiveChatUserId, getEffectiveRoomMemberIds]);
 
   const selectedRoom = useMemo(() => {
@@ -820,7 +822,7 @@ export default function ChatView({
   const repairDirectRooms = useCallback(async (rooms: ChatRoom[]) => {
     const sourceRooms = Array.isArray(rooms) ? rooms : [];
     const orphanRooms = sourceRooms.filter(( room: ChatRoom) =>
-      room?.type === 'direct' && (!Array.isArray(room.members) || room.members.length === 0)
+      room?.type === 'direct' && normalizeMemberIds(room.members).length === 0
     );
     if (orphanRooms.length === 0) {
       return sourceRooms;
@@ -972,23 +974,59 @@ export default function ChatView({
   ) => {
     if (!effectiveChatUserId) return;
 
-    const targetRoomIds = Array.from(
-      new Set(roomIds.map((roomId) => String(roomId || '').trim()).filter(Boolean))
+    const targetRoomIds = new Set(
+      roomIds.map((roomId) => String(roomId || '').trim()).filter(Boolean)
     );
-    if (targetRoomIds.length === 0) return;
+    if (targetRoomIds.size === 0) return;
 
-    // 읽음 커서·알림 시각: SQL 포맷 우선 (D1 문자열 비교 정합)
+    // D1 은 PostgREST JSONPath(metadata->>room_id) 필터를 지원하지 않음.
+    // 미읽음 message/mention 을 가져와 room_id 를 JS 로 매칭 후 id 단위 갱신.
     const resolvedReadAt = toUtcSqlTimestamp(readAt);
-    await Promise.allSettled(
-      targetRoomIds.map((targetRoomId) =>
-        d1.from('notifications')
-          .update({ read_at: resolvedReadAt })
-          .eq('user_id', effectiveChatUserId)
-          .in('type', ['message', 'mention'])
-          .is('read_at', null)
-          .filter('metadata->>room_id', 'eq', targetRoomId)
-      )
-    );
+    try {
+      const { data, error } = await d1
+        .from('notifications')
+        .select('id, metadata')
+        .eq('user_id', effectiveChatUserId)
+        .in('type', ['message', 'mention'])
+        .is('read_at', null)
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+
+      const idsToMark: string[] = [];
+      for (const row of data || []) {
+        const meta =
+          row?.metadata && typeof row.metadata === 'object'
+            ? (row.metadata as Record<string, unknown>)
+            : typeof row?.metadata === 'string'
+              ? (() => {
+                  try {
+                    return JSON.parse(row.metadata) as Record<string, unknown>;
+                  } catch {
+                    return {};
+                  }
+                })()
+              : {};
+        const roomId = String(meta.room_id || meta.roomId || '').trim();
+        if (roomId && targetRoomIds.has(roomId)) {
+          const id = String(row.id || '').trim();
+          if (id) idsToMark.push(id);
+        }
+      }
+
+      if (idsToMark.length > 0) {
+        // D1 IN 파라미터 한도 여유 — 청크 갱신
+        for (let i = 0; i < idsToMark.length; i += 50) {
+          const chunk = idsToMark.slice(i, i + 50);
+          await d1
+            .from('notifications')
+            .update({ read_at: resolvedReadAt })
+            .in('id', chunk);
+        }
+      }
+    } catch (err) {
+      logger.warn('대화방 알림 읽음 처리 실패:', err);
+    }
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('erp-notification-read'));
@@ -996,30 +1034,27 @@ export default function ChatView({
   }, [effectiveChatUserId]);
   markConversationNotificationsAsReadRef.current = markConversationNotificationsAsRead;
 
-  // 전체 unread가 0이 되면 message/mention 알림도 읽음 처리한다.
+  // 전체 unread가 0이 되면, 0으로 확인된 방들의 알림만 읽음 처리 (전역 일괄 wipe 금지).
   const prevTotalUnreadRef = useRef<number | null>(null);
   useEffect(() => {
     if (!effectiveChatUserId) return;
+    if (chatRooms.length === 0) return;
     const total = Object.values(roomUnreadCounts).reduce((sum, n) => sum + (n || 0), 0);
     const roomCount = Object.keys(roomUnreadCounts).length;
-    if (roomCount === 0) return; // 아직 unread 집계가 준비되지 않은 상태
-    if (total === 0 && prevTotalUnreadRef.current !== 0) {
+    if (roomCount === 0) return;
+    if (roomCount < Math.min(3, chatRooms.length) && total === 0) return;
+    if (total === 0 && prevTotalUnreadRef.current !== 0 && prevTotalUnreadRef.current !== null) {
       prevTotalUnreadRef.current = 0;
-      // message/mention 알림을 일괄 읽음 처리
-      void d1.from('notifications')
-        .update({ read_at: new Date().toISOString() })
-        .eq('user_id', effectiveChatUserId)
-        .in('type', ['message', 'mention'])
-        .is('read_at', null)
-        .then(() => {
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('erp-notification-read'));
-          }
-        });
+      const zeroRooms = Object.entries(roomUnreadCounts)
+        .filter(([, count]) => (count || 0) === 0)
+        .map(([roomId]) => roomId);
+      if (zeroRooms.length > 0) {
+        void markConversationNotificationsAsRead(zeroRooms);
+      }
     } else {
       prevTotalUnreadRef.current = total;
     }
-  }, [roomUnreadCounts, effectiveChatUserId]);
+  }, [roomUnreadCounts, effectiveChatUserId, chatRooms.length, markConversationNotificationsAsRead]);
 
   const loadMentionInbox = useCallback(async () => {
     if (!effectiveChatUserId) {
@@ -1922,23 +1957,38 @@ export default function ChatView({
     let active = true;
     const loadRooms = async () => {
       try {
+        // 로컬 캐시가 있으면 먼저 그려 빈 목록 체감을 줄인다.
+        if (active && chatRoomsRef.current.length === 0) {
+          const cached = readCachedChatRooms();
+          if (cached.length > 0) {
+            await syncChatRoomsState(cached);
+          }
+        }
+
         const { data: noticeRoom } = await db
           .from('chat_rooms')
           .select('id')
           .eq('id', NOTICE_ROOM_ID)
           .maybeSingle();
 
+        // staff 디렉터리가 아직 비어 있으면 members:[] 로 공지방을 덮어쓰지 않는다.
+        // (빈 배열 패치는 멤버십 기반 푸시/접근 검사에 치명적이다.)
+        const canSyncNoticeMembers = noticeRoomMemberIds.length > 0;
         if (!noticeRoom) {
           await createOrUpsertChatRoom({
             id: NOTICE_ROOM_ID,
+            name: NOTICE_ROOM_NAME,
+            type: 'notice',
+            ...(canSyncNoticeMembers ? { members: noticeRoomMemberIds } : {}) });
+        } else if (canSyncNoticeMembers) {
+          await patchChatRoom(NOTICE_ROOM_ID, {
             name: NOTICE_ROOM_NAME,
             type: 'notice',
             members: noticeRoomMemberIds });
         } else {
           await patchChatRoom(NOTICE_ROOM_ID, {
             name: NOTICE_ROOM_NAME,
-            type: 'notice',
-            members: noticeRoomMemberIds });
+            type: 'notice' });
         }
 
         const roomResult = await fetchAllChatRooms({ force: true });
@@ -1949,13 +1999,18 @@ export default function ChatView({
         writeCachedChatRooms(syncedRooms);
       } catch (error) {
         logger.error('채팅방 목록 로드 실패:', error);
-        if (active && chatRoomsRef.current.length > 0) {
+        if (!active) return;
+        if (chatRoomsRef.current.length > 0) {
           await syncChatRoomsState(chatRoomsRef.current);
+          return;
+        }
+        const cached = readCachedChatRooms();
+        if (cached.length > 0) {
+          await syncChatRoomsState(cached);
         }
       }
     };
     void loadRooms();
-    // selectedRoomId 변경과 무관하게 방 목록은 한 번 더 동기화한다.
     return () => {
       active = false;
     };
@@ -1968,7 +2023,6 @@ export default function ChatView({
 
   // Phase 5-C — Supabase Realtime channel → polling으로 전환.
   // chat_rooms 테이블 변경(생성/이름변경/멤버변경/삭제) 감지 시 전체 리스트 refetch.
-  // 폴링 5초 + visibility hidden 자동 중단(polling-bus 내장).
   useEffect(() => {
     return subscribeRealtime(
       'chat-rooms-list',
@@ -1976,9 +2030,16 @@ export default function ChatView({
       () => {
         void fetchAllChatRooms({ force: true }).then((result) => {
           if (result.error || !result.data) return;
-          const accessible = result.data.filter((room) => isRoomAccessibleToCurrentUser(room));
+          let accessible = result.data.filter((room) => isRoomAccessibleToCurrentUser(room));
+          // identity/멤버 필드 일시 불일치로 accessible 이 비면 기존 목록을 지우지 않는다.
+          // (사이드바 뱃지는 뜨는데 목록만 비는 회귀 방지)
+          if (accessible.length === 0) {
+            if (chatRoomsRef.current.length > 0) return;
+            // 공지방만이라도 유지
+            accessible = result.data.filter((room) => String(room.id) === NOTICE_ROOM_ID);
+            if (accessible.length === 0) return;
+          }
           // 폴링이 방 목록을 덮을 때: 현재 메모리 상의 더 최신 last_message_at 은 유지
-          // (삭제 직후 로컬 미리보기가 옛 file:// 로 되돌아가는 버그 방지)
           setChatRooms((prev) => {
             const prevById = new Map(prev.map((r) => [String(r.id), r]));
             const merged = accessible.map((room) => {
@@ -1986,7 +2047,6 @@ export default function ChatView({
               if (!old) return room;
               const oldAt = new Date(String(old.last_message_at || 0).replace(' ', 'T')).getTime();
               const newAt = new Date(String(room.last_message_at || 0).replace(' ', 'T')).getTime();
-              // 로컬이 삭제 문구/파일 정제로 더 깨끗하고 시각이 같거나 더 최근이면 로컬 preview 우선
               const oldPreview = String(old.last_message_preview || old.last_message || '');
               const newPreview = String(room.last_message_preview || room.last_message || '');
               const newIsDirty =
@@ -2266,11 +2326,7 @@ export default function ChatView({
 
   const addableMembers = useMemo(() => {
     if (!selectedRoom) return [];
-    const currentMemberIds = new Set(
-      Array.isArray(selectedRoom.members)
-        ? selectedRoom.members.map((id: unknown) => String(id))
-        : []
-    );
+    const currentMemberIds = new Set(normalizeMemberIds(selectedRoom.members));
     return allKnownStaffs
       .filter((staff: StaffMember) => isActiveChatMember(staff))
       .filter(( s: StaffMember) => !currentMemberIds.has(String(s.id)))

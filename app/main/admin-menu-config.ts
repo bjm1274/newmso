@@ -107,17 +107,26 @@ export const ADMIN_TAB_ALIASES: Record<string, AdminOuterTabId> = {
   양식빌더: '문서양식',
   문서서식: '문서양식',
   연차수동부여: '시스템마스터센터',
-  // Phase B #8: 레거시 open_subview/즐겨찾기/e2e `회사관리` → SSOT CompanyWorkcenter (`company`)
-  회사관리: 'company' };
+  // 레거시 한글 outer tab / open_subview / 즐겨찾기 → 영문 워크센터 SSOT
+  경영분석: 'exec',
+  회사관리: 'company',
+  직원권한: 'roles',
+  운영설정: 'ops',
+  문서양식: 'forms',
+  감사센터: 'audit',
+  데이터백업: 'audit',
+  데이터초기화: 'audit' };
 
 export const ADMIN_PARENT_SUBVIEW_MAP: Record<string, AdminOuterTabId> = {
-  ...Object.fromEntries(ADMIN_ANALYSIS_TABS.map((tab) => [tab.id, '경영분석' as const])),
-  ...Object.fromEntries(ADMIN_OPERATIONS_TABS.map((tab) => [tab.id, '운영설정' as const])),
-  ...Object.fromEntries(ADMIN_AUDIT_TABS.map((tab) => [tab.id, '감사센터' as const])),
+  ...Object.fromEntries(ADMIN_ANALYSIS_TABS.map((tab) => [tab.id, 'exec' as const])),
+  ...Object.fromEntries(ADMIN_OPERATIONS_TABS.map((tab) => [tab.id, 'ops' as const])),
+  ...Object.fromEntries(ADMIN_AUDIT_TABS.map((tab) => [tab.id, 'audit' as const])),
   ...ADMIN_TAB_ALIASES };
 
+// 사이드바 정본은 영문 워크센터 id. 숨김 레거시 한글 tab(경영분석)을 기본으로 두면
+// 워크센터 라우팅이 비고 레거시 분기로만 들어가 "메뉴가 안 열린다" 체감이 난다.
 const DEFAULT_ADMIN_ENTRY: AdminEntryState = {
-  activeTab: '경영분석',
+  activeTab: 'exec',
   analysisTab: '경영대시보드',
   operationsTab: '알림자동화',
   auditTab: '접근감사로그' };
@@ -154,21 +163,21 @@ export function normalizeAdminEntry(tabId?: string | null): AdminEntryState {
   if (isAdminAnalysisTabId(aliasedTabId)) {
     return {
       ...DEFAULT_ADMIN_ENTRY,
-      activeTab: '경영분석',
+      activeTab: 'exec',
       analysisTab: aliasedTabId };
   }
 
   if (isAdminAuditTabId(aliasedTabId)) {
     return {
       ...DEFAULT_ADMIN_ENTRY,
-      activeTab: '감사센터',
+      activeTab: 'audit',
       auditTab: aliasedTabId };
   }
 
   if (isAdminOperationsTabId(aliasedTabId)) {
     return {
       ...DEFAULT_ADMIN_ENTRY,
-      activeTab: '운영설정',
+      activeTab: 'ops',
       operationsTab: aliasedTabId };
   }
 

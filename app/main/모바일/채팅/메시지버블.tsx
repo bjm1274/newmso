@@ -112,7 +112,7 @@ export default function MessageBubble({
     }
   }, [searchMessageId, message.id]);
 
-  const displayedReadCount = (mine || isGroupChat) ? readCount : 0;
+  const displayedReadCount = readCount;
 
   const ts = formatBubbleTimestamp(message.created_at);
   const senderName =

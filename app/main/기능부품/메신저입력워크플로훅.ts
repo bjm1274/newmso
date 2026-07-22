@@ -4,7 +4,7 @@ import { useCallback, useState, type Dispatch, type SetStateAction } from 'react
 import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
-import { buildPollQuestionContent, extractPollMetaFromQuestion } from './메신저유틸';
+import { buildPollQuestionContent, extractPollMetaFromQuestion, normalizeMemberIds } from './메신저유틸';
 import type { PollPrizeWinner } from './메신저유틸';
 import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
 
@@ -238,8 +238,8 @@ export function useChatWorkflowDrafts({
           const agreeCount = voteRows?.length || 0;
           
           const { data: roomData } = await db.from('chat_rooms').select('members').eq('id', poll.room_id).single();
-          if (roomData && Array.isArray(roomData.members)) {
-            const members = roomData.members as string[];
+          if (roomData) {
+            const members = normalizeMemberIds(roomData.members);
             const threshold = Math.floor((members.length - 1) / 2) + 1; // 과반수 찬성
             if (agreeCount >= threshold && members.includes(kickTargetId)) {
               const nextMembers = members.filter((m) => m !== kickTargetId);

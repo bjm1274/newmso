@@ -11,6 +11,7 @@ import {
   NOTICE_ROOM_ID,
   SELF_ROOM_NAME,
   isSelfChatRoom,
+  normalizeMemberIds,
   sortChatRoomsWithNoticeFirst } from './메신저유틸';
 
 type ChatViewMode = 'chat' | 'org';
@@ -142,7 +143,7 @@ export function useChatRoomManagement({
     }
 
     try {
-      const currentMembers = Array.isArray(selectedRoom.members) ? selectedRoom.members : [];
+      const currentMembers = normalizeMemberIds(selectedRoom.members);
       const newMembers = currentMembers.filter(
         (id: unknown) => String(id) !== String(effectiveChatUserId || user?.id || ''),
       );
@@ -210,7 +211,7 @@ export function useChatRoomManagement({
       if (!confirmed) return;
 
       try {
-        const currentMembers = Array.isArray(selectedRoom.members) ? selectedRoom.members : [];
+        const currentMembers = normalizeMemberIds(selectedRoom.members);
         const newMembers = currentMembers.filter((id: unknown) => String(id) !== String(memberId));
 
         const removerName = user?.name || '알 수 없음';
@@ -333,18 +334,17 @@ export function useChatRoomManagement({
 
         const repairedRooms = await repairDirectRooms(rooms || []);
         const isSelfTarget = otherId === effectiveChatUserId;
-        const targetMembers = new Set(
-          isSelfTarget ? [effectiveChatUserId] : [effectiveChatUserId, otherId],
-        );
 
         const foundRoom = repairedRooms
           .filter((room) => {
-            const members = Array.isArray(room?.members)
-              ? room.members.map((memberId: unknown) => String(memberId))
-              : [];
+            const members = normalizeMemberIds(room?.members);
+            if (isSelfTarget) {
+              return isSelfChatRoom(room, effectiveChatUserId) || room?.type === 'self';
+            }
             return (
-              members.length === targetMembers.size &&
-              [...targetMembers].every((memberId) => members.includes(memberId))
+              members.length === 2 &&
+              members.includes(effectiveChatUserId) &&
+              members.includes(otherId)
             );
           })
           .sort(
@@ -361,7 +361,7 @@ export function useChatRoomManagement({
                 ? {
                     ...foundRoom,
                     name: SELF_ROOM_NAME,
-                    type: 'direct' as const,
+                    type: 'self' as const,
                     members: [effectiveChatUserId] }
                 : foundRoom,
             ]),
@@ -373,7 +373,7 @@ export function useChatRoomManagement({
 
         const directResult = await createOrUpsertChatRoom({
           name: isSelfTarget ? SELF_ROOM_NAME : `${staff.name}`,
-          type: 'direct',
+          type: isSelfTarget ? 'self' : 'direct',
           members: isSelfTarget ? [effectiveChatUserId] : [effectiveChatUserId, otherId] });
         if (!directResult.ok || !directResult.room) {
           throw new Error(directResult.error || 'Direct chat create failed');
@@ -388,7 +388,7 @@ export function useChatRoomManagement({
                 ? {
                     ...room,
                     name: SELF_ROOM_NAME,
-                    type: 'direct' as const,
+                    type: 'self' as const,
                     members: [effectiveChatUserId] }
                 : room,
             ]),
@@ -409,7 +409,7 @@ export function useChatRoomManagement({
     if (!selectedRoom) return;
 
     try {
-      const currentMembers = Array.isArray(selectedRoom.members) ? selectedRoom.members : [];
+      const currentMembers = normalizeMemberIds(selectedRoom.members);
       const setIds = new Set(currentMembers.map((id: unknown) => String(id)));
       addMemberSelectingIds.forEach((id) => setIds.add(String(id)));
       const newMembers = Array.from(setIds);

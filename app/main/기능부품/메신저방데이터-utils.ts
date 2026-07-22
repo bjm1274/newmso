@@ -1,11 +1,15 @@
+import { toUtcSqlTimestamp } from '@/lib/chat-read-cursors';
 import { selectChatMessagesWithFallback as defaultSelectChatMessagesWithFallback } from './메신저데이터유틸';
 import { CHAT_METADATA_QUERY_CHUNK_SIZE, type SelectChatMessagesWithFallback } from './메신저방데이터-types';
 
+/**
+ * 메시지 페이지 커서 시각 — D1 messages.created_at 과 같은 SQL 포맷.
+ * (이전 ISO `...T...Z` 변환은 문자열 비교/or 필터가 깨져 load-older 가 빈 결과를 냄)
+ */
 export function normalizeMessageCursorTime(value: string | null | undefined) {
   const rawValue = String(value || '').trim();
   if (!rawValue) return '';
-  const parsedTime = new Date(rawValue).getTime();
-  return Number.isNaN(parsedTime) ? rawValue : new Date(rawValue).toISOString();
+  return toUtcSqlTimestamp(rawValue);
 }
 
 export const defaultLegacySelectChatMessagesWithFallback: SelectChatMessagesWithFallback = (execute) =>

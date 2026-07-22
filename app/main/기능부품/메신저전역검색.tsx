@@ -5,6 +5,7 @@ import { MessengerAvatar } from './메신저공통';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 import type { SavedChatSearch } from './메신저검색훅';
+import { normalizeMemberIds } from './메신저유틸';
 
 export type MessengerGlobalSearchTab = 'all' | 'member' | 'room' | 'message' | 'file';
 
@@ -241,9 +242,10 @@ export function GlobalSearchModal({
                       type SearchRoom = { name?: string; type?: string; members?: string[] };
                       const messageRoom = message.chat_rooms as SearchRoom | null | undefined;
                       let roomName = messageRoom?.name || '채팅방';
-                      if (messageRoom?.type === 'direct' && Array.isArray(messageRoom?.members)) {
+                      if (messageRoom?.type === 'direct') {
+                        const roomMemberIds = normalizeMemberIds(messageRoom?.members);
                         const otherStaff = allKnownStaffs.find(
-                          (staff: StaffMember) => messageRoom.members!.includes(String(staff.id)) && String(staff.id) !== String(effectiveChatUserId || '')
+                          (staff: StaffMember) => roomMemberIds.includes(String(staff.id)) && String(staff.id) !== String(effectiveChatUserId || '')
                         );
                         if (otherStaff) roomName = otherStaff.name;
                       }

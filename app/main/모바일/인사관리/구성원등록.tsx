@@ -406,7 +406,8 @@ export default function 구성원등록({ onBack, onCreated, user, company, edit
     setSubmitting(true);
 
     const salaryNum = form.salary ? Number(form.salary.replace(/[^0-9]/g, '')) : null;
-    const hireDate = form.start.replaceAll('.', '-');
+    const hireDate = form.start.trim() ? form.start.trim().replaceAll('.', '-') : null;
+    const contractEndFormatted = form.contract_end.trim() ? form.contract_end.trim().replaceAll('.', '-') : null;
 
     // 급여 정보 빌드 (역산 결과 또는 입력값 기준)
     const reverseCalc = reverseCalculateSplit();
@@ -451,7 +452,7 @@ export default function 구성원등록({ onBack, onCreated, user, company, edit
       is_basic_living: form.is_basic_living,
       is_medical_benefit: form.is_medical_benefit,
       other_welfare: form.other_welfare,
-      contract_end: form.contract_end || null,
+      contract_end: contractEndFormatted,
       probation_months: form.probation_months,
       probation_percent: form.probation_percent,
       extension: form.extension || null };

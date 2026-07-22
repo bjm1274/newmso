@@ -79,8 +79,10 @@ const myTabId = typeof window !== 'undefined'
       ? crypto.randomUUID().substring(0, 8)
       : Math.random().toString(36).substring(2, 10))
   : 'server';
-const activeTabs = new Map<string, { lastSeen: number; tables: string[] }>();
+const activeTabs = new Map<string, { lastSeen: number; tables: string[]; suspended?: boolean }>();
 let isLeader = typeof window === 'undefined'; // Default to true on server, elected on client
+/** 이 탭이 현재 leader 선출 후보에서 제외되어야 하는지 (hidden/idle) */
+let mySuspendedForLeader = false;
 
 const bc = typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined'
   ? new BroadcastChannel('newmso-realtime-bus')
@@ -95,12 +97,30 @@ if (typeof window !== 'undefined') {
       }
     });
 
-    let smallestId = myTabId;
-    activeTabs.forEach((_, tabId) => {
-      if (tabId < smallestId) {
-        smallestId = tabId;
-      }
+    // 자기 탭 상태 반영 (다른 탭 ping 과 동일 맵)
+    activeTabs.set(myTabId, {
+      lastSeen: now,
+      tables: Array.from(
+        (() => {
+          const s = new Set<string>();
+          channelRegistry.forEach((e) => e.tables.forEach((t) => s.add(t.table + (t.filter ? `:${t.filter}` : ''))));
+          return s;
+        })(),
+      ),
+      suspended: mySuspendedForLeader,
     });
+
+    // 비활성(hidden/idle) 탭은 leader 후보에서 제외 — 전경 탭이 폴링/WS 를 가져감
+    const candidates: string[] = [];
+    activeTabs.forEach((info, tabId) => {
+      if (!info.suspended) candidates.push(tabId);
+    });
+    // 전원 일시중단이면 전원 중에서 선출 (완전 단절 방지)
+    const pool = candidates.length > 0 ? candidates : Array.from(activeTabs.keys());
+    let smallestId = pool[0] || myTabId;
+    for (const tabId of pool) {
+      if (tabId < smallestId) smallestId = tabId;
+    }
 
     const nextIsLeader = smallestId === myTabId;
     if (nextIsLeader !== isLeader) {
@@ -116,7 +136,11 @@ if (typeof window !== 'undefined') {
       if (!msg || typeof msg !== 'object') return;
 
       if (msg.type === 'ping') {
-        activeTabs.set(msg.tabId, { lastSeen: Date.now(), tables: msg.tables || [] });
+        activeTabs.set(msg.tabId, {
+          lastSeen: Date.now(),
+          tables: msg.tables || [],
+          suspended: Boolean(msg.suspended),
+        });
         updateLeaderState();
       } else if (msg.type === 'change') {
         if (!isLeader) {
@@ -157,10 +181,12 @@ if (typeof window !== 'undefined') {
         myTables.add(toChannelKey(t));
       }
     }
+    mySuspendedForLeader = !isElectronShell() && (isHidden() || isIdle);
     bc.postMessage({
       type: 'ping',
       tabId: myTabId,
-      tables: Array.from(myTables)
+      tables: Array.from(myTables),
+      suspended: mySuspendedForLeader,
     });
     updateLeaderState();
   }, 3000);
@@ -176,10 +202,19 @@ function isHidden(): boolean {
  * - 일반 브라우저: 탭 hidden / 5분 idle 시 중단 (D1·Workers 비용 절감)
  * - Electron(AllERP PC): X로 닫아 트레이에만 있어도 알림·채팅 배지가 와야 하므로
  *   hidden/idle 로 끊지 않는다. (main.js 가 close → hide 트레이 유지)
+ *
+ * 리더 선출용: 중단된 탭은 leader 후보에서 제외되어 전경 탭이 WS/폴링을 가져간다.
  */
 function isSuspended(): boolean {
-  if (isElectronShell()) return false;
-  return isHidden() || isIdle;
+  if (isElectronShell()) {
+    mySuspendedForLeader = false;
+    return false;
+  }
+  const suspended = isHidden() || isIdle;
+  if (mySuspendedForLeader !== suspended) {
+    mySuspendedForLeader = suspended;
+  }
+  return suspended;
 }
 
 function ensureActivityHandlers(): void {
@@ -729,26 +764,52 @@ function makeUnsubscribe(channelKey: string, remove: (entry: ChannelEntry) => vo
 // 공개 API — realtime-bus.ts와 호환
 // ─────────────────────────────────────────────
 
-function getInterval(options?: RealtimeOptions): number {
+function isChatRealtimeChannel(channelKey: string, tables?: TableFilter[]): boolean {
+  const key = String(channelKey || '').toLowerCase();
+  if (
+    key.includes('chat') ||
+    key.includes('message') ||
+    key.includes('messenger') ||
+    key.includes('room')
+  ) {
+    return true;
+  }
+  return (tables || []).some((t) => {
+    const table = String(t.table || '').toLowerCase();
+    return (
+      table === 'messages' ||
+      table === 'chat_rooms' ||
+      table === 'room_read_cursors' ||
+      table === 'chat_typing_status' ||
+      table === 'notifications'
+    );
+  });
+}
+
+function getInterval(options?: RealtimeOptions, channelKey = '', tables: TableFilter[] = []): number {
   if (typeof window === 'undefined') return 15000;
   const hostname = window.location.hostname;
   const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
-  const isPlaywright = (window as any).__playwright__ || 
+  const isPlaywright = (window as any).__playwright__ ||
     (typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.includes('Playwright'));
-  
+
   if (isLocal || isPlaywright) {
     return options?.pollIntervalMs ?? 1000;
   }
 
+  const requested = options?.pollIntervalMs ?? 15000;
+  const chatChannel = isChatRealtimeChannel(channelKey, tables);
+
   // Electron PC 클라이언트: WS 끊김 시 폴링 폴백을 빠르게 (채팅 배지/알림)
   if (isElectronShell()) {
-    const requested = options?.pollIntervalMs ?? 5000;
-    return Math.max(requested, 3000);
+    return Math.max(requested, chatChannel ? 2000 : 3000);
   }
 
-  // 일반 브라우저: D1 비용 보호용 하한 30초 (WS 활성 시 폴링 자체는 꺼짐)
-  const minInterval = 30000;
-  return Math.max(options?.pollIntervalMs ?? 15000, minInterval);
+  // 일반 브라우저:
+  // - 채팅/알림: 3~5초 하한 (기존 30초는 배지 지연이 과도)
+  // - 기타: 15초 하한 (D1 비용 보호, WS 활성 시 폴링 자체는 꺼짐)
+  const minInterval = chatChannel ? 3000 : 15000;
+  return Math.max(requested, minInterval);
 }
 
 export function subscribeRealtime(
@@ -757,7 +818,7 @@ export function subscribeRealtime(
   callback: RealtimeCallback,
   options?: RealtimeOptions,
 ): Unsubscribe {
-  const interval = getInterval(options);
+  const interval = getInterval(options, channelKey, tables);
   const entry = getOrCreateEntry(channelKey, tables, interval);
   entry.singleCallbacks.add(callback);
   return makeUnsubscribe(channelKey, (e) => e.singleCallbacks.delete(callback));
@@ -769,7 +830,7 @@ export function subscribeRealtimeBatched(
   callback: RealtimeBatchCallback,
   options?: RealtimeOptions,
 ): Unsubscribe {
-  const interval = getInterval(options);
+  const interval = getInterval(options, channelKey, tables);
   const entry = getOrCreateEntry(channelKey, tables, interval);
   entry.batchCallbacks.add(callback);
   return makeUnsubscribe(channelKey, (e) => e.batchCallbacks.delete(callback));

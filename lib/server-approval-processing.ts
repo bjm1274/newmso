@@ -248,6 +248,15 @@ export async function processFinalApprovalEffects(
 
   const itemMetaData = item.meta_data as Record<string, unknown> | null | undefined;
 
+  if (item.type === '공문발송' || itemMetaData?.official_doc_request) {
+    try {
+      await syncOfficialDocumentLogFromApproval(item);
+      steps.push('official_document_log');
+    } catch (error) {
+      warnings.push(`공문대장 동기화 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);
+    }
+  }
+
   if (item.type === '물품신청' && itemMetaData?.items) {
     try {
       supplySummary = await prepareSupplyApprovalInventoryWorkflow(item);
@@ -361,9 +370,14 @@ export async function processFinalApprovalEffects(
 
         // 연차(부여) 및 연차(과거사용)는 실제 휴가 사용이 아니므로 출결부 마킹 생략
         if (leaveType !== LEAVE_TYPE.GRANT && leaveType !== LEAVE_TYPE.RETRO_USE) {
-          for (let index = 0; index < days; index += 1) {
+          const totalCalendarDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+          for (let index = 0; index < totalCalendarDays; index += 1) {
             const date = new Date(start);
             date.setDate(date.getDate() + index);
+            const dayOfWeek = date.getDay();
+            // 주말(토:6, 일:0)은 출결부 휴가 마킹 제외
+            if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+
             const dateStr = formatKoreanDateKey(date);
 
             await leaveDb
@@ -459,6 +473,14 @@ export async function processFinalApprovalEffects(
       await upsertAttendanceCorrectionRows(correctionRows);
 
       const { att, atts } = resolveAttendanceCorrectionStatusPair(correctionType);
+      const fixCheckIn = (itemMetaData?.check_in_time || itemMetaData?.fix_check_in || itemMetaData?.check_in || null) as string | null;
+      const fixCheckOut = (itemMetaData?.check_out_time || itemMetaData?.fix_check_out || itemMetaData?.check_out || null) as string | null;
+      const fixWorkHours = typeof itemMetaData?.work_hours_minutes === 'number'
+        ? itemMetaData.work_hours_minutes
+        : typeof itemMetaData?.work_hours === 'number'
+          ? itemMetaData.work_hours * 60
+          : null;
+
       // Phase 8-C: D1 직접 upsert — db + mirror 2단 처리 대체.
       const fixDb = await requireD1ForApprovalProcessing('attendance_fix.upsert');
       for (const dateStr of itemMetaData.correction_dates as string[]) {
@@ -481,10 +503,17 @@ export async function processFinalApprovalEffects(
             staff_id: item.sender_id as string,
             work_date: dateStr,
             status: atts,
+            check_in_time: fixCheckIn,
+            check_out_time: fixCheckOut,
+            work_hours_minutes: fixWorkHours,
             created_at: new Date().toISOString() })
           .onConflictDoUpdate({
             target: [sql`staff_id`, sql`work_date`],
-            set: { status: sql`excluded.status` } });
+            set: {
+              status: sql`excluded.status`,
+              ...(fixCheckIn ? { check_in_time: sql`excluded.check_in_time` } : {}),
+              ...(fixCheckOut ? { check_out_time: sql`excluded.check_out_time` } : {}),
+              ...(fixWorkHours !== null ? { work_hours_minutes: sql`excluded.work_hours_minutes` } : {}) } });
       }
 
       steps.push('attendance_fix');

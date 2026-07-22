@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { isActiveStaff } from '@/lib/active-staff';
 import { isAnnualLeaveType } from '@/lib/annual-leave-ledger';
+import { normalizeLeaveType } from '@/lib/leave-type';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 type Leave = {
@@ -89,7 +90,7 @@ export default function LeaveRequestList({
     setSaving(true);
     try {
       await onEdit(editing.id, {
-        leave_type: form.leave_type,
+        leave_type: normalizeLeaveType(form.leave_type),
         start_date: form.start_date,
         end_date: form.end_date || form.start_date,
         reason: form.reason,

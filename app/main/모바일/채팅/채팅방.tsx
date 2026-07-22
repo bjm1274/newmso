@@ -124,7 +124,7 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
   const headerTone = pickAvatarTone(String(room.id) + title);
   const memberCount = normalizeMemberIds(room.members).length;
 
-  const memberIds = useMemo(() => (Array.isArray(room.members) ? room.members.map((id) => String(id)) : []), [room.members]);
+  const memberIds = useMemo(() => normalizeMemberIds(room.members), [room.members]);
   const selfRoom = useMemo(() => isSelfChatRoom(room, userId), [room, userId]);
   const isGroup = useMemo(() => isGroupChatRoom(room), [room]);
   const isNotice = String(room.id) === NOTICE_ROOM_ID;
@@ -937,7 +937,7 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
         className="m-scroll"
         onScroll={handleScroll}
         data-testid="chat-message-list"
-        style={{ background: 'transparent', padding: '12px 12px 6px' }}
+        style={{ background: 'transparent', padding: '12px 12px calc(110px + env(safe-area-inset-bottom, 12px))' }}
       >
         {hasMore && loadingOlder && (
           <div

@@ -126,6 +126,7 @@ function parseTimestampMs(value: number | string): number {
 
 export function timeAgo(value: number | string): string {
   const ms = parseTimestampMs(value);
+  if (Number.isNaN(ms)) return '';
   const diffSeconds = (Date.now() - ms) / 1000;
   if (diffSeconds < 10) return '방금';
   if (diffSeconds < 60) return `${Math.floor(diffSeconds)}초 전`;

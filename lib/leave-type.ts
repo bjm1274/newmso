@@ -9,6 +9,8 @@
 export const LEAVE_TYPE = {
   ANNUAL: '연차',
   HALF: '반차',
+  HALF_AM: '오전반차',
+  HALF_PM: '오후반차',
   SICK: '병가',
   FAMILY: '경조',
   SPECIAL: '특별휴가',
@@ -24,6 +26,8 @@ export type LeaveTypeCanonical = (typeof LEAVE_TYPE)[keyof typeof LEAVE_TYPE];
 export const LEAVE_TYPE_EMPLOYEE_OPTIONS = [
   LEAVE_TYPE.ANNUAL,
   LEAVE_TYPE.HALF,
+  LEAVE_TYPE.HALF_AM,
+  LEAVE_TYPE.HALF_PM,
   LEAVE_TYPE.SICK,
   LEAVE_TYPE.FAMILY,
 ] as const;
@@ -32,6 +36,8 @@ export const LEAVE_TYPE_EMPLOYEE_OPTIONS = [
 export const LEAVE_TYPE_ADMIN_OPTIONS = [
   LEAVE_TYPE.ANNUAL,
   LEAVE_TYPE.HALF,
+  LEAVE_TYPE.HALF_AM,
+  LEAVE_TYPE.HALF_PM,
   LEAVE_TYPE.SICK,
   LEAVE_TYPE.FAMILY,
   LEAVE_TYPE.SPECIAL,
@@ -54,6 +60,26 @@ export function normalizeLeaveType(raw: unknown): string {
   if (n.includes('부여') || n === 'grant') return LEAVE_TYPE.GRANT;
   if (n.includes('과거사용') || n.includes('소급')) return LEAVE_TYPE.RETRO_USE;
   if (n.includes('이력')) return LEAVE_TYPE.HISTORY;
+
+  // 오전/오후 반차 보존 (일반 반차보다 먼저)
+  if (
+    n.includes('오전반차') ||
+    n.includes('오전반차') ||
+    n === 'half_am' ||
+    n === 'am_half' ||
+    (n.includes('오전') && n.includes('반차'))
+  ) {
+    return LEAVE_TYPE.HALF_AM;
+  }
+  if (
+    n.includes('오후반차') ||
+    n.includes('오후반차') ||
+    n === 'half_pm' ||
+    n === 'pm_half' ||
+    (n.includes('오후') && n.includes('반차'))
+  ) {
+    return LEAVE_TYPE.HALF_PM;
+  }
 
   // 반차 계열 (연차보다 먼저)
   if (
@@ -95,6 +121,10 @@ export function leaveTypeLabel(raw: unknown): string {
       return '연차 (1.0)';
     case LEAVE_TYPE.HALF:
       return '반차 (0.5)';
+    case LEAVE_TYPE.HALF_AM:
+      return '오전반차 (0.5)';
+    case LEAVE_TYPE.HALF_PM:
+      return '오후반차 (0.5)';
     case LEAVE_TYPE.GRANT:
       return '연차(부여)';
     case LEAVE_TYPE.RETRO_USE:
@@ -123,9 +153,17 @@ export function leaveTypeLookupAliases(raw: unknown): string[] {
     case LEAVE_TYPE.HALF:
       aliases.add('반차 (0.5)');
       aliases.add('반차(0.5)');
-      aliases.add('오전반차');
-      aliases.add('오후반차');
       aliases.add('half_leave');
+      break;
+    case LEAVE_TYPE.HALF_AM:
+      aliases.add('오전반차');
+      aliases.add('오전반차 (0.5)');
+      aliases.add('half_am');
+      break;
+    case LEAVE_TYPE.HALF_PM:
+      aliases.add('오후반차');
+      aliases.add('오후반차 (0.5)');
+      aliases.add('half_pm');
       break;
     case LEAVE_TYPE.FAMILY:
       aliases.add('경조사');
@@ -160,7 +198,13 @@ export function isAnnualLeaveType(value: unknown): boolean {
 }
 
 export function isHalfLeaveType(value: unknown): boolean {
-  return normalizeLeaveType(value) === LEAVE_TYPE.HALF || getLeaveUnit(value) === 0.5;
+  const c = normalizeLeaveType(value);
+  return (
+    c === LEAVE_TYPE.HALF ||
+    c === LEAVE_TYPE.HALF_AM ||
+    c === LEAVE_TYPE.HALF_PM ||
+    getLeaveUnit(value) === 0.5
+  );
 }
 
 /** 1일 단위 소진일수 (반차 0.5 / 그 외 1.0) */
@@ -171,6 +215,8 @@ export function getLeaveUnit(value: unknown): 0.5 | 1.0 {
     raw === 'half_leave' ||
     raw === 'half-day' ||
     raw === 'halfday' ||
+    raw === 'half_am' ||
+    raw === 'half_pm' ||
     raw.includes('0.5') ||
     raw.includes('반차') ||
     raw.startsWith('반차') ||
@@ -179,7 +225,7 @@ export function getLeaveUnit(value: unknown): 0.5 | 1.0 {
     return 0.5;
   }
   const n = normalizeLeaveType(value);
-  if (n === LEAVE_TYPE.HALF) return 0.5;
+  if (n === LEAVE_TYPE.HALF || n === LEAVE_TYPE.HALF_AM || n === LEAVE_TYPE.HALF_PM) return 0.5;
   return 1.0;
 }
 
@@ -188,6 +234,8 @@ export function countsTowardAnnualBalance(value: unknown): boolean {
   return (
     c === LEAVE_TYPE.ANNUAL ||
     c === LEAVE_TYPE.HALF ||
+    c === LEAVE_TYPE.HALF_AM ||
+    c === LEAVE_TYPE.HALF_PM ||
     c === LEAVE_TYPE.RETRO_USE ||
     c === LEAVE_TYPE.HISTORY
   );

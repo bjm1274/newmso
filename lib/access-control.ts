@@ -147,7 +147,12 @@ const INVENTORY_PERMISSION_KEYS: Record<string, string> = {
   status: 'inventory_현황',
   io: 'inventory_등록',
   item: 'inventory_자산',
-  analyze: 'inventory_월마감' };
+  analyze: 'inventory_월마감',
+  audit: 'inventory_재고실사',
+  udi: 'inventory_UDI',
+  inout: 'inventory_등록',
+  order: 'inventory_발주',
+  master: 'inventory_자산' };
 
 const FINANCE_PERMISSION_KEYS: Record<string, string> = {
   복식부기: 'finance_복식부기',
@@ -174,8 +179,11 @@ const FINANCE_PERMISSION_KEYS: Record<string, string> = {
 const ADMIN_PERMISSION_KEYS: Record<string, string> = {
   경영분석: 'admin_경영분석',
   감사센터: 'admin_감사센터',
+  접근감사로그: 'admin_감사센터',
+  감사로그: 'admin_감사센터',
   시스템마스터센터: 'admin_시스템마스터센터',
   알림자동화: 'admin_알림자동화',
+  운영설정: 'admin_운영설정',
   회사관리: 'admin_회사관리',
   직원권한: 'admin_직원권한',
   수술검사템플릿: 'admin_수술검사템플릿',
@@ -285,6 +293,7 @@ const LEGACY_PERMISSION_ALIASES: Record<string, string[]> = {
   admin_감사센터: ['admin'],
   admin_시스템마스터센터: ['admin'],
   admin_알림자동화: ['admin'],
+  admin_운영설정: ['admin'],
   admin_회사관리: ['admin'],
   admin_직원권한: ['admin'],
   admin_수술검사템플릿: ['admin'],
@@ -603,7 +612,13 @@ export function canAccessInventorySection(
     status:  ['inventory_현황', 'inventory_이력', 'inventory_내부서재고'],
     io:      ['inventory_등록', 'inventory_발주', 'inventory_거래처', 'inventory_납품확인서', 'inventory_이관'],
     item:    ['inventory_자산', 'inventory_스캔', 'inventory_카테고리', 'inventory_UDI'],
-    analyze: ['inventory_월마감', 'inventory_수요예측', 'inventory_재고실사', 'inventory_소모품통계', 'inventory_AS반품'] };
+    analyze: ['inventory_월마감', 'inventory_수요예측', 'inventory_재고실사', 'inventory_소모품통계', 'inventory_AS반품'],
+    audit:   ['inventory_재고실사', 'inventory_이관', 'inventory_월마감'],
+    udi:     ['inventory_UDI', 'inventory_자산', 'inventory_스캔'],
+    inout:   ['inventory_등록', 'inventory_이력'],
+    order:   ['inventory_발주', 'inventory_납품확인서', 'inventory_거래처'],
+    master:  ['inventory_자산', 'inventory_카테고리', 'inventory_스캔'],
+  };
   const group = WORKCENTER_UNIONS[sectionIdOrPermissionKey];
   if (group) {
     return group.some((key) => canAccessDetailedSection(user, '재고관리', key, INVENTORY_PERMISSION_KEYS));
@@ -628,6 +643,8 @@ export function canAccessAdminSection(
 
   if (sectionId === '운영설정' || sectionId === 'ops') {
     return (
+      canAccessDetailedSection(user, '관리자', '운영설정', ADMIN_PERMISSION_KEYS) ||
+      canAccessDetailedSection(user, '관리자', 'ops', ADMIN_PERMISSION_KEYS) ||
       canAccessDetailedSection(user, '관리자', '알림자동화', ADMIN_PERMISSION_KEYS) ||
       canAccessDetailedSection(user, '관리자', '수술검사템플릿', ADMIN_PERMISSION_KEYS) ||
       canAccessDetailedSection(user, '관리자', '팝업관리', ADMIN_PERMISSION_KEYS)
@@ -637,10 +654,18 @@ export function canAccessAdminSection(
   if (sectionId === '감사센터' || sectionId === 'audit') {
     return (
       canAccessDetailedSection(user, '관리자', '감사센터', ADMIN_PERMISSION_KEYS) ||
+      canAccessDetailedSection(user, '관리자', 'audit', ADMIN_PERMISSION_KEYS) ||
+      canAccessDetailedSection(user, '관리자', '접근감사로그', ADMIN_PERMISSION_KEYS) ||
+      canAccessDetailedSection(user, '관리자', '감사로그', ADMIN_PERMISSION_KEYS) ||
       canAccessDetailedSection(user, '관리자', '급여이상치', ADMIN_PERMISSION_KEYS) ||
       canAccessDetailedSection(user, '관리자', '데이터백업', ADMIN_PERMISSION_KEYS) ||
       canAccessDetailedSection(user, '관리자', '데이터초기화', ADMIN_PERMISSION_KEYS)
     );
+  }
+
+  // 감사 센터 내부 탭 id → 상위 권한으로 흡수
+  if (sectionId === '접근감사로그' || sectionId === '감사로그') {
+    return canAccessAdminSection(user, '감사센터');
   }
 
   return canAccessDetailedSection(user, '관리자', sectionId, ADMIN_PERMISSION_KEYS);

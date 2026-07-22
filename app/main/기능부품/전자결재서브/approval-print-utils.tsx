@@ -441,10 +441,29 @@ export function openApprovalPrintView(params: {
         cleanup();
       };
 
-      // onload 에서 직접 print() 를 호출하므로 autoPrint 스크립트는 넣지 않는다.
-      iframe.srcdoc = buildHtml(item);
       document.body.appendChild(iframe);
-      return true;
+      const doc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (doc) {
+        doc.open();
+        doc.write(buildHtml(item, { autoPrint: false }));
+        doc.close();
+        window.requestAnimationFrame(() => {
+          window.setTimeout(() => {
+            try {
+              const frameWindow = iframe.contentWindow;
+              if (frameWindow) {
+                frameWindow.focus();
+                frameWindow.print();
+              }
+            } catch {
+              toast('인쇄 미리보기를 여는 중 오류가 발생했습니다.', 'error');
+            }
+            cleanup();
+          }, 300);
+        });
+        return true;
+      }
+      return false;
     } catch {
       return false;
     }

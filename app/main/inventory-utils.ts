@@ -2,7 +2,6 @@ import { db } from '@/lib/db-client';
 import { d1Client } from '@/lib/db-client';
 import { withMissingColumnFallback, withMissingColumnsFallback } from '@/lib/db-compat';
 import {
-  callAtomicStockUpdate,
   callAtomicStockTransfer,
   postStockMovement } from '@/lib/inventory-stock-client';
 import {
@@ -262,8 +261,11 @@ export function normalizeSupplyRequestItems(rawItems: LooseRecord[] = []) {
   return rawItems
     .map((item) => ({
       name: String(item?.name || item?.item_name || '').trim(),
-      // qty 정본 — quantity 별칭도 수용 (모바일 구버전 등)
-      qty: Math.max(1, Number(item?.qty ?? item?.quantity) || 1),
+      // qty 정본 — quantity, requested_qty, count, amount 별칭 수용 (모바일/그리드 연동)
+      qty: Math.max(
+        1,
+        Number(item?.qty ?? item?.quantity ?? item?.requested_qty ?? item?.count ?? item?.amount) || 1,
+      ),
       unit: normalizeInventoryUnit(item?.unit || item?.quantity_unit || item?.request_unit),
       category: normalizeSupplyRequestCategory(item?.category || item?.item_category || item?.classification),
       dept: String(item?.dept || item?.department || '').trim(),

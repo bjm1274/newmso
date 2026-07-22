@@ -189,8 +189,11 @@ function buildApprovalArchiveContent(item: ApprovalArchiveSource) {
   }
 
   const rawBody = String(item.content || '').trim();
-  // content가 비어있으면 meta_data 양식 필드를 직렬화해서 본문으로 사용
-  const body = rawBody || serializeFormFields(metaData);
+  const serializedFields = serializeFormFields(metaData);
+  const body =
+    rawBody && serializedFields
+      ? `${rawBody}\n\n[상세 신청 정보]\n${serializedFields}`
+      : rawBody || serializedFields;
   return `${headerLines.join('\n')}\n\n${body}`.trim();
 }
 

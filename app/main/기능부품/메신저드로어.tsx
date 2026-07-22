@@ -15,7 +15,7 @@ import {
   resolveAttachmentKind } from './메신저첨부';
 import { buildMessengerImageAlt, MessengerAvatar } from './메신저공통';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
-import { isSelfChatRoom, NOTICE_ROOM_ID, toChatDate } from './메신저유틸';
+import { isSelfChatRoom, NOTICE_ROOM_ID, normalizeMemberIds, toChatDate } from './메신저유틸';
 
 type DrawerSectionKey = 'media' | 'files' | 'links' | 'bookmarks';
 
@@ -244,7 +244,7 @@ function MessengerDrawerImpl({
   const canEditRoomName =
     Boolean(selectedRoom) &&
     selectedRoom?.id !== NOTICE_ROOM_ID &&
-    (selectedRoom?.type !== 'direct' || (Array.isArray(selectedRoom?.members) && selectedRoom.members.length > 2));
+    (selectedRoom?.type !== 'direct' || normalizeMemberIds(selectedRoom?.members).length > 2);
 
   const toggleSection = (section: DrawerSectionKey) => {
     setExpandedSections((current) => ({ ...current, [section]: !current[section] }));

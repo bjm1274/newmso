@@ -37,11 +37,16 @@ import { useAnalyzeData, useClosingData, useEmptyMessage } from './stock-workcen
 const TABS: TabItem<AnalyzeTab>[] = [
   { id: 'abc', label: 'ABC 분석' },
   { id: 'pred', label: '수요 예측' },
+  { id: 'ins', label: '재고 실사' },
   { id: 'clo', label: '월마감' },
 ];
 
-export default function AnalyzeWorkcenter() {
-  const [tab, setTab] = useState<AnalyzeTab>('abc');
+export default function AnalyzeWorkcenter({ initialTab }: { initialTab?: AnalyzeTab | null } = {}) {
+  const [tab, setTab] = useState<AnalyzeTab>(
+    initialTab && (['abc', 'pred', 'ins', 'clo'] as AnalyzeTab[]).includes(initialTab)
+      ? initialTab
+      : 'abc',
+  );
   const { user } = useAppData();
   const userCompany = typeof user?.company === 'string' ? user.company : undefined;
   const data = useAnalyzeData(userCompany);
@@ -86,6 +91,17 @@ export default function AnalyzeWorkcenter() {
           {tab === 'pred' && (
             <ForecastPanel rows={data.forecast} loading={data.loading} error={data.error} />
           )}
+          {tab === 'ins' && (
+            <InspectPanel
+              rows={data.inspects}
+              pct={data.inspectProgressPct}
+              loading={data.loading}
+              error={data.error}
+              onStartInspect={() => {
+                data.refresh();
+              }}
+            />
+          )}
           {tab === 'clo' && <ClosePanel />}
         </section>
 
@@ -95,6 +111,7 @@ export default function AnalyzeWorkcenter() {
           points={[
             'ABC 분석: 매출 기여도 기준 A/B/C 등급 관리.',
             '수요 예측: 다음 30일, 신뢰도 칩으로 발주 권장일 시각화.',
+            '재고 실사: 위치별 진행률. 이관·상세 실사는 실사/이관 화면(audit) 사용.',
             '월마감 5단계 워크플로는 다크 배너 — 결정 #38 워크플로형 도구.',
           ]}
         >

@@ -415,7 +415,7 @@ export default function SBoardDetail({
           </button>
         </div>
       </div>
-      <div className="m-scroll" style={{ background: 'transparent' }}>
+      <div className="m-scroll" style={{ background: 'transparent', paddingBottom: 'calc(160px + env(safe-area-inset-bottom, 12px))' }}>
         <div style={{ padding: '16px 16px 0' }}>
           <BoardDetailHeader
             post={post}

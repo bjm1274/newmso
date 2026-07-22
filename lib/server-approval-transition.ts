@@ -361,10 +361,44 @@ async function transitionSingleApproval(params: {
   const staffMap = await fetchStaffMap(
     [storedCurrentApproverId, ...lineIds].filter(Boolean)
   );
-  const effectiveCurrentApproverId =
+  let effectiveCurrentApproverId =
     resolveEffectiveApproverId(storedCurrentApproverId, staffMap) || storedCurrentApproverId;
 
-  if (!actor.isAdmin && String(effectiveCurrentApproverId) !== String(actor.id)) {
+  const isDirectApprover = String(storedCurrentApproverId) === String(actor.id);
+  const isEffectiveApprover = String(effectiveCurrentApproverId) === String(actor.id);
+
+  if (!actor.isAdmin && !isDirectApprover && !isEffectiveApprover) {
+    try {
+      const d1 = await getD1Binding();
+      if (d1) {
+        const db = getD1Drizzle(d1);
+        const { approval_delegation } = await import('@/lib/db/schema');
+        const { and: drizzleAnd, eq: drizzleEq } = await import('drizzle-orm');
+        const delegationRows = await db
+          .select()
+          .from(approval_delegation)
+          .where(
+            drizzleAnd(
+              drizzleEq(approval_delegation.delegator_id, storedCurrentApproverId),
+              drizzleEq(approval_delegation.delegate_id, String(actor.id)),
+              drizzleEq(approval_delegation.is_active, 1),
+            ),
+          )
+          .limit(1);
+        if (delegationRows.length > 0) {
+          effectiveCurrentApproverId = String(actor.id);
+        }
+      }
+    } catch {
+      // delegation DB lookup failure is non-blocking
+    }
+  }
+
+  if (
+    !actor.isAdmin &&
+    String(storedCurrentApproverId) !== String(actor.id) &&
+    String(effectiveCurrentApproverId) !== String(actor.id)
+  ) {
     return {
       approvalId,
       action,
@@ -375,7 +409,7 @@ async function transitionSingleApproval(params: {
       alreadyProcessed: false,
       warnings: [],
       supplySummary: null,
-      error: 'Only the current approver can act on this approval.' } satisfies ApprovalTransitionResult;
+      error: 'Only the current approver or active delegate can act on this approval.' } satisfies ApprovalTransitionResult;
   }
 
   const baseMetaData = applyDelegationMeta(
@@ -421,6 +455,32 @@ async function transitionSingleApproval(params: {
       // 알림 실패는 결재 처리에 영향 없음
     }
 
+    // 출결정정 문서인 경우 attendance_corrections 테이블의 '대기' 항목을 '반려'로 갱신 (재신청 허용)
+    const correctionDates = Array.isArray(baseMetaData?.correction_dates) ? (baseMetaData.correction_dates as string[]) : [];
+    const senderIdForCorrection = String(item.sender_id || '').trim();
+    if (correctionDates.length > 0 && senderIdForCorrection) {
+      try {
+        const d1 = await getD1Binding();
+        if (d1) {
+          const db = getD1Drizzle(d1);
+          const { attendance_corrections } = await import('@/lib/db/schema');
+          const { and: drizzleAnd, eq: drizzleEq, inArray: drizzleInArray } = await import('drizzle-orm');
+          await db
+            .update(attendance_corrections)
+            .set({ status: '반려' })
+            .where(
+              drizzleAnd(
+                drizzleEq(attendance_corrections.staff_id, senderIdForCorrection),
+                drizzleInArray(attendance_corrections.attendance_date, correctionDates),
+                drizzleEq(attendance_corrections.status, '대기'),
+              ),
+            );
+        }
+      } catch (attErr) {
+        console.error('[server-approval-transition] attendance_corrections 반려 상태 갱신 실패:', attErr);
+      }
+    }
+
     return {
       approvalId,
       action,
@@ -433,7 +493,11 @@ async function transitionSingleApproval(params: {
       supplySummary: null } satisfies ApprovalTransitionResult;
   }
 
-  const isFinalApproval = currentIndex === lineIds.length - 1;
+  const isArbitraryDecision = Boolean(
+    (item.meta_data as Record<string, unknown> | null | undefined)?.is_arbitrary ||
+      approveComment?.includes('[전결]'),
+  );
+  const isFinalApproval = currentIndex === lineIds.length - 1 || isArbitraryDecision;
   const nextLineApproverId = !isFinalApproval ? lineIds[currentIndex + 1] : null;
   const nextApproverId = nextLineApproverId
     ? (resolveEffectiveApproverId(nextLineApproverId, staffMap) || nextLineApproverId)

@@ -49,22 +49,30 @@ function buildTree(comments: BoardComment[]): CommentNode[] {
 
   const roots: BoardComment[] = comments.filter((c) => !c.parent_comment_id);
   const repliesByRoot = new Map<string, BoardComment[]>();
+  const orphanReplies: BoardComment[] = [];
+
   comments.forEach((c) => {
     if (!c.parent_comment_id) return;
     const rootId = resolveRootId(c);
-    if (!rootId) return;
+    if (!rootId || !byId.has(rootId)) {
+      orphanReplies.push(c);
+      return;
+    }
     const list = repliesByRoot.get(rootId) ?? [];
     list.push(c);
     repliesByRoot.set(rootId, list);
   });
 
-  return roots.map((r) => ({
+  const allRoots = [...roots, ...orphanReplies];
+
+  return allRoots.map((r) => ({
     comment: r,
     replies: (repliesByRoot.get(String(r.id)) ?? []).sort((a, b) => {
       const at = a.created_at ? new Date(a.created_at).getTime() : 0;
       const bt = b.created_at ? new Date(b.created_at).getTime() : 0;
       return at - bt;
-    }) }));
+    }),
+  }));
 }
 
 function CommentBody({

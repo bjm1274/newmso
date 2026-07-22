@@ -4,6 +4,7 @@ import { sendFcmBatch } from '@/lib/fcm-http';
 import { shouldDeferStaleChatPush } from '@/lib/push-quiet-hours';
 import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
+import { parseMembersField } from '@/lib/chat-room-membership';
 import { emitRealtimeSignal } from '@/lib/realtime/server-signal';
 import {
   getD1Binding,
@@ -519,15 +520,7 @@ async function fetchMessageAndRoom(
   if (!rawMsg || !rawRoom) return { message: null, room: null };
 
   // D1 members는 TEXT(JSON) → 파싱
-  let parsedMembers: string[] | null = null;
-  if (typeof rawRoom.members === 'string' && rawRoom.members.length > 0) {
-    try {
-      const parsed = JSON.parse(rawRoom.members) as unknown;
-      if (Array.isArray(parsed)) parsedMembers = parsed.map((m) => String(m));
-    } catch { parsedMembers = null; }
-  } else if (Array.isArray(rawRoom.members)) {
-    parsedMembers = (rawRoom.members as unknown[]).map((m) => String(m));
-  }
+  const parsedMembers = parseMembersField(rawRoom.members);
 
   return {
     message: rawMsg as MessageRow,
@@ -650,7 +643,7 @@ export async function dispatchChatPushForMessage(params: {
       reason: 'board-auto-announcement' } satisfies ChatPushDispatchResult;
   }
 
-  let members = Array.isArray(room.members) ? room.members.map((id) => String(id)) : [];
+  let members = parseMembersField(room.members);
   // 공지방은 members가 비어 있어도 전 직원에게 발송 (시드 단계에서 members가 미설정됨)
   const isNoticeRoom =
     String(room.id || '') === NOTICE_ROOM_ID || String(room.type || '').trim() === 'notice';

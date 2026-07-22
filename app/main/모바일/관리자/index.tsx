@@ -170,7 +170,7 @@ function Hub({
           ) : undefined
         }
       />
-      <div className="m-scroll">
+      <div className="m-scroll" style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 12px))' }}>
         {canOpenExec ? (
           <button
             type="button"

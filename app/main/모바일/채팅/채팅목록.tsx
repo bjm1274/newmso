@@ -33,7 +33,7 @@ import {
   type MobileChatRoom,
   type ChatMessageSearchHit,
   type StaffDirectoryEntry } from './data-hooks';
-import { NOTICE_ROOM_ID, isGroupChatRoom, getGroupChatRoomBadgeText, isSelfChatRoom } from '@/app/main/기능부품/메신저유틸';
+import { NOTICE_ROOM_ID, isGroupChatRoom, getGroupChatRoomBadgeText, isSelfChatRoom, normalizeMemberIds } from '@/app/main/기능부품/메신저유틸';
 import { useChatPresenceMap } from '@/app/main/hooks/useChatPresenceMap';
 import { usePullToRefresh } from '../공통/usePullToRefresh';
 import PullRefreshIndicator from '../공통/PullRefreshIndicator';
@@ -84,10 +84,12 @@ export default function SChatList({ user, rooms, roomsLoading = false, onOpen, o
     }
     const memberIds = Array.from(new Set([userId, peerId]));
     
+    const isSelf = userId === peerId;
     // Find existing direct room from the rooms list
     const existing = rooms.find((room) => {
       if (room.type !== 'direct') return false;
-      const mIds = Array.isArray(room.members) ? room.members.map(String) : [];
+      if (isSelf) return isSelfChatRoom(room, userId);
+      const mIds = normalizeMemberIds(room.members);
       return mIds.length === 2 && mIds.includes(userId) && mIds.includes(peerId);
     });
 
@@ -749,9 +751,9 @@ function RoomRow({ room, userId, staffs, presenceMap, last, onClick }: RoomRowPr
   })();
   const ts = formatChatTimestamp(room.last_message_at || room.created_at);
   const unread = room.unread_count || 0;
-  const memberCount = Array.isArray(room.members) ? room.members.length : 0;
+  const memberCount = normalizeMemberIds(room.members).length;
 
-  const memberIds = Array.isArray(room.members) ? room.members.map((id) => String(id)) : [];
+  const memberIds = normalizeMemberIds(room.members);
   const selfRoom = isSelfChatRoom(room, userId);
   const isGroup = isGroupChatRoom(room);
   const isNotice = String(room.id) === NOTICE_ROOM_ID;

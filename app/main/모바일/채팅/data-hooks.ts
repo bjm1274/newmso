@@ -238,7 +238,8 @@ export function useChatRoomsForMobile(
         });
       });
     } catch {
-      setRooms([]);
+      // 일시 오류로 목록을 비우면 빈 채팅 리스트가 노출된다 — 이전 스냅샷 유지.
+      setRooms((prev) => prev);
     } finally {
       setLoading(false);
     }
@@ -463,6 +464,8 @@ export function useChatMessagesForRoom(
     loadingOlderRef.current = true;
     setLoadingOlder(true);
     try {
+      // D1 created_at 과 동일 SQL UTC 포맷으로 비교 (ISO 변환 시 페이지네이션 공집합)
+      const cursorSql = toUtcSqlTimestamp(cursor);
       const { data, error } = await selectChatMessagesWithFallback<ChatMessage[]>(
         ({ selectClause }) =>
           db
@@ -470,7 +473,7 @@ export function useChatMessagesForRoom(
             .select(selectClause)
             .eq('room_id', currentRoomId)
             .eq('is_deleted', false)
-            .lt('created_at', cursor)
+            .lt('created_at', cursorSql)
             .order('created_at', { ascending: false })
             .limit(MESSAGES_LIMIT) as PromiseLike<{
               data: ChatMessage[] | null;
@@ -593,6 +596,45 @@ export function useChatMessagesForRoom(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ roomIds: targetRoomIds, readAt: lastReadAt }),
           credentials: 'same-origin' });
+
+        // PC와 동일: 해당 방 message/mention 알림 읽음 (D1 JSONPath 불가 → JS 매칭)
+        try {
+          const { data: notifRows } = await db
+            .from('notifications')
+            .select('id, metadata')
+            .eq('user_id', userId)
+            .in('type', ['message', 'mention'])
+            .is('read_at', null)
+            .order('created_at', { ascending: false })
+            .limit(100);
+          const roomSet = new Set(targetRoomIds.map(String));
+          const ids: string[] = [];
+          for (const row of notifRows || []) {
+            const meta =
+              row?.metadata && typeof row.metadata === 'object'
+                ? (row.metadata as Record<string, unknown>)
+                : typeof row?.metadata === 'string'
+                  ? (() => {
+                      try {
+                        return JSON.parse(String(row.metadata)) as Record<string, unknown>;
+                      } catch {
+                        return {};
+                      }
+                    })()
+                  : {};
+            const rid = String(meta.room_id || meta.roomId || '').trim();
+            if (rid && roomSet.has(rid) && row?.id) ids.push(String(row.id));
+          }
+          if (ids.length > 0) {
+            await db.from('notifications').update({ read_at: lastReadAt }).in('id', ids.slice(0, 50));
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('erp-notification-read'));
+            }
+          }
+        } catch {
+          // silent
+        }
+
         if (!cancelled) {
           pokeChannel('mobile-chat-rooms-list');
         }

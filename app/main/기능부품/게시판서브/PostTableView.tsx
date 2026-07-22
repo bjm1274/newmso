@@ -144,8 +144,14 @@ export default function PostTableView({
       if (keyword) {
         const title = String(post.title ?? '').toLowerCase();
         const author = String(post.author_name ?? '').toLowerCase();
+        const content = String(post.content ?? '').toLowerCase();
         const tagText = getPostTags(post).join(' ').toLowerCase();
-        if (!title.includes(keyword) && !author.includes(keyword) && !tagText.includes(keyword)) {
+        if (
+          !title.includes(keyword) &&
+          !author.includes(keyword) &&
+          !content.includes(keyword) &&
+          !tagText.includes(keyword)
+        ) {
           return false;
         }
       }

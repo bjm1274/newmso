@@ -14,6 +14,7 @@ import {
   isMissingColumnError,
   withMissingColumnsFallback } from '@/lib/db-compat';
 import { patchChatRoom } from '@/lib/chat-rooms-client';
+import { parseMembersField } from '@/lib/chat-room-membership';
 import {
   countChecklistDone,
   getDefaultChecklist,
@@ -87,27 +88,19 @@ async function cleanupOffboardingSideEffects(staffId: string, readAt: string) {
     cleanupWarnings.push({ target: 'chat_rooms.select', error: chatRoomsResult.error });
   } else {
     const allRooms = chatRoomsResult.data ?? [];
+    const resolveRoomMembers = (room: { members?: unknown; member_ids?: unknown }) => {
+      const primary = parseMembersField(room.members);
+      return primary.length > 0 ? primary : parseMembersField(room.member_ids);
+    };
+
     const groupRoomsWithMember = allRooms.filter((room) => {
       if (room.type === 'direct') return false;
-      const membersArr: unknown = Array.isArray(room.members)
-        ? room.members
-        : Array.isArray(room.member_ids)
-          ? room.member_ids
-          : null;
-      if (!Array.isArray(membersArr)) return false;
-      return (membersArr as unknown[]).some((m) => String(m) === staffId);
+      return resolveRoomMembers(room).some((m) => String(m) === staffId);
     });
 
     let removedCount = 0;
     for (const room of groupRoomsWithMember) {
-      const rawMembers: unknown = Array.isArray(room.members)
-        ? room.members
-        : Array.isArray(room.member_ids)
-          ? room.member_ids
-          : [];
-      const newMembers = (rawMembers as unknown[])
-        .map((m) => String(m))
-        .filter((m) => m !== staffId);
+      const newMembers = resolveRoomMembers(room).filter((m) => m !== staffId);
       const result = await patchChatRoom(room.id, { members: newMembers });
       if (!result.ok) {
         cleanupWarnings.push({

@@ -13,6 +13,7 @@ import type { StaffMember } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
 import { normalizeLeaveType } from '@/lib/leave-type';
+import { buildApprovalSubmitPayload } from '@/lib/approval-submit-payload';
 
 // ─── 타입 ─────────────────────────────────────────────────────────
 export type LeaveStatus = '대기' | '승인' | '반려';
@@ -296,38 +297,47 @@ export async function submitLeaveRequest(input: LeaveSubmitInput): Promise<void>
       mode: 'head_or_above',
     });
     const firstApprover = line[0];
-    const approverIds = line.map((s) => String(s.id));
 
     let titleType = '연차 사용 신청';
     if (leaveTypeKey === '연차(부여)') titleType = '연차 신규 부여';
     else if (leaveTypeKey === '연차(과거사용)') titleType = '도입 전 사용 소급';
 
-    const approvalPayload = {
-      company_id: staffData?.company_id || null,
-      sender_id: input.staffId,
-      sender_name: staffName,
-      sender_company: staffData?.company || 'SY INC.',
-      type: '연차/휴가',
+    const { row: approvalPayload } = buildApprovalSubmitPayload({
+      staffId: input.staffId,
+      senderName: staffName,
+      senderCompany: String(staffData?.company || 'SY INC.'),
+      senderDepartment: staffData?.department || null,
+      companyId: staffData?.company_id || null,
+      typeName: '연차/휴가',
       title: `[연차/휴가] ${staffName} - ${titleType}`,
       content: input.reason || '',
-      status: '대기',
-      current_approver_id: firstApprover?.id || null,
-      meta_data: {
+      formSlug: 'leave',
+      formDisplayName: '연차/휴가',
+      approverLine: line.map((s) => ({
+        id: String(s.id),
+        name: s.name || '',
+        position: s.position || null,
+        department: s.department || null,
+        company: s.company || null,
+      })),
+      approverLineSource: 'leave_workcenter',
+      ccDepartments: ['행정팀'],
+      extraMeta: {
         startDate: input.startDate,
         endDate: input.endDate || input.startDate,
         leaveType: leaveTypeKey,
         reason: input.reason || '',
         days: input.days,
-        approver_line: approverIds,
-        cc_departments: ['행정팀']
+        vType: leaveTypeKey,
       },
-      created_at: new Date().toISOString()
-    };
+    });
 
     await db.from('approvals').insert(approvalPayload);
 
     // 수정 E: 결재자 즉시 알림 — approver_line 첫 번째 staffId에게 알림 발송
-    const firstApproverId: string | null = approvalPayload.meta_data.approver_line?.[0] ?? null;
+    const firstApproverId: string | null =
+      String((approvalPayload.meta_data as { approver_line?: string[] } | undefined)?.approver_line?.[0] || firstApprover?.id || '') ||
+      null;
     if (firstApproverId) {
       try {
         await d1.from('notifications').insert({

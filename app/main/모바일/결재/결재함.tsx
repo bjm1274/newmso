@@ -103,7 +103,18 @@ export default function SApproval({
     return baseList.filter((row) => {
       // 검색
       if (q) {
-        const fields = [row.doc_number, row.title, row.sender_name, row.type, row.sender_department];
+        const meta = (row.meta_data as Record<string, unknown> | null) || {};
+        const fields = [
+          row.doc_number,
+          row.title,
+          row.sender_name,
+          row.type,
+          row.sender_department,
+          row.content,
+          meta.form_name,
+          meta.form_slug,
+          meta.reason,
+        ];
         const matched = fields.some((f) => f != null && String(f).toLowerCase().includes(q));
         if (!matched) return false;
       }

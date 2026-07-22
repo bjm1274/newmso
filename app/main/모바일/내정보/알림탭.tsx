@@ -262,7 +262,7 @@ function MobileNotificationTabBase({ user }: 알림탭Props) {
       </div>
 
       {/* 알림 리스트 */}
-      <div className="m-scroll" style={{ background: 'transparent' }}>
+      <div className="m-scroll" style={{ background: 'transparent', paddingBottom: 'calc(100px + env(safe-area-inset-bottom, 12px))' }}>
         {loading ? (
           <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--z-400)', fontSize: 13 }}>
             불러오는 중…

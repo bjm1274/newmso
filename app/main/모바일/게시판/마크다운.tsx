@@ -18,9 +18,11 @@ type InlineToken =
   | { kind: 'bold'; children: InlineToken[] }
   | { kind: 'italic'; children: InlineToken[] }
   | { kind: 'code'; value: string }
-  | { kind: 'link'; label: string; href: string };
+  | { kind: 'link'; label: string; href: string }
+  | { kind: 'image'; alt: string; src: string };
 
 const SAFE_HREF = /^(https?:|mailto:|tel:|#|\/)/i;
+const SAFE_IMAGE_SRC = /^(https?:|data:image\/|blob:|storage\/|#|\/)/i;
 
 function sanitizeHref(href: string): string | null {
   const trimmed = href.trim();
@@ -29,8 +31,15 @@ function sanitizeHref(href: string): string | null {
   return trimmed;
 }
 
+function sanitizeImageSrc(src: string): string | null {
+  const trimmed = src.trim();
+  if (!trimmed) return null;
+  if (!SAFE_IMAGE_SRC.test(trimmed)) return null;
+  return trimmed;
+}
+
 // inline tokenizer — 한 줄을 InlineToken[]로 파싱.
-// 우선순위: code(`x`) → link([t](u)) → bold(**x**) → italic(*x*) → text
+// 우선순위: code(`x`) → image(![a](u)) → link([t](u)) → bold(**x**) → italic(*x*) → text
 function tokenizeInline(input: string): InlineToken[] {
   const tokens: InlineToken[] = [];
   let i = 0;
@@ -51,6 +60,24 @@ function tokenizeInline(input: string): InlineToken[] {
         tokens.push({ kind: 'code', value: input.slice(i + 1, end) });
         i = end + 1;
         continue;
+      }
+    }
+    // image ![alt](url)
+    if (ch === '!' && input[i + 1] === '[') {
+      const altEnd = input.indexOf(']', i + 2);
+      if (altEnd > i + 1 && input[altEnd + 1] === '(') {
+        const urlEnd = input.indexOf(')', altEnd + 2);
+        if (urlEnd > altEnd) {
+          const alt = input.slice(i + 2, altEnd);
+          const rawSrc = input.slice(altEnd + 2, urlEnd);
+          const src = sanitizeImageSrc(rawSrc);
+          if (src) {
+            flush();
+            tokens.push({ kind: 'image', alt, src });
+            i = urlEnd + 1;
+            continue;
+          }
+        }
       }
     }
     // link [label](url)
@@ -117,6 +144,15 @@ function renderInline(tokens: InlineToken[]): ReactNode[] {
         >
           {tok.value}
         </code>
+      );
+    if (tok.kind === 'image') {
+      return (
+        <img
+          key={idx}
+          src={tok.src}
+          alt={tok.alt}
+          style={{ maxWidth: '100%', height: 'auto', borderRadius: 10, margin: '8px 0', display: 'block' }}
+        />
       );
     }
     return (
