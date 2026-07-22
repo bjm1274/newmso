@@ -183,12 +183,8 @@ export function computeAnnualLeaveSummary(input: AnnualLeaveSummaryInput): Omit<
   const remainingFromBalance = hasBalanceRemaining
     ? Math.max(0, Number(input.balanceRemaining) || 0)
     : null;
-  const remaining =
-    remainingFromBalance != null &&
-    !usedBoostedByLedger &&
-    Math.abs(remainingFromBalance - remainingByFormula) < 0.01
-      ? remainingFromBalance
-      : remainingByFormula;
+  // DB leave_balances.remaining_days 가 존재하면 SSOT 로 최우선 사용
+  const remaining = remainingFromBalance != null ? remainingFromBalance : remainingByFormula;
   const usageRate = total > 0 ? Math.round((used / total) * 100) : 0;
 
   // 당해 연도 내역만 (KPI used 와 목록 합 일치). 시작·종료 중 하나라도 당해면 포함.

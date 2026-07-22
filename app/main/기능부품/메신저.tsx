@@ -1965,31 +1965,36 @@ export default function ChatView({
           }
         }
 
-        const { data: noticeRoom } = await db
-          .from('chat_rooms')
-          .select('id')
-          .eq('id', NOTICE_ROOM_ID)
-          .maybeSingle();
+        // 공지방 보장 백그라운드 비동기 실행 (채팅방 목록 로딩 지연 방지)
+        void (async () => {
+          try {
+            const { data: noticeRoom } = await db
+              .from('chat_rooms')
+              .select('id')
+              .eq('id', NOTICE_ROOM_ID)
+              .maybeSingle();
 
-        // staff 디렉터리가 아직 비어 있으면 members:[] 로 공지방을 덮어쓰지 않는다.
-        // (빈 배열 패치는 멤버십 기반 푸시/접근 검사에 치명적이다.)
-        const canSyncNoticeMembers = noticeRoomMemberIds.length > 0;
-        if (!noticeRoom) {
-          await createOrUpsertChatRoom({
-            id: NOTICE_ROOM_ID,
-            name: NOTICE_ROOM_NAME,
-            type: 'notice',
-            ...(canSyncNoticeMembers ? { members: noticeRoomMemberIds } : {}) });
-        } else if (canSyncNoticeMembers) {
-          await patchChatRoom(NOTICE_ROOM_ID, {
-            name: NOTICE_ROOM_NAME,
-            type: 'notice',
-            members: noticeRoomMemberIds });
-        } else {
-          await patchChatRoom(NOTICE_ROOM_ID, {
-            name: NOTICE_ROOM_NAME,
-            type: 'notice' });
-        }
+            const canSyncNoticeMembers = noticeRoomMemberIds.length > 0;
+            if (!noticeRoom) {
+              await createOrUpsertChatRoom({
+                id: NOTICE_ROOM_ID,
+                name: NOTICE_ROOM_NAME,
+                type: 'notice',
+                ...(canSyncNoticeMembers ? { members: noticeRoomMemberIds } : {}) });
+            } else if (canSyncNoticeMembers) {
+              await patchChatRoom(NOTICE_ROOM_ID, {
+                name: NOTICE_ROOM_NAME,
+                type: 'notice',
+                members: noticeRoomMemberIds });
+            } else {
+              await patchChatRoom(NOTICE_ROOM_ID, {
+                name: NOTICE_ROOM_NAME,
+                type: 'notice' });
+            }
+          } catch (noticeErr) {
+            logger.warn('공지방 백그라운드 갱신 무시:', noticeErr);
+          }
+        })();
 
         const roomResult = await fetchAllChatRooms({ force: true });
         if (roomResult.error) throw roomResult.error;
