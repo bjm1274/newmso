@@ -229,10 +229,10 @@ export function useChatRoomDataSync({
           last_message_at: null };
       }
 
-      const roomScopedMessages = sourceMessages.filter(
+      // 해당 방의 메시지만 엄격하게 필터링 (다른 방 메시지로 교차 오염 방지)
+      const summarySourceMessages = sourceMessages.filter(
         (message: ChatMessage) => String(message.room_id || '').trim() === targetRoomId,
       );
-      const summarySourceMessages = roomScopedMessages.length > 0 ? roomScopedMessages : sourceMessages;
 
       // 최신 메시지 기준 — 삭제됐으면 목록에 「삭제된 메시지입니다.」
       let latestAny: ChatMessage | undefined;
@@ -282,6 +282,7 @@ export function useChatRoomDataSync({
     (roomId: string | null | undefined, summary: RoomSummary) => {
       const targetRoomId = String(roomId || '').trim();
       if (!targetRoomId) return;
+      if (!summary.last_message && !summary.last_message_at) return;
 
       setChatRooms((prev) => {
         // conversation 그룹의 모든 방 ID를 함께 업데이트하여
@@ -296,9 +297,9 @@ export function useChatRoomDataSync({
             targetIds.includes(String(room.id))
               ? {
                   ...room,
-                  last_message: summary.last_message,
-                  last_message_preview: summary.last_message_preview,
-                  last_message_at: summary.last_message_at }
+                  last_message: summary.last_message || room.last_message,
+                  last_message_preview: summary.last_message_preview || room.last_message_preview,
+                  last_message_at: summary.last_message_at || room.last_message_at }
               : room,
           ),
         );
