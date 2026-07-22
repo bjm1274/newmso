@@ -86,7 +86,7 @@ export function useChatSidebarState({
 
     const fallbackRooms = new Map<string, ChatRoom>();
     chatRooms.forEach((room) => {
-      if (!room?.id) return;
+      if (!room?.id || !isRoomAccessibleToCurrentUser(room)) return;
       const roomKey = getDirectRoomMembersKey(room) || `room:${room.id}`;
       if (!fallbackRooms.has(roomKey)) {
         fallbackRooms.set(roomKey, room);

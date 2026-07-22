@@ -591,13 +591,12 @@ export default function ChatView({
   }, [allKnownStaffMap, effectiveChatUserId, noticeRoomMemberIds]);
 
   const isRoomAccessibleToCurrentUser = useCallback((room: ChatRoom | null | undefined) => {
-    if (!room) return false;
+    if (!room || !room.id) return false;
     if (String(room.id) === NOTICE_ROOM_ID) return true;
     const me = String(effectiveChatUserId || '').trim();
-    if (!me) return true;
+    if (!me) return false;
     if (isSelfChatRoom(room, me) || room.name === SELF_ROOM_NAME) return true;
     const memberIds = getEffectiveRoomMemberIds(room);
-    if (memberIds.length === 0) return true;
     return memberIds.some((memberId) => String(memberId) === me);
   }, [effectiveChatUserId, getEffectiveRoomMemberIds]);
 
