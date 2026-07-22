@@ -339,7 +339,7 @@ export function useChatRoomManagement({
           .filter((room) => {
             const members = normalizeMemberIds(room?.members);
             if (isSelfTarget) {
-              return isSelfChatRoom(room, effectiveChatUserId) || room?.type === 'self';
+              return isSelfChatRoom(room, effectiveChatUserId) || (room?.type as string) === 'self';
             }
             return (
               members.length === 2 &&
