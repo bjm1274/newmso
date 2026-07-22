@@ -178,13 +178,14 @@ export async function recalculateLeaveBalance(
     }
   }
 
-  // 사용: 당해 연도 승인 연차만 (leave_balances.year 스코프). 전 기간 합산 시 잔여 과소 표시됨.
-  // 동기화 실패 시 used=0 으로 remaining 을 부풀리지 않고 fail-closed.
+  // 사용: 입사일 기준 당해 연차 주기 내 승인 연차만. 전 기간/캘린더연도 일괄 합산 시 잔여 불일치 발생.
   let usedDays: number;
   try {
+    const hireDateStr = staff.hire_date || staff.join_date || staff.joined_at;
     usedDays = await syncAnnualLeaveUsedForStaff(staffId, {
       writeStaffMembers: false,
       year: targetYear,
+      hireDate: hireDateStr,
     });
   } catch (syncErr) {
     console.error('[recalculateLeaveBalance] syncAnnualLeaveUsedForStaff 실패:', syncErr);

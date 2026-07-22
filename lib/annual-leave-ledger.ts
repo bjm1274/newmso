@@ -249,10 +249,35 @@ export type SyncAnnualLeaveUsedOptions = {
   writeStaffMembers?: boolean;
 };
 
+export function getHireDatePeriodRange(hireDateStr: string | null | undefined, baseDate = new Date()) {
+  if (!hireDateStr) return null;
+  const hireDate = new Date(hireDateStr);
+  if (Number.isNaN(hireDate.getTime())) return null;
+
+  const hireMonth = hireDate.getMonth();
+  const hireDay = hireDate.getDate();
+
+  let periodStart = new Date(baseDate.getFullYear(), hireMonth, hireDay);
+  if (periodStart > baseDate) {
+    periodStart = new Date(baseDate.getFullYear() - 1, hireMonth, hireDay);
+  }
+
+  const periodEnd = new Date(periodStart.getFullYear() + 1, hireMonth, hireDay);
+  return { periodStart, periodEnd };
+}
+
+type SyncAnnualLeaveUsedOptions = {
+  year?: number;
+  writeStaffMembers?: boolean;
+  hireDate?: string | null;
+  periodStart?: Date | string | null;
+  periodEnd?: Date | string | null;
+};
+
 /**
  * 승인된 연차 사용일수 집계.
- * - year 미지정: 전 기간 합 (레거시)
- * - year 지정: 해당 연도에 걸친 사용분만 (잔액 테이블 SSOT)
+ * - hireDate 지정 시: 입사일 기준 당해 연차 주기(periodStart ~ periodEnd)에 걸친 사용분만 집계
+ * - year 지정 시: 해당 연도에 걸친 사용분만
  * - writeStaffMembers 기본 false → staff_members 미갱신
  */
 export async function syncAnnualLeaveUsedForStaff(
@@ -264,6 +289,17 @@ export async function syncAnnualLeaveUsedForStaff(
   const db = getD1Drizzle(d1);
   const year = options?.year;
   const writeStaff = options?.writeStaffMembers === true;
+
+  let periodStart = options?.periodStart ? new Date(options.periodStart) : null;
+  let periodEnd = options?.periodEnd ? new Date(options.periodEnd) : null;
+
+  if ((!periodStart || !periodEnd) && options?.hireDate) {
+    const range = getHireDatePeriodRange(options.hireDate);
+    if (range) {
+      periodStart = range.periodStart;
+      periodEnd = range.periodEnd;
+    }
+  }
 
   const rows = await db
     .select({
@@ -283,6 +319,26 @@ export async function syncAnnualLeaveUsedForStaff(
     const isHalf = getLeaveUnit(row?.leave_type) === 0.5;
     if (!isHalf && !isAnnualLeaveType(row?.leave_type)) return sum;
 
+    // 1) 입사일 주기 필터링 (최우선)
+    if (periodStart && periodEnd) {
+      const rowStart = new Date(String(row?.start_date));
+      const rowEnd = new Date(String(row?.end_date || row?.start_date));
+      if (Number.isNaN(rowStart.getTime())) return sum;
+
+      // 주기 범위와 교집합 검사 (rowStart < periodEnd && rowEnd >= periodStart)
+      if (rowStart >= periodEnd || rowEnd < periodStart) {
+        return sum;
+      }
+
+      if (isHalf) return sum + 0.5;
+      const dbDays = row.days != null ? Number(row.days) : null;
+      if (dbDays != null && !Number.isNaN(dbDays) && dbDays > 0) {
+        return sum + dbDays;
+      }
+      return sum + calculateLeaveDays(row?.start_date as string, row?.end_date as string);
+    }
+
+    // 2) 캘린더 연도 필터링
     if (year != null) {
       const clipped = clipDateRangeToYear(
         row?.start_date as string,
@@ -309,7 +365,7 @@ export async function syncAnnualLeaveUsedForStaff(
     if (isHalf) return sum + 0.5;
     const dbDays = row.days != null ? Number(row.days) : null;
     if (dbDays !== null && !Number.isNaN(dbDays)) return sum + dbDays;
-    return sum + calculateLeaveDays(row?.start_date, row?.end_date);
+    return sum + calculateLeaveDays(row?.start_date as string, row?.end_date as string);
   }, 0);
 
   if (writeStaff) {
