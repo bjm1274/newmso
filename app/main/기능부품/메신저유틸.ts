@@ -212,16 +212,9 @@ export function isSelfChatRoom(room: ChatRoom | null | undefined, currentUserId:
   if (!normalizedCurrentUserId) return false;
   const members = normalizeMemberIds(room.members);
 
-  if (room.type === 'self') {
+  if (room.type === 'self' || room.name === SELF_ROOM_NAME) {
+    if (members.length === 0) return true;
     return members.length === 1 && members[0] === normalizedCurrentUserId;
-  }
-
-  if (room.type === 'direct') {
-    const creator = String(room.created_by || '').trim();
-    if (room.name === SELF_ROOM_NAME && (creator === '' || creator === normalizedCurrentUserId)) {
-      return members.length === 1 && members[0] === normalizedCurrentUserId;
-    }
-    return false;
   }
 
   return false;

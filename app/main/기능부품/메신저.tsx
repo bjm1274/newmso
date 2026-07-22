@@ -595,7 +595,7 @@ export default function ChatView({
     if (String(room.id) === NOTICE_ROOM_ID) return true;
     const me = String(effectiveChatUserId || '').trim();
     if (!me) return false;
-    if (isSelfChatRoom(room, me) || room.name === SELF_ROOM_NAME) return true;
+    if (isSelfChatRoom(room, me)) return true;
     const memberIds = getEffectiveRoomMemberIds(room);
     return memberIds.some((memberId) => String(memberId) === me);
   }, [effectiveChatUserId, getEffectiveRoomMemberIds]);
