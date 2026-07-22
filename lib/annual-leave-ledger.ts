@@ -239,16 +239,6 @@ export async function ensureApprovedAnnualLeaveRequest(params: EnsureApprovedAnn
   return newId;
 }
 
-export type SyncAnnualLeaveUsedOptions = {
-  /** 지정 시 해당 연도 사용분만 합산 (leave_balances 정합용) */
-  year?: number;
-  /**
-   * true면 staff_members.annual_leave_used 도 갱신.
-   * 기본 false — 직원 명단/필드 보호 (잔액은 leave_balances 로 관리)
-   */
-  writeStaffMembers?: boolean;
-};
-
 export function getHireDatePeriodRange(hireDateStr: string | null | undefined, baseDate = new Date()) {
   if (!hireDateStr) return null;
   const hireDate = new Date(hireDateStr);
@@ -266,7 +256,7 @@ export function getHireDatePeriodRange(hireDateStr: string | null | undefined, b
   return { periodStart, periodEnd };
 }
 
-type SyncAnnualLeaveUsedOptions = {
+export type SyncAnnualLeaveUsedOptions = {
   year?: number;
   writeStaffMembers?: boolean;
   hireDate?: string | null;
