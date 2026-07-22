@@ -120,8 +120,8 @@ export default function BoardDetailPanel({
   const handleDeleteComment = onDeleteComment;
 
   return (
-<div data-testid="board-post-detail-overlay" className="fixed inset-0 z-[var(--z-modal)] flex items-end md:items-center justify-center bg-black/40 p-0 md:p-5">
-  <div data-testid="board-post-detail" className="w-full max-w-4xl max-h-[90dvh] overflow-y-auto bg-[var(--card)] border-0 md:border border-[var(--border)] rounded-t-[24px] md:rounded-[var(--radius-xl)] shadow-sm p-3 md:p-4 pb-8 space-y-4 md:space-y-5 text-[13px] md:text-[14px] safe-area-pb">
+<div data-testid="board-post-detail-overlay" className="fixed inset-0 z-[9999] flex items-end md:items-center justify-center bg-black/60 backdrop-blur-xs p-0 md:p-5">
+  <div data-testid="board-post-detail" className="w-full max-w-4xl max-h-[94dvh] md:max-h-[90vh] overflow-y-auto bg-[var(--card)] border-0 md:border border-[var(--border)] rounded-t-[24px] md:rounded-[var(--radius-xl)] shadow-2xl p-4 md:p-6 pb-12 md:pb-8 space-y-4 md:space-y-5 text-[13px] md:text-[14px] safe-area-pb">
     <div className="flex flex-col items-stretch gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
       <div className="flex-1 min-w-0">
         <p className="text-[11px] md:text-[12px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest mb-1">
