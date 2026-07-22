@@ -308,6 +308,7 @@ export function buildChatNotificationHref(metadata: NotificationMetadata) {
   }
 
   return createMainHref([
+    ['open_menu', NOTIFICATION_MENU_LABELS.chat],
     ['open_chat_room', roomId],
     ['open_msg', resolveChatNotificationMessageId(metadata)],
   ]);

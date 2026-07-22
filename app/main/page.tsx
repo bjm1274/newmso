@@ -161,8 +161,8 @@ function MainPageContent() {
   );
   const navigationIntent = useMemo(
     () => ({
-      openChatRoom: searchParams.get('open_chat_room')?.trim() || null,
-      openMessage: searchParams.get('open_msg')?.trim() || null,
+      openChatRoom: searchParams.get('open_chat_room')?.trim() || searchParams.get('open_room')?.trim() || searchParams.get('room_id')?.trim() || null,
+      openMessage: searchParams.get('open_msg')?.trim() || searchParams.get('message_id')?.trim() || null,
       openMenu: searchParams.get('open_menu')?.trim() || null,
       openSubView: searchParams.get('open_subview')?.trim() || null,
       openMyPageTab: searchParams.get('open_mypage_tab')?.trim() || null,
@@ -431,8 +431,8 @@ function MainPageContent() {
             ? (() => {
                 const params = new URLSearchParams(window.location.search);
                 return {
-                  openChatRoom: params.get('open_chat_room')?.trim() || null,
-                  openMessage: params.get('open_msg')?.trim() || null,
+                  openChatRoom: params.get('open_chat_room')?.trim() || params.get('open_room')?.trim() || params.get('room_id')?.trim() || null,
+                  openMessage: params.get('open_msg')?.trim() || params.get('message_id')?.trim() || null,
                   openMenu: params.get('open_menu')?.trim() || null,
                   openSubView: params.get('open_subview')?.trim() || null,
                   openPost: params.get('open_post')?.trim() || null };

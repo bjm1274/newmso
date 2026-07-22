@@ -563,6 +563,7 @@ function erpBuildTargetUrl(data) {
   const roomId = erpResolveChatRoomId(metadata);
   if (roomId) {
     return erpBuildMainUrl(baseUrl, [
+      ['open_menu', ERP_MENU_CHAT],
       ['open_chat_room', roomId],
       ['open_msg', erpResolveChatMessageId(metadata)],
     ]);

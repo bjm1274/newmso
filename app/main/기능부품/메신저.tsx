@@ -811,10 +811,10 @@ export default function ChatView({
     if (normalizedMessageId) {
       pendingScrollMsgIdRef.current = normalizedMessageId;
     }
-    if (tryScrollToLoadedMessage(normalizedRoomId, normalizedMessageId)) {
-      return;
-    }
     setRoom(normalizedRoomId);
+    if (normalizedMessageId) {
+      tryScrollToLoadedMessage(normalizedRoomId, normalizedMessageId);
+    }
   }, [setRoom, tryScrollToLoadedMessage]);
 
   const repairDirectRooms = useCallback(async (rooms: ChatRoom[]) => {
