@@ -1371,6 +1371,17 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           throw updateErr;
         }
 
+        // 입사일이 변경된 경우 연차 자동 재계산 및 부여 동기화
+        const beforeHire = (beforeStaff as Record<string, any>)?.hire_date || (beforeStaff as Record<string, any>)?.join_date;
+        const afterHire = (afterStaff as Record<string, any>)?.hire_date || (afterStaff as Record<string, any>)?.join_date;
+        if (beforeHire !== afterHire && 선택된직원ID) {
+          void fetch('/api/admin/annual-leave/diagnose', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ staffIds: [String(선택된직원ID)], year: new Date().getFullYear() }),
+          }).catch((err) => console.error('입사일 변경 후 연차 재계산 실패:', err));
+        }
+
         await logAudit(
           '직원정보수정',
           'staff_member',

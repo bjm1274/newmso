@@ -458,7 +458,12 @@ export function useApprovalSubmit({
   }, [composeSeedApproval?.id, confirmApprovalSubmit, formType, user?.id]);
 
   const submitApproval = useCallback(async (options?: ApprovalSubmitOptions) => {
-    const trimmedTitle = formTitle.trim();
+    let trimmedTitle = formTitle.trim();
+    const isAutoTitleForm = ['증명서발급', '사직서', '금품청산 지급기일 연장 동의서', '퇴직 서약서'].includes(formType);
+    if (!trimmedTitle && isAutoTitleForm) {
+      const nameSuffix = user?.name ? ` - ${user.name}` : '';
+      trimmedTitle = `[${formType}]${nameSuffix}`;
+    }
     const officialDocumentRequest =
       formType === '공문발송'
         ? extractOfficialDocRequest(extraData)

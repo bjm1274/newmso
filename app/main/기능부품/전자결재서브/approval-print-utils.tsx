@@ -352,11 +352,11 @@ window.onload = () => window.print();
     .seal img{max-width:100%;max-height:100%;object-fit:contain;mix-blend-mode:multiply}
     .seal-trailing{margin-left:auto}
     @media print{
-      html,body{background:#fff;padding:0;margin:0}
-      .sheet{box-shadow:none;border-radius:0;max-width:none;border:none;padding:0;overflow:visible;background:transparent !important}
+      html,body{background:#fff !important;padding:0 !important;margin:0 !important;width:100% !important;height:auto !important;visibility:visible !important}
+      .sheet{box-shadow:none !important;border-radius:0 !important;max-width:none !important;width:100% !important;min-width:0 !important;border:none !important;padding:0 !important;overflow:visible !important;background:transparent !important;visibility:visible !important}
       .sheet::before{display:none}
       body::before{content:'';position:fixed;top:50%;left:50%;width:160px;height:160px;transform:translate(-50%,-50%);background:url('${escapeHtml(design.backgroundLogoUrl || DEFAULT_APPROVAL_TEMPLATE_DESIGN.backgroundLogoUrl)}') center / contain no-repeat;opacity:0.12;pointer-events:none;z-index:0}
-      .sheet > *{position:relative;z-index:1}
+      .sheet > *{position:relative;z-index:1;visibility:visible !important}
       .hero{background:linear-gradient(135deg, ${escapeHtml(alphaColor(design.primaryColor, 0.14))} 0%, rgba(255,255,255,0) 68%) !important;border-radius:12px}
       .meta div,.content,.sig-box,.seal,.supply-table{background:transparent !important}
       .supply-table th{background:${escapeHtml(alphaColor(design.primaryColor, 0.08))} !important}
@@ -412,29 +412,31 @@ export function openApprovalPrintView(params: {
       const iframe = document.createElement('iframe');
       iframe.setAttribute('aria-hidden', 'true');
       iframe.style.position = 'fixed';
-      iframe.style.right = '0';
-      iframe.style.bottom = '0';
-      iframe.style.width = '0';
-      iframe.style.height = '0';
+      iframe.style.left = '-9999px';
+      iframe.style.top = '-9999px';
+      iframe.style.width = '800px';
+      iframe.style.height = '1000px';
       iframe.style.border = '0';
-      iframe.style.opacity = '0';
+      iframe.style.opacity = '1';
+      iframe.style.visibility = 'visible';
+
+      let printed = false;
 
       const cleanup = () => {
         window.setTimeout(() => {
           iframe.remove();
-        }, 1200);
+        }, 1500);
       };
 
-      iframe.onload = () => {
-        const frameWindow = iframe.contentWindow;
-        if (!frameWindow) {
-          cleanup();
-          toast('인쇄 미리보기를 여는 중 오류가 발생했습니다.', 'error');
-          return;
-        }
+      const doPrint = () => {
+        if (printed) return;
+        printed = true;
         try {
-          frameWindow.focus();
-          frameWindow.print();
+          const frameWindow = iframe.contentWindow;
+          if (frameWindow) {
+            frameWindow.focus();
+            frameWindow.print();
+          }
         } catch {
           toast('인쇄 미리보기를 여는 중 오류가 발생했습니다.', 'error');
         }
@@ -447,20 +449,11 @@ export function openApprovalPrintView(params: {
         doc.open();
         doc.write(buildHtml(item, { autoPrint: false }));
         doc.close();
-        window.requestAnimationFrame(() => {
-          window.setTimeout(() => {
-            try {
-              const frameWindow = iframe.contentWindow;
-              if (frameWindow) {
-                frameWindow.focus();
-                frameWindow.print();
-              }
-            } catch {
-              toast('인쇄 미리보기를 여는 중 오류가 발생했습니다.', 'error');
-            }
-            cleanup();
-          }, 300);
-        });
+
+        // iframe 내부 이미지/스타일 로딩 후 안전하게 print 호출
+        window.setTimeout(() => {
+          doPrint();
+        }, 350);
         return true;
       }
       return false;

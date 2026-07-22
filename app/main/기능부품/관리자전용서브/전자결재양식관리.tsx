@@ -317,10 +317,13 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
     if (!name) return toast('양식 이름을 입력해 주세요.', 'warning');
 
     const baseTemplate = builtinTemplates.find((template) => template.slug === addBaseSlug) ?? builtinTemplates[0];
-    const slug = (addSlug.trim() || slugFromName(name)).slice(0, 50);
+    let slug = (addSlug.trim() || slugFromName(name)).toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 50);
+    if (!slug) {
+      slug = `custom-form-${Date.now().toString(36)}`;
+    }
 
     if (builtinTemplates.some((template) => template.slug === slug || template.name === name)) {
-      return toast('기본양식과 같은 이름이나 코드로는 추가할 수 없습니다.');
+      return toast('기본양식과 같은 이름이나 코드로는 추가할 수 없습니다.', 'warning');
     }
     if (list.some((row) => row.slug === slug || row.name === name)) {
       return toast('같은 이름 또는 코드의 추가 양식이 이미 있습니다.', 'warning');

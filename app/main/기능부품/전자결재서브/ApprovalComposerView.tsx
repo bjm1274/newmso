@@ -178,6 +178,10 @@ export default function ApprovalComposerView({
   const selectFormType = (tab: string) => {
     const nextFormType = normalizeComposeFormType(tab);
     setFormType(nextFormType);
+    if (!['증명서발급', '사직서', '금품청산 지급기일 연장 동의서', '퇴직 서약서'].includes(formType) && ['증명서발급', '사직서', '금품청산 지급기일 연장 동의서', '퇴직 서약서'].includes(nextFormType)) {
+      const nameSuffix = user?.name ? ` - ${user.name}` : '';
+      setFormTitle(`[${nextFormType}]${nameSuffix}`);
+    }
     if (ccLine.length === 0) applyDefaultReferenceUsers(nextFormType);
   };
 

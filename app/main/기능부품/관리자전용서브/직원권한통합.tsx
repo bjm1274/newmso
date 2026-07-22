@@ -22,10 +22,16 @@ const NON_PERMISSION_PERSONAL_KEYS: readonly string[] = [
   'profile_photo_path',
   'profile_photo_url',
   'profile_photo_updated_at',
-  // 개인 연락처 / 금융
+  // 개인 식별 / 연락처 / 금융
+  'resident_no',
+  'address',
+  'zipcode',
+  'detail_address',
   'extension',
   'bank_name',
   'bank_account',
+  'bank_code',
+  'account_holder',
   // 면허
   'license_no',
   'license_date',

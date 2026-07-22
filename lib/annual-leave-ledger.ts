@@ -83,7 +83,7 @@ export function calculateApprovedAnnualLeaveUsage(
       return sum;
     }
 
-    // 반차도 연도 clip — 서버 syncAnnualLeaveUsedForStaff 와 동일 (과거 연도 반차 과대합산 방지)
+    // 반차/반반차 연도 clip 및 dbDays 우선 적용 (과거 연도 반차 과대합산 방지 및 0.25일 지원)
     if (isHalfLeaveType(row?.leave_type)) {
       const halfClipped = clipDateRangeToYear(
         row?.start_date as string | null | undefined,
@@ -91,6 +91,10 @@ export function calculateApprovedAnnualLeaveUsage(
         year,
       );
       if (!halfClipped) return sum;
+      const dbDays = row?.days != null ? Number(row.days) : null;
+      if (dbDays != null && !Number.isNaN(dbDays) && dbDays > 0) {
+        return sum + dbDays;
+      }
       return sum + 0.5;
     }
 

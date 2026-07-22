@@ -157,31 +157,45 @@ export function openDocumentPrintView(
   const iframe = document.createElement('iframe');
   iframe.setAttribute('aria-hidden', 'true');
   iframe.style.position = 'fixed';
-  iframe.style.right = '0';
-  iframe.style.bottom = '0';
-  iframe.style.width = '0';
-  iframe.style.height = '0';
+  iframe.style.left = '-9999px';
+  iframe.style.top = '-9999px';
+  iframe.style.width = '800px';
+  iframe.style.height = '1000px';
   iframe.style.border = '0';
-  iframe.style.opacity = '0';
+  iframe.style.opacity = '1';
+  iframe.style.visibility = 'visible';
 
+  let printed = false;
   const cleanup = () => {
     window.setTimeout(() => {
       iframe.remove();
-    }, 1200);
+    }, 1500);
   };
 
-  iframe.onload = () => {
-    const frameWindow = iframe.contentWindow;
-    if (!frameWindow) {
-      cleanup();
+  const doPrint = () => {
+    if (printed) return;
+    printed = true;
+    try {
+      const frameWindow = iframe.contentWindow;
+      if (frameWindow) {
+        frameWindow.focus();
+        frameWindow.print();
+      }
+    } catch {
       toast('인쇄 미리보기를 여는 중 오류가 발생했습니다.', 'error');
-      return;
     }
-    frameWindow.focus();
-    frameWindow.print();
     cleanup();
   };
 
-  iframe.srcdoc = htmlContent;
   document.body.appendChild(iframe);
+  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+  if (iframeDoc) {
+    iframeDoc.open();
+    iframeDoc.write(htmlContent);
+    iframeDoc.close();
+
+    window.setTimeout(() => {
+      doPrint();
+    }, 350);
+  }
 }

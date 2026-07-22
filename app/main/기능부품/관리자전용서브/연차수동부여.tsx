@@ -197,6 +197,7 @@ export default function AnnualLeaveManualGrant({
         ...prev,
         [staff.id]: { expired: getExpired(staff), compensated: getCompensated(staff) } }));
       setMessage(payload.message || `${staff.name} 연차 저장 완료`);
+      onRefresh?.();
     } catch (error: unknown) {
       setMessage(`저장 실패: ${(error as Error)?.message || String(error)}`);
     } finally {

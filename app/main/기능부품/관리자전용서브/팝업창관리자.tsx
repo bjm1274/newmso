@@ -149,7 +149,11 @@ function PopupManagerDesktop() {
       return toast('팝업에 사용할 파일을 선택해주세요.', 'warning');
     }
 
-    setSaving(true);
+    const widthNum = Number(newPopup.width);
+    const heightNum = Number(newPopup.height);
+    if (Number.isNaN(widthNum) || widthNum < 100 || Number.isNaN(heightNum) || heightNum < 100) {
+      return toast('팝업의 가로 및 세로 크기는 최소 100px 이상이어야 합니다.', 'warning');
+    }
 
     try {
       const finalUrl = await uploadSelectedFile();
