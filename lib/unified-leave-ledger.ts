@@ -296,7 +296,7 @@ export async function getUnifiedAnnualLeaveSummary(
       note: leaveLedgerTable.note,
     })
     .from(leaveLedgerTable)
-    .where(eq(leaveLedgerTable.staff_id, staffId));
+    .where(eq(leaveLedgerTable.staff_id, staff.id));
 
   let entries = rows
     .map((row) => ({
@@ -339,7 +339,7 @@ export async function getUnifiedAnnualLeaveSummary(
 
     if (seedDays > 0) {
       await upsertLedgerEntry(db, {
-        staffId,
+        staffId: staff.id,
         companyId: staff.company_id,
         entryType: LEAVE_LEDGER_ENTRY_TYPE.AUTO_ANNUAL,
         days: seedDays,
@@ -359,7 +359,7 @@ export async function getUnifiedAnnualLeaveSummary(
           note: leaveLedgerTable.note,
         })
         .from(leaveLedgerTable)
-        .where(eq(leaveLedgerTable.staff_id, staffId));
+        .where(eq(leaveLedgerTable.staff_id, staff.id));
 
       entries = updatedRows
         .map((row) => ({
@@ -429,12 +429,12 @@ export async function getUnifiedAnnualLeaveSummary(
         annual_leave_total: finalTotal,
         annual_leave_used: finalUsed,
       })
-      .where(eq(staffMembersTable.id, staffId)),
+      .where(eq(staffMembersTable.id, staff.id)),
     db
       .insert(leaveBalancesTable)
       .values({
         id: crypto.randomUUID(),
-        staff_id: staffId,
+        staff_id: staff.id,
         year: Number(asOfDate.slice(0, 4)) || new Date().getFullYear(),
         total_days: finalTotal,
         used_days: finalUsed,
@@ -580,7 +580,7 @@ export async function syncApprovedLeaveRequestsToLedger(
       created_at: leaveRequestsTable.created_at,
     })
     .from(leaveRequestsTable)
-    .where(eq(leaveRequestsTable.staff_id, staffId));
+    .where(eq(leaveRequestsTable.staff_id, staff.id));
 
   for (const row of rows) {
     const periodKey = `request:${row.id}`;
@@ -591,7 +591,7 @@ export async function syncApprovedLeaveRequestsToLedger(
 
     if (!isApproved || isRetro) {
       await db.delete(leaveLedgerTable).where(and(
-        eq(leaveLedgerTable.staff_id, staffId),
+        eq(leaveLedgerTable.staff_id, staff.id),
         eq(leaveLedgerTable.period_key, periodKey),
       ));
       continue;
@@ -602,7 +602,7 @@ export async function syncApprovedLeaveRequestsToLedger(
     if (isGrant) {
       // 신규 연차 부여 신청 승인 시: 원장에 플러스(+) 일수로 더해줌
       await upsertLedgerEntry(db, {
-        staffId,
+        staffId: staff.id,
         companyId: row.company_id ?? staff.company_id,
         entryType: LEAVE_LEDGER_ENTRY_TYPE.MANUAL_ADJUSTMENT,
         days: Math.abs(leaveDays(row)),
@@ -614,7 +614,7 @@ export async function syncApprovedLeaveRequestsToLedger(
     } else if (isAnnualLeaveType(leaveType) || getLeaveUnit(leaveType) === 0.5) {
       // 일반 연차/반차 휴가 사용 승인 시: 마이너스(-) 일수로 차감
       await upsertLedgerEntry(db, {
-        staffId,
+        staffId: staff.id,
         companyId: row.company_id ?? staff.company_id,
         entryType: LEAVE_LEDGER_ENTRY_TYPE.USE,
         days: -Math.abs(leaveDays(row)),
