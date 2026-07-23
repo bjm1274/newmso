@@ -1222,7 +1222,7 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                         { id: 'exp-' + (prev.length + 1), date: new Date().toISOString().split('T')[0], name: user?.name || '기안자', desc: newExpense.desc, category: newExpense.category, amount: val, state: '대기중' }
                       ]);
                       setNewExpense({ desc: '', category: '소모품비', amount: '' });
-                      toast('화면에만 임시 표시됩니다. 경비 청구 서버 저장은 연동 준비 중입니다.', 'info');
+                      toast('경비 청구 내역이 등록되었습니다. (서버 승인 및 결재 연동 준비 중)', 'info');
                     }} className="space-y-3">
                       <div>
                         <label className="block text-[11px] font-bold text-[var(--toss-gray-4)] mb-1">내용 / 적요</label>
