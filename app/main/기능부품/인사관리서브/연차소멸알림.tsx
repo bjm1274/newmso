@@ -45,21 +45,33 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
           return;
         }
 
-        const { data: leaveBalances } = await db
-          .from('leave_balances')
-          .select('*')
-          .in('staff_id', staffIds);
+        const [{ data: leaveBalances }, { data: leaveLedgers }] = await Promise.all([
+          db.from('leave_balances').select('*').in('staff_id', staffIds),
+          db.from('leave_ledger').select('staff_id, days').in('staff_id', staffIds),
+        ]);
+
+        const ledgerRemainingMap = new Map<string, number>();
+        if (leaveLedgers && leaveLedgers.length > 0) {
+          (leaveLedgers as any[]).forEach((row) => {
+            const sId = String(row.staff_id || '');
+            if (!sId) return;
+            const days = Number(row.days) || 0;
+            ledgerRemainingMap.set(sId, (ledgerRemainingMap.get(sId) || 0) + days);
+          });
+        }
 
         const now = new Date();
         const result: LeaveInfo[] = filteredStaffs.map((staff: any) => {
-          const balance = (leaveBalances || []).find((row: any) => String(row.staff_id) === String(staff.id));
-          // leave_balances 정본 컬럼은 remaining_days (balance 컬럼 없음)
-          const remaining = Number(balance?.remaining_days ?? 0);
+          const sId = String(staff.id);
+          const balance = (leaveBalances || []).find((row: any) => String(row.staff_id) === sId);
+          const remaining = ledgerRemainingMap.has(sId)
+            ? Math.max(0, ledgerRemainingMap.get(sId)!)
+            : Number(balance?.remaining_days ?? 0);
+
           const expiryDate = balance?.expiry_date
             ? new Date(balance.expiry_date)
             : new Date(now.getFullYear(), 11, 31);
           const daysLeft = Math.ceil((expiryDate.getTime() - now.getTime()) / (24 * 3600 * 1000));
-          // staff_members 정본 컬럼은 base_salary — 미입력 시 0 (임의 200만원 추정 금지)
           const baseSalary = Number(staff.base_salary) || 0;
           const dailyWage = baseSalary > 0 ? baseSalary / 30 : 0;
 

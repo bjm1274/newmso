@@ -71,30 +71,58 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
       new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul', year: 'numeric' }),
     ) || new Date().getFullYear();
     try {
-      const [reqRes, balRes] = await Promise.all([
+      const [reqRes, balRes, legRes] = await Promise.all([
         db.from('leave_requests').select('*').order('start_date', { ascending: false }),
         db
           .from('leave_balances')
           .select('staff_id, total_days, used_days, remaining_days, expired_days, compensated_days')
           .eq('year', year),
+        db
+          .from('leave_ledger')
+          .select('staff_id, entry_type, days'),
       ]);
       if (reqRes.error) throw reqRes.error;
       if (balRes.error) throw balRes.error;
       setRequests((reqRes.data || []) as LeaveRequestRow[]);
       const map: typeof balancesByStaff = {};
-      for (const row of balRes.data || []) {
-        const sid = String((row as { staff_id?: string }).staff_id ?? '');
-        if (!sid) continue;
-        const total = Number((row as { total_days?: number }).total_days) || 0;
-        const used = Number((row as { used_days?: number }).used_days) || 0;
-        const expired = Number((row as { expired_days?: number }).expired_days) || 0;
-        const compensated = Number((row as { compensated_days?: number }).compensated_days) || 0;
-        const remainingRaw = (row as { remaining_days?: number }).remaining_days;
-        const remaining =
-          remainingRaw != null && !Number.isNaN(Number(remainingRaw))
-            ? Math.max(0, Number(remainingRaw))
-            : Math.max(0, total - used - expired - compensated);
-        map[sid] = { total, used, remaining, expired, compensated };
+
+      if (legRes.data && legRes.data.length > 0) {
+        for (const row of legRes.data) {
+          const sid = String((row as { staff_id?: string }).staff_id ?? '');
+          if (!sid) continue;
+          const entryType = String((row as { entry_type?: string }).entry_type ?? '');
+          const days = Number((row as { days?: number }).days) || 0;
+
+          if (!map[sid]) {
+            map[sid] = { total: 0, used: 0, remaining: 0, expired: 0, compensated: 0 };
+          }
+          const current = map[sid];
+          current.remaining += days;
+          if (entryType === 'use' || entryType === 'manual_used_adjustment') {
+            current.used += -days;
+          } else if (entryType === 'expire' || entryType === 'manual_expire_adjustment') {
+            current.expired += -days;
+          } else if (entryType === 'compensate' || entryType === 'manual_compensate_adjustment') {
+            current.compensated += -days;
+          } else {
+            current.total += days;
+          }
+        }
+      } else {
+        for (const row of balRes.data || []) {
+          const sid = String((row as { staff_id?: string }).staff_id ?? '');
+          if (!sid) continue;
+          const total = Number((row as { total_days?: number }).total_days) || 0;
+          const used = Number((row as { used_days?: number }).used_days) || 0;
+          const expired = Number((row as { expired_days?: number }).expired_days) || 0;
+          const compensated = Number((row as { compensated_days?: number }).compensated_days) || 0;
+          const remainingRaw = (row as { remaining_days?: number }).remaining_days;
+          const remaining =
+            remainingRaw != null && !Number.isNaN(Number(remainingRaw))
+              ? Math.max(0, Number(remainingRaw))
+              : Math.max(0, total - used - expired - compensated);
+          map[sid] = { total, used, remaining, expired, compensated };
+        }
       }
       setBalancesByStaff(map);
     } catch (err) {

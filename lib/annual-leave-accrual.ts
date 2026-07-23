@@ -13,13 +13,12 @@
  *   (지각·조퇴·승인된 연차/휴가는 출근 간주 — resolveAttendanceStatus 규칙과 동일하게 결근만 차감)
  */
 
-import { recalculateLeaveBalance } from '@/lib/annual-leave-balance';
 import { isGroupAccount } from '@/types';
 import {
   getD1Binding,
   getD1Drizzle,
   staff_members as staffMembersTable,
-  leave_accruals as leaveAccrualsTable,
+  leave_ledger as leaveLedgerTable,
   attendances as attendancesTable,
   eq,
   and,
@@ -147,26 +146,25 @@ async function tryInsertAccrual(
     kind: 'monthly' | 'annual';
     periodKey: string;
     days: number;
-    year: number;
     sourceDate: string;
     note: string;
   },
 ): Promise<boolean> {
   const inserted = await db
-    .insert(leaveAccrualsTable)
+    .insert(leaveLedgerTable)
     .values({
       id: crypto.randomUUID(),
       staff_id: row.staffId,
       company_id: row.companyId,
-      kind: row.kind,
+      entry_type: row.kind === 'monthly' ? 'auto_monthly' : 'auto_annual',
       period_key: row.periodKey,
       days: row.days,
-      year: row.year,
-      source_date: row.sourceDate,
+      occurred_on: row.sourceDate,
+      source_id: row.periodKey,
       note: row.note,
       created_at: new Date().toISOString() })
     .onConflictDoNothing()
-    .returning({ id: leaveAccrualsTable.id });
+    .returning({ id: leaveLedgerTable.id });
   return inserted.length > 0;
 }
 
@@ -193,7 +191,6 @@ function resolveHireKey(s: StaffRow): string | null {
  */
 export async function processAnnualLeaveAccrual(todayKey: string): Promise<AccrualRunResult> {
   const result: AccrualRunResult = { scanned: 0, granted: [], skipped: 0, errors: [] };
-  const targetYear = Number(todayKey.slice(0, 4)) || new Date().getFullYear();
 
   const d1 = await getD1Binding();
   if (!d1) throw new Error('[annual-leave-accrual] D1 binding not available');
@@ -205,7 +202,6 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
       name: staffMembersTable.name,
       company_id: staffMembersTable.company_id,
       status: staffMembersTable.status,
-      annual_leave_total: staffMembersTable.annual_leave_total,
       join_date: staffMembersTable.join_date,
       joined_at: staffMembersTable.joined_at,
       hire_date: staffMembersTable.hire_date })
@@ -242,12 +238,12 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
       if (maxYears >= 1) {
         // 이미 부여된 연차 목록 조회
         const existingAccruals = await db
-          .select({ period_key: leaveAccrualsTable.period_key })
-          .from(leaveAccrualsTable)
+          .select({ period_key: leaveLedgerTable.period_key })
+          .from(leaveLedgerTable)
           .where(
             and(
-              eq(leaveAccrualsTable.staff_id, s.id),
-              eq(leaveAccrualsTable.kind, 'annual')
+              eq(leaveLedgerTable.staff_id, s.id),
+              eq(leaveLedgerTable.entry_type, 'auto_annual')
             )
           );
         const existingAnnualKeys = new Set(existingAccruals.map((a) => a.period_key));
@@ -263,12 +259,9 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
               kind: 'annual',
               periodKey,
               days,
-              year: targetYear,
-              sourceDate: todayKey,
+              sourceDate: addYearsKey(hireKey, n) ?? todayKey,
               note: `만 ${n}년차 연차 ${days}일 자동부여` });
             if (ok) {
-              // staff_members 명단/잔여 필드는 건드리지 않음 — leave_accruals 원장 + leave_balances 재계산만
-              await recalculateLeaveBalance(s.id, targetYear);
               result.granted.push({
                 staffId: s.id,
                 staffName: s.name,
@@ -299,12 +292,12 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
 
       // 이미 부여된 월차 period_key 집합 (멱등 + 소급 판정)
       const existingMonthly = await db
-        .select({ period_key: leaveAccrualsTable.period_key })
-        .from(leaveAccrualsTable)
+        .select({ period_key: leaveLedgerTable.period_key })
+        .from(leaveLedgerTable)
         .where(
           and(
-            eq(leaveAccrualsTable.staff_id, s.id),
-            eq(leaveAccrualsTable.kind, 'monthly'),
+            eq(leaveLedgerTable.staff_id, s.id),
+            eq(leaveLedgerTable.entry_type, 'auto_monthly'),
           ),
         );
       const existingMonthlyKeys = new Set(existingMonthly.map((a) => a.period_key));
@@ -325,8 +318,7 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
           kind: 'monthly',
           periodKey,
           days: 1,
-          year: targetYear,
-          sourceDate: todayKey,
+          sourceDate: endKey,
           note: `${k}개월차 만근 +1일` });
         if (!ok) continue;
         monthlyGranted += 1;
@@ -338,11 +330,7 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
           periodKey,
           note: `${k}개월차 만근` });
       }
-
-      if (monthlyGranted > 0) {
-        // staff_members.annual_leave_total 누적 갱신 제거 — 잔액은 leave_balances SSOT
-        await recalculateLeaveBalance(s.id, targetYear);
-      } else {
+      if (monthlyGranted === 0) {
         result.skipped += 1;
       }
     } catch (err) {

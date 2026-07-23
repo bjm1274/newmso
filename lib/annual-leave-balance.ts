@@ -1,34 +1,16 @@
 /**
- * leave_balances 테이블 재계산 유틸
- * 승인/취소/반려/수동부여 이벤트 발생 시 호출하여 정합성 유지
+ * Compatibility facade for the unified leave ledger.
  *
- * SSOT:
- * - 발생: leave_accruals (1년 미만=월차 합, 1년+=최신 annual:N 일수)
- * - 사용: leave_requests 당해 연도 승인 연차 (staff_members 미갱신)
- * - 잔액: leave_balances 만 UPSERT (직원 명단 테이블 미수정)
+ * No annual leave number is written to staff_members or leave_balances here.
+ * The only source of truth is leave_ledger.
  */
 
-import { z } from 'zod';
-import { syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
-import { calculateAnnualLeaveExpiryDate } from '@/lib/annual-leave-promotion';
-import { formatKoreanDateKey } from '@/lib/seoul-time';
 import {
-  getD1Binding,
-  getD1Drizzle,
-  staff_members as staffMembersTable,
-  companies as companiesTable,
-  leave_balances as leaveBalancesTable,
-  leave_accruals as leaveAccrualsTable,
-  eq,
-  and } from '@/lib/db';
-
-const RecalcInputSchema = z.object({
-  staffId: z.string().min(1, 'staffId가 필요합니다'),
-  year: z.number().int().min(2000).max(2100).optional(),
-  totalOverride: z.number().min(0).optional(),
-  usedOverride: z.number().min(0).optional(),
-  expiredOverride: z.number().min(0).optional(),
-  compensatedOverride: z.number().min(0).optional() });
+  getUnifiedAnnualLeaveSummary,
+  syncApprovedLeaveRequestsToLedger,
+  type UnifiedLeaveSummary,
+} from '@/lib/unified-leave-ledger';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 
 export type RecalcOverrides = {
   totalDays?: number;
@@ -37,271 +19,32 @@ export type RecalcOverrides = {
   compensatedDays?: number;
 };
 
-type StaffRow = {
-  id: string;
-  annual_leave_total: number | null;
-  annual_leave_used: number | null;
-  join_date: string | null;
-  joined_at: string | null;
-  hire_date: string | null;
-  company_id: string | null;
-};
-
-function resolveHireDate(staff: StaffRow): string | null {
-  return staff.hire_date ?? staff.join_date ?? staff.joined_at ?? null;
-}
-
-function fiscalYearExpiryDate(refYear: number, fiscalStartMonth: number): Date {
-  const nextFiscalStart = new Date(refYear + 1, fiscalStartMonth - 1, 1);
-  return new Date(nextFiscalStart.getTime() - 86_400_000);
-}
-
-/**
- * leave_accruals 기준 발생 일수 (당해 잔액 SSOT)
- * - 1년 이상: 최신 annual:N 일수만 (과거 annual 합산 금지 → 15+15=30 버그 방지)
- * - 1년 미만: monthly 원장 합
- * - 원장 없고 staff.total 만 있으면 fallback
- */
 export async function resolveGrantedDaysFromAccruals(
   staffId: string,
-  fallbackTotal: number,
-): Promise<{ totalDays: number; source: 'annual' | 'monthly' | 'manual' | 'staff_fallback' | 'zero' }> {
-  const d1 = await getD1Binding();
-  if (!d1) throw new Error('[annual-leave-balance] D1 binding not available');
-  const db = getD1Drizzle(d1);
-
-  const rows = await db
-    .select({
-      kind: leaveAccrualsTable.kind,
-      period_key: leaveAccrualsTable.period_key,
-      days: leaveAccrualsTable.days,
-    })
-    .from(leaveAccrualsTable)
-    .where(eq(leaveAccrualsTable.staff_id, staffId));
-
-  // 1. 수동 부여(manual) 원장이 지정된 경우 최우선 적용
-  const manualRows = rows.filter((r) => r.kind === 'manual');
-  if (manualRows.length > 0) {
-    const days = Number(manualRows[manualRows.length - 1].days) || 0;
-    if (days >= 0) {
-      return { totalDays: days, source: 'manual' };
-    }
-  }
-
-  const annualRows = rows.filter((r) => r.kind === 'annual');
-  if (annualRows.length > 0) {
-    // period_key = 'annual:1' | 'annual:2' … → 가장 큰 N(최신 연차 부여)만 사용
-    let best = annualRows[0];
-    let bestN = -1;
-    for (const r of annualRows) {
-      const n = Number(String(r.period_key ?? '').replace(/^annual:/i, '')) || 0;
-      if (n >= bestN) {
-        bestN = n;
-        best = r;
-      }
-    }
-    const days = Number(best.days) || 0;
-    if (days > 0) {
-      return { totalDays: days, source: 'annual' };
-    }
-  }
-
-  const monthlySum = rows
-    .filter((r) => r.kind === 'monthly')
-    .reduce((s, r) => s + (Number(r.days) || 0), 0);
-  if (monthlySum > 0) {
-    return { totalDays: monthlySum, source: 'monthly' };
-  }
-
-  if (fallbackTotal > 0) {
-    return { totalDays: fallbackTotal, source: 'staff_fallback' };
-  }
-  return { totalDays: 0, source: 'zero' };
+  _fallbackTotal = 0,
+): Promise<{ totalDays: number; source: 'ledger' | 'zero' }> {
+  const summary = await getUnifiedAnnualLeaveSummary(staffId);
+  return {
+    totalDays: summary.total,
+    source: summary.total > 0 ? 'ledger' : 'zero',
+  };
 }
 
 /**
- * 특정 직원의 leave_balances를 재계산하여 UPSERT
- * staff_members 의 total/used 는 읽기 fallback 만 사용하고 쓰지 않음.
+ * Historical name retained for callers. It synchronizes approved requests into
+ * the unified ledger and returns the ledger-derived current-cycle summary.
  */
 export async function recalculateLeaveBalance(
   staffId: string,
   year?: number,
   overrides?: RecalcOverrides,
-): Promise<void> {
-  const parsed = RecalcInputSchema.safeParse({
-    staffId,
-    year,
-    expiredOverride: overrides?.expiredDays,
-    compensatedOverride: overrides?.compensatedDays });
-  if (!parsed.success) {
-    const msg = parsed.error.issues.map((e) => e.message).join(', ');
-    console.error('[recalculateLeaveBalance] 입력 오류:', msg);
-    throw new Error(`recalculateLeaveBalance 입력 오류: ${msg}`);
+): Promise<UnifiedLeaveSummary> {
+  if (overrides && Object.values(overrides).some((value) => value !== undefined)) {
+    throw new Error('Use setManualAnnualLeaveTarget for manual leave changes.');
   }
-
-  // KST 기준 연도 (UTC getFullYear 사용 시 1/1 00~09시 잔액 year 어긋남)
-  const targetYear =
-    parsed.data.year ?? Number(formatKoreanDateKey(new Date()).slice(0, 4));
-
-  const d1 = await getD1Binding();
-  if (!d1) throw new Error('[annual-leave-balance] D1 binding not available (recalculateLeaveBalance)');
-  const db = getD1Drizzle(d1);
-
-  const staffRows = await db
-    .select({
-      id: staffMembersTable.id,
-      annual_leave_total: staffMembersTable.annual_leave_total,
-      annual_leave_used: staffMembersTable.annual_leave_used,
-      join_date: staffMembersTable.join_date,
-      joined_at: staffMembersTable.joined_at,
-      hire_date: staffMembersTable.hire_date,
-      company_id: staffMembersTable.company_id })
-    .from(staffMembersTable)
-    .where(eq(staffMembersTable.id, staffId))
-    .limit(1);
-  const staffRow = staffRows[0] ?? null;
-  if (!staffRow) {
-    throw new Error(`직원 정보를 조회할 수 없습니다. (id: ${staffId})`);
-  }
-  const staff: StaffRow = {
-    id: String(staffRow.id),
-    annual_leave_total: staffRow.annual_leave_total ?? null,
-    annual_leave_used: staffRow.annual_leave_used ?? null,
-    join_date: staffRow.join_date ?? null,
-    joined_at: staffRow.joined_at ?? null,
-    hire_date: staffRow.hire_date ?? null,
-    company_id: staffRow.company_id ?? null };
-
-  let leavePolicy: 'entry_date' | 'fiscal_year' = 'entry_date';
-  let fiscalStartMonth = 1;
-  if (staff.company_id) {
-    const companyRows = await db
-      .select({
-        id: companiesTable.id,
-        leave_policy: companiesTable.leave_policy,
-        fiscal_year_start_month: companiesTable.fiscal_year_start_month,
-        unused_leave_compensation: companiesTable.unused_leave_compensation })
-      .from(companiesTable)
-      .where(eq(companiesTable.id, staff.company_id))
-      .limit(1);
-    const companyRow = companyRows[0] ?? null;
-    if (companyRow?.leave_policy === '회계연도') {
-      leavePolicy = 'fiscal_year';
-      fiscalStartMonth = companyRow.fiscal_year_start_month ?? 1;
-    }
-  }
-
-  // 사용: 오버라이드가 지정되었으면 수동값 적용, 아니면 신청서 내역 동기화
-  let usedDays: number;
-  if (typeof overrides?.usedDays === 'number' && overrides.usedDays >= 0) {
-    usedDays = overrides.usedDays;
-  } else {
-    try {
-      const hireDateStr = staff.hire_date || staff.join_date || staff.joined_at;
-      usedDays = await syncAnnualLeaveUsedForStaff(staffId, {
-        writeStaffMembers: false,
-        year: targetYear,
-        hireDate: hireDateStr,
-      });
-    } catch (syncErr) {
-      console.error('[recalculateLeaveBalance] syncAnnualLeaveUsedForStaff 실패:', syncErr);
-      throw new Error(
-        `[recalculateLeaveBalance] 사용일수 동기화 실패 — 잔액 갱신 중단 (staff=${staffId}, year=${targetYear})`,
-      );
-    }
-  }
-
-  // 발생: 오버라이드 우선, 없으면 원장 우선
-  let totalDays: number;
-  if (typeof overrides?.totalDays === 'number' && overrides.totalDays >= 0) {
-    totalDays = overrides.totalDays;
-  } else {
-    const granted = await resolveGrantedDaysFromAccruals(
-      staffId,
-      Number(staff.annual_leave_total) || 0,
-    );
-    totalDays = granted.totalDays;
-  }
-
-  let expiryDate: Date;
-  const hireDate = resolveHireDate(staff);
-  if (leavePolicy === 'fiscal_year') {
-    expiryDate = fiscalYearExpiryDate(targetYear, fiscalStartMonth);
-  } else {
-    expiryDate = hireDate
-      ? calculateAnnualLeaveExpiryDate(hireDate, new Date())
-      : new Date(targetYear, 11, 31);
-  }
-  const expiryDateStr = formatKoreanDateKey(expiryDate);
-
-  const existingRows = await db
-    .select({
-      id: leaveBalancesTable.id,
-      expired_days: leaveBalancesTable.expired_days,
-      compensated_days: leaveBalancesTable.compensated_days,
-      expired_at: leaveBalancesTable.expired_at,
-      expiry_date: leaveBalancesTable.expiry_date })
-    .from(leaveBalancesTable)
-    .where(
-      and(
-        eq(leaveBalancesTable.staff_id, staffId),
-        eq(leaveBalancesTable.year, targetYear),
-      ),
-    )
-    .limit(1);
-  const existingRow = existingRows[0] ?? null;
-
-  const todayKey = formatKoreanDateKey(new Date());
-  let expiredDays =
-    overrides?.expiredDays !== undefined
-      ? Number(overrides.expiredDays)
-      : Number(existingRow?.expired_days) || 0;
-  // 만료일 이전이거나 expired_at 미기록이면 소멸일수 유지 금지
-  // (과거 버그로 expired_days=total 로 박혀 잔여 0 고착되던 케이스 복구)
-  if (overrides?.expiredDays === undefined) {
-    const expAt = existingRow?.expired_at ? String(existingRow.expired_at).trim() : '';
-    const expDate = existingRow?.expiry_date
-      ? String(existingRow.expiry_date).slice(0, 10)
-      : expiryDateStr;
-    const notYetExpired = !expAt && (!expDate || expDate > todayKey);
-    if (notYetExpired && expiredDays > 0) {
-      expiredDays = 0;
-    }
-  }
-  const compensatedDays =
-    overrides?.compensatedDays !== undefined
-      ? Number(overrides.compensatedDays)
-      : Number(existingRow?.compensated_days) || 0;
-
-  const remainingDays = Math.max(
-    0,
-    Math.round((totalDays - usedDays - expiredDays - compensatedDays) * 100) / 100,
-  );
-
-  if (existingRow?.id) {
-    await db
-      .update(leaveBalancesTable)
-      .set({
-        total_days: totalDays,
-        used_days: usedDays,
-        remaining_days: remainingDays,
-        expiry_date: expiryDateStr,
-        expired_days: expiredDays,
-        compensated_days: compensatedDays,
-        updated_at: new Date().toISOString() })
-      .where(eq(leaveBalancesTable.id, existingRow.id));
-  } else {
-    await db.insert(leaveBalancesTable).values({
-      id: crypto.randomUUID(),
-      staff_id: staffId,
-      year: targetYear,
-      total_days: totalDays,
-      used_days: usedDays,
-      remaining_days: remainingDays,
-      expiry_date: expiryDateStr,
-      expired_days: expiredDays,
-      compensated_days: compensatedDays,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString() });
-  }
+  const asOfDate = year === undefined
+    ? formatKoreanDateKey(new Date())
+    : `${year}-12-31`;
+  await syncApprovedLeaveRequestsToLedger(staffId, asOfDate);
+  return getUnifiedAnnualLeaveSummary(staffId, asOfDate);
 }

@@ -1063,6 +1063,28 @@ export const leave_accruals = sqliteTable("leave_accruals", {
 	index("idx_leave_accruals_staff").on(table.staff_id),
 ]);
 
+// ?? ?? ??. ??????????????????? ?? signed days? ????.
+// leave_balances ? staff_members.annual_leave_* ? ? ??? ?? ?? ????? ???? ???.
+// entry_type: auto_monthly | auto_annual | manual_adjustment | manual_used_adjustment |
+//             manual_expire_adjustment | manual_compensate_adjustment | use | substitute | expire | compensate
+export const leave_ledger = sqliteTable("leave_ledger", {
+	id: text().primaryKey().notNull(),
+	staff_id: text().notNull().references(() => staff_members.id, { onDelete: "cascade" } ),
+	company_id: text(),
+	entry_type: text().notNull(),
+	// ??? ??, ??? ????????. ?? = ?? ?? ?? ??.
+	days: real().notNull(),
+	occurred_on: text().notNull(),
+	period_key: text().notNull(),
+	source_id: text(),
+	note: text(),
+	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
+(table) => [
+	uniqueIndex("idx_leave_ledger_staff_type_period").on(table.staff_id, table.entry_type, table.period_key),
+	index("idx_leave_ledger_staff_occurred_on").on(table.staff_id, table.occurred_on),
+	index("idx_leave_ledger_source").on(table.source_id),
+]);
+
 export const leave_requests = sqliteTable("leave_requests", {
 	id: text().primaryKey().notNull(),
 	staff_id: text().references(() => staff_members.id, { onDelete: "cascade" } ),

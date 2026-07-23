@@ -19,7 +19,6 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { db } from '@/lib/db-client';
 import {
   calculateApprovedAnnualLeaveUsage,
   calculateLeaveDays,
@@ -269,67 +268,64 @@ export function useAnnualLeaveSummary(staffId: string | null | undefined): Annua
     setState((prev) => (prev.loading ? prev : { ...prev, loading: true, error: null }));
     const year = currentLeaveYear();
     try {
-      const [staffRes, leaveRes, balanceRes] = await Promise.all([
-        db
-          .from('staff_members')
-          .select('annual_leave_total, annual_leave_used')
-          .eq('id', staffId)
-          .maybeSingle(),
-        db
-          .from('leave_requests')
-          .select('id, leave_type, start_date, end_date, days, status, reason, approved_at, created_at')
-          .eq('staff_id', staffId)
-          .order('start_date', { ascending: false })
-          .order('created_at', { ascending: false })
-          .limit(200),
-        db
-          .from('leave_balances')
-          .select('total_days, used_days, expired_days, compensated_days, remaining_days')
-          .eq('staff_id', staffId)
-          .eq('year', year)
-          .maybeSingle(),
-      ]);
-
-      if (staffRes.error) throw staffRes.error;
-      if (leaveRes.error) throw leaveRes.error;
-      if (balanceRes.error) throw balanceRes.error;
-
-      const staff = (staffRes.data ?? {}) as {
-        annual_leave_total?: number | null;
-        annual_leave_used?: number | null;
-      };
-      const balance = (balanceRes.data ?? null) as {
-        total_days?: number | null;
-        used_days?: number | null;
-        expired_days?: number | null;
-        compensated_days?: number | null;
-        remaining_days?: number | null;
-      } | null;
-      const rows = Array.isArray(leaveRes.data)
-        ? (leaveRes.data as Array<Record<string, unknown>>)
-        : [];
-
-      const computed = computeAnnualLeaveSummary({
-        staffTotal: staff.annual_leave_total,
-        staffUsed: staff.annual_leave_used,
-        balanceTotal: balance?.total_days,
-        balanceUsed: balance?.used_days,
-        balanceRemaining: balance?.remaining_days,
-        expired: balance?.expired_days,
-        compensated: balance?.compensated_days,
-        leaveRows: rows,
-        year,
+      const response = await fetch(`/api/annual-leave/summary?staffId=${encodeURIComponent(staffId)}`, {
+        credentials: 'same-origin',
       });
+      const payload = await response.json() as {
+        error?: string;
+        summary?: {
+          total: number;
+          used: number;
+          expired: number;
+          compensated: number;
+          remaining: number;
+          cycle: { start: string; end: string };
+          entries: Array<{
+            id: string;
+            entryType: string;
+            days: number;
+            occurredOn: string;
+            note?: string | null;
+          }>;
+        };
+      };
+      if (!response.ok || !payload.summary) throw new Error(payload.error || 'Could not load annual leave.');
 
-      const nextState = {
-        ...computed,
+      const summary = payload.summary;
+      const history = summary.entries
+        .filter((entry) => entry.entryType === 'use')
+        .map((entry) => ({
+          id: entry.id,
+          leave_type: '연차',
+          start_date: entry.occurredOn,
+          end_date: entry.occurredOn,
+          days: Math.abs(Number(entry.days) || 0),
+          daysLabel: `${Math.abs(Number(entry.days) || 0)}일`,
+          dateLabel: formatDateDot(entry.occurredOn),
+          status: '승인' as LeaveHistoryStatus,
+          reason: entry.note ?? null,
+          approved_at: null,
+          created_at: null,
+        }));
+      const total = Number(summary.total) || 0;
+      const used = Number(summary.used) || 0;
+      const nextState: AnnualLeaveSummary = {
+        total,
+        used,
+        remaining: Number(summary.remaining) || 0,
+        expired: Number(summary.expired) || 0,
+        compensated: Number(summary.compensated) || 0,
+        usageRate: total > 0 ? Math.round((used / total) * 100) : 0,
+        history,
+        approvedHistory: history,
+        year: Number(summary.cycle.start.slice(0, 4)) || year,
+        hasBalanceRow: true,
         loading: false,
         error: null,
       };
 
       leaveSummaryCache.set(staffId, { data: nextState, timestamp: Date.now() });
-      setState(nextState);
-    } catch (err) {
+      setState(nextState);    } catch (err) {
       console.error('[useAnnualLeaveSummary]', err);
       setState({
         ...EMPTY,

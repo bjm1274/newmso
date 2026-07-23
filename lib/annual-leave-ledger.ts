@@ -1,9 +1,9 @@
 import { formatKoreanDateKey } from '@/lib/seoul-time';
+import { syncApprovedLeaveRequestsToLedger } from '@/lib/unified-leave-ledger';
 import {
   getD1Binding,
   getD1Drizzle,
   leave_requests as leaveRequestsTable,
-  staff_members as staffMembersTable,
   eq,
   and,
   desc,
@@ -274,96 +274,9 @@ export async function syncAnnualLeaveUsedForStaff(
   staffId: string,
   options?: SyncAnnualLeaveUsedOptions,
 ) {
-  const d1 = await getD1Binding();
-  if (!d1) throw new Error('[annual-leave-ledger] D1 binding not available (syncAnnualLeaveUsedForStaff)');
-  const db = getD1Drizzle(d1);
-  const year = options?.year;
-  const writeStaff = options?.writeStaffMembers === true;
-
-  let periodStart = options?.periodStart ? new Date(options.periodStart) : null;
-  let periodEnd = options?.periodEnd ? new Date(options.periodEnd) : null;
-
-  if ((!periodStart || !periodEnd) && options?.hireDate) {
-    const range = getHireDatePeriodRange(options.hireDate);
-    if (range) {
-      periodStart = range.periodStart;
-      periodEnd = range.periodEnd;
-    }
-  }
-
-  const rows = await db
-    .select({
-      leave_type: leaveRequestsTable.leave_type,
-      start_date: leaveRequestsTable.start_date,
-      end_date: leaveRequestsTable.end_date,
-      status: leaveRequestsTable.status,
-      days: leaveRequestsTable.days })
-    .from(leaveRequestsTable)
-    .where(eq(leaveRequestsTable.staff_id, staffId));
-
-  const approvedAnnualLeaveDays = rows.reduce((sum, row) => {
-    if (!isApprovedLeaveStatus(row?.status)) return sum;
-    // '연차(부여)'는 사용이 아니라 신규 부여
-    if (row?.leave_type === '연차(부여)') return sum;
-
-    const isHalf = getLeaveUnit(row?.leave_type) === 0.5;
-    if (!isHalf && !isAnnualLeaveType(row?.leave_type)) return sum;
-
-    // 1) 입사일 주기 필터링 (최우선)
-    if (periodStart && periodEnd) {
-      const rowStart = new Date(String(row?.start_date));
-      const rowEnd = new Date(String(row?.end_date || row?.start_date));
-      if (Number.isNaN(rowStart.getTime())) return sum;
-
-      // 주기 범위와 교집합 검사 (rowStart < periodEnd && rowEnd >= periodStart)
-      if (rowStart >= periodEnd || rowEnd < periodStart) {
-        return sum;
-      }
-
-      if (isHalf) return sum + 0.5;
-      const dbDays = row.days != null ? Number(row.days) : null;
-      if (dbDays != null && !Number.isNaN(dbDays) && dbDays > 0) {
-        return sum + dbDays;
-      }
-      return sum + calculateLeaveDays(row?.start_date as string, row?.end_date as string);
-    }
-
-    // 2) 캘린더 연도 필터링
-    if (year != null) {
-      const clipped = clipDateRangeToYear(
-        row?.start_date as string,
-        row?.end_date as string,
-        year,
-      );
-      if (!clipped) return sum;
-      if (isHalf) return sum + 0.5;
-      const startY = String(row?.start_date || '').slice(0, 4);
-      const endY = String(row?.end_date || row?.start_date || '').slice(0, 4);
-      const dbDays = row.days != null ? Number(row.days) : null;
-      if (startY === String(year) && endY === String(year) && dbDays != null && !Number.isNaN(dbDays)) {
-        return sum + dbDays;
-      }
-      return (
-        sum +
-        calculateLeaveDays(
-          formatKoreanDateKey(clipped.start),
-          formatKoreanDateKey(clipped.end),
-        )
-      );
-    }
-
-    if (isHalf) return sum + 0.5;
-    const dbDays = row.days != null ? Number(row.days) : null;
-    if (dbDays !== null && !Number.isNaN(dbDays)) return sum + dbDays;
-    return sum + calculateLeaveDays(row?.start_date as string, row?.end_date as string);
-  }, 0);
-
-  if (writeStaff) {
-    await db
-      .update(staffMembersTable)
-      .set({ annual_leave_used: approvedAnnualLeaveDays })
-      .where(eq(staffMembersTable.id, staffId));
-  }
-
-  return approvedAnnualLeaveDays;
+  // leave_requests는 결재 workflow만 보관하고, 승인된 사용일수는 leave_ledger에만 반영한다.
+  // options는 기존 호출부와의 호환을 위해 유지한다.
+  void options;
+  const summary = await syncApprovedLeaveRequestsToLedger(staffId);
+  return summary.used;
 }

@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { recalculateLeaveBalance, resolveGrantedDaysFromAccruals } from '@/lib/annual-leave-balance';
 import { syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
+import { getUnifiedAnnualLeaveSummary } from '@/lib/unified-leave-ledger';
 import { isGroupAccount } from '@/types';
 import {
   getD1Binding,
@@ -48,34 +49,34 @@ export async function GET(req: NextRequest) {
     const active = staffs.filter((s) => !s.status || s.status === '재직');
 
     const overuse: unknown[] = [];
-    const totalAccrualGaps: unknown[] = [];
     const noAccrual: unknown[] = [];
-    const formulaMismatch: unknown[] = [];
 
     for (const s of active) {
       const sid = String(s.id);
-      const balRows = await db
-        .select()
-        .from(leaveBalancesTable)
-        .where(eq(leaveBalancesTable.staff_id, sid));
-      const bal = balRows.find((b) => Number(b.year) === year) ?? balRows[0];
+      try {
+        const summary = await getUnifiedAnnualLeaveSummary(sid);
+        if (summary.entries.length === 0) {
+          noAccrual.push({
+            staffId: sid,
+            name: s.name,
+            department: s.department,
+            company: s.company,
+          });
+        }
 
-      const accrualRows = await db
-        .select({
-          kind: leaveAccrualsTable.kind,
-          period_key: leaveAccrualsTable.period_key,
-          days: leaveAccrualsTable.days,
-        })
-        .from(leaveAccrualsTable)
-        .where(eq(leaveAccrualsTable.staff_id, sid));
-
-      const accrualSum = accrualRows.reduce((n, r) => n + (Number(r.days) || 0), 0);
-      const granted = await resolveGrantedDaysFromAccruals(
-        sid,
-        Number(s.annual_leave_total) || 0,
-      );
-
-      if (accrualRows.length === 0) {
+        if (summary.used > summary.total + 0.01) {
+          overuse.push({
+            staffId: sid,
+            name: s.name,
+            department: s.department,
+            company: s.company,
+            total_days: summary.total,
+            used_days: summary.used,
+            remaining_days: summary.remaining,
+            excess: Math.round((summary.used - summary.total) * 10) / 10,
+          });
+        }
+      } catch {
         noAccrual.push({
           staffId: sid,
           name: s.name,
@@ -83,57 +84,7 @@ export async function GET(req: NextRequest) {
           company: s.company,
         });
       }
-
-      const staffTotal = Number(s.annual_leave_total) || 0;
-      const gap = Math.abs(staffTotal - accrualSum);
-      if (gap > 0.5) {
-        totalAccrualGaps.push({
-          staffId: sid,
-          name: s.name,
-          department: s.department,
-          company: s.company,
-          staffTotal,
-          accrualSum,
-          grantedForBalance: granted.totalDays,
-          grantSource: granted.source,
-          gap: Math.round(gap * 10) / 10,
-        });
-      }
-
-      if (bal) {
-        const total = Number(bal.total_days) || 0;
-        const used = Number(bal.used_days) || 0;
-        const remaining = Number(bal.remaining_days) || 0;
-        const expired = Number(bal.expired_days) || 0;
-        const compensated = Number(bal.compensated_days) || 0;
-        const expected = Math.max(0, total - used - expired - compensated);
-        if (used > total + 0.01) {
-          overuse.push({
-            staffId: sid,
-            name: s.name,
-            department: s.department,
-            company: s.company,
-            year: bal.year,
-            total_days: total,
-            used_days: used,
-            remaining_days: remaining,
-            excess: Math.round((used - total) * 10) / 10,
-          });
-        }
-        if (Math.abs(remaining - expected) > 0.01 && used <= total + 0.01) {
-          formulaMismatch.push({
-            staffId: sid,
-            name: s.name,
-            remaining,
-            expected,
-          });
-        }
-      }
     }
-
-    totalAccrualGaps.sort(
-      (a, b) => Number((b as { gap: number }).gap) - Number((a as { gap: number }).gap),
-    );
 
     return NextResponse.json({
       ok: true,
@@ -141,15 +92,11 @@ export async function GET(req: NextRequest) {
       summary: {
         activeStaff: active.length,
         overuseCount: overuse.length,
-        totalAccrualGapCount: totalAccrualGaps.length,
         noAccrualCount: noAccrual.length,
-        formulaMismatchCount: formulaMismatch.length,
       },
       overuse,
-      totalAccrualGaps: totalAccrualGaps.slice(0, 30),
       noAccrual,
-      formulaMismatch,
-      note: '읽기 전용 진단. staff_members 는 수정하지 않습니다. rebalance=1 POST 로 leave_balances 만 재계산 가능.',
+      note: '단일 원장(leave_ledger) 기반 읽기 전용 진단입니다.',
     });
   } catch (err) {
     console.error('[annual-leave/diagnose]', err);

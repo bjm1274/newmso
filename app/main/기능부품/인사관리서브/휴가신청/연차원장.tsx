@@ -85,7 +85,12 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
         }
 
         const currentYear = new Date().getFullYear();
-        const [{ data, error }, { data: auditData, error: auditError }, { data: balanceData, error: balanceError }] = await Promise.all([
+        const [
+          { data, error },
+          { data: auditData, error: auditError },
+          { data: balanceData, error: balanceError },
+          { data: ledgerData, error: ledgerError }
+        ] = await Promise.all([
           db
             .from('leave_requests')
             .select('id, staff_id, leave_type, start_date, end_date, status, reason, approved_at')
@@ -104,6 +109,10 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
             .select('staff_id, expired_days, compensated_days')
             .in('staff_id', staffIds)
             .eq('year', currentYear),
+          db
+            .from('leave_ledger')
+            .select('staff_id, entry_type, days')
+            .in('staff_id', staffIds),
         ]);
 
         if (error) throw error;
@@ -116,17 +125,47 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
           return leaveIds.has(String(row.target_id || '')) || staffIds.includes(auditedStaffId);
         });
 
-        const nextBalances: Record<string, { expired: number; compensated: number }> = {};
-        ((balanceData || []) as LeaveBalanceRow[]).forEach((row) => {
-          nextBalances[String(row.staff_id)] = {
-            expired: Number(row.expired_days) || 0,
-            compensated: Number(row.compensated_days) || 0 };
-        });
+        const nextBalances: Record<string, { total: number; used: number; expired: number; compensated: number; remaining: number }> = {};
+
+        // leave_ledger 우선 집계
+        if (ledgerData && ledgerData.length > 0) {
+          (ledgerData as any[]).forEach((row) => {
+            const sId = String(row.staff_id || '');
+            if (!sId) return;
+            const entryType = String(row.entry_type || '');
+            const days = Number(row.days) || 0;
+
+            if (!nextBalances[sId]) {
+              nextBalances[sId] = { total: 0, used: 0, expired: 0, compensated: 0, remaining: 0 };
+            }
+            const current = nextBalances[sId];
+            current.remaining += days;
+            if (entryType === 'use' || entryType === 'manual_used_adjustment') {
+              current.used += -days;
+            } else if (entryType === 'expire' || entryType === 'manual_expire_adjustment') {
+              current.expired += -days;
+            } else if (entryType === 'compensate' || entryType === 'manual_compensate_adjustment') {
+              current.compensated += -days;
+            } else {
+              current.total += days;
+            }
+          });
+        } else {
+          ((balanceData || []) as LeaveBalanceRow[]).forEach((row) => {
+            nextBalances[String(row.staff_id)] = {
+              total: 0,
+              used: 0,
+              expired: Number(row.expired_days) || 0,
+              compensated: Number(row.compensated_days) || 0,
+              remaining: 0,
+            };
+          });
+        }
 
         if (active) {
           setLeaveRows((data || []) as LeaveLedgerRow[]);
           setRollbackAudits(nextRollbackAudits);
-          setBalancesByStaff(nextBalances);
+          setBalancesByStaff(nextBalances as any);
         }
       } catch (error) {
         console.error('연차 원장 조회 실패:', error);
@@ -161,11 +200,14 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
             (sum, row) => sum + calculateLeaveDays(row.start_date, row.end_date),
             0
           );
-          const total = Number(staff.annual_leave_total || 0);
-          const used = Number(staff.annual_leave_used ?? approvedDays);
-          const balance = balancesByStaff[staff.id];
+          const balance = balancesByStaff[staff.id] as any;
+          const total = balance?.total ?? Number(staff.annual_leave_total || 0);
+          const used = balance?.used ?? Number(staff.annual_leave_used ?? approvedDays);
           const expired = balance?.expired ?? 0;
           const compensated = balance?.compensated ?? 0;
+          const remaining = balance?.remaining !== undefined
+            ? Math.max(0, balance.remaining)
+            : Math.max(0, total - used - expired - compensated);
           return {
             id: staff.id,
             staff,
@@ -174,7 +216,7 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
             used,
             expired,
             compensated,
-            remaining: Math.max(0, total - used - expired - compensated),
+            remaining,
             approvedCount: approvedRows.length };
         })
         .sort((a, b) => a.staff.name.localeCompare(b.staff.name, 'ko')),

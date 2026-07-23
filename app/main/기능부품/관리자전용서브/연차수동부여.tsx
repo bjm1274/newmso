@@ -57,7 +57,7 @@ export default function AnnualLeaveManualGrant({
 }) {
   const [companyFilter, setCompanyFilter] = useState<string>('전체');
   const [edits, setEdits] = useState<Record<string, Partial<EditState>>>({});
-  const [balances, setBalances] = useState<Record<string, { expired: number; compensated: number }>>({});
+  const [balances, setBalances] = useState<Record<string, { expired: number; compensated: number; total?: number; used?: number; remaining?: number }>>({});
   const [companyPolicies, setCompanyPolicies] = useState<Record<string, CompanyPolicy>>({});
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -109,7 +109,7 @@ export default function AnnualLeaveManualGrant({
     };
   }, [list]);
 
-  // leave_balances 로드 — 현재 연도 기준 expired/compensated 조회
+  // leave_ledger 로드 — 단일 원장 기준 expired/compensated/total/used/remaining 조회
   useEffect(() => {
     let active = true;
     const staffIds = list.map((s: any) => String(s.id)).filter(Boolean);
@@ -119,26 +119,51 @@ export default function AnnualLeaveManualGrant({
     }
 
     const year = new Date().getFullYear();
-    void db
-      .from('leave_balances')
-      .select('staff_id, expired_days, compensated_days')
-      .eq('year', year)
-      .in('staff_id', staffIds)
-      .then(({ data, error }) => {
-        if (!active) return;
-        if (error) {
-          console.error('[연차수동부여] leave_balances 조회 실패:', error);
-          setBalances({});
-          return;
-        }
-        const next: Record<string, { expired: number; compensated: number }> = {};
-        ((data || []) as LeaveBalanceRow[]).forEach((row) => {
+    void Promise.all([
+      db
+        .from('leave_balances')
+        .select('staff_id, expired_days, compensated_days')
+        .eq('year', year)
+        .in('staff_id', staffIds),
+      db
+        .from('leave_ledger')
+        .select('staff_id, entry_type, days')
+        .in('staff_id', staffIds),
+    ]).then(([{ data: balData }, { data: legData }]) => {
+      if (!active) return;
+      const next: Record<string, { expired: number; compensated: number; total?: number; used?: number; remaining?: number }> = {};
+
+      if (legData && legData.length > 0) {
+        (legData as any[]).forEach((row) => {
+          const sId = String(row.staff_id || '');
+          if (!sId) return;
+          const entryType = String(row.entry_type || '');
+          const days = Number(row.days) || 0;
+
+          if (!next[sId]) {
+            next[sId] = { expired: 0, compensated: 0, total: 0, used: 0, remaining: 0 };
+          }
+          const current = next[sId];
+          current.remaining = (current.remaining || 0) + days;
+          if (entryType === 'use' || entryType === 'manual_used_adjustment') {
+            current.used = (current.used || 0) - days;
+          } else if (entryType === 'expire' || entryType === 'manual_expire_adjustment') {
+            current.expired = (current.expired || 0) - days;
+          } else if (entryType === 'compensate' || entryType === 'manual_compensate_adjustment') {
+            current.compensated = (current.compensated || 0) - days;
+          } else {
+            current.total = (current.total || 0) + days;
+          }
+        });
+      } else {
+        ((balData || []) as LeaveBalanceRow[]).forEach((row) => {
           next[String(row.staff_id)] = {
             expired: Number(row.expired_days) || 0,
             compensated: Number(row.compensated_days) || 0 };
         });
-        setBalances(next);
-      });
+      }
+      setBalances(next as any);
+    });
 
     return () => {
       active = false;
@@ -146,15 +171,17 @@ export default function AnnualLeaveManualGrant({
   }, [list]);
 
   const getTotal = (staff: any) =>
-    edits[staff.id]?.total ?? Number(staff.annual_leave_total) ?? 0;
+    edits[staff.id]?.total ?? balances[staff.id]?.total ?? Number(staff.annual_leave_total) ?? 0;
   const getUsed = (staff: any) =>
-    edits[staff.id]?.used ?? Number(staff.annual_leave_used) ?? 0;
+    edits[staff.id]?.used ?? balances[staff.id]?.used ?? Number(staff.annual_leave_used) ?? 0;
   const getExpired = (staff: any) =>
     edits[staff.id]?.expired ?? balances[staff.id]?.expired ?? 0;
   const getCompensated = (staff: any) =>
     edits[staff.id]?.compensated ?? balances[staff.id]?.compensated ?? 0;
   const getRemaining = (staff: any) =>
-    getTotal(staff) - getUsed(staff) - getExpired(staff) - getCompensated(staff);
+    balances[staff.id]?.remaining !== undefined && edits[staff.id]?.total === undefined && edits[staff.id]?.used === undefined
+      ? balances[staff.id].remaining!
+      : getTotal(staff) - getUsed(staff) - getExpired(staff) - getCompensated(staff);
 
   const setField = (id: string, key: keyof EditState, value: number) =>
     setEdits((prev) => ({ ...prev, [id]: { ...prev[id], [key]: clampNumber(value) } }));

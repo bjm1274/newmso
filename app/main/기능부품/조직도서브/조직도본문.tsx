@@ -255,17 +255,36 @@ export default function MainContent({
 
         if (existingLogs && existingLogs.length > 0) return;
 
-        const { data: balanceData } = await db
-          .from('leave_balances')
-          .select('total_days, used_days, remaining_days, expired_days, compensated_days')
-          .eq('staff_id', user.id)
-          .eq('year', targetYear)
-          .maybeSingle();
+        const [{ data: balanceData }, { data: ledgerRows }] = await Promise.all([
+          db
+            .from('leave_balances')
+            .select('total_days, used_days, remaining_days, expired_days, compensated_days')
+            .eq('staff_id', user.id)
+            .eq('year', targetYear)
+            .maybeSingle(),
+          db
+            .from('leave_ledger')
+            .select('entry_type, days')
+            .eq('staff_id', user.id),
+        ]);
 
-        // leave_balances SSOT — staff_members 다년도 누적 필드는 쓰지 않음
         let remaining = 0;
         let total = 0;
-        if (balanceData) {
+
+        if (ledgerRows && ledgerRows.length > 0) {
+          let rem = 0;
+          let tot = 0;
+          (ledgerRows as any[]).forEach((row) => {
+            const entryType = String(row.entry_type || '');
+            const days = Number(row.days) || 0;
+            rem += days;
+            if (entryType !== 'use' && entryType !== 'manual_used_adjustment' && entryType !== 'expire' && entryType !== 'manual_expire_adjustment' && entryType !== 'compensate' && entryType !== 'manual_compensate_adjustment') {
+              tot += days;
+            }
+          });
+          total = tot;
+          remaining = Math.max(0, rem);
+        } else if (balanceData) {
           total = Number(balanceData.total_days) || 0;
           const used = Number(balanceData.used_days) || 0;
           const expired = Number(balanceData.expired_days) || 0;
@@ -274,14 +293,6 @@ export default function MainContent({
             balanceData.remaining_days != null && !Number.isNaN(Number(balanceData.remaining_days))
               ? Math.max(0, Number(balanceData.remaining_days))
               : Math.max(0, total - used - expired - compensated);
-        } else {
-          const { data: staff } = await db
-            .from('staff_members')
-            .select('annual_leave_total')
-            .eq('id', user.id)
-            .single();
-          total = Number(staff?.annual_leave_total) || 0;
-          remaining = total;
         }
 
         const currentMonth = new Date().getMonth() + 1;

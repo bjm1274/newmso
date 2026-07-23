@@ -172,7 +172,7 @@ export async function fetchLeaveData({
   }
 
   const now = new Date();
-  const [balanceRes, requestRes] = await Promise.all([
+  const [balanceRes, requestRes, ledgerRes] = await Promise.all([
     db
       .from('leave_balances')
       .select('*')
@@ -182,6 +182,10 @@ export async function fetchLeaveData({
       .from('leave_requests')
       .select('id, staff_id, leave_type, start_date, end_date, reason, status, created_at')
       .in('staff_id', staffIds),
+    db
+      .from('leave_ledger')
+      .select('id, staff_id, entry_type, days, occurred_on, period_key, source_id, note')
+      .in('staff_id', staffIds),
   ]);
 
   if (signal?.aborted) {
@@ -190,12 +194,39 @@ export async function fetchLeaveData({
 
   const rawBalances = Array.isArray(balanceRes.data) ? balanceRes.data : [];
   const rawRequests = Array.isArray(requestRes.data) ? requestRes.data : [];
+  const rawLedgers = Array.isArray(ledgerRes.data) ? ledgerRes.data : [];
 
   const balances = new Map<string, LeaveBalanceRow>();
   for (const raw of rawBalances) {
     if (raw && typeof raw === 'object') {
       const normalized = normalizeBalance(raw as Record<string, unknown>, now);
       if (normalized.staff_id) balances.set(normalized.staff_id, normalized);
+    }
+  }
+
+  // leave_ledger 기반 직원별 원장 집계
+  const ledgerByStaff = new Map<string, { total: number; used: number; expired: number; compensated: number; remaining: number }>();
+  for (const l of rawLedgers) {
+    if (!l || typeof l !== 'object') continue;
+    const sId = String((l as Record<string, unknown>).staff_id || '').trim();
+    if (!sId) continue;
+    const entryType = String((l as Record<string, unknown>).entry_type || '');
+    const days = Number((l as Record<string, unknown>).days) || 0;
+
+    if (!ledgerByStaff.has(sId)) {
+      ledgerByStaff.set(sId, { total: 0, used: 0, expired: 0, compensated: 0, remaining: 0 });
+    }
+    const current = ledgerByStaff.get(sId)!;
+    current.remaining += days;
+
+    if (entryType === 'use' || entryType === 'manual_used_adjustment') {
+      current.used += -days;
+    } else if (entryType === 'expire' || entryType === 'manual_expire_adjustment') {
+      current.expired += -days;
+    } else if (entryType === 'compensate' || entryType === 'manual_compensate_adjustment') {
+      current.compensated += -days;
+    } else {
+      current.total += days;
     }
   }
 
@@ -227,6 +258,7 @@ export async function fetchLeaveData({
   const rows: LeaveStaffRow[] = targetStaff.map((staff) => {
     const sId = String(staff.id);
     const balance = balances.get(sId);
+    const ledger = ledgerByStaff.get(sId);
     const staffLeaveRows = requestsByStaff.get(sId) || [];
     const summary = computeAnnualLeaveSummary({
       staffTotal: pickNumber(staff.annual_leave_total ?? staff.annual_days ?? 0),
@@ -240,9 +272,9 @@ export async function fetchLeaveData({
       year: now.getFullYear(),
     });
 
-    const total = summary.total;
-    const used = summary.used;
-    const remaining = summary.remaining;
+    const total = ledger ? ledger.total : summary.total;
+    const used = ledger ? ledger.used : summary.used;
+    const remaining = ledger ? Math.max(0, ledger.remaining) : summary.remaining;
     const expiry = balance?.expiry_date ?? null;
     const daysUntilExpiry = balance?.days_until_expiry ?? 365;
     return {

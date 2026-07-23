@@ -10,13 +10,12 @@
  *       필요하면 leave_accruals.kind='substitute' 원장으로 집계/표시 가능.
  */
 
-import { recalculateLeaveBalance } from '@/lib/annual-leave-balance';
 import { isKoreanPublicHoliday } from '@/lib/korean-public-holidays';
 import {
   getD1Binding,
   getD1Drizzle,
   staff_members as staffMembersTable,
-  leave_accruals as leaveAccrualsTable,
+  leave_ledger as leaveLedgerTable,
   attendances as attendancesTable,
   company_holidays as companyHolidaysTable,
   system_settings as systemSettingsTable,
@@ -156,20 +155,20 @@ export async function processSubstituteHolidayGrants(
 
     try {
       const inserted = await db
-        .insert(leaveAccrualsTable)
+        .insert(leaveLedgerTable)
         .values({
           id: crypto.randomUUID(),
           staff_id: row.staff_id,
           company_id: null,
-          kind: 'substitute',
-          period_key: workDate,
+          entry_type: 'substitute',
+          period_key: `substitute:${workDate}`,
           days: 1,
-          year: Number(workDate.slice(0, 4)) || new Date().getFullYear(),
-          source_date: workDate,
+          occurred_on: workDate,
+          source_id: workDate,
           note: `${holidayName} 근무 대체휴무 +1일`,
           created_at: new Date().toISOString() })
         .onConflictDoNothing()
-        .returning({ id: leaveAccrualsTable.id });
+        .returning({ id: leaveLedgerTable.id });
 
       if (inserted.length === 0) {
         result.skipped += 1;
@@ -178,7 +177,7 @@ export async function processSubstituteHolidayGrants(
 
       // 직원 연차 총량 +1 후 잔액 재계산
       const staffRows = await db
-        .select({ name: staffMembersTable.name, annual_leave_total: staffMembersTable.annual_leave_total })
+        .select({ name: staffMembersTable.name })
         .from(staffMembersTable)
         .where(eq(staffMembersTable.id, row.staff_id))
         .limit(1);
@@ -187,12 +186,6 @@ export async function processSubstituteHolidayGrants(
         result.skipped += 1;
         continue;
       }
-      const current = Number(staff.annual_leave_total) || 0;
-      await db
-        .update(staffMembersTable)
-        .set({ annual_leave_total: current + 1 })
-        .where(eq(staffMembersTable.id, row.staff_id));
-      await recalculateLeaveBalance(row.staff_id, Number(workDate.slice(0, 4)) || new Date().getFullYear());
 
       result.granted.push({
         staffId: row.staff_id,
