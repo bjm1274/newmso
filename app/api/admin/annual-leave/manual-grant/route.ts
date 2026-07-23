@@ -8,6 +8,7 @@ import {
   getLeaveUnit,
   calculateLeaveDays } from '@/lib/annual-leave-ledger';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
+import { sql } from 'drizzle-orm';
 import {
   getD1Binding,
   getD1Drizzle,
@@ -15,6 +16,7 @@ import {
   companies as companiesTable,
   leave_requests as leaveRequestsTable,
   leave_balances as leaveBalancesTable,
+  leave_accruals as leaveAccrualsTable,
   eq,
   and,
   inArray } from '@/lib/db';
@@ -275,6 +277,40 @@ export async function POST(request: Request) {
           annual_leave_total: totalDays,
           annual_leave_used: usedDays })
         .where(eq(staffMembersTable.id, update.staffId));
+
+      // leave_accruals 원장 테이블에도 manual 수동 부여 레코드 저장 (recalculateLeaveBalance 영구 반영)
+      await db
+        .insert(leaveAccrualsTable)
+        .values({
+          id: crypto.randomUUID(),
+          staff_id: update.staffId,
+          company_id: staff.company_id || null,
+          kind: 'manual',
+          period_key: `manual:${targetYear}`,
+          days: totalDays,
+          year: targetYear,
+          source_date: formatKoreanDateKey(new Date()),
+          note: `수동 부여/조정 (${totalDays}일)`,
+          created_at: new Date().toISOString()
+        })
+        .onConflictDoUpdate({
+          target: [sql`staff_id`, sql`kind`, sql`period_key`],
+          set: {
+            days: totalDays,
+            note: `수동 부여/조정 (${totalDays}일)`
+          }
+        });
+
+      // 기존 annual 원장이 존재하면 해당 days도 같이 맞추어 전역 정합성 보장
+      await db
+        .update(leaveAccrualsTable)
+        .set({ days: totalDays })
+        .where(
+          and(
+            eq(leaveAccrualsTable.staff_id, update.staffId),
+            eq(leaveAccrualsTable.kind, 'annual')
+          )
+        );
 
       // leave_balances upsert (SELECT 후 UPDATE or INSERT)
       const existingBalance = existingBalanceMap.get(update.staffId);

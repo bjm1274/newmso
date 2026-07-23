@@ -61,7 +61,7 @@ function fiscalYearExpiryDate(refYear: number, fiscalStartMonth: number): Date {
 export async function resolveGrantedDaysFromAccruals(
   staffId: string,
   fallbackTotal: number,
-): Promise<{ totalDays: number; source: 'annual' | 'monthly' | 'staff_fallback' | 'zero' }> {
+): Promise<{ totalDays: number; source: 'annual' | 'monthly' | 'manual' | 'staff_fallback' | 'zero' }> {
   const d1 = await getD1Binding();
   if (!d1) throw new Error('[annual-leave-balance] D1 binding not available');
   const db = getD1Drizzle(d1);
@@ -74,6 +74,15 @@ export async function resolveGrantedDaysFromAccruals(
     })
     .from(leaveAccrualsTable)
     .where(eq(leaveAccrualsTable.staff_id, staffId));
+
+  // 1. 수동 부여(manual) 원장이 지정된 경우 최우선 적용
+  const manualRows = rows.filter((r) => r.kind === 'manual');
+  if (manualRows.length > 0) {
+    const days = Number(manualRows[manualRows.length - 1].days) || 0;
+    if (days >= 0) {
+      return { totalDays: days, source: 'manual' };
+    }
+  }
 
   const annualRows = rows.filter((r) => r.kind === 'annual');
   if (annualRows.length > 0) {
