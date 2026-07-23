@@ -563,13 +563,16 @@ function MessengerTimelineComponent({
           const next = Math.max(0, targetIndex - TIMELINE_JUMP_OVERSCAN);
           return next < start ? next : start;
         });
+      } else {
+        // 현재 로드된 타임라인에 없으면 이전 이력 로드 실행
+        onLoadOlderMessages?.();
       }
       // 윈도우 확장 페인트 후 부모가 msgRefs로 scrollIntoView
       window.requestAnimationFrame(() => {
         onScrollToMessage(targetId);
       });
     },
-    [combinedTimeline, onScrollToMessage],
+    [combinedTimeline, onScrollToMessage, onLoadOlderMessages],
   );
 
   useEffect(() => {
@@ -1081,39 +1084,41 @@ function MessengerTimelineComponent({
                           >
                             {!isDeletedMessage && msg.reply_to_id && (() => {
                               const parent = messages.find((message) => message.id === msg.reply_to_id);
+                              const parentSenderName = parent ? (parent.staff as { name?: string } | null | undefined)?.name || '사용자' : '이전 메시지';
                               const replyPreviewClass = isMine
-                                ? isAttachmentOnlyMessage
-                                  ? 'bg-[var(--toss-blue-light)] border-[var(--accent)]/30 text-[var(--foreground)] shadow-sm'
-                                  : 'bg-white/10 border-white/40 text-white/90'
-                                : 'bg-[var(--muted)] border-[var(--accent)]/40 text-[var(--foreground)]';
+                                ? 'bg-white/15 border-white/50 text-white/95'
+                                : 'bg-[var(--muted)] border-[var(--accent)]/50 text-[var(--foreground)]';
                               return (
                                 <div
                                   data-testid={`chat-reply-preview-${msg.id}`}
-                                  className={`mb-1 p-1.5 rounded-[var(--radius-md)] text-[11px] border-l-2 cursor-pointer hover:opacity-80 transition-opacity ${replyPreviewClass}`}
+                                  className={`mb-1.5 p-2 rounded-[var(--radius-md)] text-[11px] border-l-3 cursor-pointer hover:opacity-85 transition-all shadow-2xs ${replyPreviewClass}`}
                                   onClick={(event) => {
                                     event.stopPropagation();
                                     handleScrollToMessage(msg.reply_to_id!);
                                   }}
+                                  title="원문 메시지 위치로 이동"
                                 >
-                                  {parent ? (
-                                    <>
-                                      <span className="font-bold opacity-80">답글 {(parent.staff as { name?: string } | null | undefined)?.name}: </span>
-                                      <span className="truncate block mt-0.5">
-                                        {renderWithInlineEmoticons(
-                                          getMessageDisplayText(
-                                            parent.content,
-                                            parent.file_name,
-                                            parent.file_url,
-                                            '첨부 파일'
-                                          ),
-                                          false,
-                                          ''
-                                        )}
-                                      </span>
-                                    </>
-                                  ) : (
-                                    <span className="opacity-60 italic">이전 메시지 보기 ↑</span>
-                                  )}
+                                  <div className="flex items-center gap-1.5 font-bold opacity-90 mb-0.5">
+                                    <span className="text-[10px]">↩</span>
+                                    <span>{parent ? `${parentSenderName}님에게 답글` : '답글 원문 메시지'}</span>
+                                    {!parent && <span className="ml-auto text-[10px] font-normal underline opacity-80">이동 ↑</span>}
+                                  </div>
+                                  <div className="truncate opacity-85 text-[11px] leading-tight">
+                                    {parent ? (
+                                      renderWithInlineEmoticons(
+                                        getMessageDisplayText(
+                                          parent.content,
+                                          parent.file_name,
+                                          parent.file_url,
+                                          '첨부 파일'
+                                        ),
+                                        false,
+                                        ''
+                                      )
+                                    ) : (
+                                      <span className="italic opacity-85">원문 메시지 위치로 이동하려면 클릭하세요 ⬆</span>
+                                    )}
+                                  </div>
                                 </div>
                               );
                             })()}

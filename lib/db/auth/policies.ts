@@ -428,6 +428,54 @@ export const POLICY_REGISTRY: Registry = {
     asyncGuards: {
       update: chatRoomsUpdateGuard } },
 
+  room_read_cursors: {
+    table: 'room_read_cursors',
+    select: 'PUBLIC',
+    insert: 'AUTHENTICATED',
+    update: 'AUTHENTICATED',
+    delete: 'AUTHENTICATED',
+    staffIdField: 'user_id',
+  },
+  message_reactions: {
+    table: 'message_reactions',
+    select: 'PUBLIC',
+    insert: 'AUTHENTICATED',
+    update: 'AUTHENTICATED',
+    delete: 'AUTHENTICATED',
+    staffIdField: 'user_id',
+  },
+  message_bookmarks: {
+    table: 'message_bookmarks',
+    select: 'PUBLIC',
+    insert: 'AUTHENTICATED',
+    update: 'AUTHENTICATED',
+    delete: 'AUTHENTICATED',
+    staffIdField: 'user_id',
+  },
+  pinned_messages: {
+    table: 'pinned_messages',
+    select: 'PUBLIC',
+    insert: 'AUTHENTICATED',
+    update: 'AUTHENTICATED',
+    delete: 'AUTHENTICATED',
+  },
+  board_post_likes: {
+    table: 'board_post_likes',
+    select: 'PUBLIC',
+    insert: 'AUTHENTICATED',
+    update: 'AUTHENTICATED',
+    delete: 'AUTHENTICATED',
+    staffIdField: 'user_id',
+  },
+  board_post_comments: {
+    table: 'board_post_comments',
+    select: 'PUBLIC',
+    insert: 'AUTHENTICATED',
+    update: 'AUTHENTICATED',
+    delete: 'AUTHENTICATED',
+    staffIdField: 'author_id',
+  },
+
   // ── STAFF_IN_SCOPE / SELF_OR_SAME_COMPANY / SELF_ONLY (직원 단위)
   push_subscriptions: {
     table: 'push_subscriptions',
