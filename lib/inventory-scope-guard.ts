@@ -48,6 +48,9 @@ export async function assertInventoryItemCompanyScope(
     return { ok: true };
   } catch (error) {
     console.warn('[assertInventoryItemCompanyScope] check failed', error);
-    return { ok: true }; // DB 스키마 완충
+    return {
+      ok: false,
+      response: NextResponse.json({ ok: false, error: '재고 보안 권한 검증에 실패했습니다.' }, { status: 403 }),
+    };
   }
 }

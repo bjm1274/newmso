@@ -1172,6 +1172,8 @@ const STAFF_PII_SENSITIVE_COLUMNS = new Set([
   'resident_no',
   'account_number',
   'bank_name',
+  'bank_account',
+  'salary_info',
   'base_salary',
   'hourly_rate',
   'address',
@@ -1181,6 +1183,12 @@ const STAFF_PII_SENSITIVE_COLUMNS = new Set([
   'health_insurance',
   'employment_insurance',
   'long_term_care',
+  'birth_date',
+  'phone',
+  'email',
+  'permissions',
+  'is_admin',
+  'is_master',
 ]);
 
 function stripStaffSecrets<T extends Record<string, unknown>>(rows: T[], claims?: ErpClaims): T[] {

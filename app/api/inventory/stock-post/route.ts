@@ -13,6 +13,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
+import { assertInventoryItemCompanyScope } from '@/lib/inventory-scope-guard';
 import { getD1Binding, getD1Drizzle, StockError } from '@/lib/db';
 import {
   postInventoryMovement,
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
   try {
     const session = await readSessionFromRequest(request);
     const uid = userId(session?.user);
-    if (!uid) {
+    if (!session || !session.user || !uid) {
       return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -83,6 +84,14 @@ export async function POST(request: Request) {
         { ok: false, error: 'Invalid payload', details: parsed.error.flatten() },
         { status: 400 },
       );
+    }
+
+    const d1 = await getD1Binding();
+    if (!d1) throw new Error('[stock-post] D1 binding not available');
+
+    const scopeCheck = await assertInventoryItemCompanyScope(d1, session.user, parsed.data.itemId);
+    if (!scopeCheck.ok) {
+      return scopeCheck.response;
     }
 
     const p = parsed.data;
@@ -105,8 +114,6 @@ export async function POST(request: Request) {
       }
     }
 
-    const d1 = await getD1Binding();
-    if (!d1) throw new Error('[stock-post] D1 binding not available');
     const db = getD1Drizzle(d1);
 
     const actorName =

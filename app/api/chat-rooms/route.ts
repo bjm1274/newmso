@@ -117,6 +117,16 @@ export async function POST(request: Request) {
     const hasFixedId = Boolean(parsed.data.id);
 
     if (hasFixedId) {
+      const fixedId = String(parsed.data.id || '').trim();
+      const isNoticeTarget = fixedId === '00000000-0000-0000-0000-000000000000' || String(parsed.data.type || '').toLowerCase() === 'notice';
+      if (isNoticeTarget) {
+        const userRole = String((session?.user as Record<string, unknown>)?.role || '').toLowerCase();
+        const isMaster = Boolean((session?.user as Record<string, unknown>)?.is_master || (session?.user as Record<string, unknown>)?.is_admin);
+        if (!isMaster && userRole !== 'admin' && userRole !== 'mso' && userRole !== 'hr') {
+          return NextResponse.json({ ok: false, error: 'Notice chat room can only be modified by admins' }, { status: 403 });
+        }
+      }
+
       // idempotent upsert (NOTICE/SELF 방 같은 fixed-id 케이스)
       const upserted = await db
         .insert(chatRoomsTable)

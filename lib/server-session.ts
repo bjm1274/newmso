@@ -355,6 +355,26 @@ export async function verifySessionTokenWithSecret(token: string | null | undefi
   }
 }
 
+/**
+ * DB의 최신 force_logout_at과 비교하여 무효화 여부 검증 (민감 API용)
+ */
+export async function isStaffForceLoggedOutInDb(d1: unknown, staffId: string, tokenIat?: number): Promise<boolean> {
+  if (!staffId || !tokenIat || !d1) return false;
+  try {
+    const bind = d1 as { prepare: (sql: string) => { bind: (...args: unknown[]) => { first: <T>() => Promise<T | null> } } };
+    const row = await bind.prepare('SELECT force_logout_at FROM staff_members WHERE id = ? LIMIT 1').bind(staffId).first<{ force_logout_at?: string | null }>();
+    if (row?.force_logout_at) {
+      const dbLogoutTime = new Date(String(row.force_logout_at)).getTime() / 1000;
+      if (Number.isFinite(dbLogoutTime) && dbLogoutTime > tokenIat) {
+        return true; // 무효화된 토큰
+      }
+    }
+  } catch (err) {
+    console.warn('[isStaffForceLoggedOutInDb] check failed', err);
+  }
+  return false;
+}
+
 export async function verifySessionToken(token?: string | null) {
   return verifySessionTokenWithSecret(token, getSessionSecret());
 }
