@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { isNamedSystemMasterAccount } from '@/lib/system-master';
 import { calculateAnnualLeaveExpiryDate } from '@/lib/annual-leave-promotion';
+import { recalculateLeaveBalance } from '@/lib/annual-leave-balance';
 import {
   isApprovedLeaveStatus,
   isAnnualLeaveType,
@@ -339,6 +340,18 @@ export async function POST(request: Request) {
           compensated_days: update.compensated,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString() });
+      }
+
+      // 수동 부여/조정값을 SSOT 유틸에 오버라이드로 등록하여 자동 재계산 시에도 안전 보존
+      try {
+        await recalculateLeaveBalance(update.staffId, targetYear, {
+          totalDays,
+          usedDays,
+          expiredDays: update.expired,
+          compensatedDays: update.compensated
+        });
+      } catch (recalcErr) {
+        console.error('[manual-grant] recalculateLeaveBalance 경고:', recalcErr);
       }
     }
 

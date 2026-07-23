@@ -25,10 +25,14 @@ import {
 const RecalcInputSchema = z.object({
   staffId: z.string().min(1, 'staffId가 필요합니다'),
   year: z.number().int().min(2000).max(2100).optional(),
+  totalOverride: z.number().min(0).optional(),
+  usedOverride: z.number().min(0).optional(),
   expiredOverride: z.number().min(0).optional(),
   compensatedOverride: z.number().min(0).optional() });
 
 export type RecalcOverrides = {
+  totalDays?: number;
+  usedDays?: number;
   expiredDays?: number;
   compensatedDays?: number;
 };
@@ -187,28 +191,37 @@ export async function recalculateLeaveBalance(
     }
   }
 
-  // 사용: 입사일 기준 당해 연차 주기 내 승인 연차만. 전 기간/캘린더연도 일괄 합산 시 잔여 불일치 발생.
+  // 사용: 오버라이드가 지정되었으면 수동값 적용, 아니면 신청서 내역 동기화
   let usedDays: number;
-  try {
-    const hireDateStr = staff.hire_date || staff.join_date || staff.joined_at;
-    usedDays = await syncAnnualLeaveUsedForStaff(staffId, {
-      writeStaffMembers: false,
-      year: targetYear,
-      hireDate: hireDateStr,
-    });
-  } catch (syncErr) {
-    console.error('[recalculateLeaveBalance] syncAnnualLeaveUsedForStaff 실패:', syncErr);
-    throw new Error(
-      `[recalculateLeaveBalance] 사용일수 동기화 실패 — 잔액 갱신 중단 (staff=${staffId}, year=${targetYear})`,
-    );
+  if (typeof overrides?.usedDays === 'number' && overrides.usedDays >= 0) {
+    usedDays = overrides.usedDays;
+  } else {
+    try {
+      const hireDateStr = staff.hire_date || staff.join_date || staff.joined_at;
+      usedDays = await syncAnnualLeaveUsedForStaff(staffId, {
+        writeStaffMembers: false,
+        year: targetYear,
+        hireDate: hireDateStr,
+      });
+    } catch (syncErr) {
+      console.error('[recalculateLeaveBalance] syncAnnualLeaveUsedForStaff 실패:', syncErr);
+      throw new Error(
+        `[recalculateLeaveBalance] 사용일수 동기화 실패 — 잔액 갱신 중단 (staff=${staffId}, year=${targetYear})`,
+      );
+    }
   }
 
-  // 발생: 원장 우선
-  const granted = await resolveGrantedDaysFromAccruals(
-    staffId,
-    Number(staff.annual_leave_total) || 0,
-  );
-  const totalDays = granted.totalDays;
+  // 발생: 오버라이드 우선, 없으면 원장 우선
+  let totalDays: number;
+  if (typeof overrides?.totalDays === 'number' && overrides.totalDays >= 0) {
+    totalDays = overrides.totalDays;
+  } else {
+    const granted = await resolveGrantedDaysFromAccruals(
+      staffId,
+      Number(staff.annual_leave_total) || 0,
+    );
+    totalDays = granted.totalDays;
+  }
 
   let expiryDate: Date;
   const hireDate = resolveHireDate(staff);
