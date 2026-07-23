@@ -1008,7 +1008,7 @@ export default function LeaveWorkcenter({
                     : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--card)]'
                 }`}
               >
-                발생 내역 ({accrualList.length + (manualAdjustment !== 0 ? 1 : 0)}건)
+                발생 내역 (유효 {totalAccrued}일)
               </button>
             </div>
 
@@ -1070,23 +1070,25 @@ export default function LeaveWorkcenter({
                       <th className="pb-1">날짜</th>
                       <th className="pb-1">발생 구분</th>
                       <th className="pb-1 text-center">일수</th>
-                      <th className="pb-1">사유</th>
-                      <th className="pb-1 text-right">상태</th>
+                      <th className="pb-1">비고 및 설명</th>
+                      <th className="pb-1 text-right">적용 상태</th>
                     </tr>
                   </thead>
                   <tbody>
                     {/* 수동 조정(부여/차감) 내역 표시 */}
                     {manualAdjustment !== 0 && (
-                      <tr className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/20 font-semibold">
-                        <td className="py-2.5">
+                      <tr className="border-b border-[var(--border)]/50 bg-emerald-500/5 hover:bg-emerald-500/10 font-semibold">
+                        <td className="py-2">
                           {doubleClickedStaff.updatedAt ? doubleClickedStaff.updatedAt.slice(0, 10) : '-'}
                         </td>
-                        <td className="py-2.5 text-emerald-600">관리자 수동 조정 (부여/차감)</td>
-                        <td className={`py-2.5 text-center font-bold ${manualAdjustment > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <td className="py-2 text-emerald-600 font-bold">관리자 수동 조정 (부여/차감)</td>
+                        <td className={`py-2 text-center font-bold ${manualAdjustment > 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {manualAdjustment > 0 ? `+${manualAdjustment}` : manualAdjustment}일
                         </td>
-                        <td className="py-2.5 text-[10px] text-[var(--toss-gray-4)]">관리자가 수동으로 총 연차 직접 변경</td>
-                        <td className="py-2.5 text-right text-green-600">완료</td>
+                        <td className="py-2 text-[10px] text-[var(--toss-gray-4)]">관리자가 수동으로 총 연차 직접 변경</td>
+                        <td className="py-2 text-right">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-500/15 text-green-700">적용 중</span>
+                        </td>
                       </tr>
                     )}
                     {/* 자동 발생(accruals) 내역 표시 */}
@@ -1097,18 +1099,47 @@ export default function LeaveWorkcenter({
                         </td>
                       </tr>
                     ) : (
-                      accrualList.map((g) => {
-                        const dateStr = (g.created_at || '').slice(0, 10) || '-';
-                        return (
-                          <tr key={g.id} className="border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/20">
-                            <td className="py-1.5">{dateStr}</td>
-                            <td className="py-1.5 font-semibold text-emerald-600">{g.kind === 'annual' ? '회계연도/입사일 연차' : '월차 (만근)'}</td>
-                            <td className="py-1.5 text-center font-bold">+{g.days}일</td>
-                            <td className="py-1.5 truncate max-w-[80px]" title={g.note}>{g.note || '-'}</td>
-                            <td className="py-1.5 text-right font-semibold text-green-600">완료</td>
-                          </tr>
-                        );
-                      })
+                      (() => {
+                        const hasAnnualOrManual = accrualList.some((g) => g.kind === 'annual' || g.kind === 'manual');
+                        return accrualList.map((g) => {
+                          const dateStr = (g.created_at || '').slice(0, 10) || '-';
+                          const isSupercededMonthly = hasAnnualOrManual && g.kind === 'monthly';
+                          const isActiveAccrual = !isSupercededMonthly;
+
+                          return (
+                            <tr
+                              key={g.id}
+                              className={`border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/20 ${
+                                isSupercededMonthly ? 'opacity-50 text-[var(--toss-gray-3)]' : ''
+                              }`}
+                            >
+                              <td className="py-1.5">{dateStr}</td>
+                              <td className="py-1.5 font-semibold">
+                                {g.kind === 'annual' ? (
+                                  <span className="text-emerald-600 font-bold">회계연도/입사일 연차</span>
+                                ) : g.kind === 'manual' ? (
+                                  <span className="text-blue-600 font-bold">수동 부여 연차</span>
+                                ) : (
+                                  <span>월차 (만근)</span>
+                                )}
+                              </td>
+                              <td className="py-1.5 text-center font-bold">+{g.days}일</td>
+                              <td className="py-1.5 truncate max-w-[120px]" title={g.note}>{g.note || '-'}</td>
+                              <td className="py-1.5 text-right font-semibold">
+                                {isActiveAccrual ? (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-500/15 text-green-700">
+                                    적용 중
+                                  </span>
+                                ) : (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-[var(--muted)] text-[var(--toss-gray-4)]" title="1년차 법정 연차(15일) 발생으로 소멸 및 대체됨">
+                                    1년차 연차 발생으로 대체됨
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()
                     )}
                   </tbody>
                 </table>
