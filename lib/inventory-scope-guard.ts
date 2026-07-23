@@ -2,55 +2,73 @@ import { NextResponse } from 'next/server';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { SessionUser } from '@/lib/server-session';
 
-/**
- * 재고 품목 타 회사/부서 조작 방지 권한 검증 헬퍼
- */
+type ScopeResult = { ok: true } | { ok: false; response: NextResponse };
+
+function isInventoryAdmin(user: SessionUser): boolean {
+  const role = String(user.role || '').toLowerCase();
+  const perms = user.permissions || {};
+  return Boolean(
+    user.is_system_master || user.is_master || user.is_admin ||
+    role === 'admin' || role === 'mso' || perms.admin || perms.mso,
+  );
+}
+
+function canWriteInventory(user: SessionUser): boolean {
+  if (isInventoryAdmin(user)) return true;
+  return user.permissions?.inventory === true;
+}
+
+function forbidden(message: string): ScopeResult {
+  return { ok: false, response: NextResponse.json({ ok: false, error: message }, { status: 403 }) };
+}
+
+/** Verify that a company/department target is writable by the current user. */
+export function assertInventoryCompanyScope(
+  sessionUser: SessionUser,
+  target: { company?: string | null; company_id?: string | null; department?: string | null },
+): ScopeResult {
+  if (!canWriteInventory(sessionUser)) return forbidden('Inventory write permission is required.');
+  if (isInventoryAdmin(sessionUser)) return { ok: true };
+
+  const userCompany = String(sessionUser.company || '').trim();
+  const userCompanyId = String(sessionUser.company_id || '').trim();
+  const userDepartment = String(sessionUser.department || '').trim();
+  const company = String(target.company || '').trim();
+  const companyId = String(target.company_id || '').trim();
+  const department = String(target.department || '').trim();
+
+  // A row without scope metadata cannot be safely delegated to a non-admin.
+  if (!company && !companyId) return forbidden('Inventory target has no company scope.');
+  if (!(userCompany && company && userCompany === company) && !(userCompanyId && companyId && userCompanyId === companyId)) {
+    return forbidden('You cannot change inventory outside your company.');
+  }
+  if (department && (!userDepartment || userDepartment !== department)) {
+    return forbidden('You cannot change inventory outside your department.');
+  }
+  return { ok: true };
+}
+
+/** Verify that an inventory row is writable and belongs to the caller's company/department. */
 export async function assertInventoryItemCompanyScope(
   d1: D1Database,
   sessionUser: SessionUser,
   itemId: string,
-): Promise<{ ok: true } | { ok: false; response: NextResponse }> {
-  const role = String(sessionUser.role || '').toLowerCase();
-  const isMaster = Boolean(sessionUser.is_master || sessionUser.is_admin);
-  if (isMaster || role === 'admin' || role === 'mso') {
-    return { ok: true };
-  }
-
-  const userCompany = String(sessionUser.company || '').trim();
-  const userCompanyId = String(sessionUser.company_id || '').trim();
-
+): Promise<ScopeResult> {
   try {
-    const stmt = d1.prepare('SELECT id, company, company_id FROM inventory_items WHERE id = ? LIMIT 1');
-    const item = await stmt.bind(itemId).first<{ id: string; company?: string | null; company_id?: string | null }>();
+    const item = await d1
+      .prepare('SELECT id, company, company_id, department FROM inventory WHERE id = ? LIMIT 1')
+      .bind(itemId)
+      .first<{ id: string; company?: string | null; company_id?: string | null; department?: string | null }>();
 
     if (!item) {
       return {
         ok: false,
-        response: NextResponse.json({ ok: false, error: '품목을 찾을 수 없습니다.' }, { status: 404 }),
+        response: NextResponse.json({ ok: false, error: 'Inventory item not found.' }, { status: 404 }),
       };
     }
-
-    const itemCompany = String(item.company || '').trim();
-    const itemCompanyId = String(item.company_id || '').trim();
-
-    const matchCompany = Boolean(userCompany && itemCompany && userCompany === itemCompany);
-    const matchCompanyId = Boolean(userCompanyId && itemCompanyId && userCompanyId === itemCompanyId);
-
-    if (itemCompany || itemCompanyId) {
-      if (!matchCompany && !matchCompanyId) {
-        return {
-          ok: false,
-          response: NextResponse.json({ ok: false, error: '타 부서/타 회사 재고 변경 권한이 없습니다.' }, { status: 403 }),
-        };
-      }
-    }
-
-    return { ok: true };
+    return assertInventoryCompanyScope(sessionUser, item);
   } catch (error) {
     console.warn('[assertInventoryItemCompanyScope] check failed', error);
-    return {
-      ok: false,
-      response: NextResponse.json({ ok: false, error: '재고 보안 권한 검증에 실패했습니다.' }, { status: 403 }),
-    };
+    return forbidden('Inventory authorization check failed.');
   }
 }

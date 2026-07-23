@@ -3,7 +3,7 @@
  * 서비스워커의 알림 답장 버튼에서 호출됩니다.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { readSessionFromRequest } from '@/lib/server-session';
+import { readSessionFromRequest, isAdminSession } from '@/lib/server-session';
 import {
   messages as messagesTable,
   getD1Binding,
@@ -36,9 +36,7 @@ export async function POST(req: NextRequest) {
 
     // 공지방 쓰기는 관리자 전용
     if (String(room_id) === '00000000-0000-0000-0000-000000000000') {
-      const userRole = String((session.user as Record<string, unknown>).role || '').toLowerCase();
-      const isMaster = Boolean((session.user as Record<string, unknown>).is_master || (session.user as Record<string, unknown>).is_admin);
-      if (!isMaster && userRole !== 'admin' && userRole !== 'mso' && userRole !== 'hr') {
+      if (!isAdminSession(session.user)) {
         return NextResponse.json({ error: '공지 채널 메시지 작성 권한이 없습니다.' }, { status: 403 });
       }
     }

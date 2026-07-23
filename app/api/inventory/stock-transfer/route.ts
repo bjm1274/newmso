@@ -24,6 +24,7 @@ import type { BatchItem } from 'drizzle-orm/batch';
 import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
 import { StockError, getD1Binding, getD1Drizzle } from '@/lib/db';
 import { inventory, inventory_logs, inventory_transfers } from '@/lib/db/schema';
+import { assertInventoryCompanyScope, assertInventoryItemCompanyScope } from '@/lib/inventory-scope-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -88,7 +89,7 @@ export async function POST(request: Request) {
   try {
     const session = await readSessionFromRequest(request);
     const user = session?.user;
-    if (!userId(user)) {
+    if (!user || !userId(user)) {
       return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
     }
     const body = await request.json().catch(() => null);
@@ -104,6 +105,16 @@ export async function POST(request: Request) {
     const d1 = await getD1Binding();
     if (!d1) throw new Error('[stock-transfer] D1 binding not available');
     const db = getD1Drizzle(d1);
+
+    const sourceScope = await assertInventoryItemCompanyScope(d1, user, payload.sourceId);
+    if (!sourceScope.ok) return sourceScope.response;
+    if (payload.destId) {
+      const destinationScope = await assertInventoryItemCompanyScope(d1, user, payload.destId);
+      if (!destinationScope.ok) return destinationScope.response;
+    } else if (payload.newDest) {
+      const destinationScope = assertInventoryCompanyScope(user, payload.newDest);
+      if (!destinationScope.ok) return destinationScope.response;
+    }
 
     const result = await executeTransfer(db, payload, user);
     return NextResponse.json({ ok: true, data: result });

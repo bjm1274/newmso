@@ -17,7 +17,8 @@
 // ============================================================
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
+import { eq } from 'drizzle-orm';
+import { readSessionFromRequest, type SessionUser, isAdminSession } from '@/lib/server-session';
 import {
   chat_rooms as chatRoomsTable,
   getD1Binding,
@@ -66,7 +67,7 @@ function buildD1Row(payload: ChatRoomPayload, currentUserId: string): ChatRoomIn
     type: payload.type,
     // members는 D1 스키마에서 text — 배열을 JSON 문자열로 직렬화
     members: JSON.stringify(payload.members ?? []),
-    created_by: payload.created_by ?? currentUserId,
+    created_by: currentUserId,
     is_announcement: payload.is_announcement ? 1 : 0,
     created_at: new Date().toISOString() };
 }
@@ -112,19 +113,38 @@ export async function POST(request: Request) {
       );
     }
 
+    const admin = isAdminSession(session?.user);
+    const requestedNotice =
+      String(parsed.data.type || '').toLowerCase() === 'notice' ||
+      parsed.data.is_announcement === true;
+    if (requestedNotice && !admin) {
+      return NextResponse.json({ ok: false, error: 'Notice chat room can only be created by admins' }, { status: 403 });
+    }
+    if (!admin && !parsed.data.members?.some((member) => String(member).trim() === currentUserId)) {
+      return NextResponse.json({ ok: false, error: 'The room creator must be a member' }, { status: 400 });
+    }
+
     const db = await requireD1ForChatRooms('POST');
     const insertRow = buildD1Row(parsed.data, currentUserId);
     const hasFixedId = Boolean(parsed.data.id);
 
     if (hasFixedId) {
       const fixedId = String(parsed.data.id || '').trim();
-      const isNoticeTarget = fixedId === '00000000-0000-0000-0000-000000000000' || String(parsed.data.type || '').toLowerCase() === 'notice';
-      if (isNoticeTarget) {
-        const userRole = String((session?.user as Record<string, unknown>)?.role || '').toLowerCase();
-        const isMaster = Boolean((session?.user as Record<string, unknown>)?.is_master || (session?.user as Record<string, unknown>)?.is_admin);
-        if (!isMaster && userRole !== 'admin' && userRole !== 'mso' && userRole !== 'hr') {
-          return NextResponse.json({ ok: false, error: 'Notice chat room can only be modified by admins' }, { status: 403 });
-        }
+      const existingRows = await db
+        .select({ created_by: chatRoomsTable.created_by, type: chatRoomsTable.type })
+        .from(chatRoomsTable)
+        .where(eq(chatRoomsTable.id, fixedId))
+        .limit(1);
+      const existing = existingRows[0];
+      const isNoticeTarget =
+        fixedId === '00000000-0000-0000-0000-000000000000' ||
+        String(parsed.data.type || '').toLowerCase() === 'notice' ||
+        String(existing?.type || '').toLowerCase() === 'notice';
+      if (isNoticeTarget && !admin) {
+        return NextResponse.json({ ok: false, error: 'Notice chat room can only be modified by admins' }, { status: 403 });
+      }
+      if (existing && !admin && String(existing.created_by || '').trim() !== currentUserId) {
+        return NextResponse.json({ ok: false, error: 'Only the room creator can update this room' }, { status: 403 });
       }
 
       // idempotent upsert (NOTICE/SELF 방 같은 fixed-id 케이스)

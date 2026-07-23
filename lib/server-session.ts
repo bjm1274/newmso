@@ -408,7 +408,16 @@ export async function readSessionFromRequest(
     parseCookieHeader(request.headers.get('cookie'))[SESSION_COOKIE_NAME] ||
     null;
 
-  return verifySessionToken(token);
+  const session = await verifySessionToken(token);
+  if (!session) return null;
+
+  const staffId = String(session.user.id ?? '').trim();
+  if (!staffId) return session;
+  const d1 = await getD1Binding();
+  if (!d1) return session;
+  if (await isStaffForceLoggedOutInDb(d1, staffId, session.iat)) return null;
+
+  return session;
 }
 
 export function getSessionCookieOptions(maxAgeSeconds = SESSION_MAX_AGE_SECONDS): CookieOptions {
@@ -433,7 +442,13 @@ export function clearSessionCookie<T extends { cookies: { set: (name: string, va
 }
 
 export function isAdminSession(user?: SessionUser | null) {
-  return Boolean(user?.role === 'admin' || user?.permissions?.admin || user?.permissions?.mso);
+  return Boolean(
+    user?.is_system_master === true ||
+    user?.role === 'admin' ||
+    user?.permissions?.admin ||
+    user?.permissions?.mso ||
+    user?.permissions?.system_master
+  );
 }
 
 export function isSystemMasterSession(user?: SessionUser | null) {

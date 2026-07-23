@@ -45,11 +45,7 @@ function userId(user: SessionUser | null | undefined): string | null {
 }
 
 function isPrivilegedSession(user: SessionUser | null | undefined): boolean {
-  if (!user) return false;
-  if (isAdminSession(user)) return true;
-  const perms = (user.permissions ?? {}) as Record<string, unknown>;
-  // d1/mutate buildClaimsFromSession 의 erp_can_manage_company 와 정합
-  return Boolean(perms.admin || perms.mso || perms.hr);
+  return isAdminSession(user);
 }
 
 type ChatRoomsUpdateSet = Partial<typeof chatRoomsTable.$inferInsert>;
@@ -110,7 +106,7 @@ export async function PATCH(
     const requestedNotice = isNoticeRoomType(parsed.data.type);
 
     // 일반 사용자가 기존 일반 방의 type을 notice로 전환하거나 우회하려는 시도 차단
-    if (requestedNotice && !existingNotice && !privileged) {
+    if ((existingNotice || requestedNotice) && !privileged) {
       return NextResponse.json({ ok: false, error: 'Only admins can convert room to notice type' }, { status: 403 });
     }
 

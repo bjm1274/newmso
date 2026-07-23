@@ -14,6 +14,7 @@ import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
 import { getD1Binding, getD1Drizzle, StockError } from '@/lib/db';
 import { purchase_orders, inventory } from '@/lib/db/schema';
 import { postInventoryMovement } from '@/lib/inventory-movement-service';
+import { assertInventoryCompanyScope, assertInventoryItemCompanyScope } from '@/lib/inventory-scope-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,7 +83,7 @@ export async function POST(request: Request) {
   try {
     const session = await readSessionFromRequest(request);
     const uid = userId(session?.user);
-    if (!uid) {
+    if (!session?.user || !uid) {
       return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -108,6 +109,12 @@ export async function POST(request: Request) {
     if (!po) {
       return NextResponse.json({ ok: false, error: '발주를 찾을 수 없습니다.' }, { status: 404 });
     }
+
+    const poScope = assertInventoryCompanyScope(session.user, {
+      company: po.requester_company,
+      department: po.requester_department,
+    });
+    if (!poScope.ok) return poScope.response;
 
     const status = String(po.status || '');
     if (status === '대기' || status === 'draft' || status === '반려') {
@@ -183,6 +190,9 @@ export async function POST(request: Request) {
         }
         itemId = hit.id;
       }
+
+      const itemScope = await assertInventoryItemCompanyScope(d1, session.user, itemId);
+      if (!itemScope.ok) return itemScope.response;
 
       const unitPrice =
         line.unitPrice ??

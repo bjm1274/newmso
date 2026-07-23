@@ -217,7 +217,19 @@ function leaveRequestUpdateGuard(claims: ErpClaims, row: Record<string, unknown>
   return true;
 }
 
-// ─────────────────────────────────────────────────────────────
+/** leave_requests INSERT: employees may create only their own pending request. */
+function leaveRequestInsertGuard(claims: ErpClaims, row: Record<string, unknown>): boolean {
+  if (erpIsAdmin(claims) || erpCanManageCompany(claims)) return true;
+  const me = erpStaffId(claims);
+  if (me === null) return false;
+  const staffId = getField<string>(row, 'staff_id');
+  if (staffId === null || staffId !== me) return false;
+
+  const status = getField<string>(row, 'status');
+  return status === null || ['대기', 'pending', 'PENDING', '신청'].includes(String(status).trim());
+}
+
+// ─
 // 채팅 메시지(messages) soft-delete 소유자 가드
 // ─────────────────────────────────────────────────────────────
 
@@ -285,7 +297,25 @@ async function messagesInsertGuard(
   const room = await loadChatRoomMembership(db, String(roomId));
   if (!room) return false;
 
+  // Notice rooms are read-only channels; only system admins may send messages.
+  if (isNoticeRoomType(room.type)) return erpIsAdmin(claims);
+
   return canAccessChatRoom(room, me);
+}
+
+/** chat_rooms INSERT: non-admins can create only their own regular room. */
+async function chatRoomsInsertGuard(
+  _db: D1Client,
+  claims: ErpClaims,
+  row: Record<string, unknown>,
+): Promise<boolean> {
+  if (erpIsAdmin(claims)) return true;
+  const me = claimsStaffIdRaw(claims);
+  if (me === null) return false;
+  if (isNoticeRoomType(getField<string>(row, 'type'))) return false;
+  const createdBy = getField<string>(row, 'created_by');
+  if (createdBy !== null && String(createdBy).trim() !== me) return false;
+  return isRoomMember(parseMembersField(row.members), me);
 }
 
 /**
@@ -297,7 +327,7 @@ async function chatRoomsUpdateGuard(
   claims: ErpClaims,
   row: Record<string, unknown>,
 ): Promise<boolean> {
-  if (erpIsAdmin(claims) || erpCanManageCompany(claims)) return true;
+  if (erpIsAdmin(claims)) return true;
 
   const me = claimsStaffIdRaw(claims);
   if (me === null) return false;
@@ -311,7 +341,7 @@ async function chatRoomsUpdateGuard(
   // notice 방: 클라이언트가 멤버 목록 sync 용으로 update — 로그인 사용자 허용
   // (type이 set 으로 notice로 바뀌는 경우도 row.type 참고)
   const nextType = getField<string>(row, 'type');
-  if (isNoticeRoomType(room.type) || isNoticeRoomType(nextType)) return true;
+  if (isNoticeRoomType(room.type) || isNoticeRoomType(nextType)) return false;
 
   if (!canAccessChatRoom(room, me)) return false;
 
@@ -426,6 +456,7 @@ export const POLICY_REGISTRY: Registry = {
     update: 'PUBLIC',
     delete: 'ADMIN_ONLY',
     asyncGuards: {
+      insert: chatRoomsInsertGuard,
       update: chatRoomsUpdateGuard } },
 
   room_read_cursors: {
@@ -517,6 +548,7 @@ export const POLICY_REGISTRY: Registry = {
     delete: 'ADMIN_OR_MANAGER',
     staffIdField: 'staff_id',
     guards: {
+      insert: leaveRequestInsertGuard,
       update: leaveRequestUpdateGuard,
     },
   },
@@ -1063,7 +1095,7 @@ async function evalPattern(
 
   if (pattern === 'CHAT_ROOM_MEMBER') {
     // 단건 검사 — 배치 SELECT 는 filterByPolicy 전용 경로 사용
-    if (erpCanManageCompany(claims)) return true;
+    if (erpIsAdmin(claims)) return true;
     const me = claimsStaffIdRaw(claims);
     if (me === null) return false;
     // messages 행: room_id

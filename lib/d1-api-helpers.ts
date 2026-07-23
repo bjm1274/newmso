@@ -29,7 +29,7 @@ export function buildClaimsFromSession(user: SessionUser | null | undefined): Er
     erp_company_id: (user.company_id as string | undefined) ?? null,
     erp_company_name: (user.company as string | undefined) ?? null,
     erp_department_name: (user.department as string | undefined) ?? null,
-    erp_is_admin: Boolean(user.role === 'admin' || perms.admin || perms.mso),
+    erp_is_admin: Boolean(user.is_system_master || user.role === 'admin' || perms.admin || perms.mso || perms.system_master),
     erp_can_manage_company: Boolean(perms.admin || perms.mso || perms.hr),
     erp_can_view_all_inventory_companies: Boolean(perms.admin || perms.mso),
     erp_can_manage_all_inventory_companies: Boolean(perms.admin || perms.mso),
