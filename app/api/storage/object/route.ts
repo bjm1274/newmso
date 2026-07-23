@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   createR2DownloadUrl,
   getConfiguredR2ChatBucket,
-  getPublicBaseUrl,
 } from '@/lib/object-storage';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { assertChatRoomMember } from '@/lib/chat-room-membership';
@@ -75,7 +74,7 @@ export async function GET(request: NextRequest) {
     // R2 custom domain이 설정돼 있으면 인라인 보기는 R2 CDN으로 직접 redirect
     // (Workers 응답 본문 부담 제거, 브라우저가 redirect 자체를 캐싱).
     // 다운로드 요청은 Content-Disposition을 강제해야 하므로 기존 프록시 경로 유지.
-    const publicBaseUrl = getPublicBaseUrl();
+    const publicBaseUrl = getPublicBaseUrlInternal();
     if (publicBaseUrl && !download && !proxy) {
       const target = `${publicBaseUrl}/${encodeObjectKey(objectKey)}`;
       return NextResponse.redirect(target, {

@@ -33,7 +33,7 @@ function userId(user: SessionUser | null | undefined): string | null {
 export async function POST(request: Request) {
   try {
     const session = await readSessionFromRequest(request);
-    if (!userId(session?.user)) {
+    if (!session || !session.user || !userId(session.user)) {
       return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
     }
     const body = await request.json().catch(() => null);
