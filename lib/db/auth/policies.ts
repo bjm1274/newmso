@@ -718,6 +718,16 @@ export const POLICY_REGISTRY: Registry = {
     // update/delete는 admin-only (원본) — 등록 X = default deny (admin only)
     inventoryFields: { company: 'company', company_id: 'company_id', department: 'department' } },
 
+  // SEC-P0-01 fix: 결재 위임 — 위임자 본인만 생성·수정·삭제 가능
+  approval_delegation: {
+    table: 'approval_delegation',
+    select: 'SELF_ONLY',
+    insert: 'SELF_ONLY',
+    update: 'SELF_ONLY',
+    delete: 'SELF_ONLY',
+    staffIdField: 'delegator_id',
+  },
+
   // 미등록 (default deny = admin only):
   //   inventory_transfers (from/to OR — 별도 패턴 필요, 일단 admin-only)
   //   inventory_price_history (sub-select 검사 — admin-only)
@@ -778,7 +788,7 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
   'approval_form_types',
   'approval_history',
   'approval_templates',
-  'approval_delegation',
+  // 'approval_delegation', → SEC-P0-01 fix: POLICY_REGISTRY로 이동 (SELF_ONLY)
   'custom_form_templates',
 
   // documents

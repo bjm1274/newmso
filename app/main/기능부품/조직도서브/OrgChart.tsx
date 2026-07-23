@@ -294,7 +294,7 @@ async function fetchOrgChartDirectory() {
       try {
         const { data, error } = await db
           .from('staff_members')
-          .select('*')
+          .select('id, name, company, department, position, photo_url, avatar_url, status, employee_no, joined_at, permissions, shift_id, extension')
           .order('company', { ascending: true })
           .order('department', { ascending: true })
           .order('employee_no', { ascending: true });

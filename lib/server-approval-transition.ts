@@ -386,7 +386,17 @@ async function transitionSingleApproval(params: {
           )
           .limit(1);
         if (delegationRows.length > 0) {
-          effectiveCurrentApproverId = String(actor.id);
+          const delegation = delegationRows[0];
+          const now = new Date().toISOString().slice(0, 10);
+          const startDate = String(delegation.start_date || '').slice(0, 10);
+          const endDate = String(delegation.end_date || '').slice(0, 10);
+          // SEC-P0-01 fix: 위임 기간 검증 (시작일 ≤ 오늘 ≤ 종료일)
+          if (
+            (!startDate || startDate <= now) &&
+            (!endDate || endDate >= now)
+          ) {
+            effectiveCurrentApproverId = String(actor.id);
+          }
         }
       }
     } catch {
