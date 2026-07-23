@@ -169,6 +169,8 @@ async function getStaffLeaveContext(staffId: string) {
       hire_date: staffMembersTable.hire_date,
       join_date: staffMembersTable.join_date,
       joined_at: staffMembersTable.joined_at,
+      annual_leave_total: staffMembersTable.annual_leave_total,
+      annual_leave_used: staffMembersTable.annual_leave_used,
     })
     .from(staffMembersTable)
     .where(eq(staffMembersTable.id, staffId))
@@ -265,7 +267,7 @@ export async function getUnifiedAnnualLeaveSummary(
   staffId: string,
   asOfDate = formatKoreanDateKey(new Date()),
 ): Promise<UnifiedLeaveSummary> {
-  const { db, hireDate } = await getStaffLeaveContext(staffId);
+  const { db, staff, hireDate } = await getStaffLeaveContext(staffId);
   const cycle = getLeaveCycle(hireDate, asOfDate) ?? {
     key: `fallback:${asOfDate.slice(0, 4)}`,
     start: `${asOfDate.slice(0, 4)}-01-01`,
@@ -286,7 +288,7 @@ export async function getUnifiedAnnualLeaveSummary(
     .from(leaveLedgerTable)
     .where(eq(leaveLedgerTable.staff_id, staffId));
 
-  const entries = rows
+  let entries = rows
     .map((row) => ({
       id: String(row.id),
       entryType: String(row.entry_type),
@@ -297,6 +299,59 @@ export async function getUnifiedAnnualLeaveSummary(
       note: row.note ?? null,
     }))
     .filter((row) => row.occurredOn && isWithinCycle(row.occurredOn, cycle));
+
+  // 만약 원장에 당해 연도 발생/부여 행이 없다면: staff.annual_leave_total 또는 근속연수 기준 자동 적립(Seed)
+  const hasAccrualInCycle = entries.some(
+    (e) =>
+      e.entryType === LEAVE_LEDGER_ENTRY_TYPE.AUTO_ANNUAL ||
+      e.entryType === LEAVE_LEDGER_ENTRY_TYPE.AUTO_MONTHLY ||
+      e.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_ADJUSTMENT ||
+      e.entryType === 'initial_grant',
+  );
+
+  if (!hasAccrualInCycle) {
+    const existingStaffTotal = Number(staff.annual_leave_total) || 0;
+    const seedDays = existingStaffTotal > 0
+      ? existingStaffTotal
+      : (cycle.completedYears === 0 ? 11 : Math.min(25, 15 + Math.floor(cycle.completedYears / 2)));
+
+    if (seedDays > 0) {
+      await upsertLedgerEntry(db, {
+        staffId,
+        companyId: staff.company_id,
+        entryType: LEAVE_LEDGER_ENTRY_TYPE.AUTO_ANNUAL,
+        days: seedDays,
+        occurredOn: cycle.start,
+        periodKey: `auto-seed:${cycle.key}`,
+        note: `연차 자동 산정 (${cycle.completedYears}년차)`,
+      });
+
+      const updatedRows = await db
+        .select({
+          id: leaveLedgerTable.id,
+          entry_type: leaveLedgerTable.entry_type,
+          days: leaveLedgerTable.days,
+          occurred_on: leaveLedgerTable.occurred_on,
+          period_key: leaveLedgerTable.period_key,
+          source_id: leaveLedgerTable.source_id,
+          note: leaveLedgerTable.note,
+        })
+        .from(leaveLedgerTable)
+        .where(eq(leaveLedgerTable.staff_id, staffId));
+
+      entries = updatedRows
+        .map((row) => ({
+          id: String(row.id),
+          entryType: String(row.entry_type),
+          days: Number(row.days) || 0,
+          occurredOn: toDateKey(row.occurred_on) ?? '',
+          periodKey: String(row.period_key),
+          sourceId: row.source_id ?? null,
+          note: row.note ?? null,
+        }))
+        .filter((row) => row.occurredOn && isWithinCycle(row.occurredOn, cycle));
+    }
+  }
 
   let total = 0;
   let used = 0;
@@ -326,15 +381,29 @@ export async function getUnifiedAnnualLeaveSummary(
     }
   }
 
+  const finalTotal = roundDays(total);
+  const finalUsed = roundDays(Math.max(0, used));
+  const finalRemaining = roundDays(Math.max(0, remainingRaw));
+
+  // staff_members 레거시 컬럼 동기화
+  void db
+    .update(staffMembersTable)
+    .set({
+      annual_leave_total: finalTotal,
+      annual_leave_used: finalUsed,
+    })
+    .where(eq(staffMembersTable.id, staffId))
+    .catch((err) => console.error('[getUnifiedAnnualLeaveSummary] staff sync failed:', err));
+
   return {
     staffId,
     hireDate,
     cycle,
-    total: roundDays(total),
-    used: roundDays(Math.max(0, used)),
+    total: finalTotal,
+    used: finalUsed,
     expired: roundDays(Math.max(0, expired)),
     compensated: roundDays(Math.max(0, compensated)),
-    remaining: roundDays(Math.max(0, remainingRaw)),
+    remaining: finalRemaining,
     entries,
   };
 }
