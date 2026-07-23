@@ -298,7 +298,20 @@ export async function getUnifiedAnnualLeaveSummary(
       sourceId: row.source_id ?? null,
       note: row.note ?? null,
     }))
-    .filter((row) => row.occurredOn && isWithinCycle(row.occurredOn, cycle));
+    .filter((row) => {
+      if (!row.occurredOn) return false;
+      if (
+        row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_ADJUSTMENT ||
+        row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_USED_ADJUSTMENT ||
+        row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_EXPIRE_ADJUSTMENT ||
+        row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_COMPENSATE_ADJUSTMENT ||
+        row.entryType === 'initial_grant' ||
+        row.periodKey.startsWith('auto-seed:')
+      ) {
+        return true;
+      }
+      return isWithinCycle(row.occurredOn, cycle);
+    });
 
   // 만약 원장에 당해 연도 발생/부여 행이 없다면: staff.annual_leave_total 또는 근속연수 기준 자동 적립(Seed)
   const hasAccrualInCycle = entries.some(
@@ -349,7 +362,20 @@ export async function getUnifiedAnnualLeaveSummary(
           sourceId: row.source_id ?? null,
           note: row.note ?? null,
         }))
-        .filter((row) => row.occurredOn && isWithinCycle(row.occurredOn, cycle));
+        .filter((row) => {
+          if (!row.occurredOn) return false;
+          if (
+            row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_ADJUSTMENT ||
+            row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_USED_ADJUSTMENT ||
+            row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_EXPIRE_ADJUSTMENT ||
+            row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_COMPENSATE_ADJUSTMENT ||
+            row.entryType === 'initial_grant' ||
+            row.periodKey.startsWith('auto-seed:')
+          ) {
+            return true;
+          }
+          return isWithinCycle(row.occurredOn, cycle);
+        });
     }
   }
 
@@ -432,15 +458,19 @@ export async function setManualAnnualLeaveTarget(
   asOfDate = formatKoreanDateKey(new Date()),
 ): Promise<UnifiedLeaveSummary> {
   for (const value of [target.total, target.used, target.expired ?? 0, target.compensated ?? 0]) {
-    if (!Number.isFinite(value) || value < 0) throw new Error('?? ?? 0 ??? ???? ???.');
+    if (!Number.isFinite(value) || value < 0) throw new Error('연차 수량은 0 이상이어야 합니다.');
   }
   if ((target.used + (target.expired ?? 0) + (target.compensated ?? 0)) > target.total + 1e-9) {
-    throw new Error('???????? ??? ? ??? ??? ? ????.');
+    throw new Error('사용/소멸/수당 합계가 총 연차를 초과할 수 없습니다.');
   }
 
   const { db, staff, hireDate } = await getStaffLeaveContext(staffId);
-  const cycle = getLeaveCycle(hireDate, asOfDate);
-  if (!cycle) throw new Error(`?? ??? ??? ? ????. (${staffId})`);
+  const cycle = getLeaveCycle(hireDate, asOfDate) ?? {
+    key: `fallback:${asOfDate.slice(0, 4)}`,
+    start: `${asOfDate.slice(0, 4)}-01-01`,
+    end: `${asOfDate.slice(0, 4)}-12-31`,
+    completedYears: 0,
+  };
   const before = await getUnifiedAnnualLeaveSummary(staffId, asOfDate);
   const prefix = `manual:${cycle.key}`;
   const occurredOn = asOfDate;
