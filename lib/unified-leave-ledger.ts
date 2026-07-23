@@ -8,8 +8,10 @@
 import {
   and,
   eq,
+  sql,
   getD1Binding,
   getD1Drizzle,
+  leave_balances as leaveBalancesTable,
   leave_ledger as leaveLedgerTable,
   leave_requests as leaveRequestsTable,
   staff_members as staffMembersTable,
@@ -313,7 +315,7 @@ export async function getUnifiedAnnualLeaveSummary(
       return isWithinCycle(row.occurredOn, cycle);
     });
 
-  // 만약 원장에 당해 연도 발생/부여 행이 없다면: staff.annual_leave_total 또는 근속연수 기준 자동 적립(Seed)
+  // 만약 원장에 당해 연도 발생/부여 행이 없다면: 근속연수 기준 법정 연차 자동 적립(Seed)
   const hasAccrualInCycle = entries.some(
     (e) =>
       e.entryType === LEAVE_LEDGER_ENTRY_TYPE.AUTO_ANNUAL ||
@@ -323,10 +325,9 @@ export async function getUnifiedAnnualLeaveSummary(
   );
 
   if (!hasAccrualInCycle) {
-    const existingStaffTotal = Number(staff.annual_leave_total) || 0;
-    const seedDays = existingStaffTotal > 0
-      ? existingStaffTotal
-      : (cycle.completedYears === 0 ? 11 : Math.min(25, 15 + Math.floor(cycle.completedYears / 2)));
+    const seedDays = cycle.completedYears === 0
+      ? 11
+      : Math.min(25, 15 + Math.floor(Math.max(0, cycle.completedYears - 1) / 2));
 
     if (seedDays > 0) {
       await upsertLedgerEntry(db, {
@@ -336,7 +337,7 @@ export async function getUnifiedAnnualLeaveSummary(
         days: seedDays,
         occurredOn: cycle.start,
         periodKey: `auto-seed:${cycle.key}`,
-        note: `연차 자동 산정 (${cycle.completedYears}년차)`,
+        note: `연차 법정 산정 (${cycle.completedYears}년차)`,
       });
 
       const updatedRows = await db
@@ -369,6 +370,7 @@ export async function getUnifiedAnnualLeaveSummary(
             row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_USED_ADJUSTMENT ||
             row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_EXPIRE_ADJUSTMENT ||
             row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_COMPENSATE_ADJUSTMENT ||
+            row.entryType === LEAVE_LEDGER_ENTRY_TYPE.SUBSTITUTE ||
             row.entryType === 'initial_grant' ||
             row.periodKey.startsWith('auto-seed:')
           ) {
@@ -411,15 +413,40 @@ export async function getUnifiedAnnualLeaveSummary(
   const finalUsed = roundDays(Math.max(0, used));
   const finalRemaining = roundDays(Math.max(0, remainingRaw));
 
-  // staff_members 레거시 컬럼 동기화
-  void db
-    .update(staffMembersTable)
-    .set({
-      annual_leave_total: finalTotal,
-      annual_leave_used: finalUsed,
-    })
-    .where(eq(staffMembersTable.id, staffId))
-    .catch((err) => console.error('[getUnifiedAnnualLeaveSummary] staff sync failed:', err));
+  // staff_members 및 leave_balances 레거시 테이블을 원장 수치로 완전 동기화 (Clean-up)
+  void Promise.all([
+    db
+      .update(staffMembersTable)
+      .set({
+        annual_leave_total: finalTotal,
+        annual_leave_used: finalUsed,
+      })
+      .where(eq(staffMembersTable.id, staffId)),
+    db
+      .insert(leaveBalancesTable)
+      .values({
+        id: crypto.randomUUID(),
+        staff_id: staffId,
+        year: Number(asOfDate.slice(0, 4)) || new Date().getFullYear(),
+        total_days: finalTotal,
+        used_days: finalUsed,
+        remaining_days: finalRemaining,
+        expired_days: roundDays(Math.max(0, expired)),
+        compensated_days: roundDays(Math.max(0, compensated)),
+        updated_at: new Date().toISOString(),
+      })
+      .onConflictDoUpdate({
+        target: [sql`staff_id`, sql`year`],
+        set: {
+          total_days: finalTotal,
+          used_days: finalUsed,
+          remaining_days: finalRemaining,
+          expired_days: roundDays(Math.max(0, expired)),
+          compensated_days: roundDays(Math.max(0, compensated)),
+          updated_at: new Date().toISOString(),
+        },
+      }),
+  ]).catch((err) => console.error('[getUnifiedAnnualLeaveSummary] DB sync failed:', err));
 
   return {
     staffId,

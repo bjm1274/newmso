@@ -93,6 +93,23 @@ export default function AnnualLeaveUsagePanel({ user, onBack }: Props) {
   const used = summary.used;
   const remaining = summary.remaining;
 
+  const [syncing, setSyncing] = useState(false);
+
+  const handleRecalculate = async () => {
+    if (!staffId || syncing) return;
+    setSyncing(true);
+    try {
+      await fetch('/api/admin/annual-leave/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ staffId }),
+      }).catch(() => null);
+      await summary.reload(true);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <section className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
@@ -101,14 +118,27 @@ export default function AnnualLeaveUsagePanel({ user, onBack }: Props) {
             <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">연차휴가</p>
             <h2 className="mt-1 text-[18px] font-black text-[var(--foreground)]">사용내역</h2>
           </div>
-          <button
-            type="button"
-            onClick={onBack}
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--toss-gray-4)] shadow-sm transition-all hover:bg-[var(--muted)]"
-          >
-            <LucideIcon name="ArrowLeft" size={15} />
-            개요로 돌아가기
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleRecalculate}
+              disabled={syncing || loading}
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--accent)] bg-[var(--toss-blue-light)] px-3 text-[12px] font-bold text-[var(--accent)] shadow-sm transition-all hover:bg-[var(--accent)] hover:text-white disabled:opacity-50"
+            >
+              <LucideIcon name="RefreshCw" size={14} className={syncing ? 'animate-spin' : ''} />
+              {syncing ? '재계산 중...' : '연차 재계산 / 새로고침'}
+            </button>
+            {onBack && (
+              <button
+                type="button"
+                onClick={onBack}
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 text-[12px] font-bold text-[var(--toss-gray-4)] shadow-sm transition-all hover:bg-[var(--muted)]"
+              >
+                <LucideIcon name="ArrowLeft" size={15} />
+                개요로 돌아가기
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
