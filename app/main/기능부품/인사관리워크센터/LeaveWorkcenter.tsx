@@ -1101,16 +1101,20 @@ export default function LeaveWorkcenter({
                     ) : (
                       (() => {
                         const hasAnnualOrManual = accrualList.some((g) => g.kind === 'annual' || g.kind === 'manual');
+                        // 가장 최근에 발생한 연차(Annual) 1건만 유효 적용 대상
+                        const latestAnnualId = accrualList.find((g) => g.kind === 'annual')?.id;
+
                         return accrualList.map((g) => {
                           const dateStr = (g.created_at || '').slice(0, 10) || '-';
                           const isSupercededMonthly = hasAnnualOrManual && g.kind === 'monthly';
-                          const isActiveAccrual = !isSupercededMonthly;
+                          const isPastAnnual = g.kind === 'annual' && latestAnnualId && g.id !== latestAnnualId;
+                          const isActiveAccrual = !isSupercededMonthly && !isPastAnnual;
 
                           return (
                             <tr
                               key={g.id}
                               className={`border-b border-[var(--border)]/50 hover:bg-[var(--muted)]/20 ${
-                                isSupercededMonthly ? 'opacity-50 text-[var(--toss-gray-3)]' : ''
+                                !isActiveAccrual ? 'opacity-50 text-[var(--toss-gray-3)]' : ''
                               }`}
                             >
                               <td className="py-1.5">{dateStr}</td>
@@ -1129,6 +1133,10 @@ export default function LeaveWorkcenter({
                                 {isActiveAccrual ? (
                                   <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-500/15 text-green-700">
                                     적용 중
+                                  </span>
+                                ) : isPastAnnual ? (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-rose-500/15 text-rose-700" title="1년 유효기간 경과로 만료 및 소멸됨">
+                                    소멸 (유효기간 만료)
                                   </span>
                                 ) : (
                                   <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-[var(--muted)] text-[var(--toss-gray-4)]" title="1년차 법정 연차(15일) 발생으로 소멸 및 대체됨">
