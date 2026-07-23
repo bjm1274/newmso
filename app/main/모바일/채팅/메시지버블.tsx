@@ -152,6 +152,8 @@ export default function MessageBubble({
   }, [text]);
 
   const wasEdited = Boolean(message.edited_at);
+  const isPending = Boolean(message.status === 'sending' || message.is_pending || message.sending || message.is_sending);
+  const hasThreadReplies = Boolean(threadReplyCount && threadReplyCount > 0);
   const canEditMessage = mine && message.is_deleted !== true && !hasFile && !isSystemMessage && Boolean(text.trim());
 
   const handleCopy = useCallback(() => {
@@ -225,6 +227,33 @@ export default function MessageBubble({
           >
             {mine && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
+                {isPending && (
+                  <span style={{ fontSize: 10, color: '#007AFF', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                    전송중
+                  </span>
+                )}
+                {wasEdited && (
+                  <span style={{ fontSize: 10, color: 'var(--z-400)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                    수정됨
+                  </span>
+                )}
+                {hasThreadReplies && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenThread?.(message)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 0,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: '#007AFF',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap' }}
+                  >
+                    답글 {threadReplyCount}
+                  </button>
+                )}
                 {displayedReadCount > 0 && (
                   <span
                     style={{
@@ -384,6 +413,33 @@ export default function MessageBubble({
 
             {!mine && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, flexShrink: 0 }}>
+                {isPending && (
+                  <span style={{ fontSize: 10, color: '#007AFF', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                    전송중
+                  </span>
+                )}
+                {wasEdited && (
+                  <span style={{ fontSize: 10, color: 'var(--z-400)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                    수정됨
+                  </span>
+                )}
+                {hasThreadReplies && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenThread?.(message)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 0,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: '#007AFF',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap' }}
+                  >
+                    답글 {threadReplyCount}
+                  </button>
+                )}
                 {displayedReadCount > 0 && (
                   <span
                     style={{
@@ -451,21 +507,6 @@ export default function MessageBubble({
                   </button>
                 );
               })}
-            </div>
-          )}
-
-          {wasEdited && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                marginTop: 3,
-                padding: '0 4px',
-                flexWrap: 'wrap',
-                justifyContent: mine ? 'flex-end' : 'flex-start' }}
-            >
-              <span style={{ fontSize: 10, color: 'var(--z-400)', fontWeight: 600 }}>수정됨</span>
             </div>
           )}
         </div>

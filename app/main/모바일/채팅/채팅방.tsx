@@ -243,6 +243,8 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
   }, [canLeaveRoom, leaving, memberIds, membersReady, onBack, room.id, userId, userName]);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
   const prevMessageCountRef = useRef(0);
@@ -937,7 +939,7 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
         className="m-scroll"
         onScroll={handleScroll}
         data-testid="chat-message-list"
-        style={{ background: 'transparent', padding: '12px 12px calc(110px + env(safe-area-inset-bottom, 12px))' }}
+        style={{ background: 'transparent', padding: '12px 12px calc(16px + env(safe-area-inset-bottom, 0px))' }}
       >
         {hasMore && loadingOlder && (
           <div
@@ -1156,6 +1158,26 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
             )}
           </button>
           <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileChange}
+            style={{ position: 'absolute', left: -9999, top: -9999, width: 1, height: 1 }}
+            aria-hidden="true"
+            tabIndex={-1}
+          />
+          <input
+            ref={galleryInputRef}
+            type="file"
+            multiple
+            accept="image/*,video/*"
+            onChange={handleFileChange}
+            style={{ position: 'absolute', left: -9999, top: -9999, width: 1, height: 1 }}
+            aria-hidden="true"
+            tabIndex={-1}
+          />
+          <input
             ref={fileInputRef}
             type="file"
             multiple
@@ -1251,7 +1273,24 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
             type="button"
             onClick={() => {
               setActionSheetOpen(false);
-              fileInputRef.current?.click();
+              cameraInputRef.current?.click();
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '16px', borderRadius: 16,
+              background: 'rgba(0, 0, 0, 0.04)', border: '1px solid rgba(0, 0, 0, 0.02)',
+              color: 'var(--z-900)', fontSize: 16, fontWeight: 800,
+              textAlign: 'left'
+            }}
+          >
+            <MIcon name="camera" size={24} color="#007AFF" />
+            카메라
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActionSheetOpen(false);
+              galleryInputRef.current?.click();
             }}
             style={{
               display: 'flex', alignItems: 'center', gap: 12,
@@ -1262,7 +1301,24 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
             }}
           >
             <MIcon name="image" size={24} color="#007AFF" />
-            사진 / 파일 전송
+            갤러리
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActionSheetOpen(false);
+              fileInputRef.current?.click();
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '16px', borderRadius: 16,
+              background: 'rgba(0, 0, 0, 0.04)', border: '1px solid rgba(0, 0, 0, 0.02)',
+              color: 'var(--z-900)', fontSize: 16, fontWeight: 800,
+              textAlign: 'left'
+            }}
+          >
+            <MIcon name="paperclip" size={24} color="#007AFF" />
+            파일
           </button>
           <button
             type="button"
