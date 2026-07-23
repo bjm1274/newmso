@@ -591,6 +591,75 @@ export async function processFinalApprovalEffects(
     }
   }
 
+  // ── 급여인상평가서 최종 승인 시 직원 기본급(base_salary) 자동 연동 ──
+  const isSalaryIncreaseForm =
+    String(item.type || '').trim() === '급여인상평가서' ||
+    String(itemMetaData?.form_type || '').trim() === '급여인상평가서' ||
+    String(itemMetaData?.form_slug || '').trim() === 'salary_increase_evaluation' ||
+    String(itemMetaData?.request_category || '').trim() === 'salary_increase_evaluation' ||
+    itemMetaData?.evaluationType === 'salary_increase';
+
+  if (isSalaryIncreaseForm) {
+    try {
+      const targetStaffId = itemMetaData?.targetStaffId ? String(itemMetaData.targetStaffId).trim() : null;
+      const targetStaffName = itemMetaData?.targetStaffName
+        ? String(itemMetaData.targetStaffName).trim()
+        : itemMetaData?.target
+          ? String(itemMetaData.target).trim()
+          : null;
+      const newSalary = typeof itemMetaData?.newSalary === 'number'
+        ? itemMetaData.newSalary
+        : typeof itemMetaData?.proposedSalary === 'number'
+          ? itemMetaData.proposedSalary
+          : typeof itemMetaData?.afterSalary === 'number'
+            ? itemMetaData.afterSalary
+            : typeof itemMetaData?.currentSalary === 'number' && typeof itemMetaData?.raisePercent === 'number'
+              ? Math.round(itemMetaData.currentSalary * (1 + itemMetaData.raisePercent / 100))
+              : null;
+
+      if (newSalary && newSalary > 0) {
+        const db = await requireD1ForApprovalProcessing('salary_increase.update');
+        let matchedStaffId = targetStaffId;
+
+        if (!matchedStaffId && targetStaffName) {
+          const { and: drizzleAnd, eq: drizzleEq } = await import('drizzle-orm');
+          const rows = await db
+            .select({ id: staffMembersTable.id })
+            .from(staffMembersTable)
+            .where(
+              item.company_id
+                ? drizzleAnd(
+                    drizzleEq(staffMembersTable.name, targetStaffName),
+                    drizzleEq(staffMembersTable.company_id, String(item.company_id))
+                  )
+                : drizzleEq(staffMembersTable.name, targetStaffName)
+            )
+            .limit(1);
+
+          if (rows[0]?.id) {
+            matchedStaffId = String(rows[0].id);
+          }
+        }
+
+        if (matchedStaffId) {
+          await db
+            .update(staffMembersTable)
+            .set({
+              base_salary: Math.round(newSalary),
+              updated_at: new Date().toISOString()
+            })
+            .where(eq(staffMembersTable.id, matchedStaffId));
+
+          steps.push('salary_increase_applied');
+        } else {
+          warnings.push(`급여 인상 대상 직원을 찾지 못해 기본급을 자동 반영하지 못했습니다. (대상: ${targetStaffName || '미지정'})`);
+        }
+      }
+    } catch (error) {
+      warnings.push(`급여 인상 자동 반영 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);
+    }
+  }
+
   try {
     const officialDocResult = await syncOfficialDocumentLogFromApproval(item);
     if (officialDocResult) {
