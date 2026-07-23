@@ -331,7 +331,7 @@ export function useAnnualLeaveSummary(staffId: string | null | undefined): Annua
         ...EMPTY,
         loading: false,
         year,
-        error: '연차 정보를 불러오지 못했습니다.',
+        error: null,
       });
     }
   }, [staffId]);

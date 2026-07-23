@@ -112,7 +112,17 @@ export function completedLeaveYears(hireDate: string, asOfDate: string): number 
 export function getLeaveCycle(hireDate: string, asOfDate: string): LeaveCycle | null {
   const hire = toDateKey(hireDate);
   const asOf = toDateKey(asOfDate);
-  if (!hire || !asOf || hire > asOf) return null;
+  if (!hire || !asOf) return null;
+
+  if (hire > asOf) {
+    const end = addYearsToDateKey(hire, 1) ?? `${asOf.slice(0, 4)}-12-31`;
+    return {
+      key: `first-year:${hire}`,
+      start: hire,
+      end,
+      completedYears: 0,
+    };
+  }
 
   const completedYears = completedLeaveYears(hire, asOf);
   const start = completedYears === 0 ? hire : addYearsToDateKey(hire, completedYears);
@@ -133,7 +143,7 @@ function isWithinCycle(dateKey: string, cycle: LeaveCycle): boolean {
 
 function approved(value: unknown): boolean {
   const normalized = String(value ?? '').trim().toLowerCase();
-  return normalized === '??' || normalized === 'approved';
+  return normalized === '승인' || normalized === 'approved';
 }
 
 function leaveDays(row: { leave_type: string | null; start_date: string | null; end_date: string | null; days: number | null }): number {
@@ -164,9 +174,9 @@ async function getStaffLeaveContext(staffId: string) {
     .where(eq(staffMembersTable.id, staffId))
     .limit(1);
   const staff = rows[0];
-  if (!staff) throw new Error(`?? ??? ?? ? ????. (${staffId})`);
-  const hireDate = toDateKey(staff.hire_date ?? staff.join_date ?? staff.joined_at);
-  if (!hireDate) throw new Error(`???? ?? ??? ??? ? ????. (${staffId})`);
+  if (!staff) throw new Error(`직원 정보를 찾을 수 없습니다. (${staffId})`);
+  const todayKey = formatKoreanDateKey(new Date());
+  const hireDate = toDateKey(staff.hire_date ?? staff.join_date ?? staff.joined_at) || todayKey;
   return { db, staff, hireDate };
 }
 
@@ -256,8 +266,12 @@ export async function getUnifiedAnnualLeaveSummary(
   asOfDate = formatKoreanDateKey(new Date()),
 ): Promise<UnifiedLeaveSummary> {
   const { db, hireDate } = await getStaffLeaveContext(staffId);
-  const cycle = getLeaveCycle(hireDate, asOfDate);
-  if (!cycle) throw new Error(`?? ??? ??? ? ????. (${staffId})`);
+  const cycle = getLeaveCycle(hireDate, asOfDate) ?? {
+    key: `fallback:${asOfDate.slice(0, 4)}`,
+    start: `${asOfDate.slice(0, 4)}-01-01`,
+    end: `${asOfDate.slice(0, 4)}-12-31`,
+    completedYears: 0,
+  };
 
   const rows = await db
     .select({
