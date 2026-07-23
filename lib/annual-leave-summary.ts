@@ -232,20 +232,47 @@ const EMPTY: AnnualLeaveSummary = {
   hasBalanceRow: false,
 };
 
+const LEAVE_SUMMARY_STALE_TIME_MS = 60 * 1000;
+const leaveSummaryCache = new Map<string, { data: AnnualLeaveSummary; timestamp: number }>();
+
+export function invalidateAnnualLeaveCache(staffId?: string) {
+  if (staffId) {
+    leaveSummaryCache.delete(staffId);
+  } else {
+    leaveSummaryCache.clear();
+  }
+}
+
 /**
  * staffId 기준 연차 요약 훅. staffId 없으면 로딩 종료 + 0.
  */
 export function useAnnualLeaveSummary(staffId: string | null | undefined): AnnualLeaveSummary & {
-  reload: () => Promise<void>;
+  reload: (force?: boolean) => Promise<void>;
 } {
-  const [state, setState] = useState<AnnualLeaveSummary>(EMPTY);
+  const [state, setState] = useState<AnnualLeaveSummary>(() => {
+    if (staffId && leaveSummaryCache.has(staffId)) {
+      const cached = leaveSummaryCache.get(staffId);
+      if (cached && Date.now() - cached.timestamp < LEAVE_SUMMARY_STALE_TIME_MS) {
+        return cached.data;
+      }
+    }
+    return EMPTY;
+  });
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (force = false) => {
     if (!staffId) {
       setState({ ...EMPTY, loading: false, year: currentLeaveYear() });
       return;
     }
-    setState((prev) => ({ ...prev, loading: true, error: null }));
+
+    const now = Date.now();
+    const cached = leaveSummaryCache.get(staffId);
+    if (!force && cached && now - cached.timestamp < LEAVE_SUMMARY_STALE_TIME_MS) {
+      setState(cached.data);
+      return;
+    }
+
+    setState((prev) => (prev.loading ? prev : { ...prev, loading: true, error: null }));
     const year = currentLeaveYear();
     try {
       const [staffRes, leaveRes, balanceRes] = await Promise.all([
@@ -300,11 +327,14 @@ export function useAnnualLeaveSummary(staffId: string | null | undefined): Annua
         year,
       });
 
-      setState({
+      const nextState = {
         ...computed,
         loading: false,
         error: null,
-      });
+      };
+
+      leaveSummaryCache.set(staffId, { data: nextState, timestamp: Date.now() });
+      setState(nextState);
     } catch (err) {
       console.error('[useAnnualLeaveSummary]', err);
       setState({
@@ -319,6 +349,20 @@ export function useAnnualLeaveSummary(staffId: string | null | undefined): Annua
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleUpdate = () => {
+      if (staffId) invalidateAnnualLeaveCache(staffId);
+      void reload(true);
+    };
+    window.addEventListener('erp-leave-updated', handleUpdate as EventListener);
+    window.addEventListener('erp-annual-leave-updated', handleUpdate as EventListener);
+    return () => {
+      window.removeEventListener('erp-leave-updated', handleUpdate as EventListener);
+      window.removeEventListener('erp-annual-leave-updated', handleUpdate as EventListener);
+    };
+  }, [staffId, reload]);
 
   return { ...state, reload };
 }

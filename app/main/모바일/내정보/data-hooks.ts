@@ -23,11 +23,42 @@ type CommuteLogRow = {
   date?: string | null;
 };
 
-export function useMonthlyAttendance(staffId: string | null | undefined) {
-  const [data, setData] = useState<MonthlyAttendance | null>(null);
+const ATTENDANCE_STALE_TIME_MS = 60 * 1000;
+const attendanceCache = new Map<string, { data: MonthlyAttendance; timestamp: number }>();
 
-  const fetcher = useCallback(async () => {
+export function invalidateAttendanceCache(staffId?: string) {
+  if (staffId) attendanceCache.delete(staffId);
+  else attendanceCache.clear();
+}
+
+const COUNTS_STALE_TIME_MS = 30 * 1000;
+const todayCountsCache = new Map<string, { counts: TodayCounts; timestamp: number }>();
+
+export function invalidateTodayCountsCache(staffId?: string) {
+  if (staffId) todayCountsCache.delete(staffId);
+  else todayCountsCache.clear();
+}
+
+export function useMonthlyAttendance(staffId: string | null | undefined) {
+  const [data, setData] = useState<MonthlyAttendance | null>(() => {
+    if (staffId && attendanceCache.has(staffId)) {
+      const cached = attendanceCache.get(staffId);
+      if (cached && Date.now() - cached.timestamp < ATTENDANCE_STALE_TIME_MS) {
+        return cached.data;
+      }
+    }
+    return null;
+  });
+
+  const fetcher = useCallback(async (force = false) => {
     if (!staffId) return;
+    const nowTime = Date.now();
+    const cached = attendanceCache.get(staffId);
+    if (!force && cached && nowTime - cached.timestamp < ATTENDANCE_STALE_TIME_MS) {
+      setData(cached.data);
+      return;
+    }
+
     const now = new Date();
     // 이번 달 범위는 KST 기준 (디바이스 타임존과 무관하게 서버 KST 날짜키와 일치)
     const { startDate: firstDay, endDate: lastDay } = getMonthBoundaries(getKoreanMonthString(now));
@@ -39,7 +70,9 @@ export function useMonthlyAttendance(staffId: string | null | undefined) {
         .gte('date', firstDay)
         .lte('date', lastDay);
       if (error || !rows) return;
-      setData(calculateMonthlyAttendance(rows as CommuteLogRow[]));
+      const computed = calculateMonthlyAttendance(rows as CommuteLogRow[]);
+      attendanceCache.set(staffId, { data: computed, timestamp: Date.now() });
+      setData(computed);
     } catch {
       // silent
     }
@@ -51,12 +84,15 @@ export function useMonthlyAttendance(staffId: string | null | undefined) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const refetch = () => { void fetcher(); };
+    const refetch = () => {
+      if (staffId) invalidateAttendanceCache(staffId);
+      void fetcher(true);
+    };
     window.addEventListener('erp-attendance-updated', refetch as EventListener);
     return () => window.removeEventListener('erp-attendance-updated', refetch as EventListener);
-  }, [fetcher]);
+  }, [fetcher, staffId]);
 
-  return { data, refetch: fetcher };
+  return { data, refetch: (force = true) => fetcher(force) };
 }
 
 export type TodayCounts = {
@@ -68,15 +104,30 @@ export type TodayCounts = {
 };
 
 export function useTodayCounts(staffId: string | null | undefined): TodayCounts {
-  const [counts, setCounts] = useState<TodayCounts>({
-    pendingApproval: 0,
-    unreadChat: 0,
-    newBoard: 0,
-    unreadAlert: 0,
-    todoCount: 0 });
+  const [counts, setCounts] = useState<TodayCounts>(() => {
+    if (staffId && todayCountsCache.has(staffId)) {
+      const cached = todayCountsCache.get(staffId);
+      if (cached && Date.now() - cached.timestamp < COUNTS_STALE_TIME_MS) {
+        return cached.counts;
+      }
+    }
+    return {
+      pendingApproval: 0,
+      unreadChat: 0,
+      newBoard: 0,
+      unreadAlert: 0,
+      todoCount: 0,
+    };
+  });
 
   useEffect(() => {
     if (!staffId) return;
+    const cached = todayCountsCache.get(staffId);
+    if (cached && Date.now() - cached.timestamp < COUNTS_STALE_TIME_MS) {
+      setCounts(cached.counts);
+      return;
+    }
+
     let cancelled = false;
     const fetchCounts = async () => {
       try {
@@ -94,12 +145,15 @@ export function useTodayCounts(staffId: string | null | undefined): TodayCounts 
             .eq('is_complete', 0),
         ]);
         if (cancelled) return;
-        setCounts({
+        const nextCounts = {
           pendingApproval: approvalRes.count ?? 0,
           unreadChat: 0,
           newBoard: 0,
           unreadAlert,
-          todoCount: todoRes.count ?? 0 });
+          todoCount: todoRes.count ?? 0,
+        };
+        todayCountsCache.set(staffId, { counts: nextCounts, timestamp: Date.now() });
+        setCounts(nextCounts);
       } catch {
         // silent
       }
