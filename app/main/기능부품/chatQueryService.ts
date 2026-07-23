@@ -9,7 +9,7 @@ import type { ChatRoom } from '@/types';
 
 const CHAT_ROOMS_CACHE_KEY = 'newmso:chat-rooms:v1';
 const CHAT_ROOMS_CACHE_LIMIT = 200;
-const CHAT_ROOMS_FETCH_TTL_MS = 30_000;
+const CHAT_ROOMS_FETCH_TTL_MS = 60_000; // D1 비용 절감: 30초 → 60초 (WS 활성 시 실시간 업데이트는 pokeChannel로 즉시 반영)
 
 type ChatRoomsFetchResult = { data: ChatRoom[]; error: unknown };
 type FetchAllChatRoomsOptions = {

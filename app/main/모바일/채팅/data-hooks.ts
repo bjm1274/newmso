@@ -104,7 +104,7 @@ type UseChatRoomsResult = {
   refresh: () => Promise<void>;
 };
 
-const ROOM_POLL_INTERVAL_MS = 2000;
+const ROOM_POLL_INTERVAL_MS = 5000; // polling-bus 채팅 기본값(5초)과 정렬. WS 활성 시 폴링 자체는 꺼짐.
 
 function isRoomVisibleToUser(
   room: ChatRoom,
@@ -276,7 +276,7 @@ export function useChatRoomsForMobile(
 // ─────────────────────────────────────────────
 
 const MESSAGES_LIMIT = 20;
-const ROOM_MESSAGE_POLL_INTERVAL_MS = 1000;
+const ROOM_MESSAGE_POLL_INTERVAL_MS = 5000; // polling-bus 채팅 기본값(5초)과 정렬. 개별 방도 동일 간격 적용.
 
 type UseChatMessagesResult = {
   messages: ChatMessage[];

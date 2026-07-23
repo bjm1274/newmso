@@ -3,9 +3,10 @@
  *
  * - fire-and-forget: 전송 UX를 막지 않는다.
  * - keepalive: 전송 직후 앱이 백그라운드로 전환돼도 요청이 끊기지 않도록 한다.
- * - 실패 시 chat-push-flush 폴백. 서버 d1/mutate 의 chat_push_jobs enqueue + cron 이 최종 회수.
+ * - 실패 시 5분 cron(/api/cron/chat-push-dispatch)이 최종 회수하므로 별도 flush 호출 불필요.
  *
- * enqueue 자체는 서버 전용 `@/lib/chat-push-enqueue` (d1/mutate 핫패스)에서만 수행한다.
+ * D1 비용 절감: 기존에는 chat-push + chat-push-flush 2회 호출했으나,
+ * chat-push 응답 안에 flush 로직이 포함되어 있으므로 1회만 호출한다.
  */
 /** fire-and-forget 이지만 호출부 타입 호환을 위해 Promise 반환 */
 export async function triggerChatPush(roomId: string, messageId: string): Promise<void> {
@@ -14,33 +15,15 @@ export async function triggerChatPush(roomId: string, messageId: string): Promis
   if (!room || !message) return;
 
   try {
-    const res = await fetch('/api/notifications/chat-push', {
+    await fetch('/api/notifications/chat-push?flush=rest', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
       keepalive: true,
       body: JSON.stringify({ roomId: room, messageId: message }),
     });
-    // 성공/실패 모두 소량 flush (서버 enqueue + cron 이 최종 회수)
-    void fetch('/api/notifications/chat-push-flush', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      keepalive: true,
-      body: JSON.stringify({ limit: res.ok ? 5 : 8 }),
-    }).catch(() => {});
+    // chat-push API 내부에서 flush(나머지 큐)도 함께 처리하므로 별도 flush 호출 불필요
   } catch {
-    // fetch 자체가 던지는 경우도 서버 enqueue + cron 이 회수.
-    try {
-      void fetch('/api/notifications/chat-push-flush', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        keepalive: true,
-        body: JSON.stringify({ limit: 8 }),
-      }).catch(() => {});
-    } catch {
-      // ignore
-    }
+    // fetch 실패 시 5분 cron(/api/cron/chat-push-dispatch)이 큐 회수
   }
 }

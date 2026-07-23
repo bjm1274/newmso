@@ -806,9 +806,9 @@ function getInterval(options?: RealtimeOptions, channelKey = '', tables: TableFi
   }
 
   // 일반 브라우저:
-  // - 채팅/알림: 3~5초 하한 (기존 30초는 배지 지연이 과도)
+  // - 채팅/알림: WS 끊김 시 5초 폴백 (D1 비용 보호, WS 항상 선호)
   // - 기타: 15초 하한 (D1 비용 보호, WS 활성 시 폴링 자체는 꺼짐)
-  const minInterval = chatChannel ? 3000 : 15000;
+  const minInterval = chatChannel ? 5000 : 15000;
   return Math.max(requested, minInterval);
 }
 
