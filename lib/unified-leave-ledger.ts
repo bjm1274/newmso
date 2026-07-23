@@ -8,6 +8,7 @@
 import {
   and,
   eq,
+  or,
   sql,
   getD1Binding,
   getD1Drizzle,
@@ -164,6 +165,7 @@ async function getStaffLeaveContext(staffId: string) {
   const d1 = await getD1Binding();
   if (!d1) throw new Error('[unified-leave-ledger] D1 binding not available');
   const db = getD1Drizzle(d1);
+  const searchKey = String(staffId ?? '').trim();
   const rows = await db
     .select({
       id: staffMembersTable.id,
@@ -175,7 +177,13 @@ async function getStaffLeaveContext(staffId: string) {
       annual_leave_used: staffMembersTable.annual_leave_used,
     })
     .from(staffMembersTable)
-    .where(eq(staffMembersTable.id, staffId))
+    .where(
+      or(
+        eq(staffMembersTable.id, searchKey),
+        eq(staffMembersTable.employee_no, searchKey),
+        eq(staffMembersTable.name, searchKey),
+      )
+    )
     .limit(1);
   const staff = rows[0];
   if (!staff) throw new Error(`직원 정보를 찾을 수 없습니다. (${staffId})`);

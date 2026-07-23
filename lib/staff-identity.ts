@@ -34,8 +34,13 @@ export function normalizeStaffLike<T extends UserLikeRecord | null | undefined>(
 
 export function getStaffLikeId(input: UserLikeRecord | null | undefined) {
   const normalized = normalizeStaffLike(input);
+  const staffId = cleanString(normalized?.staff_id);
+  if (staffId) return staffId;
   const id = cleanString(normalized?.id);
-  return isUuidLike(id) ? id : '';
+  if (id) return id;
+  const empNo = cleanString(normalized?.employee_no);
+  if (empNo) return empNo;
+  return '';
 }
 
 function buildIdentityCacheKey(input: UserLikeRecord) {
