@@ -174,17 +174,11 @@ export function computeAnnualLeaveSummary(input: AnnualLeaveSummaryInput): Omit<
   const expired = Number(input.expired ?? 0) || 0;
   const compensated = Number(input.compensated ?? 0) || 0;
   // 잔여 공식 SSOT: total − used − expired − compensated
-  // remaining_days 컬럼은 과거 소멸 버그로 total−used 와 어긋날 수 있어
-  // 일치할 때만 참고하고, 불일치 시 항상 공식 값을 쓴다.
-  const remainingByFormula = Math.max(
+  // DB leave_balances.remaining_days 가 수동수정/미동기화 등으로 어긋날 수 있으므로 항상 정밀 계산 공식 적용
+  const remaining = Math.max(
     0,
     Math.round((total - used - expired - compensated) * 100) / 100,
   );
-  const remainingFromBalance = hasBalanceRemaining
-    ? Math.max(0, Number(input.balanceRemaining) || 0)
-    : null;
-  // DB leave_balances.remaining_days 가 존재하면 SSOT 로 최우선 사용
-  const remaining = remainingFromBalance != null ? remainingFromBalance : remainingByFormula;
   const usageRate = total > 0 ? Math.round((used / total) * 100) : 0;
 
   // 당해 연도 내역만 (KPI used 와 목록 합 일치). 시작·종료 중 하나라도 당해면 포함.

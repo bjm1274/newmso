@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import type { StaffMember } from '@/types';
 import AttendanceForms from './근태신청양식';
 import SuppliesForm from './비품구매양식';
@@ -191,6 +191,32 @@ export default function ApprovalComposerView({
 
   const submitDisabled = !hasApproverSelection || !contentReady || isSubmitting;
 
+  // 1차 카테고리 선택 state
+  const [selectedGroupKey, setSelectedGroupKey] = useState<'leave' | 'work' | 'misc'>(() => {
+    return currentOption?.group || 'leave';
+  });
+
+  // currentOption이 바뀔 때 (외부에서 formType 세팅 시) selectedGroupKey 동기화
+  useEffect(() => {
+    if (currentOption?.group && currentOption.group !== selectedGroupKey) {
+      setSelectedGroupKey(currentOption.group);
+    }
+  }, [currentOption?.group]);
+
+  // 현재 선택된 1차 그룹에 속한 2차 양식 목록
+  const secondaryOptions = useMemo(() => {
+    const groupDef = groupedOptions.find((g) => g.key === selectedGroupKey);
+    return groupDef ? groupDef.items : (groupedOptions[0]?.items || []);
+  }, [groupedOptions, selectedGroupKey]);
+
+  const handleGroupChange = (newGroupKey: 'leave' | 'work' | 'misc') => {
+    setSelectedGroupKey(newGroupKey);
+    const groupDef = groupedOptions.find((g) => g.key === newGroupKey);
+    if (groupDef && groupDef.items.length > 0) {
+      selectFormType(groupDef.items[0].tab);
+    }
+  };
+
   return (
     <div className="mx-auto w-full max-w-[62.4rem] pb-6 ap-compose single space-y-3">
       {isEditingApproval && (
@@ -230,11 +256,31 @@ export default function ApprovalComposerView({
         </div>
       )}
 
-      {/* 헤더: 양식 드롭다운 + 상신 액션 (라이브 §3-4 .mod-pageheader) — sticky로 항상 상단 고정 */}
+      {/* 헤더: 1.2차 양식 선택 드롭다운 + 상신 액션 — sticky로 항상 상단 고정 */}
       <header className="mod-pageheader ap-compose-submit-header">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <label className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-[11px] font-black text-[var(--muted-foreground)]">양식</span>
+            {/* 1차 분류 선택 (대분류) */}
+            <div className="relative">
+              <select
+                value={selectedGroupKey}
+                onChange={(e) => handleGroupChange(e.target.value as 'leave' | 'work' | 'misc')}
+                aria-label="양식 1차 분류 선택"
+                className="h-9 appearance-none rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] pl-3 pr-8 text-[13px] font-bold text-[var(--foreground)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
+              >
+                {groupedOptions.map((g) => (
+                  <option key={g.key} value={g.key}>
+                    {g.title}
+                  </option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]">
+                <LucideIcon name="ChevronDown" size={14} strokeWidth={2.2} />
+              </span>
+            </div>
+
+            {/* 2차 양식 선택 (소분류) */}
             <div className="relative">
               <select
                 value={currentSelectValue}
@@ -242,29 +288,22 @@ export default function ApprovalComposerView({
                   if (event.target.value) selectFormType(event.target.value);
                 }}
                 data-testid="approval-form-type-select"
-                aria-label="결재 양식 선택"
-                className="h-9 min-w-[180px] appearance-none rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] pl-3 pr-9 text-[13px] font-black text-[var(--foreground)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
+                aria-label="양식 선택"
+                className="h-9 min-w-[170px] appearance-none rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] pl-3 pr-8 text-[13px] font-black text-[var(--foreground)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15"
               >
-                <option value="" disabled>
-                  양식을 선택하세요
-                </option>
-                {groupedOptions.map((group) => (
-                  <optgroup key={group.key} label={group.title}>
-                    {group.items.map((option) => (
-                      <option key={option.tab} value={option.tab}>
-                        {option.label}
-                        {option.requiresPermission ? ' · 권한 필요' : ''}
-                        {option.isCustom && option.normalized !== 'overtime' ? ' (커스텀)' : ''}
-                      </option>
-                    ))}
-                  </optgroup>
+                {secondaryOptions.map((option) => (
+                  <option key={option.tab} value={option.tab}>
+                    {option.label}
+                    {option.requiresPermission ? ' · 권한 필요' : ''}
+                    {option.isCustom && option.normalized !== 'overtime' ? ' (커스텀)' : ''}
+                  </option>
                 ))}
               </select>
               <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]">
                 <LucideIcon name="ChevronDown" size={14} strokeWidth={2.2} />
               </span>
             </div>
-          </label>
+          </div>
           {currentOption?.requiresPermission && (
             <span className="rounded-[var(--radius-sm,4px)] bg-[var(--warning-light)] px-2 py-0.5 text-[10px] font-black text-[var(--warning)]">
               권한 필요

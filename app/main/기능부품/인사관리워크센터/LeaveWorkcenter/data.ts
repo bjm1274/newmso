@@ -14,6 +14,7 @@ import { isActiveStaff } from '@/lib/active-staff';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
 import { normalizeLeaveType } from '@/lib/leave-type';
 import { buildApprovalSubmitPayload } from '@/lib/approval-submit-payload';
+import { computeAnnualLeaveSummary } from '@/lib/annual-leave-summary';
 
 // ─── 타입 ─────────────────────────────────────────────────────────
 export type LeaveStatus = '대기' | '승인' | '반려';
@@ -37,6 +38,8 @@ export interface LeaveBalanceRow {
   remaining_days: number;
   expiry_date: string | null;
   days_until_expiry: number;
+  expired_days?: number;
+  compensated_days?: number;
   updated_at?: string | null;
 }
 
@@ -209,11 +212,37 @@ export async function fetchLeaveData({
     }
   }
 
+  // 직원별 leave_requests 분류
+  const requestsByStaff = new Map<string, Array<Record<string, unknown>>>();
+  for (const raw of rawRequests) {
+    if (raw && typeof raw === 'object') {
+      const sId = String((raw as Record<string, unknown>).staff_id || '').trim();
+      if (sId) {
+        if (!requestsByStaff.has(sId)) requestsByStaff.set(sId, []);
+        requestsByStaff.get(sId)!.push(raw as Record<string, unknown>);
+      }
+    }
+  }
+
   const rows: LeaveStaffRow[] = targetStaff.map((staff) => {
-    const balance = balances.get(String(staff.id));
-    const total = balance?.total_days ?? pickNumber(staff.annual_leave_total ?? staff.annual_days ?? 0);
-    const used = balance?.used_days ?? pickNumber(staff.annual_leave_used ?? staff.annual_used ?? 0);
-    const remaining = balance?.remaining_days ?? Math.max(0, total - used);
+    const sId = String(staff.id);
+    const balance = balances.get(sId);
+    const staffLeaveRows = requestsByStaff.get(sId) || [];
+    const summary = computeAnnualLeaveSummary({
+      staffTotal: pickNumber(staff.annual_leave_total ?? staff.annual_days ?? 0),
+      staffUsed: pickNumber(staff.annual_leave_used ?? staff.annual_used ?? 0),
+      balanceTotal: balance?.total_days,
+      balanceUsed: balance?.used_days,
+      balanceRemaining: balance?.remaining_days,
+      expired: balance?.expired_days,
+      compensated: balance?.compensated_days,
+      leaveRows: staffLeaveRows,
+      year: now.getFullYear(),
+    });
+
+    const total = summary.total;
+    const used = summary.used;
+    const remaining = summary.remaining;
     const expiry = balance?.expiry_date ?? null;
     const daysUntilExpiry = balance?.days_until_expiry ?? 365;
     return {
@@ -223,7 +252,7 @@ export async function fetchLeaveData({
       remaining,
       daysUntilExpiry,
       expiryDate: expiry,
-      pending: pendingByStaff.get(String(staff.id)) ?? 0,
+      pending: pendingByStaff.get(sId) ?? 0,
       updatedAt: balance?.updated_at ?? null };
   });
 
