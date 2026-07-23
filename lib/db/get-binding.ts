@@ -146,7 +146,10 @@ export async function getD1Binding(): Promise<D1Database | undefined> {
     // ignore
   }
 
-  if (process.env.NODE_ENV === 'development') {
+  // OpenNext may expose NODE_ENV="development" in a production Worker bundle.
+  // Never invoke the Node-only local D1 fallback when the Worker runtime exists.
+  const isWorkerRuntime = typeof (globalThis as typeof globalThis & { WebSocketPair?: unknown }).WebSocketPair !== 'undefined';
+  if (process.env.NODE_ENV === 'development' && !isWorkerRuntime) {
     return getLocalD1Mock();
   }
 
