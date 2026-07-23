@@ -823,6 +823,7 @@ for (const tableName of SENSITIVE_STAFF_SCOPED) {
 }
 
 const SENSITIVE_ADMIN_WRITE: string[] = [
+  'nurse_schedules',
   'chat_push_jobs',
   'system_configs',
   'system_settings',

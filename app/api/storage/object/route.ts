@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   createR2DownloadUrl,
-  getConfiguredR2ChatBucket } from '@/lib/object-storage';
+  getConfiguredR2ChatBucket,
+  getPublicBaseUrl,
+} from '@/lib/object-storage';
 import { readSessionFromRequest } from '@/lib/server-session';
+import { assertChatRoomMember } from '@/lib/chat-room-membership';
+import { getD1Binding, getD1Drizzle } from '@/lib/db';
 
 
 export const dynamic = 'force-dynamic';
 
-function getPublicBaseUrl(): string {
+function getPublicBaseUrlInternal(): string {
   return String(
     process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL || process.env.R2_PUBLIC_BASE_URL || ''
   )
@@ -44,6 +48,28 @@ export async function GET(request: NextRequest) {
     const allowedBucket = getConfiguredR2ChatBucket();
     if (!allowedBucket || bucket !== allowedBucket) {
       return NextResponse.json({ error: 'This bucket is not available' }, { status: 403 });
+    }
+
+    // 채팅 객체 경로일 경우 대화방 멤버십 ACL 검증 (chat/room_id/filename 패턴)
+    if (objectKey.startsWith('chat/') || objectKey.includes('/chat/')) {
+      const parts = objectKey.split('/');
+      const chatIdx = parts.findIndex((p) => p === 'chat');
+      const roomIdCandidate = chatIdx >= 0 && parts.length > chatIdx + 1 ? parts[chatIdx + 1] : null;
+      if (roomIdCandidate && roomIdCandidate.length > 20) {
+        const userId = String(session.user.id || session.user.user_id || '').trim();
+        const role = String(session.user.role || '').toLowerCase();
+        const isMaster = Boolean(session.user.is_master || session.user.is_admin);
+        if (!isMaster && role !== 'admin') {
+          const d1 = await getD1Binding();
+          if (d1) {
+            const db = getD1Drizzle(d1);
+            const mem = await assertChatRoomMember(db, roomIdCandidate, userId);
+            if (!mem.ok) {
+              return NextResponse.json({ error: '해당 대화방 첨부파일 접근 권한이 없습니다.' }, { status: 403 });
+            }
+          }
+        }
+      }
     }
 
     // R2 custom domain이 설정돼 있으면 인라인 보기는 R2 CDN으로 직접 redirect

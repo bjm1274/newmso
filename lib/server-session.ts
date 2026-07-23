@@ -339,6 +339,14 @@ export async function verifySessionTokenWithSecret(token: string | null | undefi
     if (!payload?.user?.name || !payload.exp || payload.exp <= now) {
       return null;
     }
+    // 강제 로그아웃 시간 검증
+    const forceLogoutAt = (payload.user as Record<string, unknown>).force_logout_at;
+    if (forceLogoutAt && payload.iat) {
+      const forceLogoutTime = new Date(String(forceLogoutAt)).getTime() / 1000;
+      if (Number.isFinite(forceLogoutTime) && forceLogoutTime > payload.iat) {
+        return null; // 토큰 발급 이후 강제 로그아웃이 수행되었으면 토큰 즉시 무효화
+      }
+    }
     return {
       ...payload,
       user: normalizeSessionUser(payload.user) };

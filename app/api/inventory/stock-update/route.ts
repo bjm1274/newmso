@@ -9,6 +9,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
+import { assertInventoryItemCompanyScope } from '@/lib/inventory-scope-guard';
 import {
   atomicStockUpdate,
   StockError,
@@ -48,6 +49,13 @@ export async function POST(request: Request) {
 
     const d1 = await getD1Binding();
     if (!d1) throw new Error('[stock-update] D1 binding not available');
+
+    // 타 회사/부서 재고 조작 방지 권한 검증
+    const scopeCheck = await assertInventoryItemCompanyScope(d1, session.user, itemId);
+    if (!scopeCheck.ok) {
+      return scopeCheck.response;
+    }
+
     const result = await atomicStockUpdate(getD1Drizzle(d1), itemId, delta, minAllowed);
     return NextResponse.json({ ok: true, data: result });
   } catch (err) {
