@@ -42,6 +42,7 @@ crons = [
   "0 0 * * *",    # KST 09:00 — unread-repush, leave-announcements, birthday-announcements,
                   #            annual-leave-accrual, annual-leave-promotion, annual-leave-expiry, substitute-holiday,
                   #            payroll-notice (급여일 리마인더 — 내부에서 day===payrollDay만 발송)
+  "30 15 * * *",  # KST 00:30 — absent-auto-create: 전날 출근 미체크 직원 결근 자동 생성
   "0 4 * * *",    # KST 13:00 — 구 temp/resend 슬롯 (worker 맵 빈 배열 = no-op)
 ]
 

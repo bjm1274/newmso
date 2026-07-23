@@ -71,6 +71,8 @@ const CRON_ROUTES_BY_SCHEDULE: Record<string, string[]> = {
     '/api/cron/substitute-holiday',
     '/api/cron/payroll-notice',
   ],
+  // KST 00:30 매일 — 전날 출근 미체크 직원 결근 자동 생성
+  '30 15 * * *': ['/api/cron/absent-auto-create'],
   // 구 /api/temp/resend · 일 1회 chat-push 슬롯 정리
   '0 4 * * *': [],
   // 레거시 wrangler 슬롯이 남아 있어도 no-op (배포 전 구 트리거 호환)

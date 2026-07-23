@@ -1,8 +1,8 @@
 /**
- * ?? ?? ?? ???.
+ * 통합 연차 원장 모듈.
  *
- * ?? ??? leave_ledger? ???????. ?????? ??? ? ?????,
- * leave_requests? ?? workflow? ???? ??? ?? ?? ? ??? ?????.
+ * 모든 연차 집계는 leave_ledger를 SSOT로 사용합니다. leave_requests는 결재 workflow만 보관하고,
+ * leave_requests의 '부여' 유형은 법정 자동 발생(auto_annual/auto_monthly)이 없을 때만 원장에 반영합니다.
  */
 
 import {
@@ -323,12 +323,12 @@ export async function getUnifiedAnnualLeaveSummary(
       return isWithinCycle(row.occurredOn, cycle);
     });
 
-  // 만약 원장에 당해 연도 발생/부여 행이 없다면: 근속연수 기준 법정 연차 자동 적립(Seed)
+  // 법정 자동 발생(auto_annual/auto_monthly)이 있는지 확인.
+  // MANUAL_ADJUSTMENT는 관리자 수동 조정이므로 법정 발생 판단에서 제외한다.
   const hasAccrualInCycle = entries.some(
     (e) =>
       e.entryType === LEAVE_LEDGER_ENTRY_TYPE.AUTO_ANNUAL ||
       e.entryType === LEAVE_LEDGER_ENTRY_TYPE.AUTO_MONTHLY ||
-      e.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_ADJUSTMENT ||
       e.entryType === 'initial_grant',
   );
 
@@ -338,14 +338,19 @@ export async function getUnifiedAnnualLeaveSummary(
       : Math.min(25, 15 + Math.floor(Math.max(0, cycle.completedYears - 1) / 2));
 
     if (seedDays > 0) {
+      // periodKey를 auto-seed 대신 법정 형식(annual:N)으로 기록하여 UI에서 '자동부여'로 인식되도록 함
+      const seedPeriodKey =
+        cycle.completedYears === 0
+          ? `auto-seed:${cycle.key}`
+          : `annual:${cycle.completedYears}`;
       await upsertLedgerEntry(db, {
         staffId: staff.id,
         companyId: staff.company_id,
         entryType: LEAVE_LEDGER_ENTRY_TYPE.AUTO_ANNUAL,
         days: seedDays,
         occurredOn: cycle.start,
-        periodKey: `auto-seed:${cycle.key}`,
-        note: `연차 법정 산정 (${cycle.completedYears}년차)`,
+        periodKey: seedPeriodKey,
+        note: `연차 법정 산정 (입사일 기준 ${cycle.completedYears}년차 자동부여)`,
       });
 
       const updatedRows = await db
@@ -529,7 +534,7 @@ export async function setManualAnnualLeaveTarget(
       days: currentTotal + (target.total - before.total),
       occurredOn,
       periodKey: totalKey,
-      note: target.note ?? '??? ?? ?? ?? ??',
+      note: target.note ?? '관리자 수동 총 연차 변경',
     }),
     upsertLedgerEntry(db, {
       staffId,
@@ -538,7 +543,7 @@ export async function setManualAnnualLeaveTarget(
       days: currentUsed - (target.used - before.used),
       occurredOn,
       periodKey: usedKey,
-      note: target.note ?? '??? ?? ?? ??? ??',
+      note: target.note ?? '관리자 수동 사용일수 변경',
     }),
     upsertLedgerEntry(db, {
       staffId,
@@ -547,7 +552,7 @@ export async function setManualAnnualLeaveTarget(
       days: currentExpired - ((target.expired ?? 0) - before.expired),
       occurredOn,
       periodKey: expiredKey,
-      note: target.note ?? '??? ?? ?? ?? ??',
+      note: target.note ?? '관리자 수동 소멸일수 변경',
     }),
     upsertLedgerEntry(db, {
       staffId,
@@ -556,7 +561,7 @@ export async function setManualAnnualLeaveTarget(
       days: currentCompensated - ((target.compensated ?? 0) - before.compensated),
       occurredOn,
       periodKey: compensatedKey,
-      note: target.note ?? '??? ?? ?? ?? ??',
+      note: target.note ?? '관리자 수동 수당일수 변경',
     }),
   ]);
 
@@ -600,17 +605,35 @@ export async function syncApprovedLeaveRequestsToLedger(
     const occurredOn = toDateKey(row.start_date) ?? toDateKey(row.created_at) ?? asOfDate;
 
     if (isGrant) {
-      // 신규 연차 부여 신청 승인 시: 원장에 플러스(+) 일수로 더해줌
-      await upsertLedgerEntry(db, {
-        staffId: staff.id,
-        companyId: row.company_id ?? staff.company_id,
-        entryType: LEAVE_LEDGER_ENTRY_TYPE.MANUAL_ADJUSTMENT,
-        days: Math.abs(leaveDays(row)),
-        occurredOn,
-        periodKey,
-        sourceId: row.id,
-        note: `신규 연차 부여 승인 (${leaveType})`,
-      });
+      // 신규 연차 부여 신청 승인 시:
+      // 법정 자동 발생(auto_annual/auto_monthly)이 이미 존재하면 leave_requests 부여는 무시한다.
+      // cron으로 입사일 기준 자동 적립된 것이 SSOT이기 때문.
+      const existingAutoAccruals = await db
+        .select({ id: leaveLedgerTable.id })
+        .from(leaveLedgerTable)
+        .where(
+          and(
+            eq(leaveLedgerTable.staff_id, staff.id),
+            or(
+              eq(leaveLedgerTable.entry_type, 'auto_annual'),
+              eq(leaveLedgerTable.entry_type, 'auto_monthly'),
+            ),
+          ),
+        )
+        .limit(1);
+
+      if (existingAutoAccruals.length === 0) {
+        await upsertLedgerEntry(db, {
+          staffId: staff.id,
+          companyId: row.company_id ?? staff.company_id,
+          entryType: LEAVE_LEDGER_ENTRY_TYPE.MANUAL_ADJUSTMENT,
+          days: Math.abs(leaveDays(row)),
+          occurredOn,
+          periodKey,
+          sourceId: row.id,
+          note: `신규 연차 부여 승인 (${leaveType})`,
+        });
+      }
     } else if (isAnnualLeaveType(leaveType) || getLeaveUnit(leaveType) === 0.5) {
       // 일반 연차/반차 휴가 사용 승인 시: 마이너스(-) 일수로 차감
       await upsertLedgerEntry(db, {
