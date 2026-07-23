@@ -35,6 +35,11 @@ import {
   employment_contracts as employmentContractsTable,
   popups as popupsTable,
   system_configs as systemConfigsTable,
+  leave_ledger as leaveLedgerTable,
+  leave_requests as leaveRequestsTable,
+  leave_accruals as leaveAccrualsTable,
+  leave_balances as leaveBalancesTable,
+  staff_members as staffMembersTable,
   // 연산자
   ne,
   eq,
@@ -55,6 +60,7 @@ const VALID_TYPES = [
   'expired_popups',
   'force_logout',
   'sync_chat_rooms',
+  'annual_leave',
 ] as const;
 
 type DataResetType = (typeof VALID_TYPES)[number];
@@ -170,6 +176,20 @@ export async function POST(req: Request) {
         await refreshChatRoomLastMessage(db, r.id);
       }
       return NextResponse.json({ ok: true, count: rooms.length });
+    }
+
+    if (type === 'annual_leave') {
+      await Promise.all([
+        db.delete(leaveLedgerTable),
+        db.delete(leaveRequestsTable),
+        db.delete(leaveAccrualsTable),
+        db.delete(leaveBalancesTable),
+        db.update(staffMembersTable).set({
+          annual_leave_total: 0,
+          annual_leave_used: 0,
+        }),
+      ]);
+      return NextResponse.json({ ok: true, message: 'All annual leave ledger and request records cleared.' });
     }
 
     // 여기까지 도달하면 isValidType 검사에서 걸렸어야 하므로 unreachable

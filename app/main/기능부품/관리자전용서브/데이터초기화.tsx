@@ -14,7 +14,8 @@ type ResetActionType =
   | 'expired_contracts'
   | 'expired_popups'
   | 'force_logout'
-  | 'staff';
+  | 'staff'
+  | 'annual_leave';
 
 type ResetAction = {
   type: ResetActionType;
@@ -68,6 +69,14 @@ const RESET_ACTIONS: ResetAction[] = [
     impact: ['board_posts: 수술일정, MRI일정표, mri'],
     recovery: '운영 일정이 즉시 사라지므로 최근 백업 여부를 먼저 확인해야 합니다.',
     confirmationText: '일정 초기화',
+    dangerLevel: 'critical' },
+  {
+    type: 'annual_leave',
+    label: '전 직원 연차 발생·사용 내역 전체 삭제',
+    description: '연차 원장(leave_ledger), 사용/신청 내역(leave_requests), 발생(leave_accruals), 잔액(leave_balances) 데이터를 삭제하고 초기화합니다.',
+    impact: ['leave_ledger', 'leave_requests', 'leave_accruals', 'leave_balances', 'staff_members'],
+    recovery: '삭제 후 조회 시 법정 기준에 따라 순수 발생 연차가 다시 산정됩니다.',
+    confirmationText: '연차 초기화',
     dangerLevel: 'critical' },
   {
     type: 'system_logs',
@@ -237,7 +246,8 @@ function DataReseterDesktop({ onRefresh }: { onRefresh: () => void }) {
         type === 'system_logs' ||
         type === 'expired_contracts' ||
         type === 'expired_popups' ||
-        type === 'force_logout'
+        type === 'force_logout' ||
+        type === 'annual_leave'
       ) {
         const res = await fetch('/api/admin/data-reset', {
           method: 'POST',
