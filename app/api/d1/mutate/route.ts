@@ -346,6 +346,18 @@ function tableHasTextId(table: string): boolean {
   }
 }
 
+/** Drizzle schema에 정의된 해당 테이블의 유효 컬럼 키 Set 리턴 (미존재 컬럼 insert/update 원천 차단). */
+function getKnownTableColumns(table: string): Set<string> | null {
+  const def = (schema as Record<string, unknown>)[table];
+  if (!def) return null;
+  try {
+    const cols = getTableColumns(def as Parameters<typeof getTableColumns>[0]);
+    return new Set(Object.keys(cols));
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const session = await readSessionFromRequest(request);
@@ -403,9 +415,14 @@ export async function POST(request: Request) {
         return serializeRecord(withId);
       });
       const tableSql = sql.identifier(payload.table);
+      const knownCols = getKnownTableColumns(payload.table);
       const allCols = Array.from(
         serializedValues.reduce<Set<string>>((acc, row) => {
-          Object.keys(row).forEach((k) => acc.add(k));
+          Object.keys(row).forEach((k) => {
+            if (COLUMN_RE.test(k) && (!knownCols || knownCols.has(k))) {
+              acc.add(k);
+            }
+          });
           return acc;
         }, new Set()),
       );
@@ -569,7 +586,8 @@ export async function POST(request: Request) {
       // 객체/배열 값을 D1 bound value로 전달 가능한 TEXT로 직렬화 (수정 2)
       const serializedSet = serializeRecord(payload.set);
       const tableSql = sql.identifier(payload.table);
-      const setKeys = Object.keys(serializedSet).filter((k) => COLUMN_RE.test(k));
+      const knownCols = getKnownTableColumns(payload.table);
+      const setKeys = Object.keys(serializedSet).filter((k) => COLUMN_RE.test(k) && (!knownCols || knownCols.has(k)));
       if (setKeys.length === 0) {
         return NextResponse.json({ ok: false, error: 'Empty set' }, { status: 400 });
       }
