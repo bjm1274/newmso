@@ -54,7 +54,7 @@ export function isRelationMarkedMissing(relationName: string): boolean {
 
 export function isMissingColumnError(error: any, columnName = 'company_id'): boolean {
   if (!error) return false;
-  const message = String(error?.message || '').toLowerCase();
+  const message = String(error?.message || error?.error || error || '').toLowerCase();
   const details = String(error?.details || '').toLowerCase();
   const hint = String(error?.hint || '').toLowerCase();
   const column = columnName.toLowerCase();

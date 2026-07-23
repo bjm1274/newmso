@@ -1287,8 +1287,6 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         joined_at: dateOrNull(신규직원.입사일),
         resigned_at: dateOrNull(신규직원.퇴사일),
         status: 신규직원.상태,
-        is_group_account: 신규직원.is_group_account ? 1 : 0,
-        account_type: 신규직원.is_group_account ? 'team_group' : 'personal',
         permissions: {
           ...existingPermissions,
           is_group_account: 신규직원.is_group_account ? 1 : 0,
