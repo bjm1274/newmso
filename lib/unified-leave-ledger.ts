@@ -550,29 +550,45 @@ export async function syncApprovedLeaveRequestsToLedger(
   for (const row of rows) {
     const periodKey = `request:${row.id}`;
     const leaveType = String(row.leave_type ?? '');
-    const countable = approved(row.status)
-      && !leaveType.includes('??')
-      && (isAnnualLeaveType(leaveType) || getLeaveUnit(leaveType) === 0.5);
-    if (!countable) {
+    const isGrant = leaveType.includes('부여') || leaveType.includes('신규');
+    const isRetro = leaveType.includes('소급');
+    const isApproved = approved(row.status);
+
+    if (!isApproved || isRetro) {
       await db.delete(leaveLedgerTable).where(and(
         eq(leaveLedgerTable.staff_id, staffId),
-        eq(leaveLedgerTable.entry_type, LEAVE_LEDGER_ENTRY_TYPE.USE),
         eq(leaveLedgerTable.period_key, periodKey),
       ));
       continue;
     }
 
     const occurredOn = toDateKey(row.start_date) ?? toDateKey(row.created_at) ?? asOfDate;
-    await upsertLedgerEntry(db, {
-      staffId,
-      companyId: row.company_id ?? staff.company_id,
-      entryType: LEAVE_LEDGER_ENTRY_TYPE.USE,
-      days: -Math.abs(leaveDays(row)),
-      occurredOn,
-      periodKey,
-      sourceId: row.id,
-      note: `?? ?? ?? (${leaveType})`,
-    });
+
+    if (isGrant) {
+      // 신규 연차 부여 신청 승인 시: 원장에 플러스(+) 일수로 더해줌
+      await upsertLedgerEntry(db, {
+        staffId,
+        companyId: row.company_id ?? staff.company_id,
+        entryType: LEAVE_LEDGER_ENTRY_TYPE.MANUAL_ADJUSTMENT,
+        days: Math.abs(leaveDays(row)),
+        occurredOn,
+        periodKey,
+        sourceId: row.id,
+        note: `신규 연차 부여 승인 (${leaveType})`,
+      });
+    } else if (isAnnualLeaveType(leaveType) || getLeaveUnit(leaveType) === 0.5) {
+      // 일반 연차/반차 휴가 사용 승인 시: 마이너스(-) 일수로 차감
+      await upsertLedgerEntry(db, {
+        staffId,
+        companyId: row.company_id ?? staff.company_id,
+        entryType: LEAVE_LEDGER_ENTRY_TYPE.USE,
+        days: -Math.abs(leaveDays(row)),
+        occurredOn,
+        periodKey,
+        sourceId: row.id,
+        note: `휴가 사용 승인 (${leaveType})`,
+      });
+    }
   }
 
   return getUnifiedAnnualLeaveSummary(staffId, asOfDate);
