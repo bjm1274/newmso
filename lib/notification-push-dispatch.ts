@@ -280,3 +280,5 @@ export async function dispatchPushForNotificationRows(
 
   return result;
 }
+
+export { dispatchPushForNotificationRows as dispatchNotificationPush };
