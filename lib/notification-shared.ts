@@ -9,7 +9,6 @@
  * 각 모듈에 그대로 남기고, 여기에는 부작용 없는 공통 변환·선택 로직만 둔다.
  * (DB 무효화/삭제 헬퍼는 D1 binding을 받아 동작하도록 일반화한다.)
  */
-import 'server-only';
 import {
   getD1Drizzle,
   push_subscriptions as pushSubscriptionsTable,
