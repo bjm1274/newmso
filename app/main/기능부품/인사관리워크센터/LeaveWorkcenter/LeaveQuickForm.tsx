@@ -95,7 +95,8 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
   const activeDays = useMemo(() => {
     if (leaveType === '연차(부여)' || leaveType === '연차(과거사용)') {
       const parsed = parseFloat(manualDays);
-      return Number.isNaN(parsed) ? 0 : parsed;
+      if (Number.isNaN(parsed)) return 0;
+      return Math.round(parsed * 2) / 2;
     }
     return totalDays;
   }, [leaveType, manualDays, totalDays]);
@@ -120,6 +121,16 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
       toast('모든 시작일을 올바르게 선택해 주세요.', 'error');
       return;
     }
+    if (leaveType === '연차(부여)') {
+      if (activeDays < 0.5 || activeDays > 100) {
+        toast('연차 수동 부여는 0.5~100일(0.5 단위)만 가능합니다.', 'error');
+        return;
+      }
+      if (Math.abs(activeDays * 2 - Math.round(activeDays * 2)) > 1e-9) {
+        toast('연차 수동 부여는 0.5일 단위만 가능합니다.', 'error');
+        return;
+      }
+    }
     setSubmitting(true);
     try {
       await Promise.all(
@@ -130,10 +141,15 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
             startDate: range.startDate,
             endDate: range.endDate || range.startDate,
             days: (leaveType === '연차(부여)' || leaveType === '연차(과거사용)') ? activeDays : computeDays(range.startDate, range.endDate, leaveType),
-            reason })
+            reason: reason || (leaveType === '연차(부여)' ? `연차 수동 부여 +${activeDays}일` : '') })
         )
       );
-      toast(`${dateRanges.length}건의 연차/휴가 신청을 상신했습니다.`, 'success');
+      toast(
+        leaveType === '연차(부여)'
+          ? `연차 수동 부여 +${activeDays}일 결재를 관리자에게 상신했습니다.`
+          : `${dateRanges.length}건의 연차/휴가 신청을 상신했습니다.`,
+        'success',
+      );
       setReason('');
       setDateRanges([{ id: Date.now(), startDate: todayIso(), endDate: todayIso() }]);
       setManualDays('1');
@@ -250,11 +266,12 @@ export default function LeaveQuickForm({ picked, user, staffs, onSubmitted }: Pr
               <input
                 type="number"
                 step="0.5"
-                min="0"
+                min={leaveType === '연차(부여)' ? 0.5 : 0}
+                max={leaveType === '연차(부여)' ? 100 : undefined}
                 value={manualDays}
                 onChange={(e) => setManualDays(e.target.value)}
                 className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-2 py-1.5 text-right text-[12px] tnum font-bold"
-                aria-label="수동 입력된 총 일수"
+                aria-label={leaveType === '연차(부여)' ? '수동 부여 일수 0.5~100' : '수동 입력된 총 일수'}
               />
             ) : (
               <input

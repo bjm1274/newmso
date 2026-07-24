@@ -292,21 +292,48 @@ export function useAnnualLeaveSummary(staffId: string | null | undefined): Annua
       if (!response.ok || !payload.summary) throw new Error(payload.error || 'Could not load annual leave.');
 
       const summary = payload.summary;
-      const history = summary.entries
-        .filter((entry) => entry.entryType === 'use')
-        .map((entry) => ({
-          id: entry.id,
-          leave_type: '연차',
-          start_date: entry.occurredOn,
-          end_date: entry.occurredOn,
-          days: Math.abs(Number(entry.days) || 0),
-          daysLabel: `${Math.abs(Number(entry.days) || 0)}일`,
-          dateLabel: formatDateDot(entry.occurredOn),
-          status: '승인' as LeaveHistoryStatus,
-          reason: entry.note ?? null,
-          approved_at: null,
-          created_at: null,
-        }));
+      // 개인 연차·휴가 내역: 사용 + 수동부여 + 법정 발생(월차/연차) 모두 표시
+      const history = (summary.entries || [])
+        .filter((entry) => {
+          const t = String(entry.entryType || '');
+          return (
+            t === 'use' ||
+            t === 'manual_used_adjustment' ||
+            t === 'auto_monthly' ||
+            t === 'auto_annual' ||
+            t === 'manual_adjustment' ||
+            t === 'substitute'
+          );
+        })
+        .map((entry) => {
+          const t = String(entry.entryType || '');
+          const daysAbs = Math.abs(Number(entry.days) || 0);
+          let leaveType = '연차';
+          if (t === 'use' || t === 'manual_used_adjustment') leaveType = '연차 사용';
+          else if (t === 'auto_monthly') leaveType = '월 만근 월차';
+          else if (t === 'auto_annual') leaveType = '연차 신규 부여';
+          else if (t === 'manual_adjustment') leaveType = '연차 수동 부여';
+          else if (t === 'substitute') leaveType = '대체휴무';
+          const sign =
+            t === 'use' || t === 'manual_used_adjustment'
+              ? -1
+              : 1;
+          return {
+            id: entry.id,
+            leave_type: leaveType,
+            start_date: entry.occurredOn,
+            end_date: entry.occurredOn,
+            days: daysAbs * (sign < 0 ? 1 : 1),
+            daysLabel: `${sign < 0 ? '-' : '+'}${daysAbs}일`,
+            dateLabel: formatDateDot(entry.occurredOn),
+            status: '승인' as LeaveHistoryStatus,
+            reason: entry.note ?? null,
+            approved_at: null,
+            created_at: null,
+          };
+        })
+        .sort((a, b) => String(b.start_date).localeCompare(String(a.start_date)));
+      const usageOnly = history.filter((h) => h.leave_type === '연차 사용');
       const total = Number(summary.total) || 0;
       const used = Number(summary.used) || 0;
       const nextState: AnnualLeaveSummary = {
@@ -317,7 +344,8 @@ export function useAnnualLeaveSummary(staffId: string | null | undefined): Annua
         compensated: Number(summary.compensated) || 0,
         usageRate: total > 0 ? Math.round((used / total) * 100) : 0,
         history,
-        approvedHistory: history,
+        // 사용 집계용 — 사용분만
+        approvedHistory: usageOnly,
         year: Number(summary.cycle.start.slice(0, 4)) || year,
         hasBalanceRow: true,
         loading: false,

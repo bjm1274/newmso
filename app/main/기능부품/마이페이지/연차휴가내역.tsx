@@ -88,7 +88,9 @@ export default function AnnualLeaveUsagePanel({ user, onBack }: Props) {
   const summary = useAnnualLeaveSummary(staffId);
   const loading = summary.loading;
   const error = resolveError || summary.error || '';
-  const rows = summary.approvedHistory;
+  // 전체 내역(발생+사용) — 인사 연차 현황과 동일 원장(leave_ledger) 기준
+  const rows = summary.history;
+  const usageRows = summary.approvedHistory;
   const total = summary.total;
   const used = summary.used;
   const remaining = summary.remaining;
@@ -116,7 +118,10 @@ export default function AnnualLeaveUsagePanel({ user, onBack }: Props) {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-widest text-[var(--toss-gray-3)]">연차휴가</p>
-            <h2 className="mt-1 text-[18px] font-black text-[var(--foreground)]">사용내역</h2>
+            <h2 className="mt-1 text-[18px] font-black text-[var(--foreground)]">연차 · 휴가 내역</h2>
+            <p className="mt-1 text-[11px] font-semibold text-[var(--toss-gray-3)]">
+              인사관리 연차 현황과 동일한 원장 기준 (본인 내역만)
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -166,7 +171,10 @@ export default function AnnualLeaveUsagePanel({ user, onBack }: Props) {
       <section className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <h3 className="text-[14px] font-bold text-[var(--foreground)]">언제 사용했는지</h3>
+            <h3 className="text-[14px] font-bold text-[var(--foreground)]">발생 · 사용 내역</h3>
+            <p className="mt-0.5 text-[11px] text-[var(--toss-gray-3)]">
+              사용 {usageRows.length}건 · 전체 {rows.length}건
+            </p>
           </div>
           <span className="rounded-[var(--radius-md)] bg-[var(--muted)] px-3 py-1 text-[12px] font-black text-[var(--accent)]">
             {rows.length}건
@@ -175,7 +183,7 @@ export default function AnnualLeaveUsagePanel({ user, onBack }: Props) {
 
         {loading ? (
           <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] p-4 text-[12px] font-semibold text-[var(--toss-gray-3)]">
-            연차휴가 사용내역을 불러오는 중입니다...
+            연차·휴가 내역을 불러오는 중입니다...
           </div>
         ) : error ? (
           <div className="rounded-[var(--radius-md)] border border-red-100 bg-red-50 p-4 text-[12px] font-bold text-red-600">
@@ -183,43 +191,51 @@ export default function AnnualLeaveUsagePanel({ user, onBack }: Props) {
           </div>
         ) : rows.length === 0 ? (
           <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--muted)] p-4 text-[12px] font-semibold text-[var(--toss-gray-4)]">
-            승인된 연차휴가 사용내역이 없습니다.
+            표시할 연차·휴가 내역이 없습니다.
           </div>
         ) : (
           <div className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border)]">
-            <div className="hidden grid-cols-[1.4fr_0.7fr_0.6fr_1fr] gap-3 bg-[var(--muted)] px-4 py-3 text-[11px] font-bold text-[var(--toss-gray-3)] md:grid">
-              <span>사용일</span>
+            <div className="hidden grid-cols-[1.2fr_1fr_0.6fr_1fr] gap-3 bg-[var(--muted)] px-4 py-3 text-[11px] font-bold text-[var(--toss-gray-3)] md:grid">
+              <span>일자</span>
               <span>유형</span>
               <span>일수</span>
-              <span>승인일</span>
+              <span>사유</span>
             </div>
             <div className="divide-y divide-[var(--border)]">
               {rows.map((row) => {
                 const rangeLabel = formatRangeFromItem(row);
-                const approvedLabel = row.approved_at ? formatDateTimeKst(row.approved_at) : '-';
+                const isUse = String(row.leave_type || '').includes('사용');
+                const daysLabel =
+                  row.daysLabel ||
+                  `${isUse ? '-' : '+'}${Number(row.days || 0).toFixed(1)}일`;
                 return (
                   <article
                     key={row.id}
-                    className="grid gap-2 px-4 py-3 text-[12px] md:grid-cols-[1.4fr_0.7fr_0.6fr_1fr] md:items-center md:gap-3"
+                    className="grid gap-2 px-4 py-3 text-[12px] md:grid-cols-[1.2fr_1fr_0.6fr_1fr] md:items-center md:gap-3"
                   >
                     <div>
                       <p
                         className="font-bold text-[var(--foreground)]"
-                        aria-label={`사용일자 ${rangeLabel}`}
+                        aria-label={`일자 ${rangeLabel}`}
                       >
                         {rangeLabel}
                       </p>
-                      {row.reason ? (
-                        <p className="mt-1 line-clamp-1 text-[11px] font-medium text-[var(--toss-gray-3)]">{row.reason}</p>
-                      ) : null}
                     </div>
-                    <span className="font-semibold text-[var(--toss-gray-4)]">{row.leave_type || '연차'}</span>
-                    <span className="font-black text-[var(--accent)]">{row.days.toFixed(1)}일</span>
                     <span
-                      className="text-[11px] font-medium text-[var(--toss-gray-3)]"
-                      aria-label={approvedLabel === '-' ? '승인일 미기록' : `승인일 ${approvedLabel}`}
+                      className={`font-semibold ${
+                        isUse ? 'text-rose-600' : 'text-emerald-700'
+                      }`}
                     >
-                      {approvedLabel}
+                      {row.leave_type || '연차'}
+                    </span>
+                    <span className={`font-black ${isUse ? 'text-rose-600' : 'text-[var(--accent)]'}`}>
+                      {daysLabel}
+                    </span>
+                    <span
+                      className="line-clamp-2 text-[11px] font-medium text-[var(--toss-gray-3)]"
+                      title={row.reason || ''}
+                    >
+                      {row.reason || '-'}
                     </span>
                   </article>
                 );

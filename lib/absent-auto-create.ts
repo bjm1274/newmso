@@ -73,8 +73,15 @@ async function fetchStaffsWithoutYesterdayAttendance(yesterday: string): Promise
          SELECT DISTINCT a.staff_id
          FROM attendance a
          WHERE a.date = ?
+       )
+       AND sm.id NOT IN (
+         SELECT DISTINCT ll.staff_id
+         FROM leave_ledger ll
+         WHERE (ll.status = '승인' OR ll.status = 'approved')
+           AND ll.start_date <= ?
+           AND ll.end_date >= ?
        )`,
-    [yesterday],
+    [yesterday, yesterday, yesterday],
   );
   return rows as unknown as StaffMember[];
 }

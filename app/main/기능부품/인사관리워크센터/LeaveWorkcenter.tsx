@@ -137,10 +137,11 @@ export default function LeaveWorkcenter({
             const entryType = String(entry.entry_type ?? '');
             const periodKey = String(entry.period_key ?? '');
             if (periodKey.startsWith('auto-seed:')) return null;
-            // 가짜 수동 조정 표시 금지 — 법정 발생(월 만근/N년차 부여)만 발생 내역에 표시
-            let kind: 'monthly' | 'annual' | null = null;
+            // 법정 발생 + 결재 승인된 수동 부여만 표시 (가짜 차액 수동조정 금지)
+            let kind: 'monthly' | 'annual' | 'manual' | null = null;
             if (entryType === 'auto_monthly') kind = 'monthly';
             else if (entryType === 'auto_annual' || entryType === 'initial_grant') kind = 'annual';
+            else if (entryType === 'manual_adjustment' && Number(entry.days) > 0) kind = 'manual';
             else return null;
             const days = Number(entry.days) || 0;
             if (days <= 0) return null;
@@ -148,12 +149,10 @@ export default function LeaveWorkcenter({
             const annualYear = Number(String(periodKey).replace(/^annual:/, '')) || 0;
             let monthIndex = 0;
             if (kind === 'monthly') {
-              // note 예: "3개월차 만근 +1일"
               const fromNote = /(\d+)\s*개월/.exec(String(entry.note ?? ''));
               if (fromNote) {
                 monthIndex = Number(fromNote[1]) || 0;
               } else {
-                // 입사일 + period_key(YYYY-MM)로 개월차 추정
                 const hireRaw = String(
                   (row.staff as { hire_date?: string; join_date?: string; joined_at?: string }).hire_date
                     ?? (row.staff as { join_date?: string }).join_date
@@ -171,17 +170,21 @@ export default function LeaveWorkcenter({
             const label =
               kind === 'monthly'
                 ? '월 만근 월차'
-                : annualYear > 0
-                  ? `${annualYear}년차 신규 부여`
-                  : '연차 신규 부여';
+                : kind === 'manual'
+                  ? '연차 수동 부여'
+                  : annualYear > 0
+                    ? `${annualYear}년차 신규 부여`
+                    : '연차 신규 부여';
             const reason =
               kind === 'monthly'
                 ? monthIndex > 0
                   ? `입사 ${monthIndex}개월차 만근에 따른 월차 발생`
                   : '1년 미만 월 만근에 따른 월차 발생'
-                : annualYear > 0
-                  ? `만 ${annualYear}년차 입사 응당일 연차 신규 부여 (${days}일)`
-                  : `입사 응당일 연차 신규 부여 (${days}일)`;
+                : kind === 'manual'
+                  ? String(entry.note || `연차 수동 부여 승인 (+${days}일)`)
+                  : annualYear > 0
+                    ? `만 ${annualYear}년차 입사 응당일 연차 신규 부여 (${days}일)`
+                    : `입사 응당일 연차 신규 부여 (${days}일)`;
 
             return {
               id: String(entry.id ?? ''),
@@ -456,19 +459,24 @@ export default function LeaveWorkcenter({
   }, [doubleClickedStaff, data.requests]);
 
   const totalAccrued = useMemo(() => {
+    const manualSum = accrualList
+      .filter((item) => item.kind === 'manual')
+      .reduce((sum, item) => sum + Number(item.days || 0), 0);
     const annualItems = accrualList.filter((item) => item.kind === 'annual');
     if (annualItems.length > 0) {
-      // 당해 사이클: 가장 최근 N년차 부여분 1건만 유효 (1년=15, 2년=15, 3년=16 …)
+      // 당해 사이클: 가장 최근 N년차 부여분 1건 + 수동 부여분
       const sortedAnnuals = [...annualItems].sort((a, b) => {
         const numA = Number(a.period_key?.replace('annual:', '')) || Number(a.annualYear) || 0;
         const numB = Number(b.period_key?.replace('annual:', '')) || Number(b.annualYear) || 0;
         return numB - numA;
       });
-      return Number(sortedAnnuals[0].days || 0);
+      return Number(sortedAnnuals[0].days || 0) + manualSum;
     }
-    return accrualList
-      .filter((item) => item.kind === 'monthly')
-      .reduce((sum, item) => sum + Number(item.days || 0), 0);
+    return (
+      accrualList
+        .filter((item) => item.kind === 'monthly')
+        .reduce((sum, item) => sum + Number(item.days || 0), 0) + manualSum
+    );
   }, [accrualList]);
 
   // 캘린더용 entries — leave_requests의 start_date~end_date를 일자 단위로 펼침
@@ -1164,19 +1172,23 @@ export default function LeaveWorkcenter({
                           const isActiveAccrual = !isSupercededMonthly && !isPastAnnual;
                           const yearN = Number(g.annualYear) || Number(String(g.period_key || '').replace('annual:', '')) || 0;
                           const typeLabel =
-                            g.kind === 'annual'
-                              ? yearN > 0
-                                ? `${yearN}년차 신규 부여`
-                                : '연차 신규 부여'
-                              : '월 만근 월차';
+                            g.kind === 'manual'
+                              ? '연차 수동 부여'
+                              : g.kind === 'annual'
+                                ? yearN > 0
+                                  ? `${yearN}년차 신규 부여`
+                                  : '연차 신규 부여'
+                                : '월 만근 월차';
                           const reasonText =
                             g.reason ||
                             g.note ||
                             (g.kind === 'monthly'
                               ? '1년 미만 월 만근에 따른 월차 발생'
-                              : yearN > 0
-                                ? `만 ${yearN}년차 입사 응당일 연차 신규 부여 (${g.days}일)`
-                                : `입사 응당일 연차 신규 부여 (${g.days}일)`);
+                              : g.kind === 'manual'
+                                ? `연차 수동 부여 승인 (+${g.days}일)`
+                                : yearN > 0
+                                  ? `만 ${yearN}년차 입사 응당일 연차 신규 부여 (${g.days}일)`
+                                  : `입사 응당일 연차 신규 부여 (${g.days}일)`);
 
                           return (
                             <tr
@@ -1189,6 +1201,8 @@ export default function LeaveWorkcenter({
                               <td className="py-1.5 font-semibold">
                                 {g.kind === 'annual' ? (
                                   <span className="text-emerald-600 font-bold">{typeLabel}</span>
+                                ) : g.kind === 'manual' ? (
+                                  <span className="text-violet-700 font-bold">{typeLabel}</span>
                                 ) : (
                                   <span className="text-sky-700 font-bold">{typeLabel}</span>
                                 )}

@@ -540,33 +540,18 @@ export async function syncApprovedLeaveRequestsToLedger(
     const occurredOn = toDateKey(row.start_date) ?? toDateKey(row.created_at) ?? asOfDate;
 
     if (isGrant) {
-      // 신규 연차 부여 신청 승인 시:
-      // 법정 자동 발생(auto_annual/auto_monthly)이 이미 존재하면 leave_requests 부여는 무시한다.
-      // cron으로 입사일 기준 자동 적립된 것이 SSOT이기 때문.
-      const existingAutoAccruals = await db
-        .select({ id: leaveLedgerTable.id })
-        .from(leaveLedgerTable)
-        .where(
-          and(
-            eq(leaveLedgerTable.staff_id, staff.id),
-            or(
-              eq(leaveLedgerTable.entry_type, 'auto_annual'),
-              eq(leaveLedgerTable.entry_type, 'auto_monthly'),
-            ),
-          ),
-        )
-        .limit(1);
-
-      if (existingAutoAccruals.length === 0) {
+      // 연차 수동 부여 승인: 법정 자동 발생과 별도로 +일수 반영 (0.5 단위 포함)
+      const grantDays = Math.abs(leaveDays(row));
+      if (grantDays > 0) {
         await upsertLedgerEntry(db, {
           staffId: staff.id,
           companyId: row.company_id ?? staff.company_id,
           entryType: LEAVE_LEDGER_ENTRY_TYPE.MANUAL_ADJUSTMENT,
-          days: Math.abs(leaveDays(row)),
+          days: grantDays,
           occurredOn,
           periodKey,
           sourceId: row.id,
-          note: `신규 연차 부여 승인 (${leaveType})`,
+          note: `연차 수동 부여 승인 (+${grantDays}일)`,
         });
       }
     } else if (isAnnualLeaveType(leaveType) || getLeaveUnit(leaveType) === 0.5) {

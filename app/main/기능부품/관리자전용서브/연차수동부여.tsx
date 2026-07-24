@@ -3,23 +3,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { db } from '@/lib/db-client';
 import { SYSTEM_MASTER_ACCOUNT_ID, isNamedSystemMasterAccount } from '@/lib/system-master';
+import { getKoreanTodayString } from '@/lib/seoul-time';
+import { submitLeaveRequest } from '@/app/main/기능부품/인사관리워크센터/LeaveWorkcenter/data';
 import ManualGrantGrid, {
   type CompanyPolicy,
   type EditState } from './연차수동부여Grid';
-
-type ManualGrantUpdate = {
-  staffId: string;
-  total: number;
-  used: number;
-  expired: number;
-  compensated: number;
-};
-
-type LeaveBalanceRow = {
-  staff_id: string;
-  expired_days: number | null;
-  compensated_days: number | null;
-};
 
 type CompanyPolicyRow = {
   name: string | null;
@@ -27,24 +15,17 @@ type CompanyPolicyRow = {
   fiscal_year_start_month: number | null;
 };
 
-async function saveManualGrant(updates: ManualGrantUpdate[]) {
-  const response = await fetch('/api/admin/annual-leave/manual-grant', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json' },
-    body: JSON.stringify({ updates }) });
-
-  const payload = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new Error(payload?.error || '연차 수동 부여 저장에 실패했습니다.');
-  }
-
-  return payload as { message?: string };
+/** 0.5 단위, 0.5~100 */
+function normalizeGrantDays(value: number): number | null {
+  if (!Number.isFinite(value)) return null;
+  const rounded = Math.round(value * 2) / 2;
+  if (rounded < 0.5 || rounded > 100) return null;
+  return rounded;
 }
 
-function clampNumber(value: number) {
+function clampHalf(value: number) {
   if (!Number.isFinite(value) || value < 0) return 0;
-  return value;
+  return Math.round(value * 2) / 2;
 }
 
 export default function AnnualLeaveManualGrant({
@@ -56,8 +37,13 @@ export default function AnnualLeaveManualGrant({
   onRefresh?: () => void;
 }) {
   const [companyFilter, setCompanyFilter] = useState<string>('전체');
+  /** staffId → 이번에 부여할 일수(0.5~100) */
+  const [grantAmounts, setGrantAmounts] = useState<Record<string, number>>({});
+  const [reasons, setReasons] = useState<Record<string, string>>({});
   const [edits, setEdits] = useState<Record<string, Partial<EditState>>>({});
-  const [balances, setBalances] = useState<Record<string, { expired: number; compensated: number; total?: number; used?: number; remaining?: number }>>({});
+  const [balances, setBalances] = useState<
+    Record<string, { expired: number; compensated: number; total?: number; used?: number; remaining?: number }>
+  >({});
   const [companyPolicies, setCompanyPolicies] = useState<Record<string, CompanyPolicy>>({});
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -74,7 +60,6 @@ export default function AnnualLeaveManualGrant({
     [companyFilter, list],
   );
 
-  // 회사 정책 로드 — leave_policy / fiscal_year_start_month
   useEffect(() => {
     let active = true;
     const companyNames = Array.from(new Set(list.map((s: any) => s.company).filter(Boolean)));
@@ -109,7 +94,6 @@ export default function AnnualLeaveManualGrant({
     };
   }, [list]);
 
-  // leave_ledger 로드 — 단일 원장 기준 expired/compensated/total/used/remaining 조회
   useEffect(() => {
     let active = true;
     const staffIds = list.map((s: any) => String(s.id)).filter(Boolean);
@@ -118,52 +102,27 @@ export default function AnnualLeaveManualGrant({
       return;
     }
 
-    const year = new Date().getFullYear();
-    void Promise.all([
-      db
-        .from('leave_balances')
-        .select('staff_id, expired_days, compensated_days')
-        .eq('year', year)
-        .in('staff_id', staffIds),
-      db
-        .from('leave_ledger')
-        .select('staff_id, entry_type, days')
-        .in('staff_id', staffIds),
-    ]).then(([{ data: balData }, { data: legData }]) => {
-      if (!active) return;
-      const next: Record<string, { expired: number; compensated: number; total?: number; used?: number; remaining?: number }> = {};
-
-      if (legData && legData.length > 0) {
-        (legData as any[]).forEach((row) => {
-          const sId = String(row.staff_id || '');
-          if (!sId) return;
-          const entryType = String(row.entry_type || '');
-          const days = Number(row.days) || 0;
-
-          if (!next[sId]) {
-            next[sId] = { expired: 0, compensated: 0, total: 0, used: 0, remaining: 0 };
-          }
-          const current = next[sId];
-          current.remaining = (current.remaining || 0) + days;
-          if (entryType === 'use' || entryType === 'manual_used_adjustment') {
-            current.used = (current.used || 0) - days;
-          } else if (entryType === 'expire' || entryType === 'manual_expire_adjustment') {
-            current.expired = (current.expired || 0) - days;
-          } else if (entryType === 'compensate' || entryType === 'manual_compensate_adjustment') {
-            current.compensated = (current.compensated || 0) - days;
-          } else {
-            current.total = (current.total || 0) + days;
-          }
-        });
-      } else {
-        ((balData || []) as LeaveBalanceRow[]).forEach((row) => {
-          next[String(row.staff_id)] = {
-            expired: Number(row.expired_days) || 0,
-            compensated: Number(row.compensated_days) || 0 };
-        });
-      }
-      setBalances(next as any);
-    });
+    void db
+      .from('leave_balances')
+      .select('staff_id, total_days, used_days, remaining_days, expired_days, compensated_days')
+      .eq('year', new Date().getFullYear())
+      .in('staff_id', staffIds)
+      .then(({ data }) => {
+        if (!active) return;
+        const next: Record<string, { expired: number; compensated: number; total?: number; used?: number; remaining?: number }> = {};
+        for (const row of data || []) {
+          const sid = String((row as any).staff_id || '');
+          if (!sid) continue;
+          next[sid] = {
+            total: Number((row as any).total_days) || 0,
+            used: Number((row as any).used_days) || 0,
+            remaining: Number((row as any).remaining_days) || 0,
+            expired: Number((row as any).expired_days) || 0,
+            compensated: Number((row as any).compensated_days) || 0,
+          };
+        }
+        setBalances(next);
+      });
 
     return () => {
       active = false;
@@ -179,54 +138,62 @@ export default function AnnualLeaveManualGrant({
   const getCompensated = (staff: any) =>
     edits[staff.id]?.compensated ?? balances[staff.id]?.compensated ?? 0;
   const getRemaining = (staff: any) =>
-    balances[staff.id]?.remaining !== undefined && edits[staff.id]?.total === undefined && edits[staff.id]?.used === undefined
-      ? balances[staff.id].remaining!
+    balances[staff.id]?.remaining !== undefined
+      ? Number(balances[staff.id].remaining)
       : getTotal(staff) - getUsed(staff) - getExpired(staff) - getCompensated(staff);
 
-  const setField = (id: string, key: keyof EditState, value: number) =>
-    setEdits((prev) => ({ ...prev, [id]: { ...prev[id], [key]: clampNumber(value) } }));
-
-  const validateRow = (staff: any): string | null => {
-    const total = getTotal(staff);
-    const used = getUsed(staff);
-    const expired = getExpired(staff);
-    const compensated = getCompensated(staff);
-    if (used + expired + compensated > total + 0.001) {
-      return `${staff.name}: 사용(${used}) + 소멸(${expired}) + 수당지급(${compensated})이 총 연차(${total})를 초과합니다.`;
+  const setField = (id: string, key: keyof EditState, value: number) => {
+    if (key === 'total') {
+      // 부여 칸 = 이번에 추가 부여할 일수 (0.5~100)
+      const normalized = normalizeGrantDays(value);
+      setGrantAmounts((prev) => ({ ...prev, [id]: normalized ?? 0 }));
+      return;
     }
-    return null;
+    setEdits((prev) => ({ ...prev, [id]: { ...prev[id], [key]: clampHalf(value) } }));
   };
+
+  const getGrantAmount = (staff: any) => {
+    const raw = grantAmounts[String(staff.id)];
+    if (raw != null && Number.isFinite(raw)) return raw;
+    return 0;
+  };
+
+  /** 그리드 '부여' 칸에는 추가 부여 예정 일수를 표시 */
+  const getDisplayTotal = (staff: any) => getGrantAmount(staff);
 
   const handleSaveOne = async (staff: any) => {
     if (!canManage) return;
-
-    const err = validateRow(staff);
-    if (err) {
-      setMessage(err);
+    const days = normalizeGrantDays(getGrantAmount(staff));
+    if (days == null) {
+      setMessage(`${staff.name}: 부여 일수는 0.5일 단위로 0.5~100일만 가능합니다.`);
       return;
     }
 
     setSaving(true);
     setMessage('');
-
     try {
-      const payload = await saveManualGrant([
-        {
-          staffId: String(staff.id),
-          total: getTotal(staff),
-          used: getUsed(staff),
-          expired: getExpired(staff),
-          compensated: getCompensated(staff) },
-      ]);
-
-      // 로컬 balances 동기화 (재조회 없이 즉시 반영)
-      setBalances((prev) => ({
-        ...prev,
-        [staff.id]: { expired: getExpired(staff), compensated: getCompensated(staff) } }));
-      setMessage(payload.message || `${staff.name} 연차 저장 완료`);
+      const today = getKoreanTodayString();
+      const reason =
+        reasons[String(staff.id)]?.trim() ||
+        `관리자 연차 수동 부여 +${days}일 (승인 후 자동 반영)`;
+      await submitLeaveRequest({
+        staffId: String(staff.id),
+        leaveType: '연차(부여)',
+        startDate: today,
+        endDate: today,
+        days,
+        reason,
+      });
+      setMessage(
+        `${staff.name}: +${days}일 연차 수동 부여 결재 상신 완료 → 관리자 승인 시 자동 반영됩니다.`,
+      );
+      setGrantAmounts((prev) => ({ ...prev, [String(staff.id)]: 0 }));
       onRefresh?.();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('erp-leave-updated'));
+      }
     } catch (error: unknown) {
-      setMessage(`저장 실패: ${(error as Error)?.message || String(error)}`);
+      setMessage(`상신 실패: ${(error as Error)?.message || String(error)}`);
     } finally {
       setSaving(false);
     }
@@ -234,51 +201,59 @@ export default function AnnualLeaveManualGrant({
 
   const handleSaveAll = async () => {
     if (!canManage) return;
-
-    for (const staff of filtered) {
-      const err = validateRow(staff);
-      if (err) {
-        setMessage(`${err} 수정 후 다시 시도해주세요.`);
-        return;
-      }
+    const targets = filtered.filter((s: any) => {
+      const d = normalizeGrantDays(getGrantAmount(s));
+      return d != null && d >= 0.5;
+    });
+    if (targets.length === 0) {
+      setMessage('부여할 직원이 없습니다. 부여 칸에 0.5~100일(0.5 단위)을 입력하세요.');
+      return;
     }
 
     setSaving(true);
     setMessage('');
-
-    try {
-      const payload = await saveManualGrant(
-        filtered.map((staff: any) => ({
+    let ok = 0;
+    const fails: string[] = [];
+    const today = getKoreanTodayString();
+    for (const staff of targets) {
+      const days = normalizeGrantDays(getGrantAmount(staff));
+      if (days == null) continue;
+      try {
+        await submitLeaveRequest({
           staffId: String(staff.id),
-          total: getTotal(staff),
-          used: getUsed(staff),
-          expired: getExpired(staff),
-          compensated: getCompensated(staff) })),
-      );
-
-      setBalances((prev) => {
-        const next = { ...prev };
-        filtered.forEach((staff: any) => {
-          next[staff.id] = { expired: getExpired(staff), compensated: getCompensated(staff) };
+          leaveType: '연차(부여)',
+          startDate: today,
+          endDate: today,
+          days,
+          reason:
+            reasons[String(staff.id)]?.trim() ||
+            `관리자 연차 수동 부여 +${days}일 (승인 후 자동 반영)`,
         });
-        return next;
-      });
-      setMessage(payload.message || `총 ${filtered.length}명 연차 반영 완료`);
-      onRefresh?.();
-    } catch (error: unknown) {
-      setMessage(`저장 실패: ${(error as Error)?.message || String(error)}`);
-    } finally {
-      setSaving(false);
+        ok += 1;
+        setGrantAmounts((prev) => ({ ...prev, [String(staff.id)]: 0 }));
+      } catch (e) {
+        fails.push(`${staff.name}: ${(e as Error)?.message || e}`);
+      }
     }
+    setMessage(
+      fails.length
+        ? `상신 완료 ${ok}명 / 실패 ${fails.length}명 — ${fails[0]}`
+        : `총 ${ok}명 연차 수동 부여 결재 상신 완료 (관리자 승인 시 자동 반영)`,
+    );
+    onRefresh?.();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('erp-leave-updated'));
+    }
+    setSaving(false);
   };
 
   if (!canManage) {
     return (
       <div className="max-w-5xl rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-5 shadow-sm">
-        <h3 className="mb-2 text-xl font-semibold text-[var(--foreground)]">연차 개수 수동 부여</h3>
+        <h3 className="mb-2 text-xl font-semibold text-[var(--foreground)]">연차 수동 부여</h3>
         <p className="text-sm text-[var(--toss-gray-3)]">
           <code className="rounded bg-[var(--muted)] px-1.5 py-0.5 font-mono text-[11px]">{SYSTEM_MASTER_ACCOUNT_ID}</code>
-          {' '}계정만 연차 수동 부여를 저장할 수 있습니다.
+          {' '}계정만 연차 수동 부여를 상신할 수 있습니다.
         </p>
       </div>
     );
@@ -286,11 +261,13 @@ export default function AnnualLeaveManualGrant({
 
   return (
     <div className="max-w-6xl rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm">
-      <h3 className="mb-2 text-base font-semibold text-[var(--foreground)]">연차 개수 수동 부여</h3>
-      <p className="mb-3 text-[11px] font-bold text-[var(--toss-gray-3)]">
-        신규입사자 포함 모든 직원의 연차 부여일·사용일·소멸·수당지급 일수를 직접 설정할 수 있습니다.
-        부여 기간은 입사일 기준 1년 단위(예: 2023-05-01 입사 → 현재 사이클 2026-05-01 ~ 2027-04-30)로 표시되며,
-        잔여 = 부여 − 사용 − 소멸 − 수당지급 으로 자동 계산됩니다.
+      <h3 className="mb-2 text-base font-semibold text-[var(--foreground)]">연차 수동 부여 (결재 후 자동 반영)</h3>
+      <p className="mb-3 text-[11px] font-bold text-[var(--toss-gray-3)] leading-relaxed">
+        • 부여 칸에 <strong>추가 부여 일수</strong>를 입력합니다 (0.5일 단위, 0.5~100일).
+        <br />
+        • 저장 시 전자결재가 <strong>관리자</strong>에게 자동 상신되고, 관리자 승인 시 leave 원장에 자동 부여됩니다.
+        <br />
+        • 현재 잔여/사용은 참고용이며, 입사일 기준 법정 발생분과 별도로 수동 부여분이 합산됩니다.
       </p>
 
       <div className="mb-3 flex items-center gap-4">
@@ -312,7 +289,7 @@ export default function AnnualLeaveManualGrant({
       {message && (
         <div
           className={`mb-3 rounded-[var(--radius-lg)] p-3 text-sm font-bold ${
-            message.includes('실패') || message.includes('초과') ? 'bg-danger/10 text-danger' : 'bg-success/10 text-success'
+            message.includes('실패') || message.includes('가능') ? 'bg-danger/10 text-danger' : 'bg-success/10 text-success'
           }`}
         >
           {message}
@@ -324,7 +301,7 @@ export default function AnnualLeaveManualGrant({
         companyPolicies={companyPolicies}
         today={today}
         saving={saving}
-        getTotal={getTotal}
+        getTotal={getDisplayTotal}
         getUsed={getUsed}
         getExpired={getExpired}
         getCompensated={getCompensated}
@@ -340,7 +317,7 @@ export default function AnnualLeaveManualGrant({
           disabled={saving}
           className="mt-4 w-full rounded-[var(--radius-md)] bg-teal-600 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
         >
-          {saving ? '저장 중...' : `위 ${filtered.length}명 일괄 저장`}
+          {saving ? '상신 중...' : `부여 입력된 직원 일괄 결재 상신`}
         </button>
       )}
     </div>

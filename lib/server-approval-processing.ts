@@ -413,14 +413,14 @@ export async function processFinalApprovalEffects(
           }
         }
 
-        if (isAnnualLeaveType(leaveType)) {
+        if (isAnnualLeaveType(leaveType) || leaveType === LEAVE_TYPE.GRANT) {
           await syncAnnualLeaveUsedForStaff(senderId);
         }
 
         // 연차 부여/차감/사용 후 잔여연차 및 밸런스 테이블 재계산 트리거
+        // (연차 수동 부여 승인 시 leave_requests → leave_ledger 반영 포함)
         try {
           const { recalculateLeaveBalance } = await import('@/lib/annual-leave-balance');
-          // 당해 연도 잔액 재계산 (year 미지정 시 서버 로컬 연도 — leave_balances.year 와 맞춤)
           await recalculateLeaveBalance(senderId);
         } catch (recalcErr) {
           console.error('[server-approval-processing] recalculateLeaveBalance 실패:', recalcErr);

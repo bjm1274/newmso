@@ -100,7 +100,8 @@ export default function ManualGrantGrid({
         id={inputId}
         type="number"
         inputMode="decimal"
-        min={0}
+        min={key === 'total' ? 0.5 : 0}
+        max={key === 'total' ? 100 : undefined}
         step={0.5}
         value={Number.isFinite(value) ? value : 0}
         onChange={(event) => {
@@ -113,8 +114,8 @@ export default function ManualGrantGrid({
     );
   };
 
-  const isOver = (staff: any) =>
-    getUsed(staff) + getExpired(staff) + getCompensated(staff) > getTotal(staff) + 0.001;
+  // 추가 부여 칸은 0.5~100 범위만 유효 — 초과 여부는 현재 잔여와 무관
+  const isOver = (_staff: any) => false;
 
   const fields: EditableGridField<any>[] = [
     {
@@ -160,36 +161,37 @@ export default function ManualGrantGrid({
       } },
     {
       id: 'total',
-      label: '부여',
-      width: '96px',
-      render: (staff) => numberInput(staff, 'total', getTotal(staff), `${staff.name} 부여 연차`) },
+      label: '추가 부여',
+      width: '110px',
+      render: (staff) => numberInput(staff, 'total', getTotal(staff), `${staff.name} 추가 부여 일수 (0.5~100)`) },
     {
       id: 'used',
-      label: '사용',
+      label: '현재 사용',
       width: '96px',
-      render: (staff) => numberInput(staff, 'used', getUsed(staff), `${staff.name} 사용 연차`) },
+      render: (staff) => (
+        <span className="text-sm font-bold text-[var(--toss-gray-4)]">{getUsed(staff).toFixed(1)}</span>
+      ) },
     {
       id: 'expired',
       label: '소멸',
-      width: '96px',
-      render: (staff) => numberInput(staff, 'expired', getExpired(staff), `${staff.name} 소멸 연차`) },
-    {
-      id: 'compensated',
-      label: '수당지급',
-      width: '96px',
-      render: (staff) =>
-        numberInput(staff, 'compensated', getCompensated(staff), `${staff.name} 수당지급 연차`) },
-    {
-      id: 'remaining',
-      label: '잔여',
-      align: 'right',
       width: '80px',
       render: (staff) => (
-        <span
-          className={`text-sm font-bold ${
-            isOver(staff) ? 'text-[var(--danger)]' : 'text-[var(--success,#16a34a)]'
-          }`}
-        >
+        <span className="text-sm font-bold text-[var(--toss-gray-4)]">{getExpired(staff).toFixed(1)}</span>
+      ) },
+    {
+      id: 'compensated',
+      label: '수당',
+      width: '80px',
+      render: (staff) => (
+        <span className="text-sm font-bold text-[var(--toss-gray-4)]">{getCompensated(staff).toFixed(1)}</span>
+      ) },
+    {
+      id: 'remaining',
+      label: '현재 잔여',
+      align: 'right',
+      width: '90px',
+      render: (staff) => (
+        <span className="text-sm font-bold text-[var(--success,#16a34a)]">
           {getRemaining(staff).toFixed(1)}일
         </span>
       ) },
@@ -206,10 +208,10 @@ export default function ManualGrantGrid({
         <button
           type="button"
           onClick={() => void onSaveOne(staff)}
-          disabled={saving || isOver(staff)}
+          disabled={saving || !(Number(getTotal(staff)) >= 0.5)}
           className="rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
         >
-          저장
+          결재 상신
         </button>
       )}
       emptyMessage="표시할 직원이 없습니다."

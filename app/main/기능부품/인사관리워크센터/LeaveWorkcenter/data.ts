@@ -328,12 +328,25 @@ export interface LeaveSubmitInput {
 
 export async function submitLeaveRequest(input: LeaveSubmitInput): Promise<void> {
   const leaveTypeKey = normalizeLeaveType(input.leaveType);
+  // 수동 부여: 0.5 단위, 0.5~100
+  let days = Number(input.days) || 0;
+  if (leaveTypeKey === '연차(부여)') {
+    if (!Number.isFinite(days) || days < 0.5 || days > 100) {
+      throw new Error('연차 수동 부여는 0.5일 단위로 0.5~100일만 가능합니다.');
+    }
+    // 0.5 배수 검증 (부동소수 허용)
+    if (Math.abs(days * 2 - Math.round(days * 2)) > 1e-9) {
+      throw new Error('연차 수동 부여는 0.5일 단위만 가능합니다.');
+    }
+    days = Math.round(days * 2) / 2;
+  }
+
   const payload = {
     staff_id: input.staffId,
     leave_type: leaveTypeKey,
     start_date: input.startDate,
     end_date: input.endDate || input.startDate,
-    days: input.days,
+    days,
     reason: input.reason || '',
     status: '대기' as LeaveStatus,
     created_at: new Date().toISOString() };
@@ -349,22 +362,43 @@ export async function submitLeaveRequest(input: LeaveSubmitInput): Promise<void>
       .maybeSingle();
 
     const staffName = staffData?.name || '직원';
-    // 전역 admin 1명 휴리스틱 제거 — 회사 스코프 기본 결재선 SSOT
     const { data: directoryRows } = await db
       .from('staff_members')
-      .select('id, name, company, department, position, status, role, permissions, hire_date, resign_date');
-    const { selectDefaultApproverLine } = await import('@/lib/approval-routing');
-    const line = selectDefaultApproverLine((directoryRows ?? []) as import('@/types').StaffMember[], {
-      selfId: input.staffId,
-      company: String(staffData?.company || '').trim() || undefined,
-      includeSyInc: true,
-      maxCount: 3,
-      mode: 'head_or_above',
-    });
+      .select('id, name, company, department, position, status, role, permissions, employee_no, hire_date, resign_date');
+
+    // 연차 수동 부여 → 관리자 결재선 고정 / 일반 사용 → 기본 결재선
+    let line: Array<{
+      id: string;
+      name?: string | null;
+      position?: string | null;
+      department?: string | null;
+      company?: string | null;
+    }> = [];
+    let approverLineSource = 'leave_workcenter';
+    if (leaveTypeKey === '연차(부여)') {
+      const { selectLeaveAdminApproverLine } = await import('@/lib/leave-admin-approver');
+      line = selectLeaveAdminApproverLine((directoryRows ?? []) as any[], {
+        selfId: input.staffId,
+        maxCount: 3,
+      });
+      approverLineSource = 'leave_admin_grant';
+      if (line.length === 0) {
+        throw new Error('관리자 결재자를 찾을 수 없습니다. 관리자 계정을 확인해주세요.');
+      }
+    } else {
+      const { selectDefaultApproverLine } = await import('@/lib/approval-routing');
+      line = selectDefaultApproverLine((directoryRows ?? []) as import('@/types').StaffMember[], {
+        selfId: input.staffId,
+        company: String(staffData?.company || '').trim() || undefined,
+        includeSyInc: true,
+        maxCount: 3,
+        mode: 'head_or_above',
+      });
+    }
     const firstApprover = line[0];
 
     let titleType = '연차 사용 신청';
-    if (leaveTypeKey === '연차(부여)') titleType = '연차 신규 부여';
+    if (leaveTypeKey === '연차(부여)') titleType = `연차 수동 부여 +${days}일`;
     else if (leaveTypeKey === '연차(과거사용)') titleType = '도입 전 사용 소급';
 
     const { row: approvalPayload } = buildApprovalSubmitPayload({
@@ -375,7 +409,10 @@ export async function submitLeaveRequest(input: LeaveSubmitInput): Promise<void>
       companyId: staffData?.company_id || null,
       typeName: '연차/휴가',
       title: `[연차/휴가] ${staffName} - ${titleType}`,
-      content: input.reason || '',
+      content:
+        leaveTypeKey === '연차(부여)'
+          ? (input.reason || `연차 수동 부여 ${days}일 (관리자 승인 후 자동 반영)`)
+          : input.reason || '',
       formSlug: 'leave',
       formDisplayName: '연차/휴가',
       approverLine: line.map((s) => ({
@@ -385,15 +422,16 @@ export async function submitLeaveRequest(input: LeaveSubmitInput): Promise<void>
         department: s.department || null,
         company: s.company || null,
       })),
-      approverLineSource: 'leave_workcenter',
+      approverLineSource,
       ccDepartments: ['행정팀'],
       extraMeta: {
         startDate: input.startDate,
         endDate: input.endDate || input.startDate,
         leaveType: leaveTypeKey,
         reason: input.reason || '',
-        days: input.days,
+        days,
         vType: leaveTypeKey,
+        manual_grant: leaveTypeKey === '연차(부여)',
       },
     });
 
@@ -407,8 +445,11 @@ export async function submitLeaveRequest(input: LeaveSubmitInput): Promise<void>
       try {
         await d1.from('notifications').insert({
           user_id: firstApproverId,
-          title: '연차 승인 요청',
-          body: `${staffName}님이 연차를 신청했습니다`,
+          title: leaveTypeKey === '연차(부여)' ? '연차 수동 부여 승인 요청' : '연차 승인 요청',
+          body:
+            leaveTypeKey === '연차(부여)'
+              ? `${staffName} 연차 수동 부여 +${days}일 승인 요청`
+              : `${staffName}님이 연차를 신청했습니다`,
           type: 'approval',
           read_at: null,
           created_at: new Date().toISOString() });
@@ -418,6 +459,10 @@ export async function submitLeaveRequest(input: LeaveSubmitInput): Promise<void>
     }
   } catch (err) {
     console.error('전자결재 상신 등록 중 오류 발생:', err);
+    // 수동 부여는 결재 상신이 핵심 — 실패 시 호출부에 전달
+    if (leaveTypeKey === '연차(부여)') {
+      throw err instanceof Error ? err : new Error(String(err));
+    }
   }
 }
 
