@@ -16,7 +16,6 @@
  *   - FCM 만료 토큰은 fcm_token=null로 무효화.
  *   - 푸시 실패 row가 있어도 전체를 중단하지 않고 로그만 남긴다.
  */
-import 'server-only';
 import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push-cloudflare';
 import { sendFcmBatch } from '@/lib/fcm-http';
 import { isWithinPushQuietHours } from '@/lib/push-quiet-hours';

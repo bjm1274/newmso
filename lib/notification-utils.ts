@@ -409,26 +409,28 @@ export async function insertNotificationsOrThrow(
       source: 'insertNotificationsOrThrow',
     }).catch(() => {});
 
-    // 인앱 알림 INSERT 후 대상 사용자들에게 FCM / WebPush 푸시 비동기 발송
-    void (async () => {
-      try {
-        const { dispatchNotificationPush } = await import('@/lib/notification-push-dispatch');
-        const pushRows = rows
-          .filter((r) => r.user_id && r.title && r.type)
-          .map((r) => ({
-            user_id: String(r.user_id),
-            type: String(r.type),
-            title: String(r.title),
-            body: String(r.body || ''),
-            metadata: r.metadata ?? null,
-          }));
-        if (pushRows.length > 0) {
-          await dispatchNotificationPush(pushRows);
+    // 인앱 알림 INSERT 후 대상 사용자들에게 FCM / WebPush 푸시 비동기 발송 (서버 전용)
+    if (typeof window === 'undefined') {
+      void (async () => {
+        try {
+          const { dispatchNotificationPush } = await import('@/lib/notification-push-dispatch');
+          const pushRows = rows
+            .filter((r) => r.user_id && r.title && r.type)
+            .map((r) => ({
+              user_id: String(r.user_id),
+              type: String(r.type),
+              title: String(r.title),
+              body: String(r.body || ''),
+              metadata: r.metadata ?? null,
+            }));
+          if (pushRows.length > 0) {
+            await dispatchNotificationPush(pushRows);
+          }
+        } catch {
+          // 푸시 실패는 인앱 알림 생성을 차단하지 않음
         }
-      } catch {
-        // 푸시 실패는 인앱 알림 생성을 차단하지 않음
-      }
-    })();
+      })();
+    }
 
     return inserted;
   } catch (err) {
