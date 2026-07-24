@@ -116,22 +116,46 @@ export default function LeaveWorkcenter({
         body: JSON.stringify({ staffId: String(row.staff.id) })
       }).catch(err => console.error('실시간 연차 동기화 실패:', err));
 
+      // SSOT: leave_ledger (leave_accruals 는 레거시, 비어 있을 수 있음)
       const res = await fetch('/api/d1/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          table: 'leave_accruals',
+          table: 'leave_ledger',
           where: [
             { field: 'staff_id', op: 'eq', value: String(row.staff.id) }
           ],
           order: [
-            { field: 'created_at', ascending: false }
+            { field: 'occurred_on', ascending: false }
           ]
         })
       });
       const result = await res.json();
       if (result.ok && Array.isArray(result.data)) {
-        setAccrualList(result.data);
+        const mapped = result.data
+          .map((entry: Record<string, unknown>) => {
+            const entryType = String(entry.entry_type ?? '');
+            const periodKey = String(entry.period_key ?? '');
+            if (periodKey.startsWith('auto-seed:')) return null;
+            let kind: 'monthly' | 'annual' | 'manual' | null = null;
+            if (entryType === 'auto_monthly') kind = 'monthly';
+            else if (entryType === 'auto_annual' || entryType === 'initial_grant') kind = 'annual';
+            else if (entryType === 'manual_adjustment' || entryType === 'substitute') kind = 'manual';
+            else return null;
+            const days = Number(entry.days) || 0;
+            if (days <= 0) return null;
+            return {
+              id: String(entry.id ?? ''),
+              kind,
+              period_key: periodKey,
+              days,
+              note: entry.note ?? null,
+              created_at: entry.occurred_on ?? entry.created_at ?? null,
+              source_date: entry.occurred_on ?? null,
+            };
+          })
+          .filter(Boolean);
+        setAccrualList(mapped);
       } else {
         console.error('자동발생 연차 조회 실패:', result.error);
       }

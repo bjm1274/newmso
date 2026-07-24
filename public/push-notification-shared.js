@@ -365,11 +365,11 @@ function erpIsMobileDevice() {
   return /android|iphone|ipad|ipod/i.test(userAgent);
 }
 
-// 수정 J: 항상 true가 되는 버그 수정.
-// 모바일 기기에서만 foreground popup 표시 (데스크톱은 인앱 toast로 충분).
+// 수정 J: PC/모바일 모두 foreground에서 시스템 팝업 표시 (2026-07-24 버그 수정).
+// 데스크톱도 OS 알림 팝업이 표시되어야 사용자가 알림을 인지할 수 있습니다.
 function erpShouldShowForegroundPopup(payload) {
   void payload;
-  return erpIsMobileDevice();
+  return true;
 }
 
 async function erpBroadcastPreviewToVisibleClients(payload) {

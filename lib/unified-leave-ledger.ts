@@ -323,76 +323,11 @@ export async function getUnifiedAnnualLeaveSummary(
       return isWithinCycle(row.occurredOn, cycle);
     });
 
-  // 법정 자동 발생(auto_annual/auto_monthly)이 있는지 확인.
-  // MANUAL_ADJUSTMENT는 관리자 수동 조정이므로 법정 발생 판단에서 제외한다.
-  const hasAccrualInCycle = entries.some(
-    (e) =>
-      e.entryType === LEAVE_LEDGER_ENTRY_TYPE.AUTO_ANNUAL ||
-      e.entryType === LEAVE_LEDGER_ENTRY_TYPE.AUTO_MONTHLY ||
-      e.entryType === 'initial_grant',
-  );
+  // 법정 자동 발생은 processAnnualLeaveAccrual / 백필 스크립트만 기록한다.
+  // 조회 경로에서 1년 미만 11일 시드 등 write side-effect를 두지 않는다.
+  // (과거 auto-seed 잔존분은 집계에서 제외)
 
-  if (!hasAccrualInCycle) {
-    const seedDays = cycle.completedYears === 0
-      ? 11
-      : Math.min(25, 15 + Math.floor(Math.max(0, cycle.completedYears - 1) / 2));
-
-    if (seedDays > 0) {
-      // periodKey를 auto-seed 대신 법정 형식(annual:N)으로 기록하여 UI에서 '자동부여'로 인식되도록 함
-      const seedPeriodKey =
-        cycle.completedYears === 0
-          ? `auto-seed:${cycle.key}`
-          : `annual:${cycle.completedYears}`;
-      await upsertLedgerEntry(db, {
-        staffId: staff.id,
-        companyId: staff.company_id,
-        entryType: LEAVE_LEDGER_ENTRY_TYPE.AUTO_ANNUAL,
-        days: seedDays,
-        occurredOn: cycle.start,
-        periodKey: seedPeriodKey,
-        note: `연차 법정 산정 (입사일 기준 ${cycle.completedYears}년차 자동부여)`,
-      });
-
-      const updatedRows = await db
-        .select({
-          id: leaveLedgerTable.id,
-          entry_type: leaveLedgerTable.entry_type,
-          days: leaveLedgerTable.days,
-          occurred_on: leaveLedgerTable.occurred_on,
-          period_key: leaveLedgerTable.period_key,
-          source_id: leaveLedgerTable.source_id,
-          note: leaveLedgerTable.note,
-        })
-        .from(leaveLedgerTable)
-        .where(eq(leaveLedgerTable.staff_id, staff.id));
-
-      entries = updatedRows
-        .map((row) => ({
-          id: String(row.id),
-          entryType: String(row.entry_type),
-          days: Number(row.days) || 0,
-          occurredOn: toDateKey(row.occurred_on) ?? '',
-          periodKey: String(row.period_key),
-          sourceId: row.source_id ?? null,
-          note: row.note ?? null,
-        }))
-        .filter((row) => {
-          if (!row.occurredOn) return false;
-          if (
-            row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_ADJUSTMENT ||
-            row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_USED_ADJUSTMENT ||
-            row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_EXPIRE_ADJUSTMENT ||
-            row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_COMPENSATE_ADJUSTMENT ||
-            row.entryType === LEAVE_LEDGER_ENTRY_TYPE.SUBSTITUTE ||
-            row.entryType === 'initial_grant' ||
-            row.periodKey.startsWith('auto-seed:')
-          ) {
-            return true;
-          }
-          return isWithinCycle(row.occurredOn, cycle);
-        });
-    }
-  }
+  entries = entries.filter((row) => !row.periodKey.startsWith('auto-seed:'));
 
   let total = 0;
   let used = 0;

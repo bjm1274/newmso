@@ -204,13 +204,16 @@ export async function fetchLeaveData({
     }
   }
 
-  // leave_ledger 기반 직원별 원장 집계
+  // leave_ledger 집계는 참고용. 화면 숫자는 leave_balances(당해 사이클 재계산분)를 우선한다.
+  // (ledger 전 이력 합산 시 과거 annual:N 이 중복 합산되어 30일 등으로 부풀려질 수 있음)
   const ledgerByStaff = new Map<string, { total: number; used: number; expired: number; compensated: number; remaining: number }>();
   for (const l of rawLedgers) {
     if (!l || typeof l !== 'object') continue;
     const sId = String((l as Record<string, unknown>).staff_id || '').trim();
     if (!sId) continue;
     const entryType = String((l as Record<string, unknown>).entry_type || '');
+    const periodKey = String((l as Record<string, unknown>).period_key || '');
+    if (periodKey.startsWith('auto-seed:')) continue;
     const days = Number((l as Record<string, unknown>).days) || 0;
 
     if (!ledgerByStaff.has(sId)) {
@@ -272,9 +275,10 @@ export async function fetchLeaveData({
       year: now.getFullYear(),
     });
 
-    const total = ledger ? ledger.total : summary.total;
-    const used = ledger ? ledger.used : summary.used;
-    const remaining = ledger ? Math.max(0, ledger.remaining) : summary.remaining;
+    // leave_balances 가 있으면 SSOT (전체 재계산 후 사이클 기준). 없으면 summary/ledger 순.
+    const total = balance != null ? summary.total : (ledger ? ledger.total : summary.total);
+    const used = balance != null ? summary.used : (ledger ? ledger.used : summary.used);
+    const remaining = balance != null ? summary.remaining : (ledger ? Math.max(0, ledger.remaining) : summary.remaining);
     const expiry = balance?.expiry_date ?? null;
     const daysUntilExpiry = balance?.days_until_expiry ?? 365;
     return {

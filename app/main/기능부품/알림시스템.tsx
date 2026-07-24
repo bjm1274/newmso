@@ -913,9 +913,9 @@ export function sendNotification(title: string, options?: NotificationOptions) {
       .then((reg) =>
         reg.showNotification(title, {
           badge: '/badge-72x72.png',
-          tag: 'erp-noti',
-          requireInteraction: false,
-          ...options })
+          tag: options?.tag || 'erp-noti',
+          requireInteraction: true,
+          ...options } as NotificationOptions & { renotify?: boolean })
       )
       .then(() => {
         recordPushDebug({
