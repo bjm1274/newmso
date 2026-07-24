@@ -284,7 +284,7 @@ for (const s of staffs) {
       const days = annualLeaveDaysForTenure(n);
       const occurredOn = addYearsKey(hireKey, n) ?? TODAY;
       const id = randomUUID();
-      const note = `만 ${n}년차 연차 ${days}일 자동부여(전체재계산)`;
+      const note = `만 ${n}년차 입사 응당일 연차 신규 부여 (${days}일)`;
       grantInserts.push({
         id,
         staff_id: s.id,
@@ -321,7 +321,7 @@ for (const s of staffs) {
     if (hasAbsence(s.id, startKey, endKey)) continue;
     const periodKey = startKey.slice(0, 7);
     const id = randomUUID();
-    const note = `${k}개월차 만근 +1일(전체재계산)`;
+    const note = `입사 ${k}개월차 만근에 따른 월차 발생`;
     grantInserts.push({
       id,
       staff_id: s.id,
