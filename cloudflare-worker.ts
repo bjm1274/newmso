@@ -22,13 +22,19 @@ type ScheduledControllerLike = {
   cron: string;
 };
 
+type D1PreparedLike = {
+  bind: (...args: unknown[]) => D1PreparedLike;
+  run: () => Promise<unknown>;
+  first: () => Promise<unknown>;
+  all: () => Promise<{ results?: unknown[] } | undefined>;
+};
+
 type WorkerEnv = Record<string, unknown> & {
   CRON_SECRET?: string;
   SESSION_SECRET?: string;
   DB?: {
-    prepare: (sql: string) => {
-      bind: (...args: unknown[]) => { run: () => Promise<unknown> };
-    };
+    prepare: (sql: string) => D1PreparedLike;
+    batch?: (statements: D1PreparedLike[]) => Promise<unknown>;
   };
   REALTIME_HUB?: {
     idFromName: (name: string) => unknown;
@@ -120,6 +126,101 @@ async function persistCronAudit(
       .run();
   } catch (err) {
     console.error('[cron-audit] Failed to persist audit_logs:', err);
+  }
+}
+
+/** 크론 실패 알림을 같은 라우트에 대해 다시 보내기까지 두는 간격. */
+const CRON_ALERT_THROTTLE_HOURS = 6;
+
+/**
+ * 크론 실패를 관리자 알림함에 띄운다.
+ *
+ * audit_logs 에 남기는 것만으로는 아무도 모른다 — 2026-07-16 부터 12일간
+ * CRON_SECRET 이 빈 값이라 백업·채팅푸시·연차자동화가 전부 멈췄는데
+ * 실패 3,624건이 쌓이는 동안 알아챈 사람이 없었다. 실패는 사람에게 도달해야 한다.
+ *
+ * **의도적으로 env.DB 만 사용한다.** 알림을 Next 라우트 호출로 만들면
+ * CRON_SECRET 이 비었을 때(=실제로 겪은 장애) 알림 자체도 같이 죽는다.
+ * 알리려는 대상이 알림 경로를 망가뜨리는 상황이므로 경로를 공유해선 안 된다.
+ */
+async function notifyCronFailure(
+  env: WorkerEnv,
+  payload: { cron: string; route?: string; error: string },
+) {
+  const db = env.DB;
+  if (!db?.prepare) return;
+
+  const target = payload.route || payload.cron;
+  const nowIso = new Date().toISOString();
+  const throttleSinceIso = new Date(
+    Date.now() - CRON_ALERT_THROTTLE_HOURS * 60 * 60 * 1000,
+  ).toISOString();
+
+  try {
+    // 5분 크론이 실패하면 하루 288건이다. 라우트별로 간격을 두지 않으면
+    // 알림함이 같은 실패로 도배돼 오히려 아무도 안 보게 된다.
+    const recentAlert = await db
+      .prepare(
+        `SELECT id FROM audit_logs
+         WHERE action = 'cron_failure_alert' AND target_id = ? AND created_at > ?
+         LIMIT 1`,
+      )
+      .bind(target, throttleSinceIso)
+      .first();
+    if (recentAlert) return;
+
+    // 관리자 판정은 claims.ts 의 기준과 맞춘다 (role admin/master 또는 이사·총무부장).
+    const adminResult = await db
+      .prepare(
+        `SELECT id FROM staff_members
+         WHERE status = '재직'
+           AND (role IN ('admin', 'master') OR position IN ('이사', '총무부장'))`,
+      )
+      .all();
+    const adminIds = ((adminResult?.results || []) as Array<{ id?: string }>)
+      .map((row) => String(row?.id || '').trim())
+      .filter(Boolean);
+    if (adminIds.length === 0) return;
+
+    const body = `${target} 실행이 실패했습니다. (${payload.error})`.slice(0, 500);
+    const metadata = JSON.stringify({
+      cron: payload.cron,
+      route: payload.route || null,
+      error: payload.error,
+      action_required: true,
+    });
+
+    const statements = adminIds.map((adminId) =>
+      db
+        .prepare(
+          `INSERT INTO notifications (id, user_id, type, title, body, metadata, created_at)
+           VALUES (?, ?, 'system_alert', '크론 실행 실패', ?, ?, ?)`,
+        )
+        .bind(makeUuid(), adminId, body, metadata, nowIso),
+    );
+
+    // 알림 발송 이력 자체가 다음 알림의 스로틀 기준이 된다.
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO audit_logs (id, user_id, user_name, action, target_type, target_id, details, actor_name, created_at)
+           VALUES (?, NULL, 'system-cron', 'cron_failure_alert', 'cron', ?, ?, 'cron', ?)`,
+        )
+        .bind(
+          makeUuid(),
+          target,
+          JSON.stringify({ ...JSON.parse(metadata), notified: adminIds.length }),
+          nowIso,
+        ),
+    );
+
+    if (typeof db.batch === 'function') {
+      await db.batch(statements);
+    } else {
+      for (const statement of statements) await statement.run();
+    }
+  } catch (err) {
+    console.error('[cron-alert] Failed to notify admins:', err);
   }
 }
 
@@ -273,6 +374,10 @@ const worker = {
             durationMs: duration,
             detail: { error: message, bodyPreview },
           }),
+        );
+        // 기록만으로는 아무도 모른다 — 관리자 알림함까지 띄운다.
+        context.waitUntil?.(
+          notifyCronFailure(env, { cron: controller.cron, route, error: message }),
         );
       }
     }

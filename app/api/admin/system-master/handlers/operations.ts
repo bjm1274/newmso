@@ -35,6 +35,7 @@ export async function handleOperations() {
   const db = getD1Drizzle(d1);
   const nowIso = new Date().toISOString();
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
     const [
       auditRawRows,
@@ -46,6 +47,8 @@ export async function handleOperations() {
       wikiDocRows,
       wikiVerRows,
       recentWikiVerRows,
+      cronFailureRows,
+      cronSuccessRows,
     ] = await Promise.all([
       db.select().from(auditLogsTable).orderBy(desc(auditLogsTable.created_at)).limit(400),
       db.select({ id: staffMembersTable.id }).from(staffMembersTable),
@@ -88,6 +91,25 @@ export async function handleOperations() {
         version_no: wikiDocumentVersionsTable.version_no,
         created_at: wikiDocumentVersionsTable.created_at,
         change_summary: wikiDocumentVersionsTable.change_summary }).from(wikiDocumentVersionsTable).orderBy(desc(wikiDocumentVersionsTable.created_at)).limit(5),
+      // 크론 실패는 위 audit_logs 400건 창에 묻힌다 (5분 크론이 죽으면 하루 288건).
+      // 별도 질의로 7일치를 직접 본다.
+      db.select({
+        target_id: auditLogsTable.target_id,
+        details: auditLogsTable.details,
+        created_at: auditLogsTable.created_at }).from(auditLogsTable)
+        .where(and(
+          eq(auditLogsTable.action, 'cron_failure'),
+          gte(auditLogsTable.created_at, since7d),
+        ))
+        .orderBy(desc(auditLogsTable.created_at)),
+      db.select({
+        target_id: auditLogsTable.target_id,
+        created_at: auditLogsTable.created_at }).from(auditLogsTable)
+        .where(and(
+          eq(auditLogsTable.action, 'cron_success'),
+          gte(auditLogsTable.created_at, since7d),
+        ))
+        .orderBy(desc(auditLogsTable.created_at)),
     ]);
 
     // audit_logs.details JSON 파싱
@@ -148,12 +170,74 @@ export async function handleOperations() {
       user_agent: String(row.user_agent || '').trim() || null }));
   const recentFailureSummary = buildPushFailureSummary(recentPushFailures);
 
+  // ── 크론 건강도 (7일) ──────────────────────────────────────────────
+  // 라우트별로 묶어서 "무엇이 언제부터 몇 번 실패했는지"를 한 줄로 보여준다.
+  // 2026-07-16~28 처럼 12일간 조용히 죽어 있는 상태를 눈에 띄게 하는 게 목적이다.
+  const cronSuccessByTarget = new Map<string, string>();
+  for (const row of cronSuccessRows as LooseRecord[]) {
+    const target = String(row.target_id || '').trim();
+    if (!target || cronSuccessByTarget.has(target)) continue;
+    cronSuccessByTarget.set(target, String(row.created_at || ''));
+  }
+
+  const cronFailureByTarget = new Map<string, {
+    target: string;
+    count: number;
+    lastAt: string;
+    firstAt: string;
+    lastError: string;
+  }>();
+  for (const row of cronFailureRows as LooseRecord[]) {
+    const target = String(row.target_id || '').trim() || '(unknown)';
+    let error = '';
+    try {
+      const parsed = typeof row.details === 'string' ? JSON.parse(row.details) : row.details;
+      error = String((parsed as LooseRecord)?.error || '');
+    } catch { error = ''; }
+    const createdAt = String(row.created_at || '');
+    const existing = cronFailureByTarget.get(target);
+    if (!existing) {
+      // 정렬이 최신순이라 첫 등장이 곧 마지막 실패다.
+      cronFailureByTarget.set(target, {
+        target,
+        count: 1,
+        lastAt: createdAt,
+        firstAt: createdAt,
+        lastError: error });
+      continue;
+    }
+    existing.count += 1;
+    if (createdAt && createdAt < existing.firstAt) existing.firstAt = createdAt;
+  }
+
+  const cronHealth = {
+    windowDays: 7,
+    totalFailures: (cronFailureRows as LooseRecord[]).length,
+    byRoute: Array.from(cronFailureByTarget.values())
+      .map((item) => ({
+        ...item,
+        lastSuccessAt: cronSuccessByTarget.get(item.target) || null }))
+      .sort((left, right) => right.count - left.count) };
+
   const latestBackup = backupRows[0] || null;
   const backupAgeHours = latestBackup ? (Date.now() - new Date(latestBackup.created_at).getTime()) / (1000 * 60 * 60) : null;
   const failedRestoreRuns = (restoreRuns as LooseRecord[]).filter((run) => String(run.status || '') === 'failed');
   const latestRestoreRun = (restoreRuns as LooseRecord[])[0] || null;
   const versionGap = Math.max(0, Number(wikiDocumentCount || 0) - Number(wikiVersionCount || 0));
+  const cronFailuresLast24h = (cronFailureRows as LooseRecord[]).filter(
+    (row) => String(row.created_at || '') >= since24h,
+  ).length;
   const failureItems = [
+    cronFailuresLast24h > 0
+      ? {
+          id: 'cron-failure',
+          severity: 'critical',
+          label: '크론 실행 실패',
+          count: cronFailuresLast24h,
+          detail: cronHealth.byRoute.length > 0
+            ? `${cronHealth.byRoute[0].target} 외 ${Math.max(0, cronHealth.byRoute.length - 1)}건 · 최근 실패 ${new Date(cronHealth.byRoute[0].lastAt).toLocaleString('ko-KR')} · ${cronHealth.byRoute[0].lastError || '원인 미상'}`
+            : '최근 24시간 내 크론 실행이 실패했습니다.' }
+      : null,
     queueSummary.deadLettered > 0
       ? { id: 'chat-push-dead-letter', severity: 'critical', label: '채팅 푸시 Dead Letter', count: queueSummary.deadLettered, detail: '재시도 한도를 넘긴 채팅 푸시 작업이 남아 있습니다.' }
       : null,
@@ -222,6 +306,7 @@ export async function handleOperations() {
     latestBackup,
     restoreRuns,
     cronJobs: OPERATION_CRONS,
+    cronHealth,
     usageSummary: buildUsageSummary(opAuditRows),
     todoAutomation: {
       dueReminders: dueTodoCount,

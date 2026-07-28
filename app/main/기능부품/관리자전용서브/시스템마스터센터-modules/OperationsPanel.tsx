@@ -166,6 +166,47 @@ export function OperationsPanel({ operations }: OperationsPanelProps) {
               </div>
             </div>
 
+            {/*
+              크론 실패는 audit_logs 에만 쌓여서 아무도 안 본다.
+              2026-07 에 12일간 백업·푸시·연차자동화가 전부 죽어 있었는데도
+              실패 3,624건이 눈에 띄지 않았다. 여기서 라우트별로 드러낸다.
+            */}
+            <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-bold text-[var(--foreground)]">
+                  크론 실패 ({operations.cronHealth?.windowDays ?? 7}일)
+                </p>
+                <span className="text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                  총 {Number(operations.cronHealth?.totalFailures || 0).toLocaleString('ko-KR')}건
+                </span>
+              </div>
+              <div className="mt-3 space-y-2">
+                {(operations.cronHealth?.byRoute || []).length === 0 ? (
+                  <p className="py-3 text-center text-[11px] text-[var(--toss-gray-3)]">
+                    실패한 크론이 없습니다.
+                  </p>
+                ) : (
+                  (operations.cronHealth?.byRoute || []).map((item) => (
+                    <div key={item.target} className="rounded-[var(--radius-md)] border border-red-300 bg-red-50 px-3 py-2 dark:bg-red-950/30">
+                      <div className="flex items-center justify-between gap-3 text-[11px]">
+                        <span className="font-semibold text-[var(--foreground)]">{item.target}</span>
+                        <span className="font-bold text-red-600">{Number(item.count || 0).toLocaleString('ko-KR')}회</span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-[var(--toss-gray-3)]">
+                        {formatDateTime(item.firstAt)}부터 · 최근 {formatDateTime(item.lastAt)}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-[var(--toss-gray-3)]">
+                        마지막 성공 {item.lastSuccessAt ? formatDateTime(item.lastSuccessAt) : '조회 기간 내 없음'}
+                      </p>
+                      {item.lastError ? (
+                        <p className="mt-1 break-all text-[11px] font-medium text-red-600">{item.lastError}</p>
+                      ) : null}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
             <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--page-bg)] p-4">
               <p className="text-xs font-bold text-[var(--foreground)]">할일 자동화 / 위키 버전</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">

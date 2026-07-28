@@ -104,6 +104,18 @@ export type SystemMasterCronJob = {
   label?: string | null;
 };
 
+export type SystemMasterCronFailure = {
+  target: string;
+  count: number;
+  /** 가장 최근 실패 시각 */
+  lastAt: string;
+  /** 이번 조회 창에서 처음 실패한 시각 — 언제부터 죽어 있었는지 */
+  firstAt: string;
+  lastError?: string | null;
+  /** 같은 창에서의 마지막 성공. null 이면 조회 기간 내내 성공한 적이 없다. */
+  lastSuccessAt?: string | null;
+};
+
 export type SystemMasterBackup = {
   name: string;
   created_at?: string | null;
@@ -160,6 +172,11 @@ export type SystemMasterOperationsPayload = {
   recentBackups?: SystemMasterBackup[];
   restoreRuns?: SystemMasterRestoreRun[];
   cronJobs?: SystemMasterCronJob[];
+  cronHealth?: {
+    windowDays?: number | null;
+    totalFailures?: number | null;
+    byRoute?: SystemMasterCronFailure[];
+  };
   todoAutomation?: {
     dueReminders?: number | null;
     repeatingOpenTodos?: number | null;

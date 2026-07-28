@@ -132,7 +132,9 @@ const TYPE_CFG: Record<string, { icon: string; bg: string; text: string; border:
   // 인사: 보라(violet 톤)
   인사:          { icon: '👥', bg: 'bg-violet-50 dark:bg-violet-950/30',     text: 'text-violet-600', border: 'border-violet-300' },
   education:    { icon: '📚', bg: 'bg-purple-500/10 dark:bg-purple-950/30', text: 'text-purple-600', border: 'border-purple-300' },
-  notification: { icon: '🔔', bg: 'bg-[var(--tab-bg)] dark:bg-slate-800/30', text: 'text-[var(--toss-gray-4)]', border: 'border-[var(--border)]' } };
+  notification: { icon: '🔔', bg: 'bg-[var(--tab-bg)] dark:bg-slate-800/30', text: 'text-[var(--toss-gray-4)]', border: 'border-[var(--border)]' },
+  // 시스템 장애(크론 실패 등) — 기본 종 아이콘에 묻히면 안 되므로 빨강으로 분리한다.
+  system_alert: { icon: '🚨', bg: 'bg-red-50 dark:bg-red-950/30', text: 'text-red-600', border: 'border-red-300' } };
 const DEFAULT_CFG = { icon: '🔔', bg: 'bg-[var(--tab-bg)] dark:bg-slate-800/30', text: 'text-[var(--toss-gray-4)]', border: 'border-[var(--border)]' };
 const getTypeCfg = (t: string) => TYPE_CFG[t] || DEFAULT_CFG;
 
