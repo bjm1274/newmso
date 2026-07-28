@@ -118,6 +118,25 @@ export function isChatPushJobExpired(createdAt: string | null | undefined, now =
 const BOARD_META_START = '[[BOARD_META]]';
 const BOARD_META_END = '[[/BOARD_META]]';
 
+/**
+ * SQLite CURRENT_TIMESTAMP 형식('YYYY-MM-DD HH:MM:SS', UTC)을 ISO 8601 로 맞춘다.
+ *
+ * TEXT 타임스탬프는 사전순으로 비교되므로 한 컬럼 안에 두 형식이 섞이면
+ * 시간 순서와 정렬 순서가 어긋난다. 이미 ISO 면 그대로 두고, 형식을 알 수 없으면
+ * null 을 돌려 호출부가 현재 시각으로 대체하게 한다(잘못된 값을 흘리지 않는다).
+ */
+export function toIsoTimestamp(value: string | null | undefined): string | null {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  if (raw.includes('T')) return raw;
+
+  const matched = raw.match(/^(\d{4}-\d{2}-\d{2})[ ](\d{2}:\d{2}:\d{2})(\.\d+)?$/);
+  if (!matched) return null;
+
+  // CURRENT_TIMESTAMP 는 UTC 라 Z 를 붙이는 게 맞다.
+  return `${matched[1]}T${matched[2]}${matched[3] || '.000'}Z`;
+}
+
 function getRetryDelayMinutes(attemptCount: number) {
   const index = Math.min(
     Math.max(attemptCount - 1, 0),
@@ -854,7 +873,15 @@ export async function dispatchChatPushForMessage(params: {
           reply_to_id: message.reply_to_id || null,
           thread_root_id: threadRootId } }),
       read_at: null,
-      created_at: message.created_at || new Date().toISOString() };
+      // **반드시 ISO 로 정규화한다.** message.created_at 를 그대로 복사하면 안 된다.
+      // messages 는 SQLite CURRENT_TIMESTAMP('2026-07-28 11:50:08') 형식인데
+      // 다른 알림(결재·재고 등)은 toISOString('2026-07-28T11:30:17.636Z') 로 들어온다.
+      // notifications.created_at 은 TEXT 라 비교가 사전순이고 ' '(0x20) < 'T'(0x54) 이므로,
+      // 같은 날짜면 채팅 알림이 항상 더 작다. /api/realtime/tail 은 테이블별
+      // max(created_at) 변화로 갱신을 감지하는데, 새 채팅 알림이 max 를 못 올려서
+      // **새 메시지 팝업·배지가 아예 뜨지 않았다.**
+      // (프로덕션 확인: max=11:30 결재 알림, 실제 최신 채팅 알림=11:50)
+      created_at: toIsoTimestamp(message.created_at) || new Date().toISOString() };
   });
 
   // 알림 DB 저장은 백그라운드로 — push 전송과 병렬 실행
