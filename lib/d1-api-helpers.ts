@@ -20,6 +20,62 @@ export function userId(user: SessionUser | null | undefined): string | null {
 /** alias — 호출부 가독성용 */
 export const userIdFromSession = userId;
 
+/**
+ * 타 직원의 인사 레코드를 다룰 수 있는 권한(관리자 또는 인사)인지.
+ *
+ * 판정 기준은 buildClaimsFromSession 의 erp_is_admin / erp_can_manage_company 와
+ * 동일하게 유지할 것.
+ */
+export function hasStaffRecordScope(user: SessionUser | null | undefined): boolean {
+  if (!user) return false;
+  const perms = (user.permissions ?? {}) as Record<string, unknown>;
+  return Boolean(
+    user.is_system_master ||
+    user.role === 'admin' ||
+    perms.admin ||
+    perms.mso ||
+    perms.system_master ||
+    perms.hr,
+  );
+}
+
+/**
+ * 직원 단위 레코드(연차·근태·급여 등)에 접근할 자격이 있는지.
+ *
+ * 본인이면 허용, 아니면 hasStaffRecordScope 를 요구한다.
+ * `staffId` 를 쿼리/바디로 받는 라우트에서 IDOR 을 막기 위한 SSOT.
+ */
+export function canAccessStaffRecord(
+  user: SessionUser | null | undefined,
+  targetStaffId: string | null | undefined,
+): boolean {
+  if (!user) return false;
+
+  const target = String(targetStaffId ?? '').trim();
+  if (!target) return false;
+
+  const me = userId(user);
+  if (me && me === target) return true;
+
+  return hasStaffRecordScope(user);
+}
+
+/**
+ * 재무 권한 보유 여부.
+ *
+ * 실제 권한 객체에는 bare `finance` 키가 없고 `finance_복식부기`·`finance_결산` 같은
+ * 세부 키만 담기는 경우가 많다(lib/access-control.ts 의 FINANCE_* 매핑 참조).
+ * bare 키만 검사하면 재무 담당자가 정책 레이어에서 계속 일반 직원으로 취급되므로,
+ * `finance` 또는 `finance_*` 중 하나라도 true 면 재무 권한으로 본다.
+ */
+function hasFinancePermission(perms: Record<string, unknown>): boolean {
+  if (perms.finance) return true;
+  for (const [key, value] of Object.entries(perms)) {
+    if (value && key.startsWith('finance_')) return true;
+  }
+  return false;
+}
+
 export function buildClaimsFromSession(user: SessionUser | null | undefined): ErpClaims {
   if (!user) return {};
   const id = userId(user);
@@ -31,6 +87,7 @@ export function buildClaimsFromSession(user: SessionUser | null | undefined): Er
     erp_department_name: (user.department as string | undefined) ?? null,
     erp_is_admin: Boolean(user.is_system_master || user.role === 'admin' || perms.admin || perms.mso || perms.system_master),
     erp_can_manage_company: Boolean(perms.admin || perms.mso || perms.hr),
+    erp_can_manage_finance: Boolean(perms.admin || perms.mso || hasFinancePermission(perms)),
     erp_can_view_all_inventory_companies: Boolean(perms.admin || perms.mso),
     erp_can_manage_all_inventory_companies: Boolean(perms.admin || perms.mso),
     erp_can_view_all_department_inventory: Boolean(perms.admin || perms.mso || perms.hr),

@@ -1,9 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getD1Binding, getD1Drizzle, staff_members } from '@/lib/db';
 import { getUnifiedAnnualLeaveSummary } from '@/lib/unified-leave-ledger';
+import {
+  isAdminSession,
+  isSystemMasterSession,
+  readSessionFromRequest } from '@/lib/server-session';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
+    // 전 직원 인사·연차 데이터를 반환하므로 형제 라우트(accrual-run)와 동일한 관리자 게이트 적용.
+    // middleware 는 '/main/:path*' 만 검사하므로 API 인증은 라우트가 직접 해야 한다.
+    const session = await readSessionFromRequest(req);
+    if (!session?.user) {
+      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+    }
+    if (!isAdminSession(session.user) && !isSystemMasterSession(session.user)) {
+      return NextResponse.json({ ok: false, error: '관리자만 조회할 수 있습니다.' }, { status: 403 });
+    }
+
     const d1 = await getD1Binding();
     if (!d1) return NextResponse.json({ error: 'No D1' }, { status: 500 });
     const db = getD1Drizzle(d1);

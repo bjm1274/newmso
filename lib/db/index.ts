@@ -66,10 +66,11 @@ export {
   erpIsAdmin, erpCanManageCompany,
   erpCanViewAllDepartmentInventory, erpCanManageDepartmentInventory,
   erpCanViewAllInventoryCompanies, erpCanManageAllInventoryCompanies,
+  erpCanManageFinance,
   erpCompanyMatches, erpCompanyNameMatches,
   erpInventoryCompanyScopeMatches, erpDepartmentInventoryScopeMatches,
   erpInventoryScopeMatches,
-  erpTargetStaffSameCompany, erpTargetStaffInScope,
+  erpTargetStaffSameCompany, erpTargetStaffInScope, erpTargetStaffInScopeBatch,
   erpIsRosterApprover } from './auth/claims';
 export {
   canAccess,
@@ -78,6 +79,8 @@ export {
   POLICY_REGISTRY,
   PolicyDenied,
   PolicyMissing,
+  STAFF_SECRET_ALWAYS_COLUMNS,
+  STAFF_PII_SENSITIVE_COLUMNS,
   type PolicyPattern,
   type TablePolicy,
   type Op,

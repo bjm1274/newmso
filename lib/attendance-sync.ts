@@ -53,15 +53,47 @@ function toModernStatus(status: string | null | undefined): string {
   return LEGACY_STATUS_TO_MODERN[key] || 'present';
 }
 
+function parseTimeToMinutes(val: string): number | null {
+  const str = String(val || '').trim();
+  if (!str) return null;
+  const timeMatch = str.match(/(\d{1,2}):(\d{2})/);
+  if (timeMatch) {
+    const h = Number(timeMatch[1]);
+    const m = Number(timeMatch[2]);
+    if (!Number.isNaN(h) && !Number.isNaN(m)) return h * 60 + m;
+  }
+  const d = new Date(str);
+  if (!Number.isNaN(d.getTime())) {
+    return d.getHours() * 60 + d.getMinutes();
+  }
+  return null;
+}
+
 function workMinutes(
   checkIn: string | null | undefined,
   checkOut: string | null | undefined,
 ): number | null {
   if (!checkIn || !checkOut) return null;
-  const mins = Math.round(
-    (new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 60000,
-  );
-  return Number.isFinite(mins) ? mins : null;
+
+  const inDate = new Date(checkIn);
+  const outDate = new Date(checkOut);
+
+  // ISO 8601 타임스탬프 두 개 모두 정상이면 시각 차이 계산
+  if (!Number.isNaN(inDate.getTime()) && !Number.isNaN(outDate.getTime())) {
+    let diffMs = outDate.getTime() - inDate.getTime();
+    if (diffMs < 0) diffMs += 24 * 60 * 60 * 1000; // 야간 자정 보정
+    const mins = Math.round(diffMs / 60000);
+    return Number.isFinite(mins) && mins >= 0 ? mins : null;
+  }
+
+  // HH:mm 문자열 폴백
+  const inMins = parseTimeToMinutes(checkIn);
+  const outMins = parseTimeToMinutes(checkOut);
+  if (inMins === null || outMins === null) return null;
+
+  let diff = outMins - inMins;
+  if (diff < 0) diff += 24 * 60; // 야간 자정 보정
+  return diff;
 }
 
 /**

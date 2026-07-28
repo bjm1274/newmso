@@ -116,6 +116,19 @@ const STAFF_MUTATION_WORK_CONDITION_COLUMNS = [
   'working_days_per_week',
 ] as const;
 
+/**
+ * `staff_members` 스키마에 **실제로 존재하지 않는** 컬럼.
+ *
+ * /api/d1/mutate 는 모르는 컬럼을 에러 없이 조용히 제거하므로,
+ * 에러를 보고 재시도하는 withMissingColumnsFallback 이 영영 발동하지 않았다.
+ * 그 결과 약정연장·야간수당을 입력하고 저장하면 성공 토스트만 뜨고 값은 사라졌다.
+ * 처음부터 permissions.payroll_allowances 로 보내도록 강제한다(읽기 경로도 그쪽을 폴백으로 본다).
+ */
+const STAFF_COLUMNS_NOT_IN_SCHEMA = [
+  'agreed_overtime_allowance',
+  'agreed_night_allowance',
+] as const;
+
 const ESS_FIELD_LABELS: Record<string, string> = {
   email: '이메일',
   phone: '연락처',
@@ -590,6 +603,16 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
   // ESS (직원 셀프 서비스) 승인 대기함 관련
   const [essRequests, setEssRequests] = useState<any[]>([]);
+  /**
+   * ESS 대기함 "조회 실패" 상태.
+   *
+   * db-client 는 실패해도 reject 하지 않고 { data: null, error } 로 resolve 한다.
+   * error 를 버리면 403/500 도 빈 배열과 구분되지 않아 화면에 "대기 중인 요청이 없습니다"로
+   * 표시되고, 실제로는 승인 대기 중인 요청이 방치된다. 실패를 별도 상태로 남긴다.
+   */
+  const [essLoadError, setEssLoadError] = useState<string | null>(null);
+  // 같은 조회 실패로 토스트가 반복되는 것을 막기 위한 최근 통지 메시지(effect 의존성이 자주 바뀜)
+  const essLoadErrorNotifiedRef = useRef<string | null>(null);
   const [showEssModal, setShowEssModal] = useState(false);
   const [pendingEssAction, setPendingEssAction] = useState<{
     type: 'approve' | 'reject';
@@ -792,10 +815,14 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
       if (staffIdsInCompany.length === 0) {
         setEssRequests([]);
+        setEssLoadError(null);
+        essLoadErrorNotifiedRef.current = null;
         return;
       }
 
-      const { data: logs } = await db
+      // error 를 반드시 받는다. audit_logs 는 ADMIN_ONLY 라 권한이 없으면 403 이 오는데,
+      // 예전 코드는 error 를 버리고 data(null)만 보아 "요청 없음"으로 위장했다.
+      const { data: logs, error: logsError } = await db
         .from('audit_logs')
         .select('*')
         .eq('target_type', 'ESS_PROFILE_UPDATE_PENDING')
@@ -803,14 +830,23 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         .order('created_at', { ascending: false })
         .limit(200);
 
-      if (!logs) {
+      if (logsError) {
+        const message =
+          (logsError as { message?: string } | null)?.message || '알 수 없는 오류';
+        console.error('ESS 변경 요청 대기함 조회 실패:', logsError);
         setEssRequests([]);
+        setEssLoadError(message);
+        // 의존성(직원목록)이 자주 바뀌므로 같은 메시지로는 한 번만 알린다.
+        if (essLoadErrorNotifiedRef.current !== message) {
+          essLoadErrorNotifiedRef.current = message;
+          toast(`내정보 변경 요청 목록을 불러오지 못했습니다: ${message}`, 'error');
+        }
         return;
       }
 
-      const filtered = logs;
-
-      setEssRequests(filtered);
+      setEssLoadError(null);
+      essLoadErrorNotifiedRef.current = null;
+      setEssRequests(logs ?? []);
     };
     fetchEssRequests();
   }, [새로고침, 선택사업체, 직원목록]);
@@ -828,10 +864,31 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         after: typeof changes[key] === 'object' ? JSON.stringify(changes[key]) : String(changes[key] ?? '(빈 값)') }));
   };
 
+  /**
+   * ESS 요청에서 "직원이 실제로 바꾸려는" 필드인지 판정한다.
+   *
+   * lib/profile-change-request.ts 의 requestedChanges 는 직원이 건드리지 않은 항목까지
+   * 항상 모든 키(email/phone/address/bank_account/bank_name/permissions)를 담는다.
+   * 따라서 키 존재 여부만 보고 덮어쓰면, 요청 제출 이후 HR 이 따로 고친 값이
+   * 요청 당시 값으로 롤백되거나 NULL 로 지워진다. original_data 와 다른 항목만 반영한다.
+   * (대기함 UI 의 getEssReviewChanges 와 동일한 비교 기준을 쓴다.)
+   */
+  const isEssFieldChanged = (
+    changes: Record<string, unknown>,
+    original: Record<string, unknown>,
+    key: string,
+  ) =>
+    Object.prototype.hasOwnProperty.call(changes, key) &&
+    JSON.stringify(changes[key] ?? null) !== JSON.stringify(original[key] ?? null);
+
+  const readEssErrorMessage = (error: unknown) =>
+    (error as { message?: string } | null)?.message || String(error || '알 수 없는 오류');
+
   const handleApproveEssSafe = async (request: Record<string, unknown>) => {
     try {
-      const updates =
-        ((request.details as Record<string, unknown> | undefined)?.requested_changes as Record<string, unknown> | undefined) || {};
+      const details = (request.details as Record<string, unknown> | undefined) || {};
+      const updates = (details.requested_changes as Record<string, unknown> | undefined) || {};
+      const original = (details.original_data as Record<string, unknown> | undefined) || {};
       const { data: staffRow, error: staffLoadError } = await db
         .from('staff_members')
         .select('permissions')
@@ -848,79 +905,130 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         updates.permissions && typeof updates.permissions === 'object' && !Array.isArray(updates.permissions)
           ? (updates.permissions as Record<string, unknown>)
           : {};
+      const originalPermissions =
+        original.permissions && typeof original.permissions === 'object' && !Array.isArray(original.permissions)
+          ? (original.permissions as Record<string, unknown>)
+          : {};
 
-      const updatePayload: Record<string, unknown> = {
-        email: (updates.email as string | null | undefined) ?? null,
-        phone: (updates.phone as string | null | undefined) ?? null,
-        address: (updates.address as string | null | undefined) ?? null,
-        bank_account: (updates.bank_account as string | null | undefined) ?? null,
-        permissions: {
-          ...currentPermissions,
-          ...requestedPermissions },
-        bank_name:
-          (updates.bank_name as string | null | undefined) ??
-          (requestedPermissions.bank_name as string | null | undefined) ??
-          null };
-
-      const primaryUpdate = await db
-        .from('staff_members')
-        .update(updatePayload)
-        .eq('id', request.target_id);
-
-      if (primaryUpdate.error) {
-        if (!isMissingColumnError(primaryUpdate.error, 'bank_name')) throw primaryUpdate.error;
-
-        const fallbackPayload = { ...updatePayload };
-        delete fallbackPayload.bank_name;
-        const fallbackUpdate = await db
-          .from('staff_members')
-          .update(fallbackPayload)
-          .eq('id', request.target_id);
-
-        if (fallbackUpdate.error) throw fallbackUpdate.error;
+      // 요청에 실제로 담겨 "바뀐" 컬럼만 payload 에 넣는다. 나머지는 아예 제외해야
+      // HR 이 그 사이 수정한 값이 보존된다.
+      const updatePayload: Record<string, unknown> = {};
+      for (const column of ['email', 'phone', 'address', 'bank_account', 'bank_name'] as const) {
+        if (isEssFieldChanged(updates, original, column)) {
+          updatePayload[column] = (updates[column] as string | null | undefined) ?? null;
+        }
       }
 
-      await db
+      /*
+       * 내선번호는 ESS 요청이 permissions.extension 에만 담는다.
+       * 하지만 HR 등록 경로는 staff_members.extension 컬럼에 직접 쓰고, 조회
+       * (lib/staff-meta.ts getStaffExtension)는 컬럼을 우선한다.
+       * permissions 만 갱신하면 승인해도 화면에 옛 컬럼 값이 계속 보이므로 둘 다 맞춘다.
+       * (extension 컬럼은 lib/db/schema.ts staff_members 에 존재함을 확인함)
+       */
+      const requestedExtension = Object.prototype.hasOwnProperty.call(requestedPermissions, 'extension')
+        ? ((requestedPermissions.extension as string | null | undefined) ?? null)
+        : undefined;
+      const originalExtension =
+        (original.extension as string | null | undefined) ??
+        (originalPermissions.extension as string | null | undefined) ??
+        null;
+      const extensionChanged =
+        requestedExtension !== undefined &&
+        JSON.stringify(requestedExtension) !== JSON.stringify(originalExtension);
+
+      if (extensionChanged) {
+        updatePayload.extension = requestedExtension ?? null;
+      }
+
+      /*
+       * permissions 는 admin 전용 컬럼(lib/db/auth/policies.ts staffPrivilegeGuard)이라
+       * 실제로 값이 바뀔 때만 payload 에 넣는다. 또한 ESS 가 소유하는 키(extension)만
+       * 현재 DB 값 위에 덧씌워, 요청 이후 바뀐 다른 권한 값이 롤백되지 않게 한다.
+       */
+      if (extensionChanged) {
+        updatePayload.permissions = {
+          ...currentPermissions,
+          extension: requestedExtension ?? null };
+      }
+
+      const runStaffUpdate = (payload: Record<string, unknown>) =>
+        db.from('staff_members').update(payload).eq('id', request.target_id);
+
+      if (Object.keys(updatePayload).length > 0) {
+        const mutationPayload: Record<string, unknown> = { ...updatePayload };
+        let updateResult = await runStaffUpdate(mutationPayload);
+
+        // extension 컬럼이 없는 스키마라면 컬럼 없이 재시도한다(값은 permissions.extension 에 남는다).
+        if (
+          updateResult.error &&
+          'extension' in mutationPayload &&
+          isMissingColumnError(updateResult.error, 'extension')
+        ) {
+          delete mutationPayload.extension;
+          updateResult = await runStaffUpdate(mutationPayload);
+        }
+
+        // bank_name 컬럼이 없는 스키마라면 permissions.bank_name 으로 우회 저장한다(기존 동작 유지).
+        if (
+          updateResult.error &&
+          'bank_name' in mutationPayload &&
+          isMissingColumnError(updateResult.error, 'bank_name')
+        ) {
+          const fallbackBankName = mutationPayload.bank_name;
+          delete mutationPayload.bank_name;
+          const basePermissions =
+            mutationPayload.permissions && typeof mutationPayload.permissions === 'object' && !Array.isArray(mutationPayload.permissions)
+              ? (mutationPayload.permissions as Record<string, unknown>)
+              : currentPermissions;
+          mutationPayload.permissions = {
+            ...basePermissions,
+            bank_name: (fallbackBankName as string | null | undefined) ?? null };
+          updateResult = await runStaffUpdate(mutationPayload);
+        }
+
+        // 실패를 삼키면 목록에서만 사라지고 새로고침 시 다시 나타나 중복 승인(중복 덮어쓰기)이 된다.
+        if (updateResult.error) throw updateResult.error;
+      }
+
+      // 상태 전환이 실패하면 요청은 여전히 대기 상태다. 목록에서 지우지 않도록 여기서도 throw 한다.
+      const statusUpdate = await db
         .from('audit_logs')
         .update({
           target_type: 'ESS_PROFILE_UPDATE_APPROVED',
           details: {
-            ...((request.details as Record<string, unknown>) || {}),
+            ...details,
             approved_at: new Date().toISOString() } })
         .eq('id', request.id);
+
+      if (statusUpdate.error) throw statusUpdate.error;
 
       toast('승인했습니다.');
       setEssRequests(prev => prev.filter(r => r.id !== request.id));
       새로고침?.();
     } catch (error) {
       console.error('ESS profile approve failed:', error);
-      toast('승인 처리 중 오류가 발생했습니다.', 'error');
-    }
-  };
-
-  const handleApproveEss = async (request: Record<string, unknown>) => {
-    try {
-      const updates = (request.details as Record<string, unknown>)?.requested_changes as Record<string, unknown>;
-      // 1. 실제 직원 정보 업데이트
-      await db.from('staff_members').update(updates).eq('id', request.target_id);
-      // 2. 요청 상태 변경
-      await db.from('audit_logs').update({ target_type: 'ESS_PROFILE_UPDATE_APPROVED' }).eq('id', request.id);
-
-      toast('승인되었습니다.');
-      setEssRequests(prev => prev.filter(r => r.id !== request.id));
-      새로고침?.();
-    } catch (error) {
-      toast('승인 처리 중 오류 발생', 'error');
+      // 낙관적 제거 금지: 목록을 그대로 두고 실패를 알린다.
+      toast(`승인 처리에 실패했습니다: ${readEssErrorMessage(error)}`, 'error');
     }
   };
 
   const handleRejectEss = async (request: Record<string, unknown>) => {
     try {
-      await db.from('audit_logs').update({ target_type: 'ESS_PROFILE_UPDATE_REJECTED' }).eq('id', request.id);
+      const { error } = await db
+        .from('audit_logs')
+        .update({ target_type: 'ESS_PROFILE_UPDATE_REJECTED' })
+        .eq('id', request.id);
+
+      // db-client 는 실패해도 reject 하지 않으므로 error 를 직접 확인해야 한다.
+      // 확인하지 않으면 반려 실패인데도 목록에서 사라져 요청이 방치된다.
+      if (error) throw error;
+
       toast('반려되었습니다.');
       setEssRequests(prev => prev.filter(r => r.id !== request.id));
     } catch (error) {
-      toast('반려 처리 중 오류 발생', 'error');
+      console.error('ESS profile reject failed:', error);
+      toast(`반려 처리에 실패했습니다: ${readEssErrorMessage(error)}`, 'error');
     }
   };
 
@@ -1357,11 +1465,24 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         const forcedOmittedWorkConditionColumns = hasFractionalValue(updatePayload.working_hours_per_week)
           ? ['working_hours_per_week']
           : [];
+
+        // `permissions` 는 PRIVILEGED_STAFF_COLUMNS 라 **admin 만** 쓸 수 있다
+        // (lib/db/auth/policies.ts staffPrivilegeGuard). 그런데 이 payload 는 값이 그대로여도
+        // permissions 를 항상 포함해서, 인사담당자(perms.hr, 비-admin)의 저장이 전부 403 이었다.
+        // 실제로 달라진 게 없으면 빼서 불필요한 권한 요구를 없앤다.
+        const prevPermissions = (beforeStaff as Record<string, unknown> | null)?.permissions;
+        const permissionsUnchanged =
+          prevPermissions !== undefined &&
+          JSON.stringify(prevPermissions ?? null) === JSON.stringify(updatePayload.permissions ?? null);
+        if (permissionsUnchanged) {
+          delete (updatePayload as Record<string, unknown>).permissions;
+        }
         const { error: updateErr } = await withMissingColumnsFallback(
           (omittedColumns) => {
             const allOmittedColumns = new Set<string>([
               ...omittedColumns,
               ...forcedOmittedWorkConditionColumns,
+              ...STAFF_COLUMNS_NOT_IN_SCHEMA,
             ]);
             return db
               .from('staff_members')
@@ -1958,14 +2079,16 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
               </button>
             )}
           </div>
-          {essRequests.length > 0 && (
+          {/* 조회 실패(essLoadError)일 때도 버튼을 노출해야 사용자가 실패 사실을 확인할 수 있다. */}
+          {(essRequests.length > 0 || essLoadError) && (
             <button
               onClick={() => setShowEssModal(true)}
               className="relative bg-amber-100 text-amber-800 px-4 py-2 text-[11px] font-bold rounded-[var(--radius-md)] hover:bg-amber-200 transition-all shadow-sm ring-1 ring-amber-300"
+              title={essLoadError ? `요청 목록 조회 실패: ${essLoadError}` : undefined}
             >
               내정보 변경 요청
               <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500/100 text-white flex items-center justify-center rounded-full text-[10px] shadow-sm animate-bounce">
-                {essRequests.length}
+                {essLoadError ? '!' : essRequests.length}
               </span>
             </button>
           )}
@@ -2821,7 +2944,16 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
             </div>
 
             <div className="p-4 overflow-y-auto flex-1 bg-[var(--muted)]">
-              {essRequests.length === 0 ? (
+              {/* 조회 실패와 "요청 없음"을 반드시 구분해서 보여준다(실패를 빈 목록으로 위장하지 않는다). */}
+              {essLoadError ? (
+                <div className="py-16 px-4 text-center">
+                  <p className="text-sm font-bold text-red-600">변경 요청 목록을 불러오지 못했습니다.</p>
+                  <p className="mt-2 text-xs text-[var(--toss-gray-3)] break-words">{essLoadError}</p>
+                  <p className="mt-2 text-[11px] text-[var(--toss-gray-4)]">
+                    대기 중인 요청이 없다는 뜻이 아닙니다. 권한 또는 네트워크 상태를 확인한 뒤 새로고침하세요.
+                  </p>
+                </div>
+              ) : essRequests.length === 0 ? (
                 <div className="py-20 text-center text-[var(--toss-gray-3)] font-medium text-sm">
                   대기 중인 변경 요청이 없습니다.
                 </div>

@@ -17,6 +17,7 @@ import {
   attendances as attendancesTable,
   attendance_corrections as attendanceCorrectionsTable,
   staff_transfer_history as staffTransferHistoryTable,
+  salary_change_history as salaryChangeHistoryTable,
   certificate_issuances as certificateIssuancesTable,
   approvals as approvalsTable,
   staff_members as staffMembersTable,
@@ -622,6 +623,10 @@ export async function processFinalApprovalEffects(
         let matchedStaffId = targetStaffId;
 
         if (!matchedStaffId && targetStaffName) {
+          // 이름 매칭 폴백 — 모바일 양식이 targetStaffId 를 담지 않아 필요하다.
+          //
+          // 예전에는 limit(1) 로 첫 행을 그냥 채택해서, **동명이인이 있으면 엉뚱한 사람의
+          // 급여가 올랐다.** 급여는 되돌리기 어려운 변경이므로 모호하면 적용하지 않는다.
           const { and: drizzleAnd, eq: drizzleEq } = await import('drizzle-orm');
           const rows = await db
             .select({ id: staffMembersTable.id })
@@ -634,23 +639,66 @@ export async function processFinalApprovalEffects(
                   )
                 : drizzleEq(staffMembersTable.name, targetStaffName)
             )
-            .limit(1);
+            .limit(2);
 
-          if (rows[0]?.id) {
+          if (rows.length > 1) {
+            warnings.push(
+              `급여 인상 대상 '${targetStaffName}' 이 여러 명이라 자동 반영하지 않았습니다. 인사에서 대상을 직접 지정해 처리하세요.`,
+            );
+          } else if (rows[0]?.id) {
             matchedStaffId = String(rows[0].id);
           }
         }
 
         if (matchedStaffId) {
+          // 변경 전 금액을 먼저 읽는다 — 이력에 before_value 를 남기기 위함.
+          const beforeRows = await db
+            .select({ base_salary: staffMembersTable.base_salary })
+            .from(staffMembersTable)
+            .where(eq(staffMembersTable.id, matchedStaffId))
+            .limit(1);
+          const beforeSalary =
+            typeof beforeRows[0]?.base_salary === 'number' ? beforeRows[0].base_salary : null;
+
+          const nowIso = new Date().toISOString();
           await db
             .update(staffMembersTable)
             .set({
               base_salary: Math.round(newSalary),
-              updated_at: new Date().toISOString()
+              updated_at: nowIso
             })
             .where(eq(staffMembersTable.id, matchedStaffId));
 
           steps.push('salary_increase_applied');
+
+          // 급여 변경 이력 기록.
+          //
+          // salary_change_history 는 테이블 정의와 **읽는 코드만** 있고 INSERT 하는 코드가
+          // 저장소 전체에 한 줄도 없었다. 그래서 인사이력원장·급여정산이 이 표를 조회해도
+          // 항상 빈 결과였고, 변경 전 금액이 어디에도 남지 않았다.
+          // 이력 기록 실패가 급여 반영 자체를 되돌리지는 않도록 오류는 warning 으로만 남긴다.
+          try {
+            const effectiveDate =
+              typeof itemMetaData?.effectiveMonth === 'string' && itemMetaData.effectiveMonth.trim()
+                ? String(itemMetaData.effectiveMonth).trim()
+                : nowIso.slice(0, 10);
+            await db.insert(salaryChangeHistoryTable).values({
+              id: crypto.randomUUID(),
+              staff_id: matchedStaffId,
+              change_type: '급여인상',
+              before_value: beforeSalary,
+              after_value: Math.round(newSalary),
+              effective_date: effectiveDate,
+              reason: `전자결재 승인 (문서 ${String(item.id ?? '')})`,
+              created_by: String(item.sender_id ?? '') || null,
+              created_at: nowIso,
+              previous_salary: beforeSalary });
+            steps.push('salary_change_history_recorded');
+          } catch (historyError) {
+            warnings.push(
+              `급여 변경 이력 기록 실패: ${String((historyError as { message?: string } | null)?.message || historyError || 'unknown')}`,
+            );
+          }
         } else {
           warnings.push(`급여 인상 대상 직원을 찾지 못해 기본급을 자동 반영하지 못했습니다. (대상: ${targetStaffName || '미지정'})`);
         }

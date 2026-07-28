@@ -249,10 +249,14 @@ function DataReseterDesktop({ onRefresh }: { onRefresh: () => void }) {
         type === 'force_logout' ||
         type === 'annual_leave'
       ) {
+        // 서버가 보안암호와 확인 문구를 재검증한다(클라이언트 2단계 확인만으로는 우회 가능했음).
         const res = await fetch('/api/admin/data-reset', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type }) });
+          body: JSON.stringify({
+            type,
+            password,
+            confirm: RESET_ACTIONS.find((a) => a.type === type)?.confirmationText ?? '' }) });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data?.ok) {
           throw new Error(data?.error || `HTTP ${res.status}`);

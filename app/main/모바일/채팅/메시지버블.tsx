@@ -12,6 +12,7 @@
 import { useMemo, useRef, useState, useCallback, useEffect } from 'react';
 import type { ChatMessage } from '@/types';
 import { renderMessageContent } from '@/app/main/기능부품/메신저메시지렌더';
+import { buildStorageInlineUrl, buildStorageDownloadUrl } from '@/lib/object-storage-url';
 import MIcon from '../공통/MIcon';
 import {
   formatBubbleTimestamp,
@@ -346,14 +347,17 @@ export default function MessageBubble({
               )}
               {imageMode && message.file_url ? (
                 <a
-                  href={String(message.file_url)}
+                  href={buildStorageInlineUrl(String(message.file_url), fileName)}
                   target="_blank"
                   rel="noreferrer"
                   aria-label={`첨부 이미지 ${fileName}`}
                   style={{ display: 'block' }}
                 >
                   <img
-                    src={String(message.file_url)}
+                    // 저장된 file_url 은 공개 R2 도메인(https://r2.pchos.kr/...)인데
+                    // 버킷이 공개가 아니라 401 이 나서 모바일에서 이미지가 깨져 있었다.
+                    // PC(메신저첨부.tsx)와 동일하게 인증 프록시 URL 로 변환해서 쓴다.
+                    src={buildStorageInlineUrl(String(message.file_url), fileName)}
                     alt={fileName}
                     onLoad={onImageLoad}
                     style={{
@@ -367,7 +371,7 @@ export default function MessageBubble({
                 </a>
               ) : hasFile ? (
                 <a
-                  href={String(message.file_url)}
+                  href={buildStorageDownloadUrl(String(message.file_url), fileName)}
                   target="_blank"
                   rel="noreferrer"
                   aria-label={`파일 다운로드 ${fileName}`}

@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { readSessionFromRequest } from '@/lib/server-session';
+import { hasStaffRecordScope } from '@/lib/d1-api-helpers';
 import { recalculateLeaveBalance, resolveGrantedDaysFromAccruals } from '@/lib/annual-leave-balance';
 import { syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
 import { getUnifiedAnnualLeaveSummary } from '@/lib/unified-leave-ledger';
@@ -23,6 +24,11 @@ export async function GET(req: NextRequest) {
     const session = await readSessionFromRequest(req);
     if (!session?.user) {
       return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // 전 직원 연차 상태를 반환한다 — 인사/관리자 전용.
+    if (!hasStaffRecordScope(session.user)) {
+      return NextResponse.json({ ok: false, error: '인사 권한자만 조회할 수 있습니다.' }, { status: 403 });
     }
 
     const year = Number(req.nextUrl.searchParams.get('year')) || new Date().getFullYear();
@@ -113,6 +119,11 @@ export async function POST(req: NextRequest) {
     const session = await readSessionFromRequest(req);
     if (!session?.user) {
       return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // 다수 직원의 leave_balances 를 재계산하는 쓰기 작업 — 인사/관리자 전용.
+    if (!hasStaffRecordScope(session.user)) {
+      return NextResponse.json({ ok: false, error: '인사 권한자만 실행할 수 있습니다.' }, { status: 403 });
     }
 
     const body = (await req.json().catch(() => ({}))) as {

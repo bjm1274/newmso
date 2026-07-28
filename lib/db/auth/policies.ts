@@ -45,12 +45,15 @@ import {
   erpIsAdmin,
   erpStaffId,
   erpCanManageCompany,
+  erpCanManageFinance,
   erpCompanyMatches,
+  erpCompanyNameMatches,
   erpInventoryScopeMatches,
   erpInventoryCompanyScopeMatches,
   erpDepartmentInventoryScopeMatches,
   erpTargetStaffSameCompany,
   erpTargetStaffInScope,
+  erpTargetStaffInScopeBatch,
   erpIsRosterApprover } from './claims';
 
 // ─────────────────────────────────────────────────────────────
@@ -72,6 +75,8 @@ export type PolicyPattern =
   | 'INVENTORY_SCOPE'
   | 'COMPANY_INVENTORY_SCOPE'
   | 'DEPARTMENT_INVENTORY_SCOPE'
+  /** 재무: finance 권한 보유자 + 회사 스코프 (회사 컬럼이 비면 전사 공용으로 간주) */
+  | 'FINANCE_SCOPE'
   /** 채팅: room 멤버(또는 notice/admin)만 행 접근 — filterByPolicy 에서 배치 평가 */
   | 'CHAT_ROOM_MEMBER';
 
@@ -96,7 +101,17 @@ export interface TablePolicy {
   update?: PolicyPattern;
   delete?: PolicyPattern;
   staffIdField?: string;
+  /** 회사 **UUID** 컬럼명 (기본 'company_id'). erpCompanyMatches 는 UUID 로만 비교한다. */
   companyIdField?: string;
+  /**
+   * 회사 **이름** 컬럼명 (예: 'company', 'company_name').
+   *
+   * D1 이관 과정에서 회사를 UUID 가 아니라 이름 문자열로 들고 있는 테이블이 다수라
+   * companyIdField 만으로는 회사 격리를 걸 수 없었다(비관리자에게 항상 false).
+   * 이 필드를 주면 회사 스코프 패턴이 erpCompanyNameMatches 로도 일치를 판정한다.
+   * companyIdField 와 함께 주면 **둘 중 하나라도 일치**하면 통과한다.
+   */
+  companyNameField?: string;
   inventoryFields?: {
     company?: string;
     company_id?: string;
@@ -111,7 +126,18 @@ export interface TablePolicy {
    * row 내용에 따라 거부할 수 있다. true=허용, false=거부.
    * (예: staff_members의 권한 컬럼 변경은 admin claim 필수)
    */
-  guards?: Partial<Record<Op, (claims: ErpClaims, row: Record<string, unknown>) => boolean>>;
+  /**
+   * changedKeys: 이번 mutation 이 **실제로 변경하는 컬럼 집합**(update 는 set 의 키, insert 는 values 의 키).
+   * 정책 판정 행(row)에 DB 정본이 병합되면서 "값이 존재한다"와 "이번에 바꾼다"를 구분할 수
+   * 없게 되므로, 컬럼 단위 가드는 row 대신 이 집합을 봐야 한다.
+   * 미제공(undefined) 시에는 기존 동작대로 row 의 키를 사용한다.
+   */
+  guards?: Partial<
+    Record<
+      Op,
+      (claims: ErpClaims, row: Record<string, unknown>, changedKeys?: ReadonlySet<string>) => boolean
+    >
+  >;
   /**
    * 비동기 행 단위 가드. 동기 guards 통과 후 op별로 호출되며, row만으로는 판정할 수
    * 없어 DB 조회가 필요한 경우(예: where에 id만 있는 soft-delete에서 소유자 확인)에
@@ -155,14 +181,33 @@ const SENSITIVE_STAFF_COLUMNS = [
   'annual_leave_used',
 ] as const;
 
-function staffPrivilegeGuard(claims: ErpClaims, row: Record<string, unknown>): boolean {
+/**
+ * 이 mutation 이 컬럼 `col` 을 실제로 변경하는지.
+ *
+ * changedKeys 가 있으면 그것만 본다(정책 판정 행에 DB 정본이 병합돼 있어도 오탐 없음).
+ * 없으면 기존 동작(row 키 존재 여부)으로 폴백한다.
+ */
+function touchesColumn(
+  row: Record<string, unknown>,
+  changedKeys: ReadonlySet<string> | undefined,
+  col: string,
+): boolean {
+  if (changedKeys) return changedKeys.has(col);
+  return Object.prototype.hasOwnProperty.call(row, col);
+}
+
+function staffPrivilegeGuard(
+  claims: ErpClaims,
+  row: Record<string, unknown>,
+  changedKeys?: ReadonlySet<string>,
+): boolean {
   const touchesPrivileged = PRIVILEGED_STAFF_COLUMNS.some(
-    (col) => Object.prototype.hasOwnProperty.call(row, col),
+    (col) => touchesColumn(row, changedKeys, col),
   );
   if (touchesPrivileged && !erpIsAdmin(claims)) return false;
 
   const touchesSensitive = SENSITIVE_STAFF_COLUMNS.some(
-    (col) => Object.prototype.hasOwnProperty.call(row, col),
+    (col) => touchesColumn(row, changedKeys, col),
   );
   if (touchesSensitive && !erpIsAdmin(claims) && !erpCanManageCompany(claims)) return false;
 
@@ -186,14 +231,21 @@ const CONTRACT_SELF_UPDATE_ALLOW = new Set([
   'updated_at',
 ]);
 
-function employmentContractUpdateGuard(claims: ErpClaims, row: Record<string, unknown>): boolean {
+function employmentContractUpdateGuard(
+  claims: ErpClaims,
+  row: Record<string, unknown>,
+  changedKeys?: ReadonlySet<string>,
+): boolean {
   if (erpIsAdmin(claims) || erpCanManageCompany(claims)) return true;
   const me = erpStaffId(claims);
   if (me === null) return false;
   const staffId = getField<string>(row, 'staff_id');
   if (staffId !== null && staffId !== me) return false;
-  // set 키만 검사 (where 키 제외 어려우므로 allowlist 외 키가 있으면 deny)
-  const keys = Object.keys(row).filter((k) => k !== 'id' && k !== 'staff_id');
+  // 실제로 바뀌는 컬럼만 검사. changedKeys 가 없을 때만 row 키로 폴백한다
+  // (폴백 시에는 where 키를 걸러낼 수 없어 id/staff_id 를 제외한다).
+  const keys = changedKeys
+    ? [...changedKeys]
+    : Object.keys(row).filter((k) => k !== 'id' && k !== 'staff_id');
   return keys.every((k) => CONTRACT_SELF_UPDATE_ALLOW.has(k));
 }
 
@@ -403,12 +455,41 @@ export const POLICY_REGISTRY: Registry = {
     update: 'ADMIN_OR_MANAGER',
     delete: 'ADMIN_OR_MANAGER' },
   board_posts: PUBLIC_ALL('board_posts'),
-  daily_closures: PUBLIC_ALL('daily_closures'),
-  daily_closure_items: PUBLIC_ALL('daily_closure_items'),
-  daily_checks: PUBLIC_ALL('daily_checks'),
+  // 마감보고: 환자명·수납금액·수표 정보가 들어 있다. PUBLIC_ALL 이던 시절에는
+  // 로그인만 하면 타 회사 마감보고를 조회·삭제할 수 있었다(클라이언트 필터만 존재).
+  // company_id 로 회사 스코프를 서버에서 강제한다.
+  daily_closures: {
+    table: 'daily_closures',
+    select: 'COMPANY_SCOPE_OR_NULL',
+    insert: 'COMPANY_SCOPE_OR_NULL',
+    update: 'COMPANY_SCOPE_OR_NULL',
+    delete: 'COMPANY_SCOPE_OR_NULL',
+    companyIdField: 'company_id' },
+  // 하위 항목에는 company_id 가 없고 closure_id 만 있다(부모로만 스코프 가능).
+  // 현재 패턴으로는 부모 참조 스코프를 표현할 수 없어 AUTHENTICATED 로 둔다 —
+  // PUBLIC 보다는 좁지만 회사 격리는 되지 않는다. 부모 기준 asyncGuard 가 후속 과제.
+  daily_closure_items: {
+    table: 'daily_closure_items',
+    select: 'AUTHENTICATED',
+    insert: 'AUTHENTICATED',
+    update: 'AUTHENTICATED',
+    delete: 'AUTHENTICATED' },
+  daily_checks: {
+    table: 'daily_checks',
+    select: 'AUTHENTICATED',
+    insert: 'AUTHENTICATED',
+    update: 'AUTHENTICATED',
+    delete: 'AUTHENTICATED' },
   system_configs: PUBLIC_ALL('system_configs'),
   work_shifts: PUBLIC_ALL('work_shifts'),
-  contract_templates: PUBLIC_ALL('contract_templates'),
+  // 계약서 양식·직인: 직원도 읽어야 하지만(증명서·계약서 미리보기), 쓰기는 관리자만.
+  // PUBLIC_ALL 이던 시절에는 아무나 근로계약서 본문과 회사 직인 URL 을 바꿀 수 있었다.
+  contract_templates: {
+    table: 'contract_templates',
+    select: 'AUTHENTICATED',
+    insert: 'ADMIN_OR_MANAGER',
+    update: 'ADMIN_OR_MANAGER',
+    delete: 'ADMIN_OR_MANAGER' },
   // 근로계약서: 본인 조회·서명(update) 필수. 관리자/매니저는 회사 스코프로 발송·관리.
   // (과거 ADMIN_ONLY → 직원이 발송된 계약서를 조회·서명하지 못하는 장애 원인)
   employment_contracts: {
@@ -422,13 +503,33 @@ export const POLICY_REGISTRY: Registry = {
       update: employmentContractUpdateGuard,
     },
   },
-  staff_evaluations: PUBLIC_ALL('staff_evaluations'),
+  // 인사평가: 평가자는 extra_직원평가 권한으로 게이팅되며 매니저가 아닐 수 있어
+  // insert/select 는 AUTHENTICATED 로 둔다. 다만 수정·삭제는 화면이 이미 admin 으로
+  // 제한하고 있으므로(직원평가시스템.tsx:141) 서버에서도 같은 규칙을 강제한다.
+  // PUBLIC_ALL 이던 시절에는 아무나 타인 평가를 수정·삭제할 수 있었다.
+  staff_evaluations: {
+    table: 'staff_evaluations',
+    select: 'AUTHENTICATED',
+    insert: 'AUTHENTICATED',
+    update: 'ADMIN_ONLY',
+    delete: 'ADMIN_ONLY',
+    staffIdField: 'staff_id' },
   staff_preferred_off: PUBLIC_ALL('staff_preferred_off'),
   monthly_off_quota: PUBLIC_ALL('monthly_off_quota'),
   board_post_reads: PUBLIC_ALL('board_post_reads'),
   license_continuing_education: PUBLIC_ALL('license_continuing_education'),
   popups: PUBLIC_ALL('popups'),
-  disciplinary_committees: PUBLIC_ALL('disciplinary_committees'),
+  // 징계 기록: 최고 민감 인사 데이터. PUBLIC_ALL 이던 시절에는 로그인한 아무 직원이나
+  // 타인의 징계 사유·결과를 열람하고 수정·삭제까지 할 수 있었다.
+  // 조회는 본인 또는 인사/관리자(STAFF_IN_SCOPE), 쓰기는 인사/관리자만.
+  disciplinary_committees: {
+    table: 'disciplinary_committees',
+    select: 'STAFF_IN_SCOPE',
+    insert: 'ADMIN_OR_MANAGER',
+    update: 'ADMIN_OR_MANAGER',
+    delete: 'ADMIN_OR_MANAGER',
+    staffIdField: 'target_staff_id',
+    companyIdField: 'company' },
 
   // 채팅 메시지:
   // SELECT: CHAT_ROOM_MEMBER — 비멤버 방 메시지 열람 차단 (filterByPolicy 배치)
@@ -889,6 +990,383 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
   'work_schedules',
 ];
 
+// ─────────────────────────────────────────────────────────────
+// 7차 전수조사 후속 — ADDITIONAL_PUBLIC_TABLES 일괄 ADMIN_ONLY 강등 해소
+//
+// 아래 루프(`ADDITIONAL_PUBLIC_TABLES` → ADMIN_ONLY_ALL)는 목록 이름과 정반대로
+// 85개 테이블을 관리자 전용으로 만들었고, 그중 54개를 살아있는 코드가 호출하고 있었다.
+// 비관리자에게 SELECT 는 조용히 빈 배열, 쓰기는 403 이라 **기능이 에러 없이 죽어 있었다**
+// (전자서명·할일·결재 양식 목록·증명서 발급·출결정정 등).
+//
+// 여기서 테이블별로 최소권한 정책을 명시 등록한다. 아래 루프는 `if (!POLICY_REGISTRY[t])`
+// 가드가 있으므로 여기 등록된 것은 덮어쓰지 않는다.
+// 명시하지 않은 것(access_logs / backup_restore_runs / message_templates /
+// external_integrations / company_expenses / budget_settings / budget_executions)은
+// 관리자 전용이 맞으므로 루프의 ADMIN_ONLY 를 그대로 둔다.
+// ─────────────────────────────────────────────────────────────
+
+// ── 본인 + 인사(STAFF_IN_SCOPE = 본인 OR admin OR 같은 회사 인사) ──
+// filterByPolicy 에 배치 경로가 있어 전 직원 조회에서도 N+1 이 나지 않는다.
+POLICY_REGISTRY['staff_licenses'] = {
+  table: 'staff_licenses',
+  select: 'STAFF_IN_SCOPE',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_OR_MANAGER',
+  staffIdField: 'staff_id' };
+// 증명서: 본인 발급 경로(모바일 cert-issue)가 있어 insert 는 본인도 가능해야 한다.
+POLICY_REGISTRY['certificate_issuances'] = {
+  table: 'certificate_issuances',
+  select: 'STAFF_IN_SCOPE',
+  insert: 'SELF_OR_SAME_COMPANY',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_ONLY',
+  staffIdField: 'staff_id' };
+POLICY_REGISTRY['health_checkups'] = {
+  table: 'health_checkups',
+  select: 'STAFF_IN_SCOPE',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_OR_MANAGER',
+  staffIdField: 'staff_id',
+  companyNameField: 'company' };
+// 교육 이수/이력: 직원 본인이 이수 기록을 남기는 upsert 경로가 있어 insert+update 필요.
+POLICY_REGISTRY['education_records'] = {
+  table: 'education_records',
+  select: 'STAFF_IN_SCOPE',
+  insert: 'STAFF_IN_SCOPE',
+  update: 'STAFF_IN_SCOPE',
+  delete: 'ADMIN_OR_MANAGER',
+  staffIdField: 'staff_id' };
+POLICY_REGISTRY['education_completions'] = {
+  table: 'education_completions',
+  select: 'STAFF_IN_SCOPE',
+  insert: 'STAFF_IN_SCOPE',
+  update: 'STAFF_IN_SCOPE',
+  delete: 'ADMIN_OR_MANAGER',
+  staffIdField: 'staff_id' };
+POLICY_REGISTRY['staff_trainings'] = {
+  table: 'staff_trainings',
+  select: 'STAFF_IN_SCOPE',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_ONLY',
+  staffIdField: 'staff_id' };
+// 출결정정: 직원 셀프서비스. 신청은 본인, 승인·수정은 인사.
+POLICY_REGISTRY['attendance_corrections'] = {
+  table: 'attendance_corrections',
+  select: 'STAFF_IN_SCOPE',
+  insert: 'SELF_OR_SAME_COMPANY',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_OR_MANAGER',
+  staffIdField: 'staff_id' };
+POLICY_REGISTRY['annual_leave_promotion_logs'] = {
+  table: 'annual_leave_promotion_logs',
+  select: 'STAFF_IN_SCOPE',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_ONLY',
+  staffIdField: 'staff_id',
+  companyNameField: 'company_name' };
+POLICY_REGISTRY['personnel_appointments'] = {
+  table: 'personnel_appointments',
+  select: 'STAFF_IN_SCOPE',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_ONLY',
+  staffIdField: 'staff_id',
+  companyNameField: 'company' };
+POLICY_REGISTRY['staff_transfer_history'] = {
+  table: 'staff_transfer_history',
+  select: 'STAFF_IN_SCOPE',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_ONLY',
+  staffIdField: 'staff_id' };
+POLICY_REGISTRY['work_type_change_history'] = {
+  table: 'work_type_change_history',
+  select: 'STAFF_IN_SCOPE',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_ONLY',
+  staffIdField: 'staff_id' };
+POLICY_REGISTRY['early_leave_records'] = {
+  table: 'early_leave_records',
+  select: 'STAFF_IN_SCOPE',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_ONLY',
+  staffIdField: 'staff_id',
+  companyNameField: 'company' };
+// 문서보관함: 소유자 컬럼이 staff_id 가 아니라 created_by 다.
+// 전자서명이 이 테이블에 선저장하는데 ADMIN_ONLY 라 403 → throw → 계약이 영구 '서명대기' 로
+// 남던 장애의 원인. SELF_OR_SAME_COMPANY 를 쓰면 본인 문서는 항상 보이고,
+// created_by 가 비어 있는 회사 공용 문서도 같은 회사 관리자에게는 보인다.
+POLICY_REGISTRY['document_repository'] = {
+  table: 'document_repository',
+  select: 'SELF_OR_SAME_COMPANY',
+  insert: 'SELF_OR_SAME_COMPANY',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_OR_MANAGER',
+  staffIdField: 'created_by',
+  companyNameField: 'company_name' };
+
+// ── 개인 전용 (인사도 볼 이유 없음) — DB 조회 0건 ──
+POLICY_REGISTRY['todos'] = {
+  table: 'todos',
+  select: 'SELF_ONLY',
+  insert: 'SELF_ONLY',
+  update: 'SELF_ONLY',
+  delete: 'SELF_ONLY',
+  staffIdField: 'user_id' };
+POLICY_REGISTRY['chat_room_prefs'] = {
+  table: 'chat_room_prefs',
+  select: 'SELF_ONLY',
+  insert: 'SELF_ONLY',
+  update: 'SELF_ONLY',
+  delete: 'SELF_ONLY',
+  staffIdField: 'user_id' };
+POLICY_REGISTRY['room_notification_settings'] = {
+  table: 'room_notification_settings',
+  select: 'SELF_ONLY',
+  insert: 'SELF_ONLY',
+  update: 'SELF_ONLY',
+  delete: 'SELF_ONLY',
+  staffIdField: 'user_id' };
+
+// ── 채팅 부속 ──
+// polls 에는 room_id 가 있어 방 멤버 스코프가 성립한다.
+POLICY_REGISTRY['polls'] = {
+  table: 'polls',
+  select: 'CHAT_ROOM_MEMBER',
+  insert: 'AUTHENTICATED',
+  update: 'CHAT_ROOM_MEMBER',
+  delete: 'SELF_ONLY',
+  staffIdField: 'creator_id' };
+// poll_votes 에는 room_id 가 없어(poll_id 만) CHAT_ROOM_MEMBER 를 쓸 수 없다.
+// 투표 집계 렌더링이 타인 투표를 읽어야 하므로 select 는 AUTHENTICATED.
+POLICY_REGISTRY['poll_votes'] = {
+  table: 'poll_votes',
+  select: 'AUTHENTICATED',
+  insert: 'SELF_ONLY',
+  update: 'SELF_ONLY',
+  delete: 'SELF_ONLY',
+  staffIdField: 'user_id' };
+// 회사 단위 드라이브 링크. 목록이 비면 클라이언트가 기본값을 자동 insert 하는 경로가 있어
+// insert 는 AUTHENTICATED 로 둔다(서버 시딩으로 옮기면 ADMIN_OR_MANAGER 로 좁힐 수 있음).
+POLICY_REGISTRY['messenger_drive_links'] = {
+  table: 'messenger_drive_links',
+  select: 'AUTHENTICATED',
+  insert: 'AUTHENTICATED',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_OR_MANAGER',
+  companyNameField: 'company_name' };
+
+// ── 마스터/참조 데이터 — 읽기는 전 직원, 쓰기는 관리 ──
+POLICY_REGISTRY['approval_form_types'] = {
+  table: 'approval_form_types',
+  select: 'AUTHENTICATED',
+  insert: 'ADMIN_ONLY',
+  update: 'ADMIN_ONLY',
+  delete: 'ADMIN_ONLY',
+  companyNameField: 'company_name' };
+POLICY_REGISTRY['org_teams'] = {
+  table: 'org_teams',
+  select: 'AUTHENTICATED',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_OR_MANAGER',
+  companyNameField: 'company_name' };
+POLICY_REGISTRY['job_categories'] = {
+  table: 'job_categories',
+  select: 'AUTHENTICATED',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_OR_MANAGER' };
+POLICY_REGISTRY['job_category_required_trainings'] = {
+  table: 'job_category_required_trainings',
+  select: 'AUTHENTICATED',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_OR_MANAGER' };
+// 직군 매핑·근무유형 배정은 조직 공개 정보이고, 전 직원 매트릭스/시프트 해석이
+// 타인 행을 읽어야 정상 동작한다(staff_members.select 가 PUBLIC 인 것과 같은 성격).
+POLICY_REGISTRY['staff_job_categories'] = {
+  table: 'staff_job_categories',
+  select: 'AUTHENTICATED',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_OR_MANAGER',
+  staffIdField: 'staff_id' };
+POLICY_REGISTRY['staff_shift_assignments'] = {
+  table: 'staff_shift_assignments',
+  select: 'AUTHENTICATED',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_OR_MANAGER',
+  staffIdField: 'staff_id' };
+POLICY_REGISTRY['shift_assignments'] = {
+  table: 'shift_assignments',
+  select: 'AUTHENTICATED',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_OR_MANAGER',
+  staffIdField: 'staff_id',
+  companyNameField: 'company_name' };
+POLICY_REGISTRY['surgery_templates'] = {
+  table: 'surgery_templates',
+  select: 'AUTHENTICATED',
+  insert: 'ADMIN_ONLY',
+  update: 'ADMIN_ONLY',
+  delete: 'ADMIN_ONLY' };
+POLICY_REGISTRY['mri_templates'] = {
+  table: 'mri_templates',
+  select: 'AUTHENTICATED',
+  insert: 'ADMIN_ONLY',
+  update: 'ADMIN_ONLY',
+  delete: 'ADMIN_ONLY' };
+POLICY_REGISTRY['suppliers'] = {
+  table: 'suppliers',
+  select: 'AUTHENTICATED',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_OR_MANAGER' };
+POLICY_REGISTRY['inventory_categories'] = {
+  table: 'inventory_categories',
+  select: 'AUTHENTICATED',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_OR_MANAGER' };
+POLICY_REGISTRY['medical_devices'] = {
+  table: 'medical_devices',
+  select: 'AUTHENTICATED',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_OR_MANAGER' };
+POLICY_REGISTRY['device_inspections'] = {
+  table: 'device_inspections',
+  select: 'AUTHENTICATED',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_OR_MANAGER' };
+// 휴가·복리후생 규정은 직원이 알아야 하는 내용이므로 읽기 개방.
+POLICY_REGISTRY['leave_policies'] = {
+  table: 'leave_policies',
+  select: 'AUTHENTICATED',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_ONLY',
+  companyNameField: 'company' };
+POLICY_REGISTRY['company_welfare_policies'] = {
+  table: 'company_welfare_policies',
+  select: 'AUTHENTICATED',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_ONLY',
+  companyNameField: 'company_name' };
+// 근태 차감 규칙: 직원이 차감 근거를 확인할 수 있어야 하고, 인사 급여정산도 읽는다.
+POLICY_REGISTRY['attendance_deduction_rules'] = {
+  table: 'attendance_deduction_rules',
+  select: 'AUTHENTICATED',
+  insert: 'ADMIN_ONLY',
+  update: 'ADMIN_ONLY',
+  delete: 'ADMIN_ONLY',
+  companyNameField: 'company_name' };
+
+// ── 현장 공유 화면 (팀 단위 열람이 업무 전제) ──
+POLICY_REGISTRY['handover_notes'] = {
+  table: 'handover_notes',
+  select: 'AUTHENTICATED',
+  insert: 'AUTHENTICATED',
+  update: 'AUTHENTICATED',
+  delete: 'SELF_ONLY',
+  staffIdField: 'author_id' };
+// 주의: discharge_reviews 에는 환자 PHI(이름·생년월일·진단명)가 들어 있는데
+// 회사/부서 컬럼이 아예 없어 격리 수단이 없다. 공유 심사 큐가 업무 전제라 현재는
+// AUTHENTICATED 로 두되, company_id 컬럼 추가 후 COMPANY_SCOPE_OR_NULL 전환이 필요하다.
+POLICY_REGISTRY['discharge_reviews'] = {
+  table: 'discharge_reviews',
+  select: 'AUTHENTICATED',
+  insert: 'AUTHENTICATED',
+  update: 'AUTHENTICATED',
+  delete: 'ADMIN_OR_MANAGER',
+  staffIdField: 'reviewer_id' };
+// 템플릿 편집이 일반 심사 화면에서 일어나므로 insert/update 는 열어 둔다.
+POLICY_REGISTRY['discharge_templates'] = {
+  table: 'discharge_templates',
+  select: 'AUTHENTICATED',
+  insert: 'AUTHENTICATED',
+  update: 'AUTHENTICATED',
+  delete: 'ADMIN_OR_MANAGER' };
+// 사고 신고는 전 직원이 할 수 있어야 하고, 수정·삭제는 인사가 관리.
+POLICY_REGISTRY['incident_reports'] = {
+  table: 'incident_reports',
+  select: 'AUTHENTICATED',
+  insert: 'AUTHENTICATED',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_OR_MANAGER',
+  staffIdField: 'reporter_id' };
+
+// ── 인사 전용(민감) — ADMIN_ONLY 로는 인사팀(perms.hr)이 막히므로 ADMIN_OR_MANAGER ──
+POLICY_REGISTRY['company_payroll_policies'] = {
+  table: 'company_payroll_policies',
+  select: 'ADMIN_OR_MANAGER',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_ONLY',
+  companyNameField: 'company_name' };
+POLICY_REGISTRY['congratulations_condolences'] = {
+  table: 'congratulations_condolences',
+  select: 'ADMIN_OR_MANAGER',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_OR_MANAGER',
+  companyNameField: 'company' };
+// 급여 정보(salary 컬럼) 포함 → 인사 이상만.
+POLICY_REGISTRY['generated_contracts'] = {
+  table: 'generated_contracts',
+  select: 'ADMIN_OR_MANAGER',
+  insert: 'ADMIN_OR_MANAGER',
+  update: 'ADMIN_OR_MANAGER',
+  delete: 'ADMIN_ONLY',
+  staffIdField: 'staff_id',
+  companyNameField: 'company_name' };
+
+// ── 재무 ──
+// FINANCE_SCOPE = finance 권한 + 회사 스코프. 이 패턴이 없던 시절에는 finance_* 권한이
+// claim 으로 변환되지 않아 재무 담당자가 자기 화면 데이터를 전혀 읽지 못했다.
+POLICY_REGISTRY['journal_entries'] = {
+  table: 'journal_entries',
+  select: 'FINANCE_SCOPE',
+  insert: 'FINANCE_SCOPE',
+  update: 'FINANCE_SCOPE',
+  delete: 'ADMIN_ONLY',
+  companyIdField: 'company_id' };
+POLICY_REGISTRY['fixed_assets'] = {
+  table: 'fixed_assets',
+  select: 'FINANCE_SCOPE',
+  insert: 'FINANCE_SCOPE',
+  update: 'FINANCE_SCOPE',
+  delete: 'ADMIN_ONLY',
+  companyIdField: 'company_id' };
+// 계좌번호를 담고 있어 쓰기는 관리자만.
+POLICY_REGISTRY['bank_accounts_sync'] = {
+  table: 'bank_accounts_sync',
+  select: 'FINANCE_SCOPE',
+  insert: 'ADMIN_ONLY',
+  update: 'ADMIN_ONLY',
+  delete: 'ADMIN_ONLY',
+  companyIdField: 'company_id' };
+// 환자명·계좌번호가 들어 있고 회사 UUID 로 격리 가능. 입금 수신은 서버 웹훅이라 쓰기는 관리자만.
+POLICY_REGISTRY['virtual_account_deposits'] = {
+  table: 'virtual_account_deposits',
+  select: 'MANAGE_COMPANY',
+  insert: 'ADMIN_ONLY',
+  update: 'ADMIN_ONLY',
+  delete: 'ADMIN_ONLY',
+  companyIdField: 'company_id' };
+
+
 for (const tableName of ADDITIONAL_PUBLIC_TABLES) {
   if (!POLICY_REGISTRY[tableName]) {
     // 자동 PUBLIC_ALL 부여 제거 — 미등록 테이블은 Default Deny (ADMIN_ONLY 또는 403)
@@ -1013,6 +1491,30 @@ async function evalPattern(
   const staffField = cfg.staffIdField ?? 'staff_id';
   const companyField = cfg.companyIdField ?? 'company_id';
 
+  /**
+   * 행의 회사가 내 회사인지 — UUID 컬럼과 이름 컬럼을 모두 인정한다.
+   *
+   * companyIdField 만 보던 시절에는, 회사를 이름 문자열로만 들고 있는 테이블(24개)에서
+   * 비관리자에게 항상 false 가 되어 회사 스코프를 아예 걸 수 없었다.
+   * 둘 중 하나라도 일치하면 통과. 둘 다 값이 없으면 판단 불가로 false.
+   */
+  const rowCompanyMatches = (): boolean => {
+    const byId = getField<string>(row, companyField);
+    if (byId !== null && erpCompanyMatches(claims, byId)) return true;
+    if (cfg.companyNameField) {
+      const byName = getField<string>(row, cfg.companyNameField);
+      if (byName !== null && erpCompanyNameMatches(claims, byName)) return true;
+    }
+    return false;
+  };
+
+  /** 회사 컬럼이 아예 비어 있는가(=전사 공용 행) */
+  const rowCompanyIsNull = (): boolean => {
+    if (getField<string>(row, companyField) !== null) return false;
+    if (cfg.companyNameField && getField<string>(row, cfg.companyNameField) !== null) return false;
+    return true;
+  };
+
   if (pattern === 'SELF_ONLY') {
     const rowStaff = getField<string>(row, staffField);
     return rowStaff !== null && rowStaff === erpStaffId(claims);
@@ -1024,14 +1526,22 @@ async function evalPattern(
 
   if (pattern === 'MANAGE_COMPANY') {
     if (!erpCanManageCompany(claims)) return false;
-    return erpCompanyMatches(claims, getField<string>(row, companyField));
+    return rowCompanyMatches();
   }
 
   if (pattern === 'MANAGE_COMPANY_OR_NULL') {
     if (!erpCanManageCompany(claims)) return false;
-    const v = getField<string>(row, companyField);
-    if (v === null) return true;
-    return erpCompanyMatches(claims, v);
+    if (rowCompanyIsNull()) return true;
+    return rowCompanyMatches();
+  }
+
+  if (pattern === 'FINANCE_SCOPE') {
+    // 재무 데이터(분개장·고정자산·금융연동). finance 권한 보유자 + 회사 스코프.
+    // 이 패턴이 없던 시절에는 finance_* 권한이 claim 으로 변환되지 않아
+    // 재무 담당자가 정책 레이어에서 일반 직원 취급을 받아 접근 자체가 불가능했다.
+    if (!erpCanManageFinance(claims)) return false;
+    if (rowCompanyIsNull()) return true;
+    return rowCompanyMatches();
   }
 
   if (pattern === 'SELF_OR_SAME_COMPANY') {
@@ -1043,7 +1553,7 @@ async function evalPattern(
       const sameCompany = await erpTargetStaffSameCompany(db, claims, rowStaff);
       if (sameCompany) return true;
     }
-    return erpCompanyMatches(claims, getField<string>(row, companyField));
+    return rowCompanyMatches();
   }
 
   if (pattern === 'STAFF_IN_SCOPE') {
@@ -1053,9 +1563,8 @@ async function evalPattern(
   }
 
   if (pattern === 'COMPANY_SCOPE_OR_NULL') {
-    const v = getField<string>(row, companyField);
-    if (v === null) return true;
-    return erpCompanyMatches(claims, v);
+    if (rowCompanyIsNull()) return true;
+    return rowCompanyMatches();
   }
 
   if (pattern === 'ROSTER_APPROVER_OR_SELF') {
@@ -1071,7 +1580,7 @@ async function evalPattern(
     const me = erpStaffId(claims);
     if (me !== null && (sender === me || approver === me)) return true;
     if (!erpCanManageCompany(claims)) return false;
-    return erpCompanyMatches(claims, getField<string>(row, companyField));
+    return rowCompanyMatches();
   }
 
   if (pattern === 'INVENTORY_SCOPE') {
@@ -1154,7 +1663,27 @@ export interface PolicyCheckArgs {
   claims: ErpClaims;
   table: string;
   op: Op;
+  /**
+   * 패턴(SELF_ONLY / APPROVAL_SCOPE / INVENTORY_SCOPE …) 판정에 쓰이는 행.
+   *
+   * update/delete 에서는 **변경 전 DB 정본**이어야 한다. "이 행을 건드릴 자격이 있는가"는
+   * 기존 상태로 판단해야 하며, 클라이언트가 보낸 새 값으로 판단하면
+   * `set:{current_approver_id: 내id}` 같은 값으로 소유권을 위조할 수 있다.
+   */
   row: Record<string, unknown>;
+  /**
+   * 컬럼 단위 가드에 넘길 행. 미지정 시 row 를 쓴다.
+   *
+   * 가드는 패턴과 반대로 **변경 후 상태**를 봐야 하는 경우가 있다
+   * (예: leaveRequestUpdateGuard 는 본인이 status 를 '승인' 으로 바꾸는 것을 막는다).
+   * 따라서 호출부는 `{...DB정본, ...set}` 을 넘긴다.
+   */
+  guardRow?: Record<string, unknown>;
+  /**
+   * 이번 mutation 이 실제로 변경하는 컬럼 집합(update=set 키, insert=values 키).
+   * guardRow 에 DB 정본이 병합된 경우 컬럼 단위 가드가 오탐하지 않도록 반드시 전달할 것.
+   */
+  changedKeys?: ReadonlySet<string>;
 }
 
 /**
@@ -1170,11 +1699,13 @@ export async function canAccess(args: PolicyCheckArgs): Promise<boolean> {
   const ok = await evalPattern(pattern, args.db, args.claims, args.row, cfg);
   if (!ok) return false;
   // 패턴 통과 후 컬럼 단위 가드 적용 (예: 권한 컬럼 변경 차단)
+  // 가드는 패턴과 달리 **변경 후 상태**를 봐야 하므로 guardRow 를 쓴다.
+  const guardRow = args.guardRow ?? args.row;
   const guard = cfg.guards?.[args.op];
-  if (guard && !guard(args.claims, args.row)) return false;
+  if (guard && !guard(args.claims, guardRow, args.changedKeys)) return false;
   // 비동기 행 단위 가드 (예: messages soft-delete 소유자 확인 — DB 조회 필요)
   const asyncGuard = cfg.asyncGuards?.[args.op];
-  if (asyncGuard && !(await asyncGuard(args.db, args.claims, args.row))) return false;
+  if (asyncGuard && !(await asyncGuard(args.db, args.claims, guardRow))) return false;
   return true;
 }
 
@@ -1257,8 +1788,17 @@ async function filterChatRoomsByMembership<T extends Record<string, unknown>>(
 /**
  * 여러 row를 일괄 필터링 — SELECT 결과를 RLS처럼 적용.
  */
-const STAFF_SECRET_ALWAYS_COLUMNS = new Set(['password', 'passwd']);
-const STAFF_PII_SENSITIVE_COLUMNS = new Set([
+/**
+ * 응답에서 항상 제거되는 staff_members 컬럼.
+ *
+ * 주의: 응답 마스킹만으로는 부족하다. `where`/`order`/`count` 로 이 컬럼을 참조하면
+ * 결과 유무·개수가 오라클이 되어 값을 이분탐색으로 복원할 수 있다.
+ * 따라서 /api/d1/query 가 이 집합을 필터·정렬 필드에서도 차단한다
+ * (app/api/d1/query/route.ts assertNoSensitiveFieldAccess).
+ */
+export const STAFF_SECRET_ALWAYS_COLUMNS = new Set(['password', 'passwd']);
+/** 본인·관리자 외에는 응답에서 제거되는 PII. 위와 같은 이유로 필터·정렬에서도 차단된다. */
+export const STAFF_PII_SENSITIVE_COLUMNS = new Set([
   'resident_no',
   'account_number',
   'bank_name',
@@ -1336,6 +1876,25 @@ export async function filterByPolicy<T extends Record<string, unknown>>(
     if (table === 'chat_rooms') {
       return filterChatRoomsByMembership(db, claims, rows);
     }
+  }
+
+  // STAFF_IN_SCOPE 배치 평가 — 행마다 erpTargetStaffInScope 를 부르면 비본인 행 1건당
+  // D1 쿼리 1건이 나가 전 직원 조회 화면에서 요청당 수백 쿼리가 됐다.
+  // 대상 staff id 를 모아 한 번에 스코프를 구한 뒤 메모리에서 필터한다.
+  if (cfg.select === 'STAFF_IN_SCOPE') {
+    const staffField = cfg.staffIdField ?? 'staff_id';
+    const targets = new Set<string>();
+    for (const row of rows) {
+      const v = getField<string>(row, staffField);
+      if (v !== null) targets.add(v);
+    }
+    const allowed = await erpTargetStaffInScopeBatch(db, claims, [...targets]);
+    const scoped = rows.filter((row) => {
+      const v = getField<string>(row, staffField);
+      // 단건 경로와 동일하게, staff 필드가 비어 있으면 거부한다.
+      return v !== null && allowed.has(v);
+    });
+    return stripSecrets ? stripStaffSecrets(scoped, claims) : scoped;
   }
 
   const out: T[] = [];

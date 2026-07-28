@@ -468,41 +468,34 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
     const queryLimit = isScheduleBoard ? 500 : requestedLimit + 1;
 
     setLoading(true);
+    const boardTypeVariants =
+      requestedBoard === 'MRI일정'
+        ? ['MRI일정', 'MRI일정표', 'mri']
+        : requestedBoard === '수술일정'
+        ? ['수술일정', '수술']
+        : [requestedBoard];
+
     const { data } = await withMissingColumnsFallback<BoardPostRow[]>(
       async (omittedColumns): Promise<QueryResult<BoardPostRow[]>> => {
         let query = db
           .from('board_posts')
           .select(buildSelectColumns(listRequiredColumns, BOARD_POST_OPTIONAL_COLUMNS, omittedColumns))
-          .eq('board_type', requestedBoard);
-
-        // 회사 격리: MSO는 selectedCo/selectedCompanyId, 병원 직원은 세션 company
-        const scopeCompanyId =
-          (selectedCompanyId && String(selectedCompanyId).trim()) ||
-          (!isMsoUser(user) && user?.company_id ? String(user.company_id).trim() : '') ||
-          '';
-        const scopeCompanyName =
-          (selectedCo && selectedCo !== '전체' ? String(selectedCo).trim() : '') ||
-          (!isMsoUser(user) && user?.company ? String(user.company).trim() : '') ||
-          '';
-        if (scopeCompanyId && !omittedColumns.has('company_id')) {
-          query = query.eq('company_id', scopeCompanyId);
-        } else if (scopeCompanyName) {
-          query = query.eq('company', scopeCompanyName);
-        }
+          .in('board_type', boardTypeVariants);
 
         const result = await query
           .order('created_at', { ascending: false })
-          .limit(queryLimit);
+          .limit(queryLimit * 2);
         return result as unknown as QueryResult<BoardPostRow[]>;
       },
       [...BOARD_POST_OPTIONAL_COLUMNS]
     );
+
     if (fetchSeq !== boardFetchSeqRef.current) {
       setLoading(false);
       return;
     }
 
-    if (!data) {
+    if (!data || !Array.isArray(data)) {
       setPosts([]);
       setHasMorePosts(false);
       setLoading(false);

@@ -18,6 +18,7 @@ import {
   withWeeklyRotationShifts } from '@/lib/contract-shift-rotation';
 import ContractStandardPreview from './계약서표준미리보기';
 import ConfidentialityPledge from './비밀유지서약서';
+import { resolveCompanySealUrl } from '@/lib/company-brand-assets';
 
 type Props = {
   staff?: any;
@@ -101,16 +102,9 @@ export default function ContractPreview({
           tmpl = data;
         }
 
-        let resolvedSealUrl: string | null | undefined =
-          sealUrlOverride !== undefined ? sealUrlOverride : tmpl?.seal_url;
-
-        if (!resolvedSealUrl && companyName && companyName !== '전체') {
-          const { data: fallbackTmpl } = await db
-            .from('contract_templates')
-            .select('seal_url')
-            .eq('company_name', '전체')
-            .maybeSingle();
-          resolvedSealUrl = fallbackTmpl?.seal_url ?? undefined;
+        let resolvedSealUrl: string | null | undefined = sealUrlOverride;
+        if (!resolvedSealUrl && companyName) {
+          resolvedSealUrl = (await resolveCompanySealUrl(companyName)) ?? undefined;
         }
 
         setCompany({ ...companyInfo, seal_url: resolvedSealUrl ?? (companyInfo as any)?.seal_url });
@@ -241,8 +235,22 @@ export default function ContractPreview({
       const num = Number(raw);
       return Number.isFinite(num) ? num : 0;
     };
+    // 0022 마이그레이션으로 employment_contracts 에 생긴 "체결 시점 스냅샷" 컬럼.
+    // 계약서 행에 값이 기록되어 있으면(0 포함) 그것이 확정 사실이므로 staff 폴백을 막는다.
+    // 마이그레이션 이전 계약서는 NULL 이라 기존 폴백 경로를 그대로 탄다.
+    const SNAPSHOT_ONLY_FIELDS = new Set([
+      'agreed_overtime_allowance',
+      'agreed_night_allowance',
+      'night_duty_allowance',
+    ]);
+    const isRecorded = (val: any) =>
+      val !== null && val !== undefined && val !== '' && typeof val !== 'boolean';
+
     // Resolve salary field: use contract value if positive, else staff value
     const resolve = (field: string, ...altFields: string[]) => {
+      if (contract && SNAPSHOT_ONLY_FIELDS.has(field) && isRecorded(contract[field])) {
+        return parseAmount(contract[field]);
+      }
       let val = parseAmount(src[field]);
       if (val > 0) return val;
       for (const alt of altFields) {

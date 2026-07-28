@@ -180,6 +180,7 @@ async function getStaffLeaveContext(staffId: string) {
     .where(
       or(
         eq(staffMembersTable.id, searchKey),
+        eq(staffMembersTable.auth_user_id, searchKey),
         eq(staffMembersTable.employee_no, searchKey),
         eq(staffMembersTable.name, searchKey),
       )

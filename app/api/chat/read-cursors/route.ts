@@ -69,6 +69,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const result = await upsertRoomReadCursors({ userId, roomIds: allowedRoomIds, readAt });
+
+    // 실시간 신호 발신 — 이게 없어서 상대 화면의 "안 읽음(1)" 표시가 즉시 사라지지 않았다.
+    // /api/d1/mutate 를 거치지 않고 D1 에 직접 쓰는 경로라 triggerMutationSignal 이 돌지 않으므로
+    // 여기서 같은 채널 규칙(room_read_cursors, room_read_cursors:room_id=eq.X, chat_rooms)으로 직접 쏜다.
+    // 발신 실패가 읽음 저장 자체를 실패로 만들지 않도록 오류는 삼킨다.
+    if (result.ok) {
+      try {
+        const { emitRealtimeSignal } = await import('@/lib/realtime/server-signal');
+        const channels = ['room_read_cursors', 'chat_rooms'];
+        for (const roomId of allowedRoomIds) {
+          channels.push(`room_read_cursors:room_id=eq.${roomId}`);
+        }
+        await emitRealtimeSignal({ channels, source: 'chat-read-cursors' });
+      } catch (signalErr) {
+        console.error('[chat/read-cursors] realtime signal 실패 (non-fatal):', signalErr);
+      }
+    }
+
     return NextResponse.json({ ok: result.ok, readAt: result.readAt });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal error';

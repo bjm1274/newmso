@@ -102,12 +102,17 @@ function StaffDrawerInner({
         ...직원,
         status: '퇴사',
         resigned_at: (직원 as any).resigned_at || today };
-      await db
+      // db-client 는 실패해도 reject 하지 않고 { data: null, error } 로 resolve 한다.
+      // error 를 받지 않으면 403/500 인데도 성공 토스트가 떠 퇴사 처리가 된 것처럼 보인다.
+      // (구성원현황.tsx 의 직원삭제와 동일한 검사)
+      const { error: updateErr } = await db
         .from('staff_members')
         .update({
           status: '퇴사',
           resigned_at: (직원 as any).resigned_at || today })
         .eq('id', 직원.id);
+
+      if (updateErr) throw updateErr;
 
       await logAudit(
         '직원퇴사처리',
@@ -124,7 +129,14 @@ function StaffDrawerInner({
       onClose?.();
       onRefresh?.();
     } catch (e: unknown) {
-      toast('직원 퇴사 처리 중 오류가 발생했습니다.', 'error');
+      console.error('직원 퇴사 처리 실패:', e);
+      const errMsg = (e as { message?: string } | null)?.message || String(e || '');
+      toast(
+        errMsg
+          ? `직원 퇴사 처리 중 오류가 발생했습니다: ${errMsg}`
+          : '직원 퇴사 처리 중 오류가 발생했습니다.',
+        'error',
+      );
     }
   };
 

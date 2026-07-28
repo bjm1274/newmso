@@ -550,9 +550,17 @@ export function canAccessBoard(
   if (!canAccessMainMenu(user, '게시판')) return false;
 
   const permissionKeys = BOARD_PERMISSION_KEYS[boardId];
-  if (!permissionKeys) return false;
+  const targetKey = permissionKeys ? (action === 'write' ? permissionKeys.write : permissionKeys.read) : `board_${boardId}_${action}`;
 
-  return hasPermission(user, action === 'write' ? permissionKeys.write : permissionKeys.read);
+  const explicit = getExplicitPermissionState(user, targetKey);
+  if (explicit !== null) return explicit;
+
+  if (action === 'read') {
+    // 게시판 메인 메뉴 접근 권한이 있고 명시적 false가 아니라면 읽기 기본 허용
+    return true;
+  }
+
+  return isAdminUser(user) || hasPermission(user, targetKey);
 }
 
 export function canAccessApprovalSection(

@@ -20,7 +20,7 @@
 // 호출자가 권한 검사를 잊지 않도록 명시적 API로 설계.
 // ============================================================
 
-import { eq, and, isNotNull } from 'drizzle-orm';
+import { eq, and, isNotNull, inArray } from 'drizzle-orm';
 import type { D1Client } from '../client-d1';
 import { staff_members } from '../schema';
 
@@ -38,6 +38,8 @@ export interface ErpClaims {
   erp_can_manage_department_inventory?: boolean | null;
   erp_can_view_all_inventory_companies?: boolean | null;
   erp_can_manage_all_inventory_companies?: boolean | null;
+  /** 재무 데이터(급여·정산·매출 등) 관리 권한 — admin/mso/finance */
+  erp_can_manage_finance?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -82,6 +84,14 @@ export const erpCanViewAllInventoryCompanies = (c: ErpClaims) =>
   claimBool(c, 'erp_can_view_all_inventory_companies');
 export const erpCanManageAllInventoryCompanies = (c: ErpClaims) =>
   claimBool(c, 'erp_can_manage_all_inventory_companies');
+
+/**
+ * 재무 데이터 관리 권한 (admin/mso/finance).
+ * 관리자는 항상 포함한다.
+ */
+export function erpCanManageFinance(c: ErpClaims): boolean {
+  return erpIsAdmin(c) || claimBool(c, 'erp_can_manage_finance');
+}
 
 // ─────────────────────────────────────────────────────────────
 // 회사 단위 scope 검사
@@ -187,6 +197,78 @@ export async function erpTargetStaffInScope(
   if (targetStaffId === erpStaffId(c)) return true;
   if (!erpCanManageCompany(c)) return false;
   return erpTargetStaffSameCompany(db, c, targetStaffId);
+}
+
+/**
+ * D1 은 쿼리 1건당 bound parameter 100개 제한이 있다.
+ * IN 목록만으로 100개를 채우기 위해 회사 비교는 SQL 이 아니라 JS 에서 수행한다.
+ */
+const STAFF_SCOPE_CHUNK_SIZE = 100;
+
+/**
+ * 여러 직원 id 를 한 번에 스코프 판정. erpTargetStaffInScope 의 배치 버전.
+ *
+ * 판정 규칙은 erpTargetStaffInScope / erpTargetStaffSameCompany 와 동일:
+ *   - admin 이면 전부 허용
+ *   - 본인 id 는 항상 허용
+ *   - erpCanManageCompany 가 false 면 본인 것만 허용
+ *   - true 면 내 회사(erp_company_id, UUID)와 staff_members.company_id 가
+ *     일치하고 NULL 이 아닌 대상만 허용
+ *
+ * 행마다 쿼리하는 대신 최대 100개씩 IN 으로 묶어 조회한다.
+ * 반환: 접근 가능한 staffId 집합 (입력에 없던 id 는 포함되지 않음)
+ */
+export async function erpTargetStaffInScopeBatch(
+  db: D1Client,
+  c: ErpClaims,
+  targetStaffIds: string[],
+): Promise<Set<string>> {
+  const allowed = new Set<string>();
+  if (!Array.isArray(targetStaffIds) || targetStaffIds.length === 0) return allowed;
+
+  // 중복 제거 (원본 문자열 그대로 — 단건 버전이 trim 하지 않으므로 동일하게 유지)
+  const unique: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of targetStaffIds) {
+    if (typeof raw !== 'string' || raw === '') continue;
+    if (seen.has(raw)) continue;
+    seen.add(raw);
+    unique.push(raw);
+  }
+  if (unique.length === 0) return allowed;
+
+  // admin — 전부 허용
+  if (erpIsAdmin(c)) {
+    for (const id of unique) allowed.add(id);
+    return allowed;
+  }
+
+  // 본인은 항상 허용
+  const me = erpStaffId(c);
+  if (me !== null && seen.has(me)) allowed.add(me);
+
+  if (!erpCanManageCompany(c)) return allowed;
+
+  // erpTargetStaffSameCompany 와 동일하게, 내 회사 claim 이 유효한 UUID 가
+  // 아니면(=null) 회사 단위 확장은 불가.
+  const my = erpCompanyId(c);
+  if (my === null) return allowed;
+
+  const pending = unique.filter((id) => !allowed.has(id));
+  for (let i = 0; i < pending.length; i += STAFF_SCOPE_CHUNK_SIZE) {
+    const chunk = pending.slice(i, i + STAFF_SCOPE_CHUNK_SIZE);
+    const rows = await db
+      .select({ id: staff_members.id, company_id: staff_members.company_id })
+      .from(staff_members)
+      .where(inArray(staff_members.id, chunk));
+    for (const row of rows) {
+      // eq(company_id, my) + isNotNull(company_id) 와 동일한 판정
+      if (row.company_id !== null && row.company_id !== undefined && row.company_id === my) {
+        allowed.add(row.id);
+      }
+    }
+  }
+  return allowed;
 }
 
 /**

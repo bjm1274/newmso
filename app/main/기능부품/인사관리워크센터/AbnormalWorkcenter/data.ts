@@ -242,11 +242,20 @@ export async function fetchAbnormalData({
   const allDays = build4WeekDays(now);
   const sinceIso = getAbnormalLookbackSince(ABNORMAL_LOOKBACK_DAYS, now);
 
-  const { data } = await db
+  // `late_minutes` / `early_leave_minutes` 는 attendances 스키마에 **실재하지 않는다**
+  // (0000_lovely_alice.sql 의 DDL 확인). 이 두 컬럼을 select 에 넣으면 "no such column" 으로
+  // 쿼리가 통째로 실패하는데, 아래에서 error 를 받지 않아 결과가 항상 빈 배열이 되고
+  // **근태이상 감지가 영구히 "이상 없음"** 으로 표시됐다. 존재하는 컬럼만 조회한다.
+  const { data, error } = await db
     .from('attendances')
-    .select('staff_id, work_date, status, check_in_time, check_out_time, late_minutes, early_leave_minutes')
+    .select('staff_id, work_date, status, check_in_time, check_out_time')
     .in('staff_id', staffIds)
     .gte('work_date', sinceIso);
+
+  if (error) {
+    console.error('[AbnormalWorkcenter] attendances 조회 실패', error);
+    throw error;
+  }
 
   if (signal?.aborted) {
     throw new DOMException('aborted', 'AbortError');
@@ -416,9 +425,10 @@ export async function resolveStaffAbnormalRecords(
   const sinceIso = getAbnormalLookbackSince(ABNORMAL_LOOKBACK_DAYS, now);
 
   // 1) attendances(복수) lookback(28일) row 조회 — 어떤 날짜가 abnormal인지 식별
+  // 위와 동일 — late_minutes / early_leave_minutes 는 실재하지 않는 컬럼이라 select 에서 뺀다.
   const { data: rawAttendances, error: fetchErr } = await db
     .from('attendances')
-    .select('staff_id, work_date, status, check_in_time, check_out_time, late_minutes, early_leave_minutes')
+    .select('staff_id, work_date, status, check_in_time, check_out_time')
     .eq('staff_id', staffId)
     .gte('work_date', sinceIso);
 
@@ -442,8 +452,10 @@ export async function resolveStaffAbnormalRecords(
     return { updatedDates: [] };
   }
 
-  // 2) attendances 보정 — 누락 컬럼은 withMissingColumnFallback 없이 직접 시도
-  //    (이미 한 번 select 했으므로 컬럼은 존재. 실패 시 throw)
+  // 2) attendances 보정.
+  //    late_minutes / early_leave_minutes 는 현재 스키마에 없다. /api/d1/mutate 가 모르는 컬럼을
+  //    걸러내므로 보통은 status 만 반영되고, 컬럼이 추가된 환경에서는 함께 반영된다.
+  //    그래도 실패하면 아래 폴백이 status 만으로 재시도한다.
   const { error: updateAttendancesErr } = await db
     .from('attendances')
     .update({

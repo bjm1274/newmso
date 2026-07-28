@@ -24,7 +24,7 @@ const ROOT = join(__dirname, '..');
 const args = process.argv.slice(2);
 const DRY = args.includes('--dry-run');
 const dateArg = args.find((a) => a.startsWith('--date='));
-const DB = 'pchos-d1';
+const DB = 'pchos-d1-v2';
 const WORK = mkdtempSync(join(tmpdir(), 'leave-full-recalc-'));
 const wranglerJs = join(ROOT, 'node_modules/wrangler/bin/wrangler.js');
 

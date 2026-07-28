@@ -40,6 +40,14 @@ function getPairEnds(pair: any): { client: HibernatableWebSocket; server: Hibern
   return { client, server };
 }
 
+/**
+ * 소켓 1개가 유지할 수 있는 최대 구독 채널 수.
+ *
+ * 클라이언트는 (열려 있는 방 1개 × 채널 5종) + 전역 채널 몇 개를 보내므로 평상시 10개 안팎이다.
+ * 여러 탭의 채널이 리더 탭으로 합쳐지는 경우를 감안해 여유를 둔다.
+ */
+const MAX_SUBSCRIPTIONS_PER_SOCKET = 100;
+
 export class RealtimeHub {
   state: any;
   env: any;
@@ -176,15 +184,21 @@ export class RealtimeHub {
       }
 
       if (data.type === 'subscribe') {
+        // 클라이언트(lib/polling-bus.ts syncRealtimeConnections)는 매번 **현재 원하는 전체
+        // 채널 목록**을 보낸다. 따라서 여기서는 누적이 아니라 **교체**해야 한다.
+        //
+        // 예전에는 기존 구독과 union 한 뒤 앞에서부터 80개로 잘랐다. 클라이언트가
+        // unsubscribe 를 보내지 않으므로 방을 전환할 때마다 채널이 5개씩 쌓였고,
+        // 약 15회 전환 후 상한이 포화되면 **새로 연 방의 messages 채널이 잘려나가**
+        // 그 방만 실시간 갱신이 멈췄다(새로고침하면 복구되던 증상).
         const newSubs = Array.isArray(data.channels) ? data.channels : [];
-        const capped = newSubs
-          .map((c) => String(c || '').trim())
-          .filter(Boolean)
-          .slice(0, 40);
-        const currentSubs = attachment.subscriptions || [];
         attachment.subscriptions = Array.from(
-          new Set([...currentSubs, ...capped]),
-        ).slice(0, 80);
+          new Set(
+            newSubs
+              .map((c) => String(c || '').trim())
+              .filter(Boolean),
+          ),
+        ).slice(0, MAX_SUBSCRIPTIONS_PER_SOCKET);
         ws.serializeAttachment(attachment);
         try {
           ws.send(

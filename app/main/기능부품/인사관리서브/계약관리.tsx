@@ -63,7 +63,25 @@ export default function ContractMain({
     'working_days_per_week',
     'agreed_overtime_allowance',
     'agreed_night_allowance',
+    'night_duty_allowance',
   ];
+
+  /**
+   * 직원 급여 항목 읽기.
+   *
+   * `agreed_overtime_allowance` / `agreed_night_allowance` 는 `staff_members` 스키마에
+   * **실재하지 않아** `permissions.payroll_allowances` (JSON) 에 저장된다.
+   * (구성원현황.tsx 의 STAFF_COLUMNS_NOT_IN_SCHEMA / buildStaffMutationPayload 참고)
+   * 따라서 top-level → permissions.payroll_allowances → 대체 컬럼 순으로 찾는다.
+   */
+  const readStaffAllowance = (staff: any, key: string, ...altKeys: string[]) => {
+    const fallback = staff?.permissions?.payroll_allowances as Record<string, unknown> | undefined;
+    for (const candidate of [key, ...altKeys]) {
+      const value = Number(staff?.[candidate] ?? fallback?.[candidate] ?? 0);
+      if (Number.isFinite(value) && value > 0) return value;
+    }
+    return 0;
+  };
 
   const omitColumnsFromRecord = (
     record: Record<string, unknown>,
@@ -87,14 +105,28 @@ export default function ContractMain({
 
       const { data: existing, error: fetchErr } = await d1
         .from('employment_contracts')
-        .select('id, staff_id')
+        .select('id, staff_id, signature_data, status')
         .in('staff_id', staffIds)
         .eq('contract_type', contractType);
       if (fetchErr) return { error: fetchErr, data: null };
 
+      // 이미 서명된 계약서는 **덮어쓰지 않는다.**
+      //
+      // 예전에는 같은 contract_type 의 기존 행을 그대로 UPDATE 하고 중복행은 hard delete 해서,
+      // signature_data 는 남은 채 금액·상태만 바뀌었다. 즉 직원이 서명한 계약이 소리 없이
+      // 다른 내용으로 둔갑했다. 계약서는 체결 시점 스냅샷이어야 하므로,
+      // 서명본은 건드리지 말고 새 계약서를 별도 행으로 만든다.
+      const isSigned = (row: Record<string, unknown>) =>
+        Boolean(row.signature_data) || String(row.status ?? '') === '서명완료';
+
       const existingMap = new Map<string, string[]>();
+      const signedStaffIds = new Set<string>();
       for (const row of (existing || [])) {
         const sid = String(row.staff_id);
+        if (isSigned(row as Record<string, unknown>)) {
+          signedStaffIds.add(sid);
+          continue;
+        }
         if (!existingMap.has(sid)) existingMap.set(sid, []);
         existingMap.get(sid)!.push(row.id);
       }
@@ -119,6 +151,14 @@ export default function ContractMain({
       if (toInsert.length > 0) {
         const { error } = await d1.from('employment_contracts').insert(toInsert);
         if (error) return { error, data: null };
+      }
+      // 서명본이 있어 덮어쓰지 않고 새 계약서를 만든 경우 사용자에게 알린다.
+      // (호출부가 여러 폴백 계층을 거쳐 값을 흘리기 어려워 여기서 직접 안내한다.)
+      if (signedStaffIds.size > 0) {
+        toast(
+          `이미 서명된 계약서 ${signedStaffIds.size}건은 보존하고 새 계약서를 발송했습니다.`,
+          'info',
+        );
       }
       return { error: null, data: [] };
     } catch (err: any) {
@@ -214,8 +254,13 @@ export default function ContractMain({
             position_allowance: salaryInfo.position_allowance || s?.position_allowance || 0,
             research_allowance: salaryInfo.research_allowance || s?.research_allowance || 0,
             other_taxfree: salaryInfo.other_taxfree || s?.other_taxfree || 0,
-            agreed_overtime_allowance: salaryInfo.agreed_overtime_allowance || s?.agreed_overtime_allowance || 0,
-            agreed_night_allowance: salaryInfo.agreed_night_allowance || s?.agreed_night_allowance || 0,
+            agreed_overtime_allowance:
+              salaryInfo.agreed_overtime_allowance
+              || readStaffAllowance(s, 'agreed_overtime_allowance', 'overtime_allowance'),
+            agreed_night_allowance:
+              salaryInfo.agreed_night_allowance
+              || readStaffAllowance(s, 'agreed_night_allowance', 'night_work_allowance'),
+            night_duty_allowance: readStaffAllowance(s, 'night_duty_allowance'),
             effective_date: conditionsAppDate
           }
           : {
@@ -226,8 +271,9 @@ export default function ContractMain({
             position_allowance: s?.position_allowance ?? 0,
             research_allowance: s?.research_allowance ?? 0,
             other_taxfree: s?.other_taxfree ?? 0,
-            agreed_overtime_allowance: s?.agreed_overtime_allowance ?? 0,
-            agreed_night_allowance: s?.agreed_night_allowance ?? 0,
+            agreed_overtime_allowance: readStaffAllowance(s, 'agreed_overtime_allowance', 'overtime_allowance'),
+            agreed_night_allowance: readStaffAllowance(s, 'agreed_night_allowance', 'night_work_allowance'),
+            night_duty_allowance: readStaffAllowance(s, 'night_duty_allowance'),
             effective_date: conditionsAppDate
           };
         return {
@@ -308,7 +354,9 @@ export default function ContractMain({
 
 
       if (includeTaxFree) {
-        await Promise.all(checkedIds.map((id: string) => {
+        // 계약서 금액을 staff_members 로 역기록한다. 예전에는 결과를 버려서
+        // 실패해도 "발송 완료" 로 보였다 — 실패를 사용자에게 알린다.
+        const writeBackResults = await Promise.all(checkedIds.map((id: string) => {
           const s = (staffs as any[])?.find((x: any) => String(x.id) === String(id));
           return d1.from('staff_members').update({
             base_salary: salaryInfo.base_salary || s?.base_salary || 0,
@@ -322,6 +370,14 @@ export default function ContractMain({
             night_work_allowance: salaryInfo.agreed_night_allowance || s?.agreed_night_allowance || s?.night_work_allowance || 0
           }).eq('id', id);
         }));
+        const writeBackFailed = writeBackResults.filter((r) => (r as { error?: unknown } | null)?.error);
+        if (writeBackFailed.length > 0) {
+          const first = (writeBackFailed[0] as { error?: { message?: string } }).error;
+          toast(
+            `계약서는 발송됐으나 급여 정보 반영에 실패했습니다(${writeBackFailed.length}건): ${first?.message || '저장 오류'}`,
+            'error',
+          );
+        }
       }
 
       // 발송 시 알림함으로 노티 발송 (type: 인사 — 기본 알림 설정에 포함, 직원 마이페이지/모바일 서명 유도)

@@ -22,6 +22,28 @@ const OPTIONAL_ALLOWANCE_FIELDS = [
   { token: '{{other_taxfree}}', labels: ['기타 비과세', '비과세'] },
 ] as const;
 
+/**
+ * 0022 마이그레이션으로 `employment_contracts` 에 새로 생긴 "체결 시점 스냅샷" 수당 컬럼.
+ *
+ * 이 컬럼들은 DEFAULT 가 없어서
+ *   - 마이그레이션 이전에 만들어진 계약서 → NULL  → 지금까지처럼 staff_members 폴백
+ *   - 이후 발송된 계약서                → 0 포함 확정값 → 그 값을 그대로 사용
+ * 로 구분된다. 기존 급여 컬럼(base_salary 등)은 DEFAULT 0 이라 0/NULL 구분이 불가능하므로
+ * 회귀를 피하려고 기존 `contractVal > 0` 규칙을 그대로 둔다.
+ */
+const SNAPSHOT_ONLY_SALARY_FIELDS = new Set([
+  'agreed_overtime_allowance',
+  'agreed_night_allowance',
+  'night_duty_allowance',
+]);
+
+/** 계약서 행에 값이 "기록되어 있는지"(0 포함) 판정. NULL/undefined/'' 는 미기록. */
+function hasRecordedValue(value: unknown) {
+  if (value === null || value === undefined || typeof value === 'boolean') return false;
+  if (typeof value === 'string' && value.trim() === '') return false;
+  return Number.isFinite(Number(typeof value === 'string' ? value.replace(/,/g, '').trim() : value));
+}
+
 function formatDate(value?: unknown) {
   if (typeof value === 'boolean') return '';
   if (value === null || value === undefined || value === '') return '';
@@ -298,6 +320,12 @@ export function fillEmploymentContractTemplate(
       }
       return val;
     };
+
+    // 스냅샷 컬럼은 계약서 행에 값이 기록되어 있으면 0 이라도 그것이 이긴다.
+    // (0 = "이 계약에는 해당 수당 없음" 이라는 확정 사실이므로 현재 급여로 폴백하면 안 된다.)
+    if (SNAPSHOT_ONLY_SALARY_FIELDS.has(fieldName) && hasRecordedValue(safeContract[fieldName])) {
+      return toMoneyNumber(safeContract[fieldName]);
+    }
 
     const contractVal = tryResolve(safeContract);
     const userVal = tryResolve(safeUser);

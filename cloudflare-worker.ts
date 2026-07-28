@@ -70,6 +70,9 @@ const CRON_ROUTES_BY_SCHEDULE: Record<string, string[]> = {
     '/api/cron/annual-leave-expiry',
     '/api/cron/substitute-holiday',
     '/api/cron/payroll-notice',
+    // 발령일이 도래한 예약 인사발령을 staff_members 에 반영.
+    // (미래 발령은 등록 시 '대기' 로만 저장되므로 이 크론이 없으면 영원히 미반영으로 남는다.)
+    '/api/cron/appointment-apply',
   ],
   // KST 00:30 매일 — 전날 출근 미체크 직원 결근 자동 생성
   '30 15 * * *': ['/api/cron/absent-auto-create'],

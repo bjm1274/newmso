@@ -5,8 +5,14 @@ compatibility_flags = ["nodejs_compat"]
 # 래퍼가 fetch 는 그대로 위임하고 scheduled() 를 추가해 [triggers] crons 가 실제로 동작하게 한다.
 # (이전에는 .open-next/worker.js 직접 지정 → scheduled 핸들러 부재로 cron 5개 전부 무동작 버그)
 main = "cloudflare-worker.ts"
-account_id = "e4d2c3499fac63baef7f4a9d10de7ba4"
+account_id = "462cf9a8da5cfd0edfdca833e2443e19"
 
+
+workers_dev = true
+
+routes = [
+  { pattern = "erp.pchos.kr", custom_domain = true }
+]
 
 [assets]
 directory = ".open-next/assets"
@@ -35,24 +41,24 @@ NEXT_PUBLIC_VAPID_PUBLIC_KEY = "BMf4VkZmz6KBu1gqZSPypXMmYurULhlG31-m0F-GO-dH9fkB
 # Daily full backup (KST 00:00 = UTC 15:00) using D1 (no Supabase egress)
 [triggers]
 crons = [
-  "*/5 * * * *",  # /api/cron/chat-push-dispatch — 5분마다 미발송 큐 회수 (카톡급 폴백, $5 한도 내)
+  "*/5 * * * *",  # /api/cron/chat-push-dispatch
   "0 15 * * *",   # /api/cron/backup
   "0 17 * * *",   # /api/cron/chat-retention
-  "0 3 * * *",    # /api/cron/push-subscription-cleanup (+ runLicenseExpiryJobs 통합)
-  "0 0 * * *",    # KST 09:00 — unread-repush, leave-announcements, birthday-announcements,
-                  #            annual-leave-accrual, annual-leave-promotion, annual-leave-expiry, substitute-holiday,
-                  #            payroll-notice (급여일 리마인더 — 내부에서 day===payrollDay만 발송)
-  "30 15 * * *",  # KST 00:30 — absent-auto-create: 전날 출근 미체크 직원 결근 자동 생성
-  "0 4 * * *",    # KST 13:00 — 구 temp/resend 슬롯 (worker 맵 빈 배열 = no-op)
+  "0 3 * * *",    # /api/cron/push-subscription-cleanup
+  "0 0 * * *",    # KST 09:00 — unread-repush, leave-announcements, etc.
 ]
 
 # Cloudflare D1 binding (Supabase → D1 마이그레이션, Phase 1C)
 # 사용: env.DB 로 접근 → getD1Drizzle(env.DB)로 Drizzle 클라이언트 생성
 [[d1_databases]]
 binding = "DB"
-database_name = "pchos-d1"
-database_id = "e6e054c7-2bba-4a97-a740-b39a42906a74"
+database_name = "pchos-d1-v2"
+database_id = "4576c96e-7d63-4103-946e-75fcee3c0b20"
 migrations_dir = "lib/db/migrations"
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "pchos-files"
 
 [[durable_objects.bindings]]
 name = "REALTIME_HUB"

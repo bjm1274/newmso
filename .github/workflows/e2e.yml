@@ -80,6 +80,18 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
+      # 로컬 D1 시드(scripts/seed-e2e-d1.mjs)는 CI에서 의도적으로 건너뛴다.
+      #  - CI는 `next build` + `next start`(production)로 돌기 때문에
+      #    next.config.ts의 initOpenNextCloudflareForDev()가 비활성이고,
+      #    lib/db/get-binding.ts의 로컬 폴백도 NODE_ENV=development에서만 동작한다.
+      #    → CI 러너에는 D1 바인딩 자체가 없으므로 시드해도 앱이 읽지 못한다.
+      #  - 따라서 CI의 E2E는 tests/e2e/helpers.ts의 mockSupabase()/seedSession()
+      #    기반 UI 검증 범위로 한정된다. 시드가 필요한 스펙
+      #    (tests/e2e/seeded-login.desktop.spec.ts)은 CI에서 자동 skip된다.
+      #  - `npm run test:e2e`가 호출하는 시드 스텝은 `--if-local` 플래그로
+      #    CI 환경변수를 감지해 조용히 no-op 처리된다.
+      #  - CI에서도 실제 D1을 쓰려면 `npx wrangler dev`(miniflare) 기반 서버로
+      #    webServer를 바꾸고 여기서 `npm run test:e2e:seed`를 추가해야 한다.
       - name: Run E2E tests (${{ matrix.suite }})
         run: npm run test:e2e -- ${{ matrix.projects }}
 

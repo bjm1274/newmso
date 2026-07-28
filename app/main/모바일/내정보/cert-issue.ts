@@ -20,6 +20,7 @@ import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
+import { resolveCompanySealUrl } from '@/lib/company-brand-assets';
 import {
   openIssuedCertificatePrintView,
   type IssuedCertificate,
@@ -134,29 +135,14 @@ export async function issueAndPrintMyCert(
     let companyLogoUrl: string | null = null;
     if (companyName) {
       try {
-        const [sealRes, companyRes] = await Promise.all([
-          db
-            .from('contract_templates')
-            .select('seal_url')
-            .eq('company_name', companyName)
-            .limit(1),
-          db
-            .from('companies')
-            .select('logo_url, seal_url')
-            .eq('name', companyName)
-            .limit(1)
-        ]);
-        const sealRow = (sealRes.data?.[0] ?? null) as { seal_url?: string | null } | null;
-        const companyRow = (companyRes.data?.[0] ?? null) as {
-          logo_url?: string | null;
-          seal_url?: string | null;
-        } | null;
-        if (!sealRes.error && sealRow?.seal_url) {
-          sealUrl = String(sealRow.seal_url);
-        } else if (!companyRes.error && companyRow?.seal_url) {
-          sealUrl = String(companyRow.seal_url);
-        }
-        if (!companyRes.error && companyRow?.logo_url) {
+        sealUrl = await resolveCompanySealUrl(companyName);
+        const { data: companyRes } = await db
+          .from('companies')
+          .select('logo_url')
+          .eq('name', companyName)
+          .limit(1);
+        const companyRow = (companyRes?.[0] ?? null) as { logo_url?: string | null } | null;
+        if (companyRow?.logo_url) {
           companyLogoUrl = String(companyRow.logo_url);
         }
       } catch (sealError) {

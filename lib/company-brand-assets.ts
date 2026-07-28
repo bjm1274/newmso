@@ -50,51 +50,57 @@ export async function saveCompanySeal(params: {
   if (companyError) throw new Error(companyError.message || '직인 저장에 실패했습니다.');
 
   // 계약서/증명서가 읽는 contract_templates.seal_url 동기화
-  const { data: existing, error: selectError } = await db
-    .from('contract_templates')
-    .select('company_name')
-    .eq('company_name', companyName)
-    .maybeSingle();
-  if (selectError) {
-    // 테이블 미존재 등은 로그만 — companies.seal_url 은 이미 저장됨
-    console.warn('[company-brand] contract_templates select failed', selectError);
-    return;
-  }
-
-  if (existing) {
-    const { error } = await db
+  try {
+    const { data: existing, error: selectError } = await db
       .from('contract_templates')
-      .update({
-        seal_url: params.sealUrl,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('company_name', companyName);
-    if (error) console.warn('[company-brand] contract_templates seal update failed', error);
-    return;
-  }
+      .select('company_name')
+      .eq('company_name', companyName)
+      .maybeSingle();
+    if (selectError) {
+      console.warn('[company-brand] contract_templates select failed', selectError);
+      return;
+    }
 
-  const { error: insertError } = await db.from('contract_templates').insert({
-    company_name: companyName,
-    template_content: DEFAULT_CONTRACT_TEMPLATE,
-    seal_url: params.sealUrl,
-    updated_at: new Date().toISOString(),
-  });
-  if (insertError) console.warn('[company-brand] contract_templates seal insert failed', insertError);
+    if (existing) {
+      const { error } = await db
+        .from('contract_templates')
+        .update({
+          seal_url: params.sealUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('company_name', companyName);
+      if (error) console.warn('[company-brand] contract_templates seal update failed', error);
+      return;
+    }
+
+    const { error: insertError } = await db.from('contract_templates').insert({
+      company_name: companyName,
+      template_content: DEFAULT_CONTRACT_TEMPLATE,
+      seal_url: params.sealUrl,
+      updated_at: new Date().toISOString(),
+    });
+    if (insertError) console.warn('[company-brand] contract_templates seal insert failed', insertError);
+  } catch (syncErr) {
+    console.warn('[company-brand] contract_templates sync caught error:', syncErr);
+  }
 }
 
-/** 증명서/계약 직인 조회: contract_templates 우선, companies.seal_url 폴백 */
+/** 증명서/계약 직인 조회: contract_templates 우선 → companies.seal_url → '전체' 템플릿 3단계 폴백 */
 export async function resolveCompanySealUrl(companyName: string): Promise<string | null> {
   const name = companyName.trim();
   if (!name) return null;
   try {
-    const [tmplRes, companyRes] = await Promise.all([
+    const [tmplRes, companyRes, globalRes] = await Promise.all([
       db.from('contract_templates').select('seal_url').eq('company_name', name).limit(1),
       db.from('companies').select('seal_url').eq('name', name).limit(1),
+      db.from('contract_templates').select('seal_url').eq('company_name', '전체').limit(1),
     ]);
     const tmpl = tmplRes.data?.[0] as { seal_url?: string | null } | undefined;
     if (tmpl?.seal_url) return String(tmpl.seal_url);
     const co = companyRes.data?.[0] as { seal_url?: string | null } | undefined;
     if (co?.seal_url) return String(co.seal_url);
+    const gTmpl = globalRes.data?.[0] as { seal_url?: string | null } | undefined;
+    if (gTmpl?.seal_url) return String(gTmpl.seal_url);
   } catch (err) {
     console.warn('[company-brand] resolveCompanySealUrl failed', err);
   }

@@ -1,3 +1,5 @@
+import { rewritePublicR2UrlToInternal } from '@/lib/object-storage-url';
+
 const PROFILE_PHOTO_BUCKET = 'profiles';
 const STAFF_SALARY_KEYS = [
   // 기본급도 일부 직원은 top-level 컬럼이 0/누락이고 permissions.payroll_allowances에만 값이 있어,
@@ -67,15 +69,14 @@ export function buildProfilePhotoUrlFromPath(
   path: string | null | undefined,
   updatedAt?: string | null
 ): string | null {
-  const r2Base = getR2PublicBase();
   const cleanedPath = cleanString(path);
-  if (!r2Base || !cleanedPath) return null;
+  if (!cleanedPath) return null;
   const relativePath = toBucketRelativePath(cleanedPath);
   if (!relativePath) return null;
-  const encodedPath = relativePath.split('/').map(encodeURIComponent).join('/');
-  const basePhotoUrl = `${r2Base}/${PROFILE_PHOTO_BUCKET}/${encodedPath}`;
+  const objectKey = `${PROFILE_PHOTO_BUCKET}/${relativePath}`;
+  const basePhotoUrl = `/api/storage/object?provider=r2&bucket=pchos-files&key=${encodeURIComponent(objectKey)}`;
   const version = cleanString(updatedAt);
-  return version ? `${basePhotoUrl}?v=${encodeURIComponent(version)}` : basePhotoUrl;
+  return version ? `${basePhotoUrl}&v=${encodeURIComponent(version)}` : basePhotoUrl;
 }
 
 const profilePhotoUrlCache = new Map<string, string | null>();
@@ -96,12 +97,18 @@ export function getProfilePhotoUrl(source: any): string | null {
     if (generatedUrl) return generatedUrl;
   }
 
-  const finalUrl =
+  const rawUrl =
     cleanString(source?.avatar_url) ||
     cleanString(source?.photo_url) ||
     cleanString(source?.profile_photo_url) ||
     cleanString(source?.permissions?.profile_photo_url) ||
     null;
+
+  let finalUrl = rawUrl;
+  if (rawUrl) {
+    const rewritten = rewritePublicR2UrlToInternal(rawUrl);
+    finalUrl = rewritten || rawUrl;
+  }
 
   if (cacheKey) {
     if (profilePhotoUrlCache.size > 500) {

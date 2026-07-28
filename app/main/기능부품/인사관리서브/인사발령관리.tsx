@@ -6,10 +6,44 @@ import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import { buildAuditDiff, logAudit, readClientAuditActor } from '@/lib/audit';
 import { getScopedActiveStaffs } from '@/lib/active-staff';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 import type { StaffMember } from '@/types';
 
 const ORDER_TYPES = ['승진', '전보(부서이동)', '퇴직/면직'] as const;
+
+/**
+ * personnel_appointments.status 값.
+ *
+ * - '대기'     : staff_members 에 아직 반영되지 않은 발령 (미래 발령 예약분 포함)
+ * - '발령완료' : staff_members 반영이 끝난 발령 (D1 스키마 default 값)
+ *
+ * 판정은 "'대기' 가 아니면 반영 완료". status 가 null 인 과거 행은 스키마 default 로
+ * 들어간 것이므로 미반영으로 오표시하면 안 된다.
+ */
+const PENDING_STATUS = '대기';
+const APPLIED_STATUS = '발령완료';
+
+function isAppliedAppointment(status: string | null | undefined): boolean {
+  return (status ?? '').trim() !== PENDING_STATUS;
+}
+
+/**
+ * 퇴직·면직 계열 발령인지.
+ * 키워드는 모바일 발령필터의 classifyOrderType '퇴직' 버킷과 동일하게 유지할 것.
+ */
+function isSeparationOrder(orderType: string | null | undefined): boolean {
+  const text = (orderType ?? '').trim();
+  return text.includes('퇴직') || text.includes('면직') || text.includes('퇴사');
+}
+
+/** 발령일(YYYY-MM-DD)이 KST 오늘 이후인지 — 미래 발령은 즉시 반영하지 않는다. */
+function isFutureEffectiveDate(effectiveDate: string): boolean {
+  const value = effectiveDate.trim();
+  if (!value) return false;
+  // new Date() 로컬 비교는 타임존에 따라 하루가 밀린다 → KST 날짜 문자열 사전순 비교.
+  return value > getKoreanTodayString();
+}
 
 type AppointmentRecord = {
   id?: string | number;
@@ -162,6 +196,30 @@ export default function PersonnelAppointment({
       label: '발령일',
       render: (r) => <span className="text-[var(--toss-gray-4)]">{r.effective_date}</span> },
     {
+      key: 'apply_state',
+      label: '반영 상태',
+      render: (r) => {
+        // 발령 이력이 있어도 구성원 정보에 들어갔는지는 별개 — 목록에서 바로 보이게 한다.
+        if (isAppliedAppointment(r.status)) {
+          return (
+            <span className="rounded-lg bg-emerald-500/10 px-2 py-1 font-bold text-emerald-700">
+              반영 완료
+            </span>
+          );
+        }
+        if (isFutureEffectiveDate(r.effective_date || '')) {
+          return (
+            <span className="rounded-lg bg-amber-500/10 px-2 py-1 font-bold text-amber-700">
+              {r.effective_date} 반영 예정
+            </span>
+          );
+        }
+        // 발령일이 지났는데도 '대기' — 자동 반영 스케줄러가 없어 수동 확인이 필요한 상태.
+        return (
+          <span className="rounded-lg bg-red-500/10 px-2 py-1 font-bold text-red-700">미반영</span>
+        );
+      } },
+    {
       key: 'reason',
       label: '사유',
       render: (r) => <span className="text-[var(--toss-gray-4)]">{r.reason || '-'}</span> },
@@ -210,6 +268,18 @@ export default function PersonnelAppointment({
       return;
     }
 
+    // SmartDatePicker 는 입력 도중 'YYYY-MM' 같은 부분 문자열도 그대로 올려보낸다.
+    // 발령일 도래 판정을 날짜 문자열 비교로 하므로 완전한 형식이 아니면 즉시 막는다.
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(form.effective_date.trim())) {
+      toast('발령일을 YYYY-MM-DD 형식으로 모두 입력해주세요.', 'warning');
+      return;
+    }
+
+    // 발령일이 오늘(KST) 이후면 이력만 남기고 staff_members 는 건드리지 않는다.
+    // 기존 구현은 발령일을 무시하고 즉시 갱신해 미래 발령이 오늘 적용되는 문제가 있었다.
+    const isReserved = isFutureEffectiveDate(form.effective_date);
+    const separation = isSeparationOrder(form.order_type);
+
     setSaving(true);
     const actor = readClientAuditActor();
 
@@ -228,7 +298,9 @@ export default function PersonnelAppointment({
         after_role: form.after_role || '',
         reason: form.reason.trim(),
         memo: form.memo.trim(),
-        status: '발령완료',
+        // 일단 '대기'로 저장하고 staff_members 반영이 끝난 뒤에만 '발령완료'로 승격한다.
+        // 중간에 실패하면 '대기'로 남아 목록에 '미반영'으로 드러난다(무음 실패 방지).
+        status: PENDING_STATUS,
         issued_by:
           typeof user?.name === 'string'
             ? user.name
@@ -247,12 +319,35 @@ export default function PersonnelAppointment({
         throw error || new Error('인사발령 저장 응답이 비어 있습니다.');
       }
 
+      // 발령일이 도래한 발령만 구성원 정보에 반영한다.
+      //   - 값이 실제로 바뀔 때만 payload 에 담는다. 특히 `role` 은 PRIVILEGED_STAFF_COLUMNS 라
+      //     admin 만 쓸 수 있어(lib/db/auth/policies.ts staffPrivilegeGuard), 변하지도 않는 role 을
+      //     같이 보내면 인사담당자(perms.hr)의 발령이 통째로 거부된다.
+      //   - 퇴직·면직 발령은 status/resigned_at 까지 반영. 값은 구성원현황의 퇴사 처리
+      //     (구성원현황.tsx 직원삭제)와 동일하게 status='퇴사', resigned_at=발령일.
+      //     role='inactive' / 세션 회수 등 계정 정리는 오프보딩 완료 플로우의 책임이라 제외.
+      const pickChanged = (next: string, prev: string): string | null => {
+        const trimmed = next.trim();
+        if (!trimmed || trimmed === prev.trim()) return null;
+        return trimmed;
+      };
+
       const staffUpdates: Record<string, unknown> = {};
-      if (form.after_dept.trim()) staffUpdates.department = form.after_dept.trim();
-      if (form.after_position.trim()) staffUpdates.position = form.after_position.trim();
-      if (form.after_role.trim()) staffUpdates.role = form.after_role.trim();
+      if (!isReserved) {
+        const nextDept = pickChanged(form.after_dept, form.before_dept);
+        if (nextDept) staffUpdates.department = nextDept;
+        const nextPosition = pickChanged(form.after_position, form.before_position);
+        if (nextPosition) staffUpdates.position = nextPosition;
+        const nextRole = pickChanged(form.after_role, form.before_role);
+        if (nextRole) staffUpdates.role = nextRole;
+        if (separation) {
+          staffUpdates.status = '퇴사';
+          staffUpdates.resigned_at = form.effective_date;
+        }
+      }
 
       if (Object.keys(staffUpdates).length > 0) {
+        // update() 는 실패해도 reject 하지 않고 { error } 로 resolve 한다(lib/db-client.ts).
         const { error: staffUpdateError } = await db
           .from('staff_members')
           .update(staffUpdates)
@@ -260,6 +355,18 @@ export default function PersonnelAppointment({
 
         if (staffUpdateError) {
           throw staffUpdateError;
+        }
+      }
+
+      // 반영이 끝난 뒤에만 '발령완료'로 승격 (예약 발령은 '대기' 유지)
+      if (!isReserved) {
+        const { error: statusError } = await db
+          .from('personnel_appointments')
+          .update({ status: APPLIED_STATUS })
+          .eq('id', String(data.id));
+
+        if (statusError) {
+          throw statusError;
         }
       }
 
@@ -271,6 +378,9 @@ export default function PersonnelAppointment({
           appointment_id: data.id,
           order_type: newRecord.order_type,
           effective_date: newRecord.effective_date,
+          // 미래 발령은 이력만 저장된 상태 — 감사로그에서도 반영 여부를 구분할 수 있어야 한다.
+          applied_to_staff: !isReserved,
+          separation,
           ...buildAuditDiff(
             {
               department: form.before_dept || null,
@@ -288,8 +398,16 @@ export default function PersonnelAppointment({
         actor.userName,
       );
 
-      setRecords((prev) => [data as AppointmentRecord, ...prev]);
-      toast('인사발령이 저장되었습니다.', 'success');
+      setRecords((prev) => [
+        { ...(data as AppointmentRecord), status: isReserved ? PENDING_STATUS : APPLIED_STATUS },
+        ...prev,
+      ]);
+      toast(
+        isReserved
+          ? `인사발령이 저장되었습니다. ${form.effective_date}에 반영 예정입니다.`
+          : '인사발령이 저장되고 구성원 정보에 반영되었습니다.',
+        'success',
+      );
       setShowForm(false);
       resetForm();
       fetchRecords();
@@ -426,6 +544,12 @@ export default function PersonnelAppointment({
                   onChange={(value) => setForm((prev) => ({ ...prev, effective_date: value }))}
                   inputClassName="rounded-xl border border-[var(--border)] bg-[var(--input-bg)] px-3 py-2.5 text-[11px] font-bold text-[var(--foreground)] outline-none"
                 />
+                {/* 미래 발령은 등록해도 구성원 정보가 아직 바뀌지 않는다 — 등록 전에 알린다. */}
+                {isFutureEffectiveDate(form.effective_date) && (
+                  <p role="status" className="mt-1.5 rounded-lg bg-amber-500/10 px-2 py-1.5 text-[10px] font-bold leading-relaxed text-amber-700">
+                    발령일이 아직 오지 않았습니다. 이력만 저장되고 구성원 정보는 발령일에 반영됩니다.
+                  </p>
+                )}
               </div>
             </div>
 

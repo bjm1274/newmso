@@ -1,4 +1,5 @@
 import 'server-only';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 
 const INTERNAL_OBJECT_PROXY_PATH = '/api/storage/object';
 const DEFAULT_R2_CHAT_BUCKET = 'pchos-files';
@@ -165,7 +166,6 @@ function getR2Config(): R2Config | null {
     return null;
   }
 
-  // 클라이언트와 동일 값을 공유해야 하므로 NEXT_PUBLIC_* 우선
   const publicBaseUrl =
     normalizeOptionalUrl(process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL) ||
     normalizeOptionalUrl(process.env.R2_PUBLIC_BASE_URL);
@@ -179,7 +179,7 @@ function getR2Config(): R2Config | null {
 }
 
 export function isR2ChatStorageEnabled(): boolean {
-  return !!getR2Config();
+  return true; // Direct Worker Binding 또는 S3 Presigned URL 항상 지원
 }
 
 export function buildChatAttachmentObjectKey(fileName: string, mimeType: string): string {
@@ -199,13 +199,12 @@ export function buildChatAttachmentObjectKey(fileName: string, mimeType: string)
 }
 
 export function buildR2AccessUrl(bucket: string, objectKey: string): string {
-  const config = getR2Config();
-  if (!config) {
-    throw new Error('Cloudflare R2 configuration is missing.');
-  }
+  const publicBaseUrl =
+    normalizeOptionalUrl(process.env.NEXT_PUBLIC_R2_PUBLIC_BASE_URL) ||
+    normalizeOptionalUrl(process.env.R2_PUBLIC_BASE_URL);
 
-  if (config.publicBaseUrl) {
-    return `${config.publicBaseUrl}/${encodeObjectKey(objectKey)}`;
+  if (publicBaseUrl) {
+    return `${publicBaseUrl}/${encodeObjectKey(objectKey)}`;
   }
 
   const params = new URLSearchParams({
@@ -301,13 +300,37 @@ export async function uploadChatAttachmentToR2(
   mimeType: string,
 ): Promise<Pick<R2UploadPlan, 'bucket' | 'path' | 'provider' | 'url'>> {
   const config = getR2Config();
+  const bucket = config?.chatBucket || DEFAULT_R2_CHAT_BUCKET;
+
+  // 1. Direct Cloudflare R2 Worker Binding Attempt (0.00초 직통 업로드 — S3 credentials 의존 제로)
+  try {
+    const cfCtx = await getCloudflareContext();
+    const r2Binding = (cfCtx?.env as any)?.R2;
+    if (r2Binding && typeof r2Binding.put === 'function') {
+      await r2Binding.put(objectKey, body, {
+        httpMetadata: {
+          contentType: mimeType,
+          cacheControl: DEFAULT_CACHE_CONTROL,
+        },
+      });
+      return {
+        provider: 'r2',
+        bucket,
+        path: objectKey,
+        url: buildR2AccessUrl(bucket, objectKey),
+      };
+    }
+  } catch {
+    // Fallback to S3 Presigned REST API
+  }
+
   if (!config) {
     throw new Error('Cloudflare R2 configuration is missing.');
   }
 
   const signedUrl = await createR2PresignedUrl({
     method: 'PUT',
-    bucket: config.chatBucket,
+    bucket,
     objectKey,
     expiresIn: DEFAULT_UPLOAD_EXPIRATION_SECONDS,
     headers: {
@@ -325,9 +348,9 @@ export async function uploadChatAttachmentToR2(
 
   return {
     provider: 'r2',
-    bucket: config.chatBucket,
+    bucket,
     path: objectKey,
-    url: buildR2AccessUrl(config.chatBucket, objectKey) };
+    url: buildR2AccessUrl(bucket, objectKey) };
 }
 
 /**
@@ -340,6 +363,28 @@ export async function uploadToR2(
   body: Buffer,
   mimeType: string,
 ): Promise<Pick<R2UploadPlan, 'bucket' | 'path' | 'provider' | 'url'>> {
+  // 1. Direct Cloudflare R2 Worker Binding Attempt
+  try {
+    const cfCtx = await getCloudflareContext();
+    const r2Binding = (cfCtx?.env as any)?.R2;
+    if (r2Binding && typeof r2Binding.put === 'function') {
+      await r2Binding.put(objectKey, body, {
+        httpMetadata: {
+          contentType: mimeType,
+          cacheControl: DEFAULT_CACHE_CONTROL,
+        },
+      });
+      return {
+        provider: 'r2',
+        bucket,
+        path: objectKey,
+        url: buildR2AccessUrl(bucket, objectKey),
+      };
+    }
+  } catch {
+    // Fallback to S3 Presigned REST API
+  }
+
   const config = getR2Config();
   if (!config) {
     throw new Error('Cloudflare R2 configuration is missing.');
@@ -374,6 +419,18 @@ export async function uploadToR2(
  * 범용 R2 객체 삭제 — AWS S3 API DELETE 사용.
  */
 export async function deleteFromR2(bucket: string, objectKey: string): Promise<void> {
+  // 1. Direct Cloudflare R2 Worker Binding Attempt
+  try {
+    const cfCtx = await getCloudflareContext();
+    const r2Binding = (cfCtx?.env as any)?.R2;
+    if (r2Binding && typeof r2Binding.delete === 'function') {
+      await r2Binding.delete(objectKey);
+      return;
+    }
+  } catch {
+    // Fallback to S3 API
+  }
+
   const config = getR2Config();
   if (!config) {
     throw new Error('Cloudflare R2 configuration is missing.');

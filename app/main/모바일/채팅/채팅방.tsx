@@ -26,6 +26,7 @@ import { toast } from '@/lib/toast';
 import { db } from '@/lib/db-client';
 import { pokeChannel, subscribeRealtime, type TableFilter } from '@/lib/realtime-bus';
 import { logger } from '@/lib/logger';
+import { buildStorageInlineUrl, buildStorageDownloadUrl } from '@/lib/object-storage-url';
 import MIcon from '../공통/MIcon';
 import MAvatar from '../공통/MAvatar';
 import MSheet from '../공통/MSheet';
@@ -1519,10 +1520,11 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
               )}
               {attachments.slice(0, 9).map((att) => (
                 <div key={att.id} className="macos-glass" style={{ aspectRatio: 1, borderRadius: 8, background: 'rgba(255, 255, 255, 0.65)', border: '1px solid rgba(0, 0, 0, 0.05)', overflow: 'hidden', position: 'relative' }}>
+                  {/* file_url 은 공개 R2 도메인이라 401 이 난다 — 인증 프록시 URL 로 변환해서 쓴다. */}
                   {/\.(png|jpg|jpeg|gif|webp|bmp|heic|heif|avif)(\?|$)/i.test(att.file_url!) ? (
-                    <img src={att.file_url!} alt="첨부" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onClick={() => window.open(att.file_url!, '_blank')} />
+                    <img src={buildStorageInlineUrl(att.file_url!, att.file_name || '첨부')} alt="첨부" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onClick={() => window.open(buildStorageInlineUrl(att.file_url!, att.file_name || '첨부'), '_blank')} />
                   ) : (
-                    <div onClick={() => window.open(att.file_url!, '_blank')} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#007AFF' }}>
+                    <div onClick={() => window.open(buildStorageDownloadUrl(att.file_url!, att.file_name || '파일'), '_blank')} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#007AFF' }}>
                       <MIcon name="file" size={24} />
                       <span style={{ fontSize: 9, marginTop: 4, width: '90%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>{att.file_name || '파일'}</span>
                     </div>

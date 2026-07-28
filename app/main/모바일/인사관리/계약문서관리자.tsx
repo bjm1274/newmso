@@ -9,6 +9,7 @@ import MChip from '../공통/MChip';
 import MBtn from '../공통/MBtn';
 import MAvatar from '../공통/MAvatar';
 import { pickAvatarTone } from './data-hooks';
+import { buildStorageDownloadUrl } from '@/lib/object-storage-url';
 
 interface AdminDocsProps {
   staffs: StaffMember[];
@@ -397,7 +398,8 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
                   </div>
                   <button
                     type="button"
-                    onClick={() => window.open(file.file_url, '_blank')}
+                    // 저장 URL 은 공개 R2 도메인이라 401 이 난다 — 인증 프록시 경유로 내려받는다.
+                    onClick={() => window.open(buildStorageDownloadUrl(String(file.file_url ?? ''), file.title || '문서'), '_blank')}
                     style={{ padding: 6, background: 'none', border: 'none' }}
                   >
                     <MIcon name="download" size={18} color="var(--z-500)" />

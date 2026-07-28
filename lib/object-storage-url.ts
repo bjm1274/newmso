@@ -55,17 +55,19 @@ export function isInternalStorageObjectUrl(url: string): boolean {
 export function rewritePublicR2UrlToInternal(url: string): string | null {
   const normalizedUrl = String(url || '').trim();
   if (!normalizedUrl) return null;
-  if (!R2_PUBLIC_BASE || !R2_PUBLIC_HOST) return null;
 
-  try {
-    const parsed = new URL(normalizedUrl, typeof window !== 'undefined' ? window.location.origin : 'https://local-storage-proxy.test');
-    if (parsed.hostname !== R2_PUBLIC_HOST) return null;
-    const objectKey = decodeURIComponent(parsed.pathname.substring(1));
-    if (!objectKey) return null;
-    return `${INTERNAL_OBJECT_PROXY_PATH}?provider=r2&bucket=pchos-files&key=${encodeURIComponent(objectKey)}`;
-  } catch {
-    return null;
+  if (normalizedUrl.includes('r2.pchos.kr') || (R2_PUBLIC_HOST && normalizedUrl.includes(R2_PUBLIC_HOST))) {
+    try {
+      const parsed = new URL(normalizedUrl, typeof window !== 'undefined' ? window.location.origin : 'https://local-storage-proxy.test');
+      const objectKey = decodeURIComponent(parsed.pathname.substring(1));
+      if (!objectKey) return null;
+      return `${INTERNAL_OBJECT_PROXY_PATH}?provider=r2&bucket=pchos-files&key=${encodeURIComponent(objectKey)}`;
+    } catch {
+      return null;
+    }
   }
+
+  return null;
 }
 
 
@@ -84,10 +86,15 @@ export function buildStorageDownloadUrl(url: string, fileName: string): string {
   if (!normalizedUrl) return '';
 
   if (isInternalStorageObjectUrl(normalizedUrl)) {
-    const directR2Url = rewriteInternalR2UrlToPublic(normalizedUrl);
-    if (directR2Url) {
-      return `/api/download?url=${encodeURIComponent(directR2Url)}&name=${encodeURIComponent(normalizedFileName)}`;
-    }
+    // 내부 프록시 URL 은 그대로 내부 프록시로 내려받는다.
+    //
+    // 예전에는 여기서 공개 R2 도메인(NEXT_PUBLIC_R2_PUBLIC_BASE_URL)으로 되돌린 뒤
+    // /api/download 가 그 URL 을 fetch 했다. 그런데 버킷이 공개로 열려 있지 않아
+    // https://r2.pchos.kr 이 401 을 반환했고, /api/download 는 upstream.ok 실패를
+    // 404 "파일을 찾을 수 없습니다" 로 바꿔 **모든 첨부 다운로드가 실패**했다.
+    //
+    // 내부 프록시는 R2 바인딩으로 직접 읽으므로 버킷 공개 여부와 무관하고,
+    // 세션·멤버십 검사도 거친다(의료·인사 파일이라 공개 버킷은 애초에 부적절).
     return buildInternalStorageDownloadUrl(normalizedUrl, normalizedFileName);
   }
 
@@ -100,20 +107,16 @@ export function buildStorageInlineUrl(url: string, fileName: string): string {
   if (!normalizedUrl) return '';
   if (/^(blob|data):/i.test(normalizedUrl)) return normalizedUrl;
 
-  if (isInternalStorageObjectUrl(normalizedUrl)) {
-    // R2 public 도메인이 설정돼 있으면 내부 프록시 URL을 직접 R2 CDN으로 rewrite
-    // → Cloudflare Workers를 완전히 우회 (대용량/다중 이미지 로드 안정성 ↑)
-    const directR2Url = rewriteInternalR2UrlToPublic(normalizedUrl);
-    return directR2Url || normalizedUrl;
+  const rewritten = rewritePublicR2UrlToInternal(normalizedUrl);
+  if (rewritten) {
+    return rewritten;
   }
 
-  if (normalizedUrl.startsWith('/')) {
+  if (isInternalStorageObjectUrl(normalizedUrl)) {
     return normalizedUrl;
   }
 
-  // 공개 R2 CDN URL은 인증 없이 직접 접근 가능하므로 Cloudflare Workers 프록시를 거치지 않는다.
-  // 프록시 경유 시 큰 이미지에서 1102(Worker 리소스 초과) 오류 발생.
-  if (isPublicR2StorageUrl(normalizedUrl)) {
+  if (normalizedUrl.startsWith('/')) {
     return normalizedUrl;
   }
 

@@ -6,7 +6,8 @@ import {
 import { readSessionFromRequest } from '@/lib/server-session';
 import { assertChatRoomMember } from '@/lib/chat-room-membership';
 import { getD1Binding, getD1Drizzle } from '@/lib/db';
-
+import { sql } from 'drizzle-orm';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,10 +26,6 @@ function encodeObjectKey(objectKey: string): string {
 export async function GET(request: NextRequest) {
   try {
     const session = await readSessionFromRequest(request);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const provider = String(request.nextUrl.searchParams.get('provider') || '').trim().toLowerCase();
     const bucket = String(request.nextUrl.searchParams.get('bucket') || '').trim();
     const objectKey = String(request.nextUrl.searchParams.get('key') || '').trim().split('?')[0];
@@ -44,25 +41,76 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'bucket and key are required' }, { status: 400 });
     }
 
-    const allowedBucket = getConfiguredR2ChatBucket();
-    if (!allowedBucket || bucket !== allowedBucket) {
+    const allowedBucket = getConfiguredR2ChatBucket() || 'pchos-files';
+    if (bucket !== allowedBucket && bucket !== 'pchos-files') {
       return NextResponse.json({ error: 'This bucket is not available' }, { status: 403 });
+    }
+
+    // 퍼블릭 리소스 (로고, 직인, 프로필 사진, 팝업 이미지)는 세션 미인증 상태(<img src> 태그, 인쇄창 포함)에서도 조회 허용
+    const isPublicAsset =
+      objectKey.startsWith('logos/') ||
+      objectKey.startsWith('seals/') ||
+      objectKey.startsWith('profiles/') ||
+      objectKey.startsWith('popups/');
+
+    if (!isPublicAsset && !session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // 채팅 객체 경로일 경우 대화방 멤버십 ACL 검증 (chat/room_id/filename 패턴)
     if (objectKey.startsWith('chat/') || objectKey.includes('/chat/')) {
+      if (!session?.user?.id) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
       const parts = objectKey.split('/');
       const chatIdx = parts.findIndex((p) => p === 'chat');
-      const roomIdCandidate = chatIdx >= 0 && parts.length > chatIdx + 1 ? parts[chatIdx + 1] : null;
-      if (roomIdCandidate && roomIdCandidate.length > 20) {
-        const userId = String(session.user.id || session.user.user_id || '').trim();
-        const role = String(session.user.role || '').toLowerCase();
-        const isMaster = Boolean(session.user.is_master || session.user.is_admin);
-        if (!isMaster && role !== 'admin') {
-          const d1 = await getD1Binding();
-          if (d1) {
-            const db = getD1Drizzle(d1);
-            const mem = await assertChatRoomMember(db, roomIdCandidate, userId);
+
+      // 키에서 방 id 를 뽑는다.
+      //
+      // 주의: 실제 업로드 키는 `chat/<timestamp>_<uuid>.<ext>` 2단이라(lib/object-storage.ts:198)
+      // 뒤 조각은 **파일명**이지 방 id 가 아니다. 예전에는 그걸 방 id 로 간주해
+      // assertChatRoomMember 에 넘겼고, 당연히 멤버십 조회가 실패해
+      // **정상 멤버에게도 403** 을 내보내 첨부가 열리지 않았다.
+      // 따라서 뒤에 조각이 더 있을 때(`chat/<roomId>/<file>`)만 방 id 로 인정한다.
+      const roomIdFromPath =
+        chatIdx >= 0 && parts.length > chatIdx + 2 ? parts[chatIdx + 1] : null;
+
+      const userId = String(session.user.id || session.user.user_id || '').trim();
+      const role = String(session.user.role || '').toLowerCase();
+      const isMaster = Boolean(session.user.is_master || session.user.is_admin);
+
+      if (!isMaster && role !== 'admin') {
+        const d1 = await getD1Binding();
+        if (d1) {
+          const db = getD1Drizzle(d1);
+
+          // 경로에 방 id 가 없으면 이 객체를 참조하는 메시지로 방을 역추적한다.
+          // 찾지 못하면(업로드 직후 등 아직 메시지가 없는 경우) 세션 검사까지만 적용한다 —
+          // 키에 UUID 가 들어 있어 열거가 불가능하다.
+          let roomId = roomIdFromPath;
+          if (!roomId) {
+            try {
+              // LIKE 는 쓰지 않는다 — D1 이 `LIKE or GLOB pattern too complex` 로 거부한다.
+              // file_url 은 공개 베이스 URL + 객체 키 형태로 저장되므로 정확 일치로 찾는다.
+              // (인코딩 여부가 경로에 따라 갈려 두 형태를 모두 후보로 둔다.)
+              const publicBase = getPublicBaseUrlInternal();
+              const candidates = publicBase
+                ? [`${publicBase}/${encodeObjectKey(objectKey)}`, `${publicBase}/${objectKey}`]
+                : [];
+              if (candidates.length > 0) {
+                const found = await d1
+                  .prepare('SELECT room_id FROM messages WHERE file_url IN (?1, ?2) LIMIT 1')
+                  .bind(candidates[0], candidates[1])
+                  .first<{ room_id: string | null }>();
+                if (found?.room_id) roomId = String(found.room_id);
+              }
+            } catch (lookupErr) {
+              console.error('[storage/object] 채팅 첨부 방 역추적 실패:', lookupErr);
+            }
+          }
+
+          if (roomId) {
+            const mem = await assertChatRoomMember(db, roomId, userId);
             if (!mem.ok) {
               return NextResponse.json({ error: '해당 대화방 첨부파일 접근 권한이 없습니다.' }, { status: 403 });
             }
@@ -71,25 +119,50 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // R2 custom domain이 설정돼 있으면 인라인 보기는 R2 CDN으로 직접 redirect
-    // (Workers 응답 본문 부담 제거, 브라우저가 redirect 자체를 캐싱).
-    // 다운로드 요청은 Content-Disposition을 강제해야 하므로 기존 프록시 경로 유지.
-    const publicBaseUrl = getPublicBaseUrlInternal();
-    if (publicBaseUrl && !download && !proxy) {
-      const target = `${publicBaseUrl}/${encodeObjectKey(objectKey)}`;
-      return NextResponse.redirect(target, {
-        status: 302,
-        headers: {
-          // 객체 키가 UUID라 영구 불변 → 브라우저 redirect 캐시 길게 유지
-          'Cache-Control': 'public, max-age=86400, immutable' } });
+    // 1. Direct Cloudflare R2 Worker Binding Attempt (Zero-latency direct stream)
+    try {
+      const cfCtx = await getCloudflareContext();
+      const r2Binding = (cfCtx?.env as any)?.R2;
+      if (r2Binding && typeof r2Binding.get === 'function') {
+        const r2Object = await r2Binding.get(objectKey);
+        if (r2Object && r2Object.body) {
+          const contentType = r2Object.httpMetadata?.contentType || 'application/octet-stream';
+          const headers: Record<string, string> = {
+            'Content-Type': contentType,
+            'Cache-Control': 'public, max-age=86400, immutable',
+            'X-Content-Type-Options': 'nosniff',
+          };
+          if (r2Object.size) {
+            headers['Content-Length'] = String(r2Object.size);
+          }
+          if (download) {
+            const ascii = fileName.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
+            const encoded = encodeURIComponent(fileName);
+            headers['Content-Disposition'] = `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+          }
+          return new NextResponse(r2Object.body as ReadableStream, { status: 200, headers });
+        }
+      }
+    } catch {
+      // Fallback to S3 Presigned URL / REST API
     }
 
+    // 2. Fallback to S3 Presigned URL
     const signedUrl = await createR2DownloadUrl(bucket, objectKey);
     if (!signedUrl) {
       return NextResponse.json({ error: 'Cloudflare R2 is not configured' }, { status: 500 });
     }
 
-    // 스트리밍 프록시: R2에서 직접 가져와서 바이트를 전달 (CORS 우회)
+    if (!download && !proxy) {
+      return NextResponse.redirect(signedUrl, {
+        status: 302,
+        headers: {
+          'Cache-Control': 'private, max-age=300'
+        }
+      });
+    }
+
+    // 스트리밍 프록시
     const upstream = await fetch(signedUrl);
     if (!upstream.ok) {
       return NextResponse.json({ error: 'Failed to fetch from storage' }, { status: upstream.status });

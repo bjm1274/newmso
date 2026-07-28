@@ -666,6 +666,11 @@ export const employment_contracts = sqliteTable("employment_contracts", {
 	position_allowance: integer().default(0),
 	research_allowance: integer().default(0),
 	other_taxfree: integer().default(0),
+	// 체결 시점 스냅샷용 수당(0022 마이그레이션). DEFAULT 없음 = 기존 계약서는 NULL 로 남아
+	// staff_members 폴백을 계속 타고, 신규 계약서는 0 도 "수당 없음" 으로 확정 저장된다.
+	agreed_overtime_allowance: integer(),
+	agreed_night_allowance: integer(),
+	night_duty_allowance: integer(),
 	effective_date: text(),
 	probation_months: integer().default(3),
 	probation_percent: integer().default(90),

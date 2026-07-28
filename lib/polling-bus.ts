@@ -171,25 +171,34 @@ if (typeof window !== 'undefined') {
   }
 
   // Periodically send ping heartbeats to other tabs (every 3 seconds)
+  //
+  // updateLeaderState() 는 BroadcastChannel 유무와 무관하게 매 틱 실행해야 한다.
+  // 예전에는 `if (!bc) return;` 뒤에 있어서, BroadcastChannel 미지원 브라우저에서는
+  // isLeader 가 초기값 false 로 고정되고 WS·폴링이 **영구히 시작되지 않았다**.
+  // (bc 가 없으면 activeTabs 에는 자기 탭만 있으므로 자연히 leader 가 된다.)
   setInterval(() => {
-    if (!bc) return;
-    // Full channel keys (incl. room_id filters) so leader WS can subscribe to scoped channels
-    // that only a follower tab currently has open.
-    const myTables = new Set<string>();
-    for (const entry of channelRegistry.values()) {
-      for (const t of entry.tables) {
-        myTables.add(toChannelKey(t));
-      }
-    }
     mySuspendedForLeader = !isElectronShell() && (isHidden() || isIdle);
-    bc.postMessage({
-      type: 'ping',
-      tabId: myTabId,
-      tables: Array.from(myTables),
-      suspended: mySuspendedForLeader,
-    });
+    if (bc) {
+      // Full channel keys (incl. room_id filters) so leader WS can subscribe to scoped channels
+      // that only a follower tab currently has open.
+      const myTables = new Set<string>();
+      for (const entry of channelRegistry.values()) {
+        for (const t of entry.tables) {
+          myTables.add(toChannelKey(t));
+        }
+      }
+      bc.postMessage({
+        type: 'ping',
+        tabId: myTabId,
+        tables: Array.from(myTables),
+        suspended: mySuspendedForLeader,
+      });
+    }
     updateLeaderState();
   }, 3000);
+
+  // 첫 하트비트(3초)까지 기다리지 않고 즉시 1회 선출 — 초기 로드 후 무연결 구간 제거.
+  updateLeaderState();
 }
 
 function isHidden(): boolean {
@@ -478,6 +487,10 @@ function syncWebSocketConnectionInternal() {
           channels: channelList
         }));
       }
+
+      // 재연결 직후 catch-up — 소켓이 끊겨 있던 동안 발생한 변경은 어떤 change 프레임으로도
+      // 오지 않는다. subscribe 만 보내고 끝내면 그 구간이 영영 유실되므로 즉시 1회 동기화한다.
+      triggerImmediateSync();
 
       if (wsPingTimer) clearInterval(wsPingTimer);
       wsPingTimer = setInterval(() => {

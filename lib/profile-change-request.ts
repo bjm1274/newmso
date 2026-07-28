@@ -115,39 +115,16 @@ export async function submitProfileChangeRequest(
       permissions: currentPermissions } };
 
   try {
-    const existing = await db
-      .from('audit_logs')
-      .select('id')
-      .eq('target_type', 'ESS_PROFILE_UPDATE_PENDING')
-      .eq('target_id', String(userId))
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (existing.error) throw existing.error;
-
-    if (existing.data?.id) {
-      const { error } = await db
-        .from('audit_logs')
-        .update({
-          user_name: currentUser.name ?? null,
-          action: '인사변경',
-          details,
-          created_at: new Date().toISOString() })
-        .eq('id', existing.data.id);
-      if (error) throw error;
-    } else {
-      const { error } = await db.from('audit_logs').insert([
-        {
-          user_id: userId,
-          user_name: currentUser.name ?? null,
-          action: '인사변경',
-          target_type: 'ESS_PROFILE_UPDATE_PENDING',
-          target_id: String(userId),
-          details,
-          created_at: new Date().toISOString() },
-      ]);
-      if (error) throw error;
+    // audit_logs 는 ADMIN_ONLY 라 클라이언트가 직접 쓸 수 없다(일반 직원 403).
+    // 세션으로 본인을 확인하고 서버 권한으로 기록하는 전용 라우트에 위임한다.
+    const res = await fetch('/api/profile-change-request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ details }) });
+    const json = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+    if (!res.ok || !json?.ok) {
+      return { ok: false, error: json?.error || `요청 접수 실패 (HTTP ${res.status})` };
     }
     return { ok: true, status: 'submitted' };
   } catch (err) {

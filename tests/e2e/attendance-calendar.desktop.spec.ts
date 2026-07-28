@@ -16,6 +16,24 @@ test('attendance calendar supports day week month views with detailed status lab
   const yearMonth = new Date().toISOString().slice(0, 7);
   const targetDate = `${yearMonth}-06`;
 
+  // 주별 패널 검증용 날짜는 **targetDate 와 같은 주**에서 뽑는다.
+  // 예전에는 `-04`·`-05` 를 하드코딩했는데, 6일이 무슨 요일인지에 따라 같은 주가 아닐 수 있어
+  // (예: 6일이 월요일이면 일요일 시작 주는 5~11 이라 4일이 빠진다) 달마다 통과/실패가 갈렸다.
+  // 주 시작 규칙은 앱(AttendCalendarDetail.weekIsoRange)과 동일하게 **일요일 시작**.
+  const weekMates = (() => {
+    const base = new Date(`${targetDate}T00:00:00`);
+    const sunday = new Date(base);
+    sunday.setDate(base.getDate() - base.getDay());
+    const iso = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(sunday);
+      d.setDate(sunday.getDate() + i);
+      return iso(d);
+    }).filter((d) => d !== targetDate && d.startsWith(yearMonth));
+    return { leaveDate: days[0] ?? targetDate, absentDate: days[1] ?? targetDate };
+  })();
+
   const hrUser = {
     ...fakeUser,
     id: 'attendance-hr-1',
@@ -85,13 +103,13 @@ test('attendance calendar supports day week month views with detailed status lab
       {
         id: 'attendance-day-3',
         staff_id: 'attendance-staff-1',
-        work_date: `${yearMonth}-04`,
+        work_date: weekMates.leaveDate,
         status: 'annual_leave',
       },
       {
         id: 'attendance-day-4',
         staff_id: 'attendance-staff-2',
-        work_date: `${yearMonth}-05`,
+        work_date: weekMates.absentDate,
         status: 'absent',
       },
     ],

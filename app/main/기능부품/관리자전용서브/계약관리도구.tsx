@@ -90,20 +90,51 @@ export default function ContractManager({ initialCompany, onBack }: ContractMana
 
   const handleSave = async () => {
     setSaving(true);
-    const normalizedTemplate = upgradeLegacyContractTemplate(template);
-    setTemplate(normalizedTemplate);
-    const { error } = await d1.from('contract_templates').upsert(
-      {
-        company_name: selectedCo,
-        template_content: normalizedTemplate,
-        seal_url: sealUrl,
-        updated_at: new Date().toISOString()
-      },
-      { onConflict: 'company_name', ignoreDuplicates: false }
-    );
-    setSaving(false);
-    if (error) toast('저장 중 오류가 발생했습니다.', 'error');
-    else toast(`${selectedCo} 계약서 표준 양식이 저장되었습니다. 인사관리에서 발송하는 계약서에 적용됩니다.`, 'success');
+    try {
+      const normalizedTemplate = upgradeLegacyContractTemplate(template);
+      setTemplate(normalizedTemplate);
+      const nowIso = new Date().toISOString();
+
+      const { data: existing } = await d1
+        .from('contract_templates')
+        .select('company_name')
+        .eq('company_name', selectedCo)
+        .maybeSingle();
+
+      let err: Error | null = null;
+      if (existing) {
+        const { error } = await d1
+          .from('contract_templates')
+          .update({
+            template_content: normalizedTemplate,
+            seal_url: sealUrl || null,
+            updated_at: nowIso,
+          })
+          .eq('company_name', selectedCo);
+        if (error) err = error as Error;
+      } else {
+        const { error } = await d1.from('contract_templates').insert({
+          company_name: selectedCo,
+          template_content: normalizedTemplate,
+          seal_url: sealUrl || null,
+          updated_at: nowIso,
+        });
+        if (error) err = error as Error;
+      }
+
+      if (err) {
+        toast('저장 중 오류가 발생했습니다: ' + (err.message || String(err)), 'error');
+      } else {
+        toast(`${selectedCo} 계약서 표준 양식이 저장되었습니다. 인사관리에서 발송하는 계약서에 적용됩니다.`, 'success');
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('contract-templates-updated', { detail: { companyName: selectedCo } }));
+        }
+      }
+    } catch (e: unknown) {
+      toast('저장 처리 중 오류가 발생했습니다: ' + ((e as Error)?.message || String(e)), 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleLoadDefaultTemplate = async () => {

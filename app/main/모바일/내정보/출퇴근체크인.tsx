@@ -345,6 +345,19 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
               checkOut: null,
               status: checkInStatus,
             });
+            // attendances 테이블 direct fallback mutation
+            void enqueueD1Mutation({
+              kind: 'upsert',
+              table: 'attendances',
+              payload: {
+                staff_id: staffId,
+                work_date: today,
+                check_in_time: nowIso,
+                check_out_time: null,
+                status: checkInStatus === '지각' ? 'late' : 'present',
+              },
+              onConflict: 'staff_id,work_date',
+            }).catch(() => {});
           } catch (syncErr) {
             console.error('syncAttendanceToAttendances fail', syncErr);
           }

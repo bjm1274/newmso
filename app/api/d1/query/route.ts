@@ -28,7 +28,9 @@ import {
   getD1Binding,
   getD1Drizzle,
   filterByPolicy,
-  POLICY_REGISTRY } from '@/lib/db';
+  POLICY_REGISTRY,
+  STAFF_SECRET_ALWAYS_COLUMNS,
+  STAFF_PII_SENSITIVE_COLUMNS } from '@/lib/db';
 import {
   FilterNodeSchema,
   assertFilterTreeValid,
@@ -185,6 +187,44 @@ function deserializeRows(
   return rows.map((row) => deserializeRow(table, row));
 }
 
+/**
+ * 응답에서 마스킹되는 staff_members 컬럼이 where/orFilters/order 에 쓰였는지 검사.
+ *
+ * 마스킹은 반환값만 가린다. 필터·정렬에 쓰면 "결과가 있는가/몇 건인가"가 오라클이 되어
+ * 값을 접두 이분탐색으로 복원할 수 있다(특히 count:true 는 SQL COUNT 로 직행해 더 싸다).
+ * 마스킹 대상 컬럼은 아예 조건절에 못 쓰게 한다.
+ *
+ * @returns 위반한 필드명, 없으면 null
+ */
+function findSensitiveFieldUsage(payload: Payload): string | null {
+  if (payload.table !== 'staff_members') return null;
+
+  const blocked = (field: string) =>
+    STAFF_SECRET_ALWAYS_COLUMNS.has(field) || STAFF_PII_SENSITIVE_COLUMNS.has(field);
+
+  for (const cond of payload.where ?? []) {
+    if (blocked(cond.field)) return cond.field;
+  }
+  for (const o of payload.order ?? []) {
+    if (blocked(o.field)) return o.field;
+  }
+
+  const walk = (node: FilterNode): string | null => {
+    if (node.kind === 'cond') return blocked(node.field) ? node.field : null;
+    for (const child of node.children) {
+      const hit = walk(child);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  for (const node of payload.orFilters ?? []) {
+    const hit = walk(node);
+    if (hit) return hit;
+  }
+
+  return null;
+}
+
 function buildSelectSql(payload: Payload): SQL {
   const tableSql = sql.identifier(payload.table);
   const colsSql = payload.columns && payload.columns.length > 0
@@ -255,6 +295,18 @@ export async function POST(request: Request) {
     if (!ALLOWED_TABLES.has(payload.table)) {
       return NextResponse.json(
         { ok: false, error: `Table not allowed: ${payload.table}` },
+        { status: 403 },
+      );
+    }
+
+    // staff_members 는 조직도 때문에 select 가 PUBLIC 이고, 민감 컬럼은 응답에서 마스킹된다
+    // (filterByPolicy → stripStaffSecrets). 그러나 where/order/count 는 제한이 없어서
+    // `where password like '$2a$10$ab%'` 의 결과 유무·개수로 값을 접두 이분탐색할 수 있었다.
+    // 마스킹된 컬럼은 필터·정렬 대상에서도 막는다 — 실제 앱 코드는 이 컬럼으로 필터하지 않는다.
+    const sensitiveField = findSensitiveFieldUsage(payload);
+    if (sensitiveField) {
+      return NextResponse.json(
+        { ok: false, error: `Field not allowed in filter/order: ${sensitiveField}` },
         { status: 403 },
       );
     }

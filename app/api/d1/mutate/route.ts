@@ -192,77 +192,74 @@ function whereToRowProxy(where: { field: string; op: string; value: unknown }[])
   return proxy;
 }
 
-/** update/delete 정책이 행 소유자(staff_id 등)를 보려면 기존 행 필드가 필요. */
-const PATTERNS_NEEDING_EXISTING_ROW = new Set([
-  'SELF_ONLY',
-  'SELF_OR_SAME_COMPANY',
-  'STAFF_IN_SCOPE',
-  'APPROVAL_SCOPE',
-  'ROSTER_APPROVER_OR_SELF',
-  'MANAGE_COMPANY',
-  'MANAGE_COMPANY_OR_NULL',
-  'COMPANY_SCOPE_OR_NULL',
-  'INVENTORY_SCOPE',
-  'CHAT_ROOM_MEMBER',
-]);
+/**
+ * 한 번의 update/delete 가 정책 검사를 받을 수 있는 최대 행 수.
+ * 초과 요청은 400 으로 거부하고 전용 서버 라우트를 쓰도록 유도한다.
+ * (알림 일괄 읽음은 50개 청크, 근태 일괄 정정은 월 단위라 200 이면 충분하다.)
+ */
+const MAX_POLICY_ROWS_PER_MUTATION = 200;
 
 /**
- * UPDATE/DELETE 정책용 row proxy.
- * - where + set 을 합치되, 소유권 필드(staff_id/company_id/sender_id/id)는
- *   가능하면 DB 기존 행을 읽어 **항상 기존 값을 강제** (set 스푸핑 차단).
- * - 전체 행 병합은 하지 않음 → column guard 가 set 외 컬럼을 오탐 deny 하는 것 방지.
+ * UPDATE/DELETE 정책 판정 대상 행을 **클라이언트 WHERE 로 실제 조회**해서 돌려준다.
+ *
+ * 이전 구현은 `where` 의 eq 필드 + `set` 을 합성한 *가상 행* 하나에 정책을 적용했다.
+ * 그런데 실제 SQL 은 클라이언트 WHERE 를 그대로 실행하므로 판정 대상과 실행 대상이 달랐고,
+ * `set` 에 소유권 필드를 심으면(`current_approver_id`, `company` 등) 정책을 통과한 뒤
+ * `where: [{id, neq, ''}]` 같은 조건으로 테이블 전체를 바꿀 수 있었다.
+ *
+ * 이제는 WHERE 가 실제로 잡는 행들을 읽어 각 행마다 정책을 검사한다.
+ *
+ * 반환하는 행은 **DB 정본 그대로**다. 여기에 set 을 병합하면 안 된다 —
+ * 병합하면 `set:{current_approver_id: 내id}` 가 정본을 덮어써 소유권 위조가 다시 뚫린다.
+ * (실제로 그렇게 만들었다가 런타임 검증에서 공격이 통과하는 것을 확인했다.)
+ * 변경 후 상태를 봐야 하는 컬럼 가드에는 호출부가 `{...정본, ...set}` 을 guardRow 로 따로 넘긴다.
+ *
+ * 조회가 불가능한 상황(테이블 미허용 등)에서는 기존 방식의 합성 행으로 폴백한다.
  */
-async function enrichRowProxyForPolicy(
+async function loadPolicyRowsForMutation(
   db: ReturnType<typeof getD1Drizzle>,
   table: string,
   op: 'update' | 'delete',
   where: { field: string; op: string; value: unknown }[],
   set?: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
+): Promise<{ rows: Record<string, unknown>[]; tooMany: boolean; loadedFromDb: boolean }> {
   const whereProxy = whereToRowProxy(where);
   const setProxy = set ?? {};
-  const proxy: Record<string, unknown> = { ...whereProxy, ...setProxy };
+  const fallback = { rows: [{ ...whereProxy, ...setProxy }], tooMany: false, loadedFromDb: false };
+
+  if (!ALLOWED_TABLES.has(table) || !COLUMN_RE.test(table)) return fallback;
+  if (!where || where.length === 0) return fallback;
+
+  // 행 내용과 무관한 정책(PUBLIC/AUTHENTICATED)이고 컬럼 가드도 없으면 조회가 무의미하다.
+  // 어떤 행을 잡든 판정이 같으므로 기존처럼 합성 행 1개로 검사해 왕복을 아낀다.
+  // (이 경우의 위험은 정책 자체가 과도하게 열려 있다는 것이며, 그건 policies.ts 에서 다룰 문제다.)
   const cfg = POLICY_REGISTRY[table];
-  if (!cfg) return proxy;
-
-  const pattern = cfg[op];
-  // 소유권 패턴 또는 컬럼 가드/async 가드가 있으면 기존 행 소유권 로드
-  const needsOwnership =
-    (pattern && PATTERNS_NEEDING_EXISTING_ROW.has(pattern)) ||
-    Boolean(cfg.guards?.[op]) ||
-    Boolean(cfg.asyncGuards?.[op]);
-  if (!needsOwnership) return proxy;
-
-  const staffField = cfg.staffIdField ?? 'staff_id';
-  const companyField = cfg.companyIdField ?? 'company_id';
-
-  const idCond = where.find((w) => w.field === 'id' && w.op === 'eq');
-  if (!idCond || idCond.value == null || idCond.value === '') return proxy;
-  if (!ALLOWED_TABLES.has(table) || !COLUMN_RE.test(table)) return proxy;
+  const pattern = cfg?.[op];
+  const rowIndependent = pattern === 'PUBLIC' || pattern === 'AUTHENTICATED';
+  const hasGuards = Boolean(cfg?.guards?.[op]) || Boolean(cfg?.asyncGuards?.[op]);
+  if (cfg && rowIndependent && !hasGuards) return fallback;
 
   try {
+    const whereParts = buildWhereSql(where);
+    if (whereParts.length === 0) return fallback;
     const result = await db.run(
-      sql`SELECT * FROM ${sql.identifier(table)} WHERE id = ${normalizeBindValue(idCond.value)} LIMIT 1`,
+      sql`SELECT * FROM ${sql.identifier(table)} WHERE ${sql.join(whereParts, sql` AND `)} LIMIT ${
+        MAX_POLICY_ROWS_PER_MUTATION + 1
+      }`,
     );
-    const rows = ((result as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
-    const existing = rows[0];
-    if (!existing) return proxy;
+    const existing = ((result as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
 
-    // 정책 판정용 소유권은 DB 정본 (클라이언트가 set 으로 속일 수 없음)
-    const ownership: Record<string, unknown> = { id: existing.id ?? idCond.value };
-    if (existing[staffField] != null) ownership[staffField] = existing[staffField];
-    if (existing[companyField] != null) ownership[companyField] = existing[companyField];
-    if (existing.sender_id != null) ownership.sender_id = existing.sender_id;
-    if (existing.user_id != null && staffField === 'user_id') ownership.user_id = existing.user_id;
+    // 대상 행이 없으면 실행해도 no-op — 정책 검사를 통과시키되 SQL 은 0건에 적용된다.
+    if (existing.length === 0) return { rows: [], tooMany: false, loadedFromDb: true };
+    if (existing.length > MAX_POLICY_ROWS_PER_MUTATION) {
+      return { rows: [], tooMany: true, loadedFromDb: true };
+    }
 
-    return {
-      ...whereProxy,
-      ...setProxy,
-      ...ownership,
-    };
+    // DB 정본 그대로 — set 을 병합하지 않는다(위 주석 참조).
+    return { rows: existing, tooMany: false, loadedFromDb: true };
   } catch (err) {
-    console.error(`[d1/mutate] enrichRowProxyForPolicy failed for ${table}:`, err);
-    return proxy;
+    console.error(`[d1/mutate] loadPolicyRowsForMutation failed for ${table}:`, err);
+    return fallback;
   }
 }
 
@@ -574,6 +571,73 @@ export async function POST(request: Request) {
         }
       }
 
+      // notifications INSERT — 인앱 행만 만들고 푸시가 나가지 않던 문제 수정.
+      //
+      // 클라이언트(전자결재 상신·계약서 서명요청·급여명세서 발송·재고 불출 승인·근태·OP 등)가
+      // d1.from('notifications').insert(...) 로 만드는 알림은 이 라우트로 들어오는데,
+      // 여기에 푸시 디스패치가 없어 "인앱에는 뜨는데 단말에는 안 오는" 상태였다.
+      // 서버 경로(insertNotificationsOrThrow / insertNotificationsChunked)는 이미
+      // dispatchPushForNotificationRows 를 호출하므로, 그와 동일한 팬아웃을 여기서도 태운다.
+      //
+      // 주의: 호출부 대부분이 `.select()` 없이 `.insert()` 만 하므로 RETURNING 이 비어
+      // allResults 가 빈 배열이다. 그래서 triggerMutationSignal 이 채널을 만들 때와 동일하게
+      // payload.values 를 소스로 쓴다(RETURNING 이 있으면 그쪽을 우선).
+      if (payload.table === 'notifications') {
+        const notiRows: Record<string, unknown>[] =
+          allResults.length > 0 ? [...allResults] : [...payload.values];
+        const dispatchInsertedNotificationPushes = async () => {
+          try {
+            const { dispatchPushForNotificationRows } = await import(
+              '@/lib/notification-push-dispatch'
+            );
+            const rows = notiRows
+              .map((r) => r as Record<string, unknown>)
+              .filter((row) => String(row.user_id ?? '').trim() !== '')
+              .map((row) => {
+                // notifications.metadata 는 D1 에서 TEXT(JSON) 이다 — 객체로 복원해서 넘긴다.
+                let metadata: Record<string, unknown> | null = null;
+                const raw = row.metadata;
+                if (raw && typeof raw === 'object') {
+                  metadata = raw as Record<string, unknown>;
+                } else if (typeof raw === 'string' && raw.trim() !== '') {
+                  try {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && typeof parsed === 'object') metadata = parsed as Record<string, unknown>;
+                  } catch {
+                    // 파싱 불가한 metadata 는 무시 — 푸시 자체는 계속 보낸다.
+                  }
+                }
+                return {
+                  user_id: String(row.user_id),
+                  type: String(row.type ?? 'notification'),
+                  title: String(row.title ?? ''),
+                  body: String(row.body ?? row.message ?? ''),
+                  metadata };
+              });
+            if (rows.length === 0) return;
+            await dispatchPushForNotificationRows(rows);
+          } catch (pushErr) {
+            console.error('[d1/mutate] notification push 디스패치 실패 (non-fatal):', pushErr);
+          }
+        };
+
+        let notiScheduled = false;
+        try {
+          const { getCloudflareContext } = await import('@opennextjs/cloudflare');
+          const cf = getCloudflareContext();
+          const waitUntil = (cf as { ctx?: { waitUntil?: (p: Promise<unknown>) => void } })?.ctx?.waitUntil;
+          if (typeof waitUntil === 'function') {
+            waitUntil(dispatchInsertedNotificationPushes());
+            notiScheduled = true;
+          }
+        } catch {
+          // getCloudflareContext 불가(로컬 next dev 등)
+        }
+        if (!notiScheduled) {
+          void dispatchInsertedNotificationPushes();
+        }
+      }
+
       // RETURNING 결과의 JSON 컬럼 역직렬화 (수정 2)
       await triggerMutationSignal(payload, allResults);
       return NextResponse.json({ ok: true, data: deserializeRows(payload.table, allResults) });
@@ -581,13 +645,53 @@ export async function POST(request: Request) {
 
     if (payload.op === 'update') {
       // where 가 id 뿐이면 staff_id 등 소유 필드가 없어 SELF_* 정책이 오판 deny 됨 → 기존 행 병합
-      const row = await enrichRowProxyForPolicy(db, payload.table, 'update', payload.where, payload.set);
-      await assertAccess({ db, claims, table: payload.table, op: 'update', row });
+      // 정책은 "클라이언트 WHERE 가 실제로 잡는 행" 전부에 대해 검사한다.
+      // (합성 가상 행 1개만 검사하던 시절에는 set 으로 소유권을 위조해 통과한 뒤
+      //  WHERE 로 테이블 전체를 바꿀 수 있었다.)
+      const updateTargets = await loadPolicyRowsForMutation(
+        db,
+        payload.table,
+        'update',
+        payload.where,
+        payload.set,
+      );
+      if (updateTargets.tooMany) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `한 번에 수정할 수 있는 행 수(${MAX_POLICY_ROWS_PER_MUTATION})를 초과했습니다. 전용 API 를 사용하세요.`,
+            code: 'TOO_MANY_ROWS' },
+          { status: 400 },
+        );
+      }
+      const updateChangedKeys = new Set(Object.keys(payload.set ?? {}));
+      for (const row of updateTargets.rows) {
+        await assertAccess({
+          db,
+          claims,
+          table: payload.table,
+          op: 'update',
+          // 패턴은 변경 전 정본으로, 가드는 변경 후 상태로 판정한다.
+          row,
+          guardRow: { ...row, ...payload.set },
+          changedKeys: updateChangedKeys });
+      }
       // 객체/배열 값을 D1 bound value로 전달 가능한 TEXT로 직렬화 (수정 2)
       const serializedSet = serializeRecord(payload.set);
       const tableSql = sql.identifier(payload.table);
       const knownCols = getKnownTableColumns(payload.table);
       const setKeys = Object.keys(serializedSet).filter((k) => COLUMN_RE.test(k) && (!knownCols || knownCols.has(k)));
+      // 스키마에 없는 컬럼은 여기서 제거된다. 예전에는 **아무 흔적 없이** 버려져,
+      // 화면은 성공 토스트를 띄우는데 값은 저장되지 않는 무음 데이터 유실이 생겼다
+      // (예: staff_members.agreed_overtime_allowance — 컬럼이 실재하지 않음).
+      // 클라이언트 폴백(withMissingColumnsFallback)이 에러를 봐야 동작하므로,
+      // 최소한 서버 로그와 응답에 남겨 유실을 관측 가능하게 한다.
+      const droppedColumns = Object.keys(serializedSet).filter((k) => !setKeys.includes(k));
+      if (droppedColumns.length > 0) {
+        console.warn(
+          `[d1/mutate] ${payload.table}: 스키마에 없는 컬럼을 무시함 → ${droppedColumns.join(', ')}`,
+        );
+      }
       if (setKeys.length === 0) {
         return NextResponse.json({ ok: false, error: 'Empty set' }, { status: 400 });
       }
@@ -649,14 +753,26 @@ export async function POST(request: Request) {
         }
       }
       if (payload.returning && payload.returning.length > 0) {
-        return NextResponse.json({ ok: true, data: deserializeRows(payload.table, updatedRows) });
+        return NextResponse.json({ ok: true, data: deserializeRows(payload.table, updatedRows), ...(droppedColumns.length > 0 ? { droppedColumns } : {}) });
       }
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true, ...(droppedColumns.length > 0 ? { droppedColumns } : {}) });
     }
 
     if (payload.op === 'delete') {
-      const row = await enrichRowProxyForPolicy(db, payload.table, 'delete', payload.where);
-      await assertAccess({ db, claims, table: payload.table, op: 'delete', row });
+      // update 와 동일 — WHERE 가 실제로 잡는 행 전부에 정책을 적용한다.
+      const deleteTargets = await loadPolicyRowsForMutation(db, payload.table, 'delete', payload.where);
+      if (deleteTargets.tooMany) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `한 번에 삭제할 수 있는 행 수(${MAX_POLICY_ROWS_PER_MUTATION})를 초과했습니다. 전용 API 를 사용하세요.`,
+            code: 'TOO_MANY_ROWS' },
+          { status: 400 },
+        );
+      }
+      for (const row of deleteTargets.rows) {
+        await assertAccess({ db, claims, table: payload.table, op: 'delete', row });
+      }
       const tableSql = sql.identifier(payload.table);
       const whereParts = buildWhereSql(payload.where);
       const stmt = sql`DELETE FROM ${tableSql} WHERE ${sql.join(whereParts, sql` AND `)}`;

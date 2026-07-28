@@ -5,7 +5,8 @@
  *
  * - 월간 캘린더 (월~일 7열) + 일별 정상/지각/결근 카운트
  * - 데이터: `attendances` 테이블에서 해당 월 fetch
- * - 무거운 일별 상세는 기존 `근태관리메인` calendar view로 진입
+ * - 일별 상세: 날짜 셀 클릭 또는 상단 일/주/월 버튼 → AttendCalendarDetail
+ *   (이미 불러온 월 단위 rows 로 그리므로 추가 쿼리 없음)
  *
  * JM2: 월 변경 시 AbortController로 이전 fetch 취소
  * JM3: fetch 에러 inline 메시지
@@ -16,6 +17,7 @@ import { db } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
 import { getKoreanPublicHolidayName } from '@/lib/korean-public-holidays';
 import { isActive } from '../MemberWorkcenter/data';
+import AttendCalendarDetail, { type DetailRange } from './AttendCalendarDetail';
 import {
   formatIsoDate,
   resolveAttendanceStatus,
@@ -24,6 +26,7 @@ import {
 interface AttendCalendarProps {
   staffs: StaffMember[];
   selectedCo?: string;
+  /** @deprecated 레거시 근태관리메인 진입용. 상세가 이 컴포넌트에 내장되어 더 이상 쓰지 않는다. */
   onOpenLegacyCalendar?: () => void;
 }
 
@@ -46,6 +49,11 @@ export default function AttendCalendar({ staffs, selectedCo, onOpenLegacyCalenda
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  /** 일별 상세 — 선택 날짜와 범위(일/주/월). null 이면 닫힘. */
+  const [detailIso, setDetailIso] = useState<string | null>(null);
+  const [detailRange, setDetailRange] = useState<DetailRange>('day');
+  /** 상단 일/주/월 진입 버튼 노출 여부 */
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const scopedStaffs = useMemo(() => {
     return staffs.filter((s) => {
@@ -197,14 +205,36 @@ export default function AttendCalendar({ staffs, selectedCo, onOpenLegacyCalenda
           >
             오늘
           </button>
-          {onOpenLegacyCalendar && (
-            <button
-              type="button"
-              onClick={onOpenLegacyCalendar}
-              className="ml-2 rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-[12px] font-bold text-white hover:bg-[var(--accent-hover)]"
-            >
-              일별 상세
-            </button>
+          {/*
+            "일별 상세" — 누르면 일/주/월 진입 버튼이 펼쳐진다.
+            예전에는 onOpenLegacyCalendar prop 이 넘어올 때만 렌더돼, 호출부가 그걸 주지 않아
+            버튼 자체가 영영 보이지 않았다(기능 소실의 1차 원인).
+          */}
+          <button
+            type="button"
+            onClick={() => setDetailOpen((prev) => !prev)}
+            aria-expanded={detailOpen}
+            className="ml-2 rounded-[var(--radius-md)] bg-[var(--accent)] px-3 py-1.5 text-[12px] font-bold text-white hover:bg-[var(--accent-hover)]"
+          >
+            일별 상세
+          </button>
+          {detailOpen && (
+            <div className="flex items-center gap-1">
+              {(['day', 'week', 'month'] as const).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  data-testid={`attendance-calendar-open-${key}`}
+                  onClick={() => {
+                    setDetailRange(key);
+                    setDetailIso((prev) => prev ?? todayIso);
+                  }}
+                  className="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-1 text-[12px] font-semibold text-[var(--toss-gray-4)] hover:bg-[var(--muted)]"
+                >
+                  {key === 'day' ? '일' : key === 'week' ? '주' : '월'}
+                </button>
+              ))}
+            </div>
           )}
         </div>
       </header>
@@ -237,9 +267,18 @@ export default function AttendCalendar({ staffs, selectedCo, onOpenLegacyCalenda
             const isHoliday = Boolean(holidayName);
             const stats = byDate.get(cell.iso);
             return (
-              <div
+              // 날짜 셀 클릭 → 그 날의 일별 상세. 예전에는 onClick 자체가 없어 눌러도 반응이 없었다.
+              <button
                 key={cell.iso}
-                className={`flex min-h-[64px] flex-col gap-1 rounded-[var(--radius-md)] border px-1.5 py-1 ${
+                type="button"
+                data-testid={`attendance-calendar-cell-${cell.iso}`}
+                onClick={() => {
+                  setDetailIso(cell.iso);
+                  setDetailRange('day');
+                  setDetailOpen(true);
+                }}
+                aria-label={`${cell.iso} 근태 상세 보기`}
+                className={`flex min-h-[64px] flex-col gap-1 rounded-[var(--radius-md)] border px-1.5 py-1 text-left hover:border-[var(--accent)] ${
                   isToday
                     ? 'border-[var(--accent)] bg-[var(--accent-soft)]'
                     : isHoliday
@@ -278,11 +317,22 @@ export default function AttendCalendar({ staffs, selectedCo, onOpenLegacyCalenda
                     )}
                   </div>
                 )}
-              </div>
+              </button>
             );
           })}
         </div>
       </div>
+
+      {detailIso && (
+        <AttendCalendarDetail
+          selectedIso={detailIso}
+          range={detailRange}
+          onRangeChange={setDetailRange}
+          onClose={() => setDetailIso(null)}
+          rows={rows}
+          staffs={scopedStaffs}
+        />
+      )}
     </section>
   );
 }
