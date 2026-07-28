@@ -25,6 +25,33 @@ import {
   normalizeBindValue,
   buildWhereSql } from '@/lib/d1-api-helpers';
 
+/**
+ * notifications INSERT 에 created_at 이 없으면 ISO 로 채운다.
+ *
+ * 비우면 SQLite DEFAULT CURRENT_TIMESTAMP 가 'YYYY-MM-DD HH:MM:SS' 를 넣는데,
+ * 서버 경로들은 toISOString() 을 넣으므로 한 컬럼에 두 형식이 섞인다.
+ * created_at 은 TEXT 라 비교가 사전순이고 ' '(0x20) < 'T'(0x54) 이므로,
+ * 같은 날짜면 공백 형식이 항상 더 작다. /api/realtime/tail 이 테이블별
+ * max(created_at) 변화로 갱신을 감지하는 탓에 새 알림이 max 를 못 올려
+ * **새 메시지 팝업·배지가 아예 뜨지 않았다.**
+ * (2026-07-28 확인: max=11:30 결재 알림 vs 실제 최신 채팅 알림 11:50)
+ *
+ * 삽입 지점(lib/chat-push-dispatch.ts)은 이미 고쳤지만, 클라이언트가
+ * created_at 없이 넣는 경로가 남아 있어(예: useSupplyWorkflow.ts:180) 관문에서 막는다.
+ *
+ * **notifications 에만 적용한다.** messages 는 현재 전 행이 공백 형식이라
+ * 여기서 ISO 를 섞으면 오히려 메시지 정렬이 깨진다.
+ */
+function fillNotificationCreatedAt(
+  table: string,
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  if (table !== 'notifications') return row;
+  const current = String(row.created_at ?? '').trim();
+  if (current) return row;
+  return { ...row, created_at: new Date().toISOString() };
+}
+
 /** Collect room_id values from insert/update/returning rows for scoped realtime channels. */
 function collectRoomIds(payload: Payload, allResults?: Record<string, unknown>[]): Set<string> {
   const rowIds = new Set<string>();
@@ -409,7 +436,7 @@ export async function POST(request: Request) {
           fillId && (row.id === undefined || row.id === null)
             ? { ...row, id: crypto.randomUUID() }
             : row;
-        return serializeRecord(withId);
+        return serializeRecord(fillNotificationCreatedAt(payload.table, withId));
       });
       const tableSql = sql.identifier(payload.table);
       const knownCols = getKnownTableColumns(payload.table);
