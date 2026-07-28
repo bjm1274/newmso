@@ -171,18 +171,29 @@ export async function erpTargetStaffSameCompany(
   c: ErpClaims,
   targetStaffId: string,
 ): Promise<boolean> {
-  const my = erpCompanyId(c);
-  if (my === null) return false;
+  // 회사 판정은 UUID(company_id) 우선, 없으면 **회사명(company)** 으로 폴백한다.
+  //
+  // company_id 로만 비교하던 시절에는, 실데이터에서 staff_members.company_id 가
+  // 대부분 비어 있어(프로덕션 실측 재직 45명 중 34명 NULL) 인사담당자(perms.hr)가
+  // 인사발령·건강검진·조퇴·연차촉진 목록에서 본인 행 외에 거의 아무것도 못 봤다.
+  // 이 시스템은 회사를 이름 문자열로 다루는 곳이 많아 UUID 단독 판정은 성립하지 않는다.
+  const myId = erpCompanyId(c);
+  const myName = erpCompanyName(c);
+  if (myId === null && myName === null) return false;
+
   const rows = await db
-    .select({ id: staff_members.id })
+    .select({ company_id: staff_members.company_id, company: staff_members.company })
     .from(staff_members)
-    .where(and(
-      eq(staff_members.id, targetStaffId),
-      eq(staff_members.company_id, my),
-      isNotNull(staff_members.company_id),
-    ))
+    .where(eq(staff_members.id, targetStaffId))
     .limit(1);
-  return rows.length > 0;
+  const row = rows[0];
+  if (!row) return false;
+
+  if (myId !== null && row.company_id != null && String(row.company_id) === myId) return true;
+  if (myName !== null && row.company != null) {
+    return String(row.company).trim() === myName.trim();
+  }
+  return false;
 }
 
 /**
@@ -249,21 +260,29 @@ export async function erpTargetStaffInScopeBatch(
 
   if (!erpCanManageCompany(c)) return allowed;
 
-  // erpTargetStaffSameCompany 와 동일하게, 내 회사 claim 이 유효한 UUID 가
-  // 아니면(=null) 회사 단위 확장은 불가.
-  const my = erpCompanyId(c);
-  if (my === null) return allowed;
+  // erpTargetStaffSameCompany 와 동일한 판정 — UUID 우선, 없으면 회사명 폴백.
+  // (실데이터의 company_id 대부분이 비어 있어 UUID 단독으로는 회사 확장이 성립하지 않는다.)
+  const myId = erpCompanyId(c);
+  const myName = erpCompanyName(c);
+  if (myId === null && myName === null) return allowed;
+  const myNameTrimmed = myName === null ? null : myName.trim();
 
   const pending = unique.filter((id) => !allowed.has(id));
   for (let i = 0; i < pending.length; i += STAFF_SCOPE_CHUNK_SIZE) {
     const chunk = pending.slice(i, i + STAFF_SCOPE_CHUNK_SIZE);
     const rows = await db
-      .select({ id: staff_members.id, company_id: staff_members.company_id })
+      .select({
+        id: staff_members.id,
+        company_id: staff_members.company_id,
+        company: staff_members.company })
       .from(staff_members)
       .where(inArray(staff_members.id, chunk));
     for (const row of rows) {
-      // eq(company_id, my) + isNotNull(company_id) 와 동일한 판정
-      if (row.company_id !== null && row.company_id !== undefined && row.company_id === my) {
+      if (myId !== null && row.company_id != null && String(row.company_id) === myId) {
+        allowed.add(row.id);
+        continue;
+      }
+      if (myNameTrimmed !== null && row.company != null && String(row.company).trim() === myNameTrimmed) {
         allowed.add(row.id);
       }
     }

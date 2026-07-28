@@ -84,7 +84,7 @@ export default function SApprovalCcPicker({
     [staffRows, query, selfId, company]
   );
 
-  const groups = useMemo(() => groupStaffByDepartment(filtered), [filtered]);
+  const groups = useMemo(() => groupStaffByDepartment(filtered, company), [filtered, company]);
 
   const toggleMember = useCallback((s: StaffMember) => {
     const id = String(s.id || '');

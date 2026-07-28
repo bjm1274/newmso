@@ -68,16 +68,21 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
   const [staffs, setStaffs] = useState<StaffMember[]>([]);
   const [staffsLoading, setStaffsLoading] = useState(false);
 
+  // 업무대행자 후보는 **전 회사** 직원이다.
+  //
+  // MSO 구조상 모회사가 자회사 직원까지 관리하고 회사 간 대체근무가 성립하므로,
+  // 대행자를 자기 회사로 좁히면 안 된다. 예전에는 `.eq('company', company)` 로
+  // SQL 단계에서 잘라내 타 회사 직원이 아예 목록에 뜨지 않았고,
+  // 회사 정보가 없는 사용자는 `if (!company) return` 때문에 목록이 통째로 비었다.
+  // PC(근태신청양식.tsx)는 이미 전 회사를 대상으로 하고 있어 동작이 갈렸다.
   useEffect(() => {
-    if (!company) return;
     let cancelled = false;
     (async () => {
       setStaffsLoading(true);
       try {
         const { data, error } = await db
           .from('staff_members')
-          .select('id, name, status, company, department, team, position, hire_date, resign_date')
-          .eq('company', company);
+          .select('id, name, status, company, department, team, position, hire_date, resign_date');
         if (error || cancelled || !data) return;
         setStaffs(data as StaffMember[]);
       } catch (err) {
@@ -89,7 +94,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
     return () => {
       cancelled = true;
     };
-  }, [company]);
+  }, []);
 
   const leaveDelegateOptions = useMemo(() => {
     const currentUserId = String(staffId || '').trim();
@@ -102,14 +107,24 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
         return true;
       })
       .sort((left, right) => {
+        // 전 회사 직원이 섞이므로 회사 → 부서 → 이름 순으로 정렬한다.
+        // 본인 회사를 맨 앞에 둬서 평소 자주 고르는 대상이 위로 오게 한다.
+        const myCompany = String(company || '').trim();
+        const leftCompany = String(left?.company || '').trim();
+        const rightCompany = String(right?.company || '').trim();
+        const leftMine = myCompany && leftCompany === myCompany ? 0 : 1;
+        const rightMine = myCompany && rightCompany === myCompany ? 0 : 1;
+        if (leftMine !== rightMine) return leftMine - rightMine;
+
         const leftDepartment = String(left?.department || left?.team || '').trim();
         const rightDepartment = String(right?.department || right?.team || '').trim();
         return (
+          leftCompany.localeCompare(rightCompany, 'ko-KR') ||
           leftDepartment.localeCompare(rightDepartment, 'ko-KR') ||
           String(left?.name || '').localeCompare(String(right?.name || ''), 'ko-KR')
         );
       });
-  }, [staffId, staffs]);
+  }, [staffId, staffs, company]);
 
   const base = useApprovalFormBase({ user, staffId, company });
   const {
@@ -278,9 +293,11 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
               >
                 <option value="">대행자 선택 안함</option>
                 {leaveDelegateOptions.map((staff) => {
+                  // 타 회사 직원이 함께 나오므로 회사명을 표시해 동명이인·소속을 구분한다.
+                  const co = String(staff.company || '').trim();
                   const dept = String(staff.department || staff.team || '').trim();
                   const pos = String(staff.position || '').trim();
-                  const details = [dept, pos].filter(Boolean).join(' / ');
+                  const details = [co, dept, pos].filter(Boolean).join(' / ');
                   return (
                     <option key={staff.id} value={staff.id}>
                       {details ? `${staff.name} (${details})` : staff.name}

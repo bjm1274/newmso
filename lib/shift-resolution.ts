@@ -177,17 +177,22 @@ export function resolveAssignedShift(
 
   const shiftId = String(assignment?.shift_id || '').trim();
   if (shiftId) {
+    // **명시적으로 배정된 shift_id 는 회사가 달라도 그대로 사용한다.**
+    //
+    // 예전에는 시프트의 company_name 이 직원 회사와 다르면 배정을 버리고
+    // 기본 시프트로 폴백했다. 그런데 이 시스템은 MSO 라 회사 간 **대체근무**가
+    // 정상 업무이고, 프로덕션 근무배정 1,945건 중 766건(39.4%)이 교차회사다.
+    // 즉 대체근무 배정이 통째로 무시되어 지각 판정·근로시간 계산이 틀리고 있었다.
+    // 배정 자체가 관리자의 명시적 의도이므로 회사 일치를 요구해서는 안 된다.
+    //
+    // 회사 선호(preferredCompany)는 아래 **이름 기반 해석**에서만 의미가 있다.
+    // 같은 이름의 시프트가 회사마다 있을 때 어느 것인지 고르는 용도다.
     const assignedShift = lookup.byId.get(shiftId) || null;
-    const preferredCompanyKey = normalizeShiftLookupText(options?.preferredCompany);
-    if (
-      assignedShift &&
-      preferredCompanyKey &&
-      normalizeShiftLookupText(assignedShift.company_name) !== preferredCompanyKey
-    ) {
-      return resolveFallbackShift();
+    if (assignedShift) {
+      return applyDailyScheduleForDate(assignedShift, options?.workDate);
     }
-
-    return applyDailyScheduleForDate(assignedShift, options?.workDate);
+    // 배정된 id 가 시프트 마스터에 없으면(삭제 등) 폴백.
+    return resolveFallbackShift();
   }
 
   const shiftNameKey = normalizeShiftLookupText(assignment?.shift_name);

@@ -1,7 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { buildShiftLookup, isShiftScheduledOnDate, resolveAssignedShift } from '../../lib/shift-resolution';
 
-test('resolveAssignedShift falls back when an assigned shift belongs to another company', async () => {
+// MSO 시스템이라 **회사 간 대체근무**가 정상 업무다.
+// 명시적으로 배정된 shift_id 는 시프트의 소속 회사가 달라도 그대로 적용되어야 한다.
+// (예전에는 회사가 다르면 배정을 버리고 기본 시프트로 폴백했고, 그 결과 프로덕션
+//  근무배정 1,945건 중 교차회사 766건이 무시되어 지각 판정·근로시간이 틀렸다.)
+test('resolveAssignedShift keeps an explicit cross-company assignment', async () => {
   const lookup = buildShiftLookup([
     {
       id: 'assigned-820',
@@ -25,8 +29,29 @@ test('resolveAssignedShift falls back when an assigned shift belongs to another 
     { fallbackShiftId: 'default-830', preferredCompany: 'SY INC.' },
   );
 
+  expect(shift?.id).toBe('assigned-820');
+  expect(shift?.start_time).toBe('08:20:00');
+});
+
+// 배정된 shift_id 가 시프트 마스터에 없으면(삭제 등) 기본 시프트로 폴백한다.
+test('resolveAssignedShift falls back when the assigned shift no longer exists', async () => {
+  const lookup = buildShiftLookup([
+    {
+      id: 'default-830',
+      name: 'Regular',
+      company_name: 'SY INC.',
+      start_time: '08:30:00',
+      end_time: '17:30:00',
+    },
+  ]);
+
+  const shift = resolveAssignedShift(
+    { shift_id: 'deleted-shift' },
+    lookup,
+    { fallbackShiftId: 'default-830', preferredCompany: 'SY INC.' },
+  );
+
   expect(shift?.id).toBe('default-830');
-  expect(shift?.start_time).toBe('08:30:00');
 });
 
 test('resolveAssignedShift keeps a same-company assignment ahead of the default shift', async () => {

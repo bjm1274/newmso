@@ -809,8 +809,16 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     const fetchEssRequests = async () => {
       // 1. 먼저 보류 중인 모든 요청을 가져옴
       // 서버 사이드 필터: 해당 사업체 직원 ID 목록으로 직접 필터링 (N+1 제거)
+      // 사업체 선택이 '전체'(또는 미지정)이면 **전 회사** 직원을 대상으로 한다.
+      //
+      // 예전에는 `s.company === 선택사업체` 단독 비교라, 기본값인 '전체' 에서는
+      // 어느 직원도 매칭되지 않아 staffIdsInCompany 가 항상 빈 배열이 됐고
+      // ESS 변경요청 대기함이 **영구히 0건**으로 보였다.
+      // MSO 구조상 모회사가 자회사 직원 요청까지 처리해야 하므로 전체 조회가 기본이다.
+      const 사업체필터 = String(선택사업체 ?? '').trim();
+      const 전체보기 = !사업체필터 || 사업체필터 === '전체';
       const staffIdsInCompany = 직원목록
-        .filter((s: StaffMember) => s.company === 선택사업체)
+        .filter((s: StaffMember) => 전체보기 || s.company === 사업체필터)
         .map((s: StaffMember) => s.id);
 
       if (staffIdsInCompany.length === 0) {

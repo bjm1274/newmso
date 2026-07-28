@@ -89,7 +89,7 @@ export default function SApprovalApproverPicker({
     [staffRows, query, selfId, selectedIds]
   );
 
-  const groups = useMemo(() => groupStaffByDepartment(filtered), [filtered]);
+  const groups = useMemo(() => groupStaffByDepartment(filtered, _company), [filtered, _company]);
 
   const addMember = useCallback((s: StaffMember) => {
     setLine((prev) => [...prev, toStaffPick(s)]);

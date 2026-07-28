@@ -110,12 +110,30 @@ export default function RosterWorkspace({
   const [lastPlan, setLastPlan] = useState<RosterPlanConfig | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  /**
+   * 근무표 편성 대상 직원 — **회사로 잘라내지 않는다.**
+   *
+   * MSO 구조라 회사 간 대체근무가 정상 업무다(프로덕션 근무배정 1,945건 중 766건이 교차회사).
+   * 예전에는 선택된 회사 외 직원을 후보에서 통째로 제거해, 정작 대체근무를 **배정하는**
+   * 화면에서 타 회사 직원을 고를 수 없었다.
+   * 선택 회사는 제거 기준이 아니라 **정렬 기준**으로만 쓴다(본인 회사가 위로).
+   */
   const scopedAll = useMemo(() => {
-    return staffs.filter((s) => {
-      if (!isActive(s)) return false;
-      if (selectedCo && selectedCo !== '전체') return s.company === selectedCo;
-      return true;
-    });
+    const co = selectedCo && selectedCo !== '전체' ? selectedCo : '';
+    return staffs
+      .filter((s) => isActive(s))
+      .sort((a, b) => {
+        if (co) {
+          const aMine = String(a.company || '').trim() === co ? 0 : 1;
+          const bMine = String(b.company || '').trim() === co ? 0 : 1;
+          if (aMine !== bMine) return aMine - bMine;
+        }
+        return (
+          String(a.company || '').localeCompare(String(b.company || ''), 'ko') ||
+          String(a.department || a.team || '').localeCompare(String(b.department || b.team || ''), 'ko') ||
+          String(a.name || '').localeCompare(String(b.name || ''), 'ko')
+        );
+      });
   }, [staffs, selectedCo]);
 
   const teamList = useMemo(() => {
@@ -166,11 +184,12 @@ export default function RosterWorkspace({
 
   const fetchShifts = useCallback(async () => {
     try {
-      let q = db
+      // 시프트 팔레트도 회사로 좁히지 않는다 — 타 회사 시프트로 대체근무를 배정해야 하기 때문.
+      // (직원 후보만 열고 팔레트를 막으면 교차 배정 자체가 불가능하다.)
+      const q = db
         .from('work_shifts')
-        .select('id, name, start_time, end_time, shift_type, description')
+        .select('id, name, start_time, end_time, shift_type, description, company_name')
         .eq('is_active', true);
-      if (selectedCo && selectedCo !== '전체') q = q.eq('company_name', selectedCo);
       const { data, error } = await q.order('start_time', { ascending: true });
       if (error) throw error;
       setShifts((data ?? []) as WorkShiftRow[]);
@@ -178,7 +197,7 @@ export default function RosterWorkspace({
       console.error('[RosterWorkspace] work_shifts', e);
       setShifts([]);
     }
-  }, [selectedCo]);
+  }, []);
 
   const fetchAssignments = useCallback(async () => {
     abortRef.current?.abort();
@@ -237,7 +256,10 @@ export default function RosterWorkspace({
             staff_id: staffId,
             work_date: workDate,
             shift_id: shiftId,
-            company_name: company || selectedCo || null,
+            // 배정 행의 company_name 은 **직원 소속**이어야 한다.
+            // selectedCo 로 폴백하면 타 회사 직원을 배정할 때 엉뚱한 회사가 찍혀
+            // 이후 집계·필터가 어긋난다.
+            company_name: company || scopedAll.find((s2) => String(s2.id) === staffId)?.company || null,
           },
           { onConflict: 'staff_id,work_date' },
         );
@@ -249,7 +271,7 @@ export default function RosterWorkspace({
         throw e;
       }
     },
-    [assignments, selectedCo],
+    [assignments, scopedAll],
   );
 
   const bulkApply = useCallback(
@@ -264,7 +286,7 @@ export default function RosterWorkspace({
             staff_id: staffId,
             work_date: workDate,
             shift_id: shiftId || null,
-            company_name: staff?.company || selectedCo || null,
+            company_name: staff?.company || null,
           };
         });
         // chunk upsert
