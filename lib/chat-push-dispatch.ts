@@ -96,6 +96,25 @@ export type ChatPushDispatchResult = {
 
 const CHAT_PUSH_MAX_ATTEMPTS = 5;
 const CHAT_PUSH_RETRY_DELAYS_MINUTES = [1, 5, 15, 30, 60];
+/**
+ * 큐에 남은 채팅 푸시의 만료 시각(시간).
+ *
+ * 지난 며칠치 채팅 알림이 한꺼번에 폰에 뜨는 것은 알림이 아니라 사고다.
+ * 크론이 멈췄다가 되살아나는 상황(실제로 CRON_SECRET 공백으로 12일간 정지)에서
+ * 밀린 job 을 그대로 발송하면 19일 전 메시지 푸시가 쏟아진다.
+ * 만료된 job 은 발송하지 않고 처리 완료로 닫는다 — 인앱 알림·안읽음 배지는
+ * 메시지 자체로 이미 남아 있으므로 사용자가 놓치는 정보는 없다.
+ */
+const CHAT_PUSH_EXPIRY_HOURS = (() => {
+  const parsed = Number(process.env.ERP_CHAT_PUSH_EXPIRY_HOURS);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 24;
+})();
+
+export function isChatPushJobExpired(createdAt: string | null | undefined, now = Date.now()) {
+  const created = Date.parse(String(createdAt || ''));
+  if (!Number.isFinite(created)) return false;
+  return now - created > CHAT_PUSH_EXPIRY_HOURS * 60 * 60 * 1000;
+}
 const BOARD_META_START = '[[BOARD_META]]';
 const BOARD_META_END = '[[/BOARD_META]]';
 
@@ -1135,6 +1154,16 @@ export async function processPendingChatPushJobs(limit = 25) {
   let skipped = 0;
 
   for (const job of jobs) {
+    // 만료된 job 은 발송하지 않고 닫는다 (크론 장기 정지 후 밀린 푸시 폭주 방지).
+    if (isChatPushJobExpired(job.created_at)) {
+      skipped += 1;
+      await updateChatPushJobById(job.id, {
+        processed_at: new Date().toISOString(),
+        processing_started_at: null,
+        last_error: 'expired-not-sent' });
+      continue;
+    }
+
     const quietHoursPatch = buildQuietHoursDeferredPatch(job, queueSelection.supportsRetryColumns);
     if (quietHoursPatch) {
       skipped += 1;
@@ -1143,8 +1172,18 @@ export async function processPendingChatPushJobs(limit = 25) {
     }
 
     const nextAttemptCount = Number(job.attempt_count || 0) + 1;
+    // **processing_started_at 를 여기서 선점하면 안 된다.**
+    //
+    // dispatchChatPushForMessage 는 진입 직후 processing_started_at 이 90초 이내면
+    // "다른 워커가 처리 중" 으로 보고 reason:'in-flight' 로 즉시 반환한다(:560-570).
+    // 예전에는 이 루프가 dispatch 호출 **직전에** processing_started_at 을 now 로 써서,
+    // 크론이 고른 모든 job 이 자기 자신의 락에 걸려 in-flight 로 튕겨 나갔다.
+    // in-flight 는 예외도 아니고 web-push-disabled 도 아니라 실패 패치도 타지 않으므로
+    // processed_at 도 dead_lettered_at 도 영원히 NULL — 5분마다 attempt_count 만 오르는
+    // 라이브락이었다(프로덕션 최대 3,233회 시도, 데드레터 0건, 미처리 247건 잔류).
+    // 락 선점은 dispatch 내부의 CAS claim(:423) 에 맡긴다. 여기서 고른 행은 select 단계에서
+    // 이미 processing_started_at 이 2분 넘게 낡은 것만 통과하므로 claim(90초 기준)은 성립한다.
     await updateChatPushJobById(job.id, {
-      processing_started_at: new Date().toISOString(),
       attempt_count: nextAttemptCount,
       last_error: null });
 
@@ -1168,6 +1207,17 @@ export async function processPendingChatPushJobs(limit = 25) {
             processing_started_at: null,
             last_error: result.reason });
         }
+        continue;
+      }
+      // in-flight 는 **아무 종결 상태도 쓰지 않은** 유일한 결과다(다른 reason 은 모두
+      // processed_at 을 남긴다). 백오프를 걸어 두지 않으면 5분마다 무한 재시도가 되므로
+      // 실패로 취급해 재시도 지연 + 시도 소진 시 데드레터까지 태운다.
+      if (result.reason === 'in-flight') {
+        skipped += 1;
+        await updateChatPushJobById(
+          job.id,
+          buildQueueFailurePatch(nextAttemptCount, 'in-flight', queueSelection.supportsRetryColumns),
+        );
         continue;
       }
       if (result.reason) skipped += 1;
