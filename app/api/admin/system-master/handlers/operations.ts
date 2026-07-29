@@ -17,6 +17,7 @@ import {
   gte,
   ne } from '@/lib/db';
 import { collectChatPushQueueHealth } from '@/lib/chat-push-health';
+import { formatKoreanDateTimeLabel } from '@/lib/seoul-time';
 import {
   OPERATION_CRONS,
   buildPushFailureSummary,
@@ -235,7 +236,7 @@ export async function handleOperations() {
           label: '크론 실행 실패',
           count: cronFailuresLast24h,
           detail: cronHealth.byRoute.length > 0
-            ? `${cronHealth.byRoute[0].target} 외 ${Math.max(0, cronHealth.byRoute.length - 1)}건 · 최근 실패 ${new Date(cronHealth.byRoute[0].lastAt).toLocaleString('ko-KR')} · ${cronHealth.byRoute[0].lastError || '원인 미상'}`
+            ? `${cronHealth.byRoute[0].target} 외 ${Math.max(0, cronHealth.byRoute.length - 1)}건 · 최근 실패 ${formatKoreanDateTimeLabel(cronHealth.byRoute[0].lastAt)} · ${cronHealth.byRoute[0].lastError || '원인 미상'}`
             : '최근 24시간 내 크론 실행이 실패했습니다.' }
       : null,
     queueSummary.deadLettered > 0
@@ -247,7 +248,7 @@ export async function handleOperations() {
           severity: queueSummary.ready > 0 ? 'warning' : 'info',
           label: '대기 중인 채팅 푸시 작업',
           count: queueSummary.pending,
-          detail: queueSummary.oldestPendingAt ? `가장 오래된 작업: ${new Date(queueSummary.oldestPendingAt).toLocaleString('ko-KR')}` : '처리 대기 중인 작업이 있습니다.' }
+          detail: queueSummary.oldestPendingAt ? `가장 오래된 작업: ${formatKoreanDateTimeLabel(queueSummary.oldestPendingAt)}` : '처리 대기 중인 작업이 있습니다.' }
       : null,
     orphanSubscriptions + nullStaffSubscriptions > 0
       ? { id: 'push-subscription-orphan', severity: 'warning', label: '정리 필요한 푸시 구독', count: orphanSubscriptions + nullStaffSubscriptions, detail: `null staff ${nullStaffSubscriptions}건 · orphan ${orphanSubscriptions}건` }
@@ -264,7 +265,7 @@ export async function handleOperations() {
           severity: 'warning',
           label: '백업 복원 실패 이력',
           count: failedRestoreRuns.length,
-          detail: latestRestoreRun?.started_at ? `최근 복원 시각: ${new Date(String(latestRestoreRun.started_at)).toLocaleString('ko-KR')}` : '최근 복원 작업 중 실패한 이력이 있습니다.' }
+          detail: latestRestoreRun?.started_at ? `최근 복원 시각: ${formatKoreanDateTimeLabel(String(latestRestoreRun.started_at))}` : '최근 복원 작업 중 실패한 이력이 있습니다.' }
       : null,
     dueTodoCount > 0
       ? {

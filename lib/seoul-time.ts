@@ -42,3 +42,16 @@ export function formatKoreanTimeLabel(date: Date = new Date()): string {
 export function formatKoreanDateLabel(date: Date = new Date()): string {
   return date.toLocaleDateString('ko-KR', { timeZone: SEOUL_TIME_ZONE });
 }
+
+/**
+ * 날짜+시각 라벨 (KST 고정).
+ *
+ * 서버(Cloudflare Worker)의 로컬 타임존은 UTC 라, 화면에 보일 시각을
+ * 서버에서 만들 때 timeZone 없이 toLocaleString 을 쓰면 9시간 어긋난다.
+ * 서버에서 시각 문자열을 만들 일이 있으면 이걸 쓴다.
+ */
+export function formatKoreanDateTimeLabel(value: string | number | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value ?? '');
+  return date.toLocaleString('ko-KR', { timeZone: SEOUL_TIME_ZONE });
+}

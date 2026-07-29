@@ -18,7 +18,9 @@ import {
   resolveHireDateFromStaff,
 } from '@/lib/annual-leave-promotion';
 import { mirrorNotificationsToD1, type NotificationRow } from '@/lib/notification-utils';
-import { formatKoreanDateKey } from '@/lib/seoul-time';
+// 통보일자는 KST 기준이어야 한다 — 이 코드는 크론(UTC 워커)에서 돌기 때문에
+// toLocaleDateString('ko-KR') 만 쓰면 KST 09:00 이후 날짜가 하루 밀린다.
+import { formatKoreanDateKey, formatKoreanDateLabel } from '@/lib/seoul-time';
 import { loadNotificationAutomationSettings } from '@/lib/notification-automation-settings';
 import {
   getD1Binding,
@@ -102,7 +104,7 @@ function buildPromotionDocument(params: {
 
 ${bodyMain}
 
-통보일자: ${new Date().toLocaleDateString('ko-KR')}
+통보일자: ${formatKoreanDateLabel()}
 `;
 }
 

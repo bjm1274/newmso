@@ -115,7 +115,13 @@ function actorLabel(row: AuditRow): string {
 function formatWhen(iso: string): string {
   const d = new Date(iso);
   if (!Number.isFinite(d.getTime())) return '';
-  return d.toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  // 서버(Cloudflare Worker)의 로컬 타임존은 UTC 라 timeZone 을 빼면 9시간 어긋난다.
+  return d.toLocaleString('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit' });
 }
 
 // 최근 7일 audit_logs에서 행위자별 단시간(1시간 윈도) 다수 삭제/권한변경을 묶어 카드화.
