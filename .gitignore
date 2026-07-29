@@ -68,7 +68,10 @@ dc_retirement_contribution_*.xlsx
 ~$*.xlsx
 __tmp_*
 tmp_withholding_*.pdf
-backups/
+# 최상위 백업 산출물 폴더만 제외한다. 경로를 고정하지 않으면 어느 깊이의
+# 'backups' 폴더든 잡혀서 app/api/admin/audit/backups/route.ts 같은 소스까지
+# 버전관리에서 빠진다 (실제로 그 라우트가 한 번도 커밋된 적 없었다).
+/backups/
 
 # local editor/build caches
 .vscode/
