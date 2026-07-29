@@ -37,7 +37,10 @@ const FULL_BACKUP_TABLES = [
 ];
 
 // 실제 존재하는 테이블만 백업 (실패 스킵)
-const DB = 'pchos-d1';
+// DB 이름은 wrangler.toml 의 database_name 과 반드시 일치해야 한다.
+// 예전에는 'pchos-d1'(구 DB)로 하드코딩돼 있어, 운영 DB 가 pchos-d1-v2 로 바뀐 뒤
+// 이 스크립트를 돌리면 엉뚱한 DB 를 백업하거나 통째로 실패한다.
+const DB = 'pchos-d1-v2';
 const R2_BUCKET = 'pchos-files';
 const PAGE = 500;
 
