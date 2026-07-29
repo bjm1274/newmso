@@ -123,12 +123,32 @@ export async function runBackup(type: BackupType): Promise<BackupResult> {
   }
 
   const tables = type === '24h' ? FULL_BACKUP_TABLES : SIX_HOUR_BACKUP_TABLES;
-  const data: Record<string, unknown[]> = {};
   const skipped: Array<{ table: string; error: string }> = [];
+  const files: Array<{ table: string; key: string; rows: number; bytes: number }> = [];
   let totalRows = 0;
+  let totalBytes = 0;
   const now = new Date();
   const iso = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const dateOnly = formatKoreanDateKey(now);
+
+  // **테이블별로 따로 올린다. 전부 모아서 한 파일로 만들면 워커가 죽는다.**
+  //
+  // 예전에는 모든 테이블의 전 행을 data 객체에 쌓고 JSON.stringify → Buffer 로
+  // 3중 복사한 뒤 한 번에 업로드했다. JSON 텍스트만 40~60MB 인데 JS 객체 상태의
+  // 메모리는 그 2~5배라(행마다 20여 개 문자열 키) 워커 128MB 한계를 넘겨
+  // 아이솔레이트가 그냥 죽었다. 죽으면 아래 recordBackupRun 도 실행되지 않아
+  // backup_restore_runs 에 성공도 실패도 안 남고, 관리자 화면에서는
+  // "버튼을 눌러도 아무 반응이 없는" 상태가 된다. cron 도 같은 이유로
+  // audit_logs 에 아무 기록 없이 사라졌다(2026-07-28 15:00 UTC).
+  //
+  // 이제 한 번에 한 테이블만 메모리에 두고 즉시 업로드한 뒤 참조를 버린다.
+  // 최대 사용량은 가장 큰 테이블 하나(현재 notifications 약 12MB) 수준이다.
+  // 앱에서 이 백업 JSON 을 파싱하는 코드는 없고(관리자 목록은 D1 메타만 읽는다)
+  // 복구는 수동이므로 파일 분할이 안전하다.
+  const folderKey =
+    type === '24h'
+      ? `backup/24h/mso-full-${dateOnly}-${iso}`
+      : `backup/6h/mso-data-${iso}`;
 
   for (const table of tables) {
     if (!TABLE_NAME_RE.test(table)) {
@@ -148,8 +168,16 @@ export async function runBackup(type: BackupType): Promise<BackupResult> {
         if (rows.length < PAGE_SIZE) break;
         offset += PAGE_SIZE;
       }
-      data[table] = allRows;
+
+      const tableJson = JSON.stringify(allRows);
+      const tableBytes = Buffer.byteLength(tableJson, 'utf-8');
+      const tableKey = `${folderKey}/${table}.json`;
+      await uploadToR2(R2_BUCKET, tableKey, Buffer.from(tableJson, 'utf-8'), 'application/json');
+
+      files.push({ table, key: tableKey, rows: allRows.length, bytes: tableBytes });
       totalRows += allRows.length;
+      totalBytes += tableBytes;
+      // allRows/tableJson 은 여기서 참조가 끊겨 다음 테이블 전에 회수된다.
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       console.warn(`[backup] skip ${table}:`, message);
@@ -157,43 +185,72 @@ export async function runBackup(type: BackupType): Promise<BackupResult> {
     }
   }
 
-  // pretty-print 제거 — 메모리·업로드 시간·워커 타임아웃 완화
-  const json = JSON.stringify({
+  // 매니페스트는 마지막에 올린다 — 이 파일이 있으면 백업이 끝까지 갔다는 뜻이다.
+  const manifestKey = `${folderKey}/manifest.json`;
+  const manifestJson = JSON.stringify({
     meta: {
       type,
       createdAt: startedAt,
-      tables: Object.keys(data).length,
+      finishedAt: new Date().toISOString(),
+      tables: files.length,
       rows: totalRows,
+      bytes: totalBytes,
       skipped,
+      layout: 'per-table',
     },
-    data,
+    files,
   });
-  const bytes = Buffer.byteLength(json, 'utf-8');
-  const objectKey =
-    type === '24h'
-      ? `backup/24h/mso-full-${dateOnly}-${iso}.json`
-      : `backup/6h/mso-data-${iso}.json`;
 
   try {
-    await uploadToR2(R2_BUCKET, objectKey, Buffer.from(json, 'utf-8'), 'application/json');
+    await uploadToR2(
+      R2_BUCKET,
+      manifestKey,
+      Buffer.from(manifestJson, 'utf-8'),
+      'application/json',
+    );
   } catch (uploadError: unknown) {
     const message = uploadError instanceof Error ? uploadError.message : String(uploadError);
-    console.error('[backup] upload failed', uploadError);
+    console.error('[backup] manifest upload failed', uploadError);
     const result: BackupResult = {
       ok: false,
       type,
       error: message,
       hint: `R2 버킷 '${R2_BUCKET}'에 backup/ prefix로 쓸 수 있는지 확인하세요.`,
-      tables: Object.keys(data).length,
+      tables: files.length,
       rows: totalRows,
-      bytes,
+      bytes: totalBytes,
     };
     await recordBackupRun({
       id: runId,
-      fileName: objectKey,
+      fileName: manifestKey,
       status: 'failed',
-      totalTables: Object.keys(data).length,
+      totalTables: files.length,
       totalRows,
+      resultSummary: { ...result, skipped },
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      requestedByName: 'cron',
+    });
+    return result;
+  }
+
+  // 테이블을 하나도 못 올렸으면 성공이 아니다 (빈 백업을 성공으로 남기지 않는다).
+  if (files.length === 0) {
+    const result: BackupResult = {
+      ok: false,
+      type,
+      error: '백업된 테이블이 없습니다.',
+      hint: skipped.length > 0 ? `${skipped.length}개 테이블이 모두 실패했습니다.` : undefined,
+      tables: 0,
+      rows: 0,
+      bytes: totalBytes,
+    };
+    await recordBackupRun({
+      id: runId,
+      fileName: manifestKey,
+      status: 'failed',
+      totalTables: 0,
+      totalRows: 0,
       resultSummary: { ...result, skipped },
       startedAt,
       finishedAt: new Date().toISOString(),
@@ -205,16 +262,16 @@ export async function runBackup(type: BackupType): Promise<BackupResult> {
   const result: BackupResult = {
     ok: true,
     type,
-    path: objectKey,
-    tables: Object.keys(data).length,
+    path: manifestKey,
+    tables: files.length,
     rows: totalRows,
-    bytes,
+    bytes: totalBytes,
   };
   await recordBackupRun({
     id: runId,
-    fileName: objectKey,
+    fileName: manifestKey,
     status: 'completed',
-    totalTables: Object.keys(data).length,
+    totalTables: files.length,
     totalRows,
     resultSummary: { ...result, skipped },
     startedAt,
@@ -222,7 +279,7 @@ export async function runBackup(type: BackupType): Promise<BackupResult> {
     requestedByName: 'cron',
   });
   console.log(
-    `[backup] ok type=${type} path=${objectKey} tables=${result.tables} rows=${totalRows} bytes=${bytes}`,
+    `[backup] ok type=${type} path=${manifestKey} tables=${result.tables} rows=${totalRows} bytes=${totalBytes}`,
   );
   return result;
 }
