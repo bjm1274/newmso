@@ -20,7 +20,19 @@ import { randomUUID } from 'node:crypto';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const DRY = process.argv.includes('--dry-run');
-const DB = 'pchos-d1';
+// 운영 DB 이름. wrangler.toml 의 database_name 과 일치해야 한다.
+// 예전에는 구 DB 'pchos-d1' 로 굳어 있었다. 운영이 pchos-d1-v2 로 바뀐 뒤에도
+// 그대로여서, 실행해도 사실상 빈 구 DB 에 아무 일도 없이 "성공"으로 끝났다.
+const DB = 'pchos-d1-v2';
+
+// 이 스크립트는 운영 데이터를 직접 수정한다. 위 DB 이름을 바로잡은 이상
+// 실수로 실행하면 진짜 데이터가 바뀌므로 명시적 확인을 요구한다.
+if (!process.argv.includes('--dry-run') && !process.argv.includes('--yes')) {
+  console.error(
+    `[${DB}] 운영 데이터베이스를 수정합니다. 확인했으면 --yes 를 붙여 다시 실행하세요. (먼저 --dry-run 으로 확인하세요)`,
+  );
+  process.exit(1);
+}
 const WORK = mkdtempSync(join(tmpdir(), 'leave-usage-reset-'));
 const wranglerJs = join(ROOT, 'node_modules/wrangler/bin/wrangler.js');
 
