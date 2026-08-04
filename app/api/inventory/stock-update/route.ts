@@ -7,8 +7,9 @@
 //       (Supabase 컷오버 완료 — D1이 유일한 진실원)
 // ============================================================
 import { NextResponse } from 'next/server';
+import { userId } from '@/lib/d1-api-helpers';
 import { z } from 'zod';
-import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
+import { readSessionFromRequest } from '@/lib/server-session';
 import { assertInventoryItemCompanyScope } from '@/lib/inventory-scope-guard';
 import {
   atomicStockUpdate,
@@ -22,13 +23,6 @@ const PayloadSchema = z.object({
   itemId: z.string().min(1),
   delta: z.number().int(),
   minAllowed: z.number().int().optional() });
-
-function userId(user: SessionUser | null | undefined): string | null {
-  if (!user) return null;
-  const candidate = (user.id ?? user.user_id ?? '') as string;
-  const trimmed = String(candidate).trim();
-  return trimmed || null;
-}
 
 export async function POST(request: Request) {
   try {

@@ -10,8 +10,9 @@
 // 동작: D1 binding으로 atomicStockConsumeWithLog를 호출해 배치 트랜잭션 처리.
 // ============================================================
 import { NextResponse } from 'next/server';
+import { userId } from '@/lib/d1-api-helpers';
 import { z } from 'zod';
-import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
+import { readSessionFromRequest } from '@/lib/server-session';
 import {
   atomicStockConsumeWithLog,
   StockError,
@@ -27,13 +28,6 @@ const PayloadSchema = z.object({
   companyId: z.string().nullable().optional(),
   department: z.string().nullable().optional(),
   notes: z.string().nullable().optional() });
-
-function userId(user: SessionUser | null | undefined): string | null {
-  if (!user) return null;
-  const candidate = (user.id ?? user.user_id ?? '') as string;
-  const trimmed = String(candidate).trim();
-  return trimmed || null;
-}
 
 export async function POST(request: Request) {
   // 호환 유지: 신규 클라이언트는 stock-post 사용. 호출 시 410으로 안내.

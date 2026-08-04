@@ -18,6 +18,7 @@
 // 동일하게 유지한다.
 // ============================================================
 import { NextResponse } from 'next/server';
+import { userId } from '@/lib/d1-api-helpers';
 import { z } from 'zod';
 import { eq, inArray, sql } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
@@ -72,13 +73,6 @@ const PayloadSchema = z
     message: 'destId 또는 newDest 중 정확히 하나만 지정해야 합니다.' });
 
 type Payload = z.infer<typeof PayloadSchema>;
-
-function userId(user: SessionUser | null | undefined): string | null {
-  if (!user) return null;
-  const candidate = (user.id ?? user.user_id ?? '') as string;
-  const trimmed = String(candidate).trim();
-  return trimmed || null;
-}
 
 function actorName(user: SessionUser | null | undefined): string {
   if (!user) return '알 수 없음';

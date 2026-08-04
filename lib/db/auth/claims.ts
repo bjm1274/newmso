@@ -53,6 +53,30 @@ export function claimUuid(claims: ErpClaims, key: keyof ErpClaims): string | nul
   return UUID_RE.test(v.trim()) ? v.trim() : null;
 }
 
+/**
+ * 식별자 claim. UUID 형식을 요구하지 않는다.
+ *
+ * 예전에는 erp_staff_id 도 claimUuid 를 썼는데, id 가 UUID 가 아니면 null 이 되어
+ * SELF_ONLY · SELF_OR_SAME_COMPANY · APPROVAL_SCOPE 판정이 통째로 실패했다.
+ * 실운영 계정은 대부분 UUID 지만 시드/이관 데이터는 그렇지 않아서
+ * (예: scripts/seed-e2e-d1.mjs 의 'test-staff-...'), E2E 가 본인 범위 정책을
+ * 검증하지 못한 채 통과하는 사각지대가 생겼다.
+ *
+ * 값은 서명된 세션에서 나오고 비교도 문자열 동치(===)로만 하므로 형식 제약이 필요 없다.
+ * 다만 비정상적으로 긴 값이나 제어문자는 걸러 낸다.
+ */
+const MAX_IDENTIFIER_LENGTH = 128;
+const CONTROL_CHAR_RE = /[\u0000-\u001f\u007f]/;
+
+export function claimIdentifier(claims: ErpClaims, key: keyof ErpClaims): string | null {
+  const v = claims[key];
+  if (typeof v !== 'string') return null;
+  const trimmed = v.trim();
+  if (!trimmed || trimmed.length > MAX_IDENTIFIER_LENGTH) return null;
+  if (CONTROL_CHAR_RE.test(trimmed)) return null;
+  return trimmed;
+}
+
 export function claimText(claims: ErpClaims, key: keyof ErpClaims): string | null {
   const v = claims[key];
   if (typeof v !== 'string') return null;
@@ -70,7 +94,7 @@ export function claimBool(claims: ErpClaims, key: keyof ErpClaims): boolean {
 // ─────────────────────────────────────────────────────────────
 // 단순 접근자
 // ─────────────────────────────────────────────────────────────
-export const erpStaffId = (c: ErpClaims) => claimUuid(c, 'erp_staff_id');
+export const erpStaffId = (c: ErpClaims) => claimIdentifier(c, 'erp_staff_id');
 export const erpCompanyId = (c: ErpClaims) => claimUuid(c, 'erp_company_id');
 export const erpCompanyName = (c: ErpClaims) => claimText(c, 'erp_company_name');
 export const erpDepartmentName = (c: ErpClaims) => claimText(c, 'erp_department_name');

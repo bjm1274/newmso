@@ -1,4 +1,5 @@
-import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
+import { readSessionFromRequest } from '@/lib/server-session';
+import { userId } from '@/lib/d1-api-helpers';
 import { getD1Binding } from '@/lib/db';
 import {
   REALTIME_ALLOWED_TABLE_SET as ALLOWED_TABLES,
@@ -9,12 +10,6 @@ import {
 export const dynamic = 'force-dynamic';
 
 
-function userId(user: SessionUser | null | undefined): string | null {
-  if (!user) return null;
-  const candidate = (user.id ?? user.user_id ?? '') as string;
-  const trimmed = String(candidate).trim();
-  return trimmed || null;
-}
 
 async function fetchMaxCreatedAtD1(
   d1: NonNullable<Awaited<ReturnType<typeof getD1Binding>>>,

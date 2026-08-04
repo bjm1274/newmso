@@ -8,9 +8,10 @@
  * }
  */
 import { NextResponse } from 'next/server';
+import { userId } from '@/lib/d1-api-helpers';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
-import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
+import { readSessionFromRequest } from '@/lib/server-session';
 import { getD1Binding, getD1Drizzle, StockError } from '@/lib/db';
 import { purchase_orders, inventory } from '@/lib/db/schema';
 import { postInventoryMovement } from '@/lib/inventory-movement-service';
@@ -31,11 +32,6 @@ const PayloadSchema = z.object({
   purchaseOrderId: z.string().min(1),
   lines: z.array(LineSchema).min(1),
 });
-
-function userId(user: SessionUser | null | undefined): string | null {
-  if (!user) return null;
-  return String((user.id ?? user.user_id ?? '') as string).trim() || null;
-}
 
 function parseItems(raw: unknown): Array<Record<string, unknown>> {
   if (Array.isArray(raw)) return raw as Array<Record<string, unknown>>;

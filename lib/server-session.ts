@@ -35,11 +35,29 @@ export type SessionUser = Record<string, unknown> & {
   permissions: Record<string, any>;
 };
 
+/**
+ * 토큰 안에 실제로 직렬화되는 사용자 표현.
+ * 쿠키 4KB 한도 때문에 권한을 permissions 객체가 아니라 pt/pf 배열로 압축해 담는다.
+ * 읽는 쪽에서 SessionUser 로 되돌리므로 소비 코드는 이 타입을 볼 일이 없다.
+ */
+type SerializedSessionUser = Omit<SessionUser, 'permissions'> & {
+  /** 값이 true 인 권한 키 */
+  pt?: string[];
+  /** 값이 명시적으로 false 인 권한 키 (차단 의미를 갖는다) */
+  pf?: string[];
+  /** 예전 형식 토큰 호환 */
+  permissions?: Record<string, any>;
+};
+
 export type SessionPayload = {
   ver: 1;
   iat: number;
   exp: number;
   user: SessionUser;
+};
+
+type SerializedSessionPayload = Omit<SessionPayload, 'user'> & {
+  user: SerializedSessionUser;
 };
 
 type CookieOptions = {
@@ -133,24 +151,89 @@ async function verifySignatureWithSecret(value: string, signature: string, secre
   );
 }
 
-const SESSION_PERMISSION_KEYS = new Set([
+// ---------------------------------------------------------------------------
+// 세션 토큰에 담을 권한 키
+// ---------------------------------------------------------------------------
+// 세션은 쿠키에 들어가고 쿠키 한도는 4KB 다. 그래서 권한 전체를 담을 수 없고
+// 추려서 담는데, 예전 목록은 bare 8개 + `menu_*` 뿐이었다.
+// 그 결과 서버가 실제로 판정에 쓰는 키들이 토큰에서 사라졌다.
+//   - `finance_*` 소실 → lib/d1-api-helpers.ts 의 hasFinancePermission() 이 항상 false
+//     → policies.ts 의 FINANCE_SCOPE 3테이블이 재무 담당자에게 통째로 닫힘 (fail-closed)
+//   - `mypage_수정` 소실 → `perms.mypage_수정 === false` 로 막던 라우트가
+//     `undefined === false` 가 되어 차단이 풀림 (fail-open)
+//
+// 그래서 "서버가 권한 판정에 읽는 키"를 기준으로 다시 정의한다.
+// 실측(권한 121개 전량 기준):
+//   객체 형태로 전량   → 4,653B  쿠키 한도 초과
+//   배열 압축으로 전량 → 3,837B  들어가지만 여유 260B
+//   아래 접두사 범위   → 3,209B  여유 ~900B
+const SESSION_PERMISSION_BARE_KEYS = new Set([
   'admin',
   'mso',
   'system_master',
   'hr',
   'inventory',
   'approval',
-  'hr_교대근무',
-  'hr_근무표생성',
+  'finance',
 ]);
 
+// 서버 코드가 판정에 참조하는 접두사. 여기에 없는 접두사(admin_ 등)는
+// 화면 표시 전용이라 클라이언트가 별도로 조회한다.
+const SESSION_PERMISSION_PREFIXES = [
+  'menu_',
+  'finance_',
+  'mypage_',
+  'hr_',
+  'calendar_',
+  'chat_',
+  'inventory_',
+  'extra_',
+  'board_',
+];
+
+function isSessionPermissionKey(key: string) {
+  return (
+    SESSION_PERMISSION_BARE_KEYS.has(key) ||
+    SESSION_PERMISSION_PREFIXES.some((prefix) => key.startsWith(prefix))
+  );
+}
+
+/**
+ * 권한 객체를 토큰용 두 배열로 압축한다.
+ *  - pt: 값이 true 인 키
+ *  - pf: 값이 **명시적으로** false 인 키 (차단 의미를 갖는 키가 있어 보존해야 한다)
+ *
+ * `{"키":true,}` 형태보다 배열이 키당 7바이트 남짓 작다.
+ */
 function compactSessionPermissions(permissions: Record<string, any>) {
-  return Object.entries(permissions || {}).reduce<Record<string, boolean>>((acc, [key, value]) => {
-    if (SESSION_PERMISSION_KEYS.has(key) || key.startsWith('menu_')) {
-      acc[key] = value === true;
-    }
-    return acc;
-  }, {});
+  const pt: string[] = [];
+  const pf: string[] = [];
+  for (const [key, value] of Object.entries(permissions || {})) {
+    if (!isSessionPermissionKey(key)) continue;
+    if (value === true) pt.push(key);
+    else if (value === false) pf.push(key);
+  }
+  return { pt, pf };
+}
+
+/**
+ * 토큰의 압축 표현을 원래의 권한 객체로 되돌린다.
+ * 예전 토큰은 `permissions` 객체를 그대로 담고 있으므로 그 형태도 받아들인다
+ * (그래야 이 변경 배포 시 기존 로그인 세션이 무효화되지 않는다).
+ */
+function expandSessionPermissions(user: Record<string, any>): Record<string, boolean> {
+  const legacy = user?.permissions;
+  if (legacy && typeof legacy === 'object' && !Array.isArray(legacy)) {
+    return legacy as Record<string, boolean>;
+  }
+  const out: Record<string, boolean> = {};
+  for (const key of Array.isArray(user?.pt) ? user.pt : []) {
+    if (typeof key === 'string') out[key] = true;
+  }
+  for (const key of Array.isArray(user?.pf) ? user.pf : []) {
+    if (typeof key === 'string') out[key] = false;
+  }
+  return out;
 }
 
 export function normalizeSessionUser(input: any): SessionUser {
@@ -288,7 +371,7 @@ export async function resolveLatestSessionUser(sessionUser: unknown): Promise<Se
   return normalizedUser;
 }
 
-function createSessionUserSnapshot(input: any): SessionUser {
+function createSessionUserSnapshot(input: any): SerializedSessionUser {
   const normalizedUser = normalizeSessionUser(input);
   return {
     id: normalizedUser.id ?? null,
@@ -308,12 +391,14 @@ function createSessionUserSnapshot(input: any): SessionUser {
     auth_user_id: String(normalizedUser.auth_user_id ?? '').trim() || null,
     is_system_master: normalizedUser.is_system_master === true,
     login_id: (normalizedUser as any).login_id ?? null,
-    permissions: compactSessionPermissions(normalizedUser.permissions || {}) };
+    // 권한은 pt/pf 배열로 압축해 담는다. 읽는 쪽(verifySessionTokenWithSecret)에서
+    // 다시 permissions 객체로 되돌리므로, 소비 코드는 종전대로 user.permissions 를 쓰면 된다.
+    ...compactSessionPermissions(normalizedUser.permissions || {}) };
 }
 
 export async function createSessionToken(user: any, maxAgeSeconds = SESSION_MAX_AGE_SECONDS) {
   const now = Math.floor(Date.now() / 1000);
-  const payload: SessionPayload = {
+  const payload: SerializedSessionPayload = {
     ver: 1,
     iat: now,
     exp: now + maxAgeSeconds,
@@ -334,7 +419,7 @@ export async function verifySessionTokenWithSecret(token: string | null | undefi
   if (!isValid) return null;
 
   try {
-    const payload = JSON.parse(base64UrlToString(body)) as SessionPayload;
+    const payload = JSON.parse(base64UrlToString(body)) as SerializedSessionPayload;
     const now = Math.floor(Date.now() / 1000);
     if (!payload?.user?.name || !payload.exp || payload.exp <= now) {
       return null;
@@ -347,9 +432,19 @@ export async function verifySessionTokenWithSecret(token: string | null | undefi
         return null; // 토큰 발급 이후 강제 로그아웃이 수행되었으면 토큰 즉시 무효화
       }
     }
+    // 압축된 pt/pf 배열을 permissions 객체로 되돌린 뒤 정규화한다.
+    // 예전 형식(permissions 객체)도 그대로 받아들이므로 기존 로그인 세션이 끊기지 않는다.
+    const rawUser = payload.user as Record<string, any>;
+    const expandedUser: Record<string, any> = {
+      ...rawUser,
+      permissions: expandSessionPermissions(rawUser),
+    };
+    delete expandedUser.pt;
+    delete expandedUser.pf;
+
     return {
       ...payload,
-      user: normalizeSessionUser(payload.user) };
+      user: normalizeSessionUser(expandedUser) };
   } catch {
     return null;
   }

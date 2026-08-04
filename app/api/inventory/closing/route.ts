@@ -12,6 +12,7 @@
  * 현재 월마감 스냅샷 조회
  */
 import { NextResponse } from 'next/server';
+import { userId } from '@/lib/d1-api-helpers';
 import { z } from 'zod';
 import { and, eq, sql } from 'drizzle-orm';
 import { readSessionFromRequest, isAdminSession, type SessionUser } from '@/lib/server-session';
@@ -31,11 +32,6 @@ const PayloadSchema = z.object({
   /** advance_step 시 목표 단계(1~5). 생략 시 +1 */
   step: z.number().int().min(1).max(5).optional(),
 });
-
-function userId(user: SessionUser | null | undefined): string | null {
-  if (!user) return null;
-  return String((user.id ?? user.user_id ?? '') as string).trim() || null;
-}
 
 function canManageClosing(user: SessionUser | null | undefined): boolean {
   if (!user) return false;

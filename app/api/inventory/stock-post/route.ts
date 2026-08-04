@@ -11,8 +11,9 @@
  *  applyMovingAverage?, skipClosingCheck?
  */
 import { NextResponse } from 'next/server';
+import { userId } from '@/lib/d1-api-helpers';
 import { z } from 'zod';
-import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
+import { readSessionFromRequest } from '@/lib/server-session';
 import { assertInventoryItemCompanyScope } from '@/lib/inventory-scope-guard';
 import { getD1Binding, getD1Drizzle, StockError } from '@/lib/db';
 import {
@@ -62,12 +63,6 @@ const PayloadSchema = z.object({
   minAllowed: z.number().int().optional(),
   idempotencyKey: z.string().nullable().optional(),
 });
-
-function userId(user: SessionUser | null | undefined): string | null {
-  if (!user) return null;
-  const candidate = (user.id ?? user.user_id ?? '') as string;
-  return String(candidate).trim() || null;
-}
 
 export async function POST(request: Request) {
   try {

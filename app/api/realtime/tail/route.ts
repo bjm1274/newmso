@@ -15,7 +15,8 @@
 // Phase 6   — d1 모드: D1 drizzle로 테이블별 max(created_at) 조회
 // ============================================================
 import { NextResponse } from 'next/server';
-import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
+import { userId } from '@/lib/d1-api-helpers';
+import { readSessionFromRequest } from '@/lib/server-session';
 import { getD1Binding } from '@/lib/db';
 import {
   REALTIME_ALLOWED_TABLE_SET as ALLOWED_TABLES,
@@ -26,14 +27,6 @@ import {
 export const dynamic = 'force-dynamic';
 
 const MAX_TABLES_PER_REQUEST = 10;
-
-
-function userId(user: SessionUser | null | undefined): string | null {
-  if (!user) return null;
-  const candidate = (user.id ?? user.user_id ?? '') as string;
-  const trimmed = String(candidate).trim();
-  return trimmed || null;
-}
 
 // D1에서 테이블의 최신 변경 timestamp 조회 — allowedTables whitelist 내에서만 호출됨.
 // 컬럼명은 TABLE_TIMESTAMP_COLUMN 매핑에서 우선 결정, 없으면 created_at.

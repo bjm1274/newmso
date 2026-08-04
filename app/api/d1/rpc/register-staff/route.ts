@@ -24,6 +24,7 @@
 // 권한: admin, mso, hr 권한 보유자만 (직원 등록 기능).
 // ============================================================
 import { NextResponse } from 'next/server';
+import { userId } from '@/lib/d1-api-helpers';
 import { z } from 'zod';
 import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
 import { getD1Binding, getD1Drizzle } from '@/lib/db';
@@ -96,12 +97,6 @@ const BodySchema = z.object({
   p_leave_total: z.number().min(0).max(365) });
 
 // ─── 유틸 ───────────────────────────────────────────────────────────────────
-
-function userId(user: SessionUser | null | undefined): string | null {
-  if (!user) return null;
-  const candidate = (user.id ?? user.user_id ?? '') as string;
-  return String(candidate).trim() || null;
-}
 
 function hasHrPermission(user: SessionUser | null | undefined): boolean {
   if (!user) return false;

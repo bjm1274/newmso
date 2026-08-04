@@ -13,6 +13,7 @@
 //       members는 jsonb → JSON.stringify
 // ============================================================
 import { NextResponse } from 'next/server';
+import { userId } from '@/lib/d1-api-helpers';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { readSessionFromRequest, type SessionUser, isAdminSession } from '@/lib/server-session';
@@ -36,13 +37,6 @@ const PatchSchema = z
     type: z.string().min(1).optional() })
   .refine((value) => Object.keys(value).length > 0, {
     message: 'At least one field required' });
-
-function userId(user: SessionUser | null | undefined): string | null {
-  if (!user) return null;
-  const candidate = (user.id ?? user.user_id ?? '') as string;
-  const trimmed = String(candidate).trim();
-  return trimmed || null;
-}
 
 function isPrivilegedSession(user: SessionUser | null | undefined): boolean {
   return isAdminSession(user);

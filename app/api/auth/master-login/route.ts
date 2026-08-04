@@ -317,6 +317,11 @@ export async function POST(request: NextRequest) {
             hr_교대근무: true } });
       }
 
+      // 이 분기(=해당 사번의 직원 행이 없음)에서는 실패를 기록하지 않고 있었다.
+      // 그 결과 env 기반 MASTER/ADMIN 자격증명에 대한 시도는 카운터가 전혀 오르지 않아
+      // 위 checkRateLimit 의 15분·10회 잠금이 통째로 무력했다 — 무제한 온라인 대입이 가능했다.
+      // 아래 두 실패 경로(:334, :419)와 동일하게 기록한다.
+      await recordFailedAttempt(loginId, WINDOW_MS);
       return failureResponse('아이디 또는 비밀번호가 일치하지 않습니다.');
     }
 

@@ -15,8 +15,9 @@
 // 권한: 로그인 사용자 (AUTHENTICATED — 조회수 증가는 공개 게시판 기준).
 // ============================================================
 import { NextResponse } from 'next/server';
+import { userId } from '@/lib/d1-api-helpers';
 import { z } from 'zod';
-import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
+import { readSessionFromRequest } from '@/lib/server-session';
 import { getD1Binding, getD1Drizzle } from '@/lib/db';
 import { incrementPostViews } from '@/lib/db/functions/counters';
 
@@ -24,12 +25,6 @@ export const dynamic = 'force-dynamic';
 
 const BodySchema = z.object({
   p_post_id: z.string().min(1).max(128) });
-
-function userId(user: SessionUser | null | undefined): string | null {
-  if (!user) return null;
-  const candidate = (user.id ?? user.user_id ?? '') as string;
-  return String(candidate).trim() || null;
-}
 
 export async function POST(request: Request) {
   try {

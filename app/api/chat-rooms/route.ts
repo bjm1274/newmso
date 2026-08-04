@@ -16,9 +16,10 @@
 // members/member_ids 는 jsonb → text(JSON.stringify) 변환.
 // ============================================================
 import { NextResponse } from 'next/server';
+import { userId } from '@/lib/d1-api-helpers';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
-import { readSessionFromRequest, type SessionUser, isAdminSession } from '@/lib/server-session';
+import { readSessionFromRequest, isAdminSession } from '@/lib/server-session';
 import {
   chat_rooms as chatRoomsTable,
   getD1Binding,
@@ -38,13 +39,6 @@ const PayloadSchema = z.object({
   is_announcement: z.boolean().optional() });
 
 type ChatRoomPayload = z.infer<typeof PayloadSchema>;
-
-function userId(user: SessionUser | null | undefined): string | null {
-  if (!user) return null;
-  const candidate = (user.id ?? user.user_id ?? '') as string;
-  const trimmed = String(candidate).trim();
-  return trimmed || null;
-}
 
 // D1 binding 필수 — Workers env 가 없으면 throw.
 async function requireD1ForChatRooms(label: string) {
