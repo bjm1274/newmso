@@ -80,7 +80,6 @@ function AttachmentCard({ attachment }: { attachment: ApprovalAttachmentMeta }) 
         aria-label={`이미지 첨부 ${attachment.name} 다운로드`}
         style={{ padding: 0, overflow: 'hidden', textAlign: 'left', width: '100%' }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={inlineUrl}
           alt={attachment.name}
