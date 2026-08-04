@@ -44,6 +44,7 @@ import {
   and,
   inArray } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
+import { logAudit } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -186,12 +187,12 @@ function buildDeletions(db: ReturnType<typeof getD1Drizzle>): DepDeletion[] {
         .delete(documentRepositoryTable)
         .where(inArray(documentRepositoryTable.created_by, c)),
     ),
-    wrap('audit_logs.user_id', (c) =>
-      db.delete(auditLogsTable).where(inArray(auditLogsTable.user_id, c)),
-    ),
-    wrap('audit_logs.target_id', (c) =>
-      db.delete(auditLogsTable).where(inArray(auditLogsTable.target_id, c)),
-    ),
+    // ⚠ audit_logs 는 여기서 지우지 않는다.
+    //
+    // 예전에는 삭제 대상 직원이 행위자이거나 대상인 감사로그를 전부 지웠다.
+    // 그 결과 가장 파괴적인 작업(전 직원 삭제)이 스스로 흔적을 없애,
+    // "누가 언제 무엇을 지웠는가" 를 사후에 확인할 방법이 남지 않았다.
+    // 감사로그는 삭제된 직원을 참조하더라도 보존한다 — 그게 감사로그의 목적이다.
   ];
 }
 
@@ -239,6 +240,28 @@ export async function POST(req: Request) {
         deleted: 0,
         message: '삭제할 직원이 없습니다. (관리자만 있음)' });
     }
+
+    // 삭제 **전에** 감사로그를 남긴다.
+    // 실행 후에 남기면, 도중에 실패하거나 아이솔레이트가 죽었을 때
+    // 데이터는 사라졌는데 기록은 없는 상태가 된다.
+    // 행위자는 클라이언트 값이 아니라 서버 세션에서 가져온다.
+    await logAudit(
+      'delete',
+      'staff_members',
+      null,
+      {
+        operation: 'reset-staff',
+        target_count: ids.length,
+        target_ids: ids.slice(0, 200),
+        target_ids_truncated: ids.length > 200,
+      },
+      String(session.user?.id ?? '') || undefined,
+      String(session.user?.name ?? '') || undefined,
+    ).catch((err) => {
+      // 감사 기록 실패는 파괴적 작업을 막는 사유다 — 조용히 넘어가지 않는다.
+      console.error('[reset-staff] 감사로그 기록 실패:', err);
+      throw new Error('감사 기록에 실패해 초기화를 중단했습니다.');
+    });
 
     // 종속 테이블 데이터 먼저 삭제 (외래키 제약조건 해소)
     const deletions = buildDeletions(db);

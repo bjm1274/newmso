@@ -18,7 +18,9 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 export default function CompanyCardTab() {
   const [rows, setRows] = useState<CorpCardRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [companies, setCompanies] = useState<string[]>(['전체', '박철홍정형외과', '수연의원', 'MSO 본사', '지점 A']);
+  // 초기값에 실제 회사명을 박아 두면 조회 실패 시 존재하지 않는 회사가 선택지로 남는다.
+  // 목록은 loadCompanies() 가 companies 테이블에서 채운다.
+  const [companies, setCompanies] = useState<string[]>(['전체']);
   
   // New Card Modal State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -28,41 +30,78 @@ export default function CompanyCardTab() {
   const [newHolder, setNewHolder] = useState('');
   const [newLimit, setNewLimit] = useState('5');
   const [newUsed, setNewUsed] = useState('0');
-  const [newCompany, setNewCompany] = useState('박철홍정형외과');
+  // loadCompanies() 가 실제 회사 목록으로 채운다.
+  const [newCompany, setNewCompany] = useState('');
 
   const loadCards = async () => {
     setLoading(true);
     try {
       const { data, error } = await db
         .from('corporate_cards')
-        .select('issuer,card_nickname,last_four,status,company_name,id')
+        .select('issuer,card_nickname,last_four,status,company_name,id,holder_id')
         .limit(100);
-      
+
       if (error || !Array.isArray(data)) {
         setRows(FALLBACK_CARDS);
       } else {
-        const list = data.filter(isRecord).map((r, index): CorpCardRow => {
+        const cards = data.filter(isRecord);
+
+        // 실제 사용액은 거래 내역에서 집계한다.
+        // 예전에는 카드 id 의 첫 글자 charCodeAt 을 시드로 한도·사용액을 만들어 내고,
+        // 사용자명은 하드코딩된 실명 목록에서 골라 표시했다.
+        // 관리자가 그 숫자를 실제 지출로 오해할 수 있어 (그리고 남의 이름이 붙어)
+        // 조작값을 만들지 않고 실제 값만 쓰거나 '-' 로 둔다.
+        const usedByCardId = new Map<string, number>();
+        const holderNameById = new Map<string, string>();
+
+        const cardIds = cards.map((r) => String(r.id ?? '')).filter(Boolean);
+        if (cardIds.length > 0) {
+          const { data: txData } = await db
+            .from('corporate_card_transactions')
+            .select('card_id,amount')
+            .in('card_id', cardIds);
+          for (const tx of (Array.isArray(txData) ? txData : []).filter(isRecord)) {
+            const cardId = String(tx.card_id ?? '');
+            const amount = Number(tx.amount ?? 0);
+            if (!cardId || !Number.isFinite(amount)) continue;
+            usedByCardId.set(cardId, (usedByCardId.get(cardId) ?? 0) + amount);
+          }
+        }
+
+        const holderIds = Array.from(
+          new Set(cards.map((r) => String(r.holder_id ?? '')).filter(Boolean)),
+        );
+        if (holderIds.length > 0) {
+          const { data: staffData } = await db
+            .from('staff_members')
+            .select('id,name')
+            .in('id', holderIds);
+          for (const s of (Array.isArray(staffData) ? staffData : []).filter(isRecord)) {
+            const id = String(s.id ?? '');
+            const name = typeof s.name === 'string' ? s.name : '';
+            if (id && name) holderNameById.set(id, name);
+          }
+        }
+
+        const list = cards.map((r): CorpCardRow => {
           const issuer = typeof r.issuer === 'string' ? r.issuer : '카드';
           const nick = typeof r.card_nickname === 'string' ? r.card_nickname : '';
           const lastFour = typeof r.last_four === 'string' ? r.last_four : '0000';
           const card = `${issuer} ${nick} (****${lastFour})`;
-          
-          // Mimic/Fallback some metrics since corporate_cards table only stores basic details
-          // Let's seed them based on index/id so they are stable
-          const seed = String(r.id).charCodeAt(0) || index;
-          const limitM = (seed % 3 === 0) ? 10 : (seed % 3 === 1 ? 5 : 3);
-          const usedM = Number(((seed * 0.77) % limitM).toFixed(1));
-          const pct = Math.round((usedM / limitM) * 100);
-          
-          let status: CorpCardRow['status'] = '정상';
-          if (pct >= 90) status = '정지';
-          else if (pct >= 70) status = '한도 임박';
-          
-          // We can let the user's registered cards show actual seeded values or dynamic holders
-          // D1 schema has holder_id. Let's use a mock holder name based on seed
-          const holders = ['박철홍', '김지오', '박유진', '백민', '홍길동', '김철수'];
-          const user = holders[seed % holders.length];
-          
+
+          const holderId = String(r.holder_id ?? '');
+          const user = holderNameById.get(holderId) ?? '-';
+
+          // 백만원 단위 표기. corporate_cards 에는 한도 컬럼이 없으므로 한도는 0(미등록)으로 둔다.
+          const usedM = Number(((usedByCardId.get(String(r.id ?? '')) ?? 0) / 1_000_000).toFixed(1));
+          const limitM = 0;
+          const pct = 0;
+
+          // 상태는 실제 컬럼 값을 쓴다 (예전에는 조작한 사용률로 역산했다).
+          const rawStatus = typeof r.status === 'string' ? r.status : '';
+          const status: CorpCardRow['status'] =
+            rawStatus === '정지' || rawStatus === '한도 임박' ? rawStatus : '정상';
+
           return { card, user, usedM, limitM, pct, status };
         });
         setRows(list);
@@ -83,11 +122,8 @@ export default function CompanyCardTab() {
       if (!error && Array.isArray(data) && data.length > 0) {
         const names = Array.from(new Set(['전체', ...data.filter(isRecord).map(d => String(d.name))]));
         setCompanies(names);
-        if (names.includes('박철홍정형외과')) {
-          setNewCompany('박철홍정형외과');
-        } else {
-          setNewCompany(names[1] || names[0]);
-        }
+        // 특정 회사를 기본 선택으로 박아 두지 않는다 — 조회된 첫 회사를 쓴다.
+        setNewCompany(names[1] || names[0]);
       }
     } catch (err) {
       console.warn('Failed to load companies:', err);

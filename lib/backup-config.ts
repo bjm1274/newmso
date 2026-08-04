@@ -111,9 +111,34 @@ export const BACKUP_GROUPS: BackupGroupDefinition[] = [
     ] },
 ];
 
-export const FULL_BACKUP_TABLES = Array.from(
+/**
+ * BACKUP_GROUPS 는 관리자 화면의 그룹 선택 UI 용 목록이다.
+ *
+ * ⚠ 전체 백업 대상을 이 목록으로 정하면 안 된다.
+ *   손으로 관리하는 목록이라 새 테이블이 생겨도 아무도 추가하지 않고,
+ *   실제로 스키마 162개 중 52개만 백업되고 있었다 —
+ *   연차 원장(leave_ledger)·급여 원본(payroll)·인사발령(personnel_appointments)·
+ *   재무 분개장(journal_entries) 등 110개가 어떤 백업에도 없었다.
+ *   전체 백업은 lib/backup-cron.ts 에서 DB 의 실제 테이블 목록을 조회해 결정한다.
+ */
+export const BACKUP_GROUP_TABLES = Array.from(
   new Set(BACKUP_GROUPS.flatMap((group) => group.tables))
 );
+
+/**
+ * 전체 백업에서 제외할 테이블.
+ * 재생성 가능하거나(레이트리밋 카운터), 순간 상태라 복원 의미가 없는 것만 담는다.
+ * **여기에 없으면 자동으로 백업 대상이다** — 새 테이블이 조용히 빠지지 않도록 하기 위함.
+ */
+export const BACKUP_EXCLUDED_TABLES = new Set<string>([
+  'rate_limit_attempts',   // 로그인 실패 카운터 — 15분 창이라 복원 의미 없음
+  'chat_typing_status',    // 입력중 표시 — 순간 상태
+  'd1_migrations',         // wrangler 가 관리
+  '_cf_METADATA',          // Cloudflare 내부
+]);
+
+/** @deprecated 전체 백업 대상이 아니다. 그룹 UI 목록이 필요하면 BACKUP_GROUP_TABLES 를 쓴다. */
+export const FULL_BACKUP_TABLES = BACKUP_GROUP_TABLES;
 
 export const BACKUP_RESTORE_ORDER = Array.from(
   new Set([

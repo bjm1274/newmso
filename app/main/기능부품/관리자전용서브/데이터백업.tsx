@@ -11,7 +11,13 @@ import { useIsMobile } from '@/app/components/useIsMobile';
 import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 
 const PAGE_SIZE = 1000;
-const RESTORE_BATCH_SIZE = 200;
+// 서버(/api/d1/mutate)의 MAX_ROWS_PER_INSERT 와 반드시 같거나 작아야 한다.
+// 예전 값은 200 이었는데 서버 zod 스키마가 .max(100) 이라, 100행이 넘는 테이블은
+// 첫 배치부터 400 으로 튕겨 나갔다 — 즉 복원이 사실상 불가능한 상태였다.
+const RESTORE_BATCH_SIZE = 100;
+/** 레이트리밋(429) 배치 재시도 횟수와 대기 기준값 — 창이 1분이라 그 안에서 회복된다. */
+const RESTORE_MAX_RETRIES = 4;
+const RESTORE_RETRY_BASE_MS = 20_000;
 const RESTORE_HISTORY_LIMIT = 6;
 
 type BackupMeta = {
@@ -488,9 +494,24 @@ function DataBackupDesktop({ user }: Props) {
 
         let failed = false;
         for (const batch of chunkRows(rows, RESTORE_BATCH_SIZE)) {
-          const { error } = await db
-            .from(table)
-            .upsert(batch as any[]);
+          // /api/d1/mutate 는 사용자당 분당 100회로 제한된다. 복원은 배치를 연속으로
+          // 쏘기 때문에 큰 테이블에서 반드시 이 한도에 닿는다. 예전에는 그 429 를
+          // 일반 오류로 보고 테이블 복원을 통째로 포기했다 — 재시도하면 되는 상황인데도.
+          let error: { message?: string; details?: string } | null = null;
+          for (let attempt = 0; attempt < RESTORE_MAX_RETRIES; attempt += 1) {
+            ({ error } = await db.from(table).upsert(batch as any[]));
+            if (!error) break;
+
+            const message = String(error.message || error.details || '');
+            const isRateLimited = /429|rate.?limit|too many/i.test(message);
+            if (!isRateLimited) break;
+
+            const waitMs = RESTORE_RETRY_BASE_MS * (attempt + 1);
+            nextLogs.push(`${table}: 요청 한도 도달 — ${Math.round(waitMs / 1000)}초 후 재시도 (${attempt + 1}/${RESTORE_MAX_RETRIES})`);
+            latestLogs = [...nextLogs];
+            setRestoreLogs(latestLogs);
+            await new Promise((resolve) => setTimeout(resolve, waitMs));
+          }
 
           if (error) {
             failed = true;

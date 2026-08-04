@@ -9,13 +9,40 @@
  */
 import 'server-only';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
-import { FULL_BACKUP_TABLES, SIX_HOUR_BACKUP_TABLES } from '@/lib/backup-config';
+import { BACKUP_EXCLUDED_TABLES, SIX_HOUR_BACKUP_TABLES } from '@/lib/backup-config';
 import { uploadToR2, isR2ChatStorageEnabled } from '@/lib/object-storage';
 import { getD1Binding } from '@/lib/db';
 
 const R2_BUCKET = 'pchos-files';
 const PAGE_SIZE = 1000;
 const TABLE_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * 전체 백업 대상 테이블을 DB 에서 직접 열거한다.
+ *
+ * 예전에는 손으로 관리하는 목록(BACKUP_GROUPS)을 썼고, 그 결과 스키마 162개 중
+ * 52개만 백업되고 있었다. 새 테이블이 추가돼도 아무도 목록에 넣지 않았기 때문이다.
+ * 이제는 DB 에 있는 것이 기본 백업 대상이고, 빼려면 BACKUP_EXCLUDED_TABLES 에
+ * 명시해야 한다 — 누락이 조용히 생기지 않도록 방향을 뒤집었다.
+ */
+async function listBackupTables(
+  d1: NonNullable<Awaited<ReturnType<typeof getD1Binding>>>,
+): Promise<string[]> {
+  const result = await d1
+    .prepare(
+      `SELECT name FROM sqlite_master
+       WHERE type = 'table'
+         AND name NOT LIKE 'sqlite_%'
+         AND name NOT LIKE '_cf_%'
+       ORDER BY name`,
+    )
+    .all<{ name: string }>();
+
+  return (result.results ?? [])
+    .map((row) => String(row.name))
+    .filter((name) => TABLE_NAME_RE.test(name))
+    .filter((name) => !BACKUP_EXCLUDED_TABLES.has(name));
+}
 
 export type BackupType = '6h' | '24h';
 
@@ -122,7 +149,8 @@ export async function runBackup(type: BackupType): Promise<BackupResult> {
     return result;
   }
 
-  const tables = type === '24h' ? FULL_BACKUP_TABLES : SIX_HOUR_BACKUP_TABLES;
+  const tables =
+    type === '24h' ? await listBackupTables(d1) : [...SIX_HOUR_BACKUP_TABLES];
   const skipped: Array<{ table: string; error: string }> = [];
   const files: Array<{ table: string; key: string; rows: number; bytes: number }> = [];
   let totalRows = 0;
@@ -252,6 +280,37 @@ export async function runBackup(type: BackupType): Promise<BackupResult> {
       totalTables: 0,
       totalRows: 0,
       resultSummary: { ...result, skipped },
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      requestedByName: 'cron',
+    });
+    return result;
+  }
+
+  // 일부 테이블이 실패했으면 성공이 아니다.
+  //
+  // 예전에는 skipped 가 있어도 ok:true / status:'completed' 로 끝내서,
+  // 특정 테이블이 매일 실패해도 관리자 화면에는 계속 "완료"로 보였고
+  // cron 도 성공으로 보고해 아무 알림이 뜨지 않았다.
+  // 복구가 필요한 시점에야 그 테이블이 어느 백업에도 없다는 걸 알게 된다.
+  if (skipped.length > 0) {
+    const result: BackupResult = {
+      ok: false,
+      type,
+      path: manifestKey,
+      error: `${tables.length}개 중 ${skipped.length}개 테이블 백업 실패`,
+      hint: `실패 테이블: ${skipped.map((s) => s.table).join(', ').slice(0, 300)}`,
+      tables: files.length,
+      rows: totalRows,
+      bytes: totalBytes,
+    };
+    await recordBackupRun({
+      id: runId,
+      fileName: manifestKey,
+      status: 'failed',
+      totalTables: files.length,
+      totalRows,
+      resultSummary: { ...result, attemptedTables: tables.length, skipped },
       startedAt,
       finishedAt: new Date().toISOString(),
       requestedByName: 'cron',

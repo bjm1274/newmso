@@ -387,7 +387,18 @@ function AccessAuditLogDesktop({ user: _user }: Props) {
             </div>
           ) : filtered.length === 0 ? (
             <div className="p-8">
-              <EmptyState title="접근 로그가 없습니다" description="지정된 기간 및 필터 조건에 부합하는 접근 이력이 없습니다." compact />
+              {/*
+                access_logs 에 기록하는 코드가 저장소에 한 줄도 없다.
+                따라서 이 화면은 조건과 무관하게 항상 비어 있는데, 예전 문구는
+                "조건에 부합하는 접근 이력이 없습니다" 라고 해서
+                "아무도 접근하지 않았다" 로 읽혔다 — 감사 화면에서 가장 위험한 오독이다.
+                수집이 구현되기 전까지는 '미수집' 임을 명시한다.
+              */}
+              <EmptyState
+                title="접근 로그가 수집되고 있지 않습니다"
+                description="현재 시스템은 access_logs 에 접근 이력을 기록하지 않습니다. 이 화면이 비어 있는 것은 접근이 없었다는 뜻이 아닙니다. 접근 감사가 필요하면 수집 기능을 먼저 활성화해야 합니다."
+                compact
+              />
             </div>
           ) : (
             <ResponsiveTable<AccessLog>

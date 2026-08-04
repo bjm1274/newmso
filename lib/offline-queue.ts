@@ -36,6 +36,12 @@ const STORAGE_KEY = 'mso:offline-queue:v1';
 const STORAGE_KEY_PREFIX = 'mso:offline-queue:';
 const MAX_RETRY_COUNT = 5;
 const RETRY_BACKOFF_MS = 4000;
+/**
+ * 자동 flush 주기.
+ * 최대 백오프가 MAX_RETRY_COUNT * RETRY_BACKOFF_MS = 20초이므로,
+ * 그보다 넉넉한 간격이면 백오프가 풀린 항목을 놓치지 않으면서 유휴 부하도 낮다.
+ */
+const AUTO_FLUSH_INTERVAL_MS = 30_000;
 
 // ─────────────────────────────────────────────────────────────
 // 공개 타입
@@ -295,12 +301,32 @@ export class OfflineQueue {
       void flush();
     };
 
+    // 주기 재시도.
+    //
+    // 예전에는 트리거가 (1) 마운트 시 1회 (2) 'online' 이벤트 뿐이었다.
+    // 그런데 실패 항목은 RETRY_BACKOFF_MS 백오프로 이번 회차에서 건너뛰어지고,
+    // 이미 온라인이면 'online' 이벤트는 다시 오지 않는다.
+    // 결과적으로 재시도 대상이 **다음 오프라인→온라인 전환이 일어날 때까지
+    // 무기한 멈춰 있었다**. 사용자가 '다시 시도' 를 눌러 active 큐로 되돌린 항목도 같다.
+    // 백오프가 풀린 항목을 주기적으로 다시 집어 준다.
+    const timer = window.setInterval(() => {
+      void flush();
+    }, AUTO_FLUSH_INTERVAL_MS);
+
+    // 탭이 다시 활성화될 때도 한 번 시도한다 (백그라운드에서 타이머가 눌린 경우 대비).
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void flush();
+    };
+
     window.addEventListener('online', onOnline);
+    document.addEventListener('visibilitychange', onVisible);
     void flush();
 
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
       window.removeEventListener('online', onOnline);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }
 
