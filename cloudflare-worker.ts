@@ -64,7 +64,12 @@ const CRON_ROUTES_BY_SCHEDULE: Record<string, string[]> = {
   // 월 호출 ≈ 12*24*30 = 8.6k (Workers 10M 한도의 0.1% 미만).
   '*/5 * * * *': ['/api/cron/chat-push-dispatch'],
   '0 15 * * *': ['/api/cron/backup'],
-  '0 17 * * *': ['/api/cron/chat-retention'],
+  // KST 02:00 — 채팅 보존정리 + 전날 결근 자동 생성.
+  // 결근 생성은 원래 '30 15 * * *'(KST 00:30) 슬롯에 매핑돼 있었는데 wrangler [triggers] 에는
+  // 그 표현식이 없어서 **한 번도 실행되지 않았다**. 크론 트리거 수를 늘리지 않고
+  // 기존 슬롯에 얹는다 — 위 scheduled() 는 라우트를 순차 실행하며 개별 try/catch 로 격리한다.
+  // 전날분 처리이므로 자정 직후 대신 02:00 이어도 결과는 같고, 늦은 퇴근 기록이 정리된 뒤라 오히려 안전하다.
+  '0 17 * * *': ['/api/cron/chat-retention', '/api/cron/absent-auto-create'],
   '0 3 * * *': ['/api/cron/push-subscription-cleanup'],
   '0 0 * * *': [
     '/api/cron/unread-notification-repush',
@@ -80,8 +85,6 @@ const CRON_ROUTES_BY_SCHEDULE: Record<string, string[]> = {
     // (미래 발령은 등록 시 '대기' 로만 저장되므로 이 크론이 없으면 영원히 미반영으로 남는다.)
     '/api/cron/appointment-apply',
   ],
-  // KST 00:30 매일 — 전날 출근 미체크 직원 결근 자동 생성
-  '30 15 * * *': ['/api/cron/absent-auto-create'],
   // 구 /api/temp/resend · 일 1회 chat-push 슬롯 정리
   '0 4 * * *': [],
   // 레거시 wrangler 슬롯이 남아 있어도 no-op (배포 전 구 트리거 호환)

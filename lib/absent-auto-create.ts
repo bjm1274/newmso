@@ -14,7 +14,7 @@
  * 크론 호출: /api/cron/absent-auto-create (KST 00:30 매일)
  */
 
-import { db } from '@/lib/db-client';
+import { getD1Binding } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { syncAttendanceToAttendances, LEGACY_STATUS_TO_MODERN } from '@/lib/attendance-sync';
 import { getKoreanTodayString, formatKoreanDateKey } from '@/lib/seoul-time';
@@ -33,28 +33,35 @@ interface StaffMember {
 }
 
 /**
- * D1 쿼리 실행 헬퍼 — db.from().select() 대신 raw fetch 사용
+ * D1 바인딩을 직접 쓴다.
+ *
+ * 예전에는 `fetch('/api/d1/query')` 를 호출했는데, 이 모듈은 크론(Workers 런타임)에서
+ * 실행되므로 두 가지 이유로 반드시 실패했다.
+ *   1) 상대 경로 fetch — 서버에는 기준 origin 이 없어 요청 자체가 만들어지지 않는다.
+ *   2) /api/d1/query 는 raw SQL 페이로드를 받지 않는다 (테이블·조건 기반 API).
+ * 즉 이 크론은 트리거가 걸려 있었더라도 첫 조회에서 죽었다.
  */
 async function queryD1(sql: string, params: unknown[] = []): Promise<Record<string, unknown>[]> {
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[absent-auto-create] D1 binding not available');
   try {
-    const res = await fetch('/api/d1/query', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sql, params }),
-      credentials: 'same-origin',
-    });
-    const json = await res.json().catch(() => null) as
-      | { ok: true; data: Record<string, unknown>[] }
-      | { ok: false; error: string }
-      | null;
-    if (!json?.ok) {
-      throw new Error((json as { error: string })?.error || 'D1 query failed');
-    }
-    return (json as { data: Record<string, unknown>[] }).data || [];
+    const stmt = d1.prepare(sql);
+    const bound = params.length ? stmt.bind(...params) : stmt;
+    const res = await bound.all<Record<string, unknown>>();
+    return res.results ?? [];
   } catch (err) {
     logger.error('[absent-auto-create] D1 query failed:', err);
     throw err;
   }
+}
+
+/** 쓰기 문장 실행 (INSERT/UPDATE). 결과 메타는 쓰지 않는다. */
+async function execD1(sql: string, params: unknown[] = []): Promise<void> {
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[absent-auto-create] D1 binding not available');
+  const stmt = d1.prepare(sql);
+  const bound = params.length ? stmt.bind(...params) : stmt;
+  await bound.run();
 }
 
 /**
@@ -75,11 +82,11 @@ async function fetchStaffsWithoutYesterdayAttendance(yesterday: string): Promise
          WHERE a.date = ?
        )
        AND sm.id NOT IN (
-         SELECT DISTINCT ll.staff_id
-         FROM leave_ledger ll
-         WHERE (ll.status = '승인' OR ll.status = 'approved')
-           AND ll.start_date <= ?
-           AND ll.end_date >= ?
+         SELECT DISTINCT lr.staff_id
+         FROM leave_requests lr
+         WHERE (lr.status = '승인' OR lr.status = 'approved')
+           AND lr.start_date <= ?
+           AND lr.end_date >= ?
        )`,
     [yesterday, yesterday, yesterday],
   );
@@ -108,45 +115,24 @@ async function fetchUncheckedOutAttendanceRows(yesterday: string): Promise<Recor
  * ON CONFLICT(staff_id, date) DO NOTHING — 이미 존재하면 무시.
  */
 async function insertAbsentAttendance(staffId: string, date: string): Promise<void> {
-  const result = await db
-    .from('attendance')
-    .upsert(
-      {
-        staff_id: staffId,
-        date,
-        check_in: null,
-        check_out: null,
-        status: '결근',
-      },
-      { onConflict: 'staff_id,date' },
-    );
-
-  if (result instanceof Promise) {
-    await result;
-  }
+  await execD1(
+    `INSERT INTO attendance (id, staff_id, date, check_in, check_out, status)
+     VALUES (?, ?, ?, NULL, NULL, '결근')
+     ON CONFLICT(staff_id, date) DO NOTHING`,
+    [crypto.randomUUID(), staffId, date],
+  );
 }
 
 /**
  * attendances (복수) 테이블에 absent 행 생성.
  */
 async function insertAbsentAttendances(staffId: string, workDate: string): Promise<void> {
-  const result = await db
-    .from('attendances')
-    .upsert(
-      {
-        staff_id: staffId,
-        work_date: workDate,
-        check_in_time: null,
-        check_out_time: null,
-        status: 'absent',
-        work_hours_minutes: 0,
-      },
-      { onConflict: 'staff_id,work_date' },
-    );
-
-  if (result instanceof Promise) {
-    await result;
-  }
+  await execD1(
+    `INSERT INTO attendances (id, staff_id, work_date, check_in_time, check_out_time, status, work_hours_minutes)
+     VALUES (?, ?, ?, NULL, NULL, 'absent', 0)
+     ON CONFLICT(staff_id, work_date) DO NOTHING`,
+    [crypto.randomUUID(), staffId, workDate],
+  );
 }
 
 /**
@@ -197,38 +183,23 @@ async function updateUncheckedOutRow(
   modernStatus: string,
   workMinutes: number,
 ): Promise<void> {
-  // attendance(단수) 업데이트
-  const result = await db
-    .from('attendance')
-    .update({
-      check_out: null, // 퇴근 기록 없음 유지
-      status: legacyStatus,
-    })
-    .eq('staff_id', staffId)
-    .eq('date', date);
+  // attendance(단수) 업데이트 — 퇴근 기록 없음(NULL)은 그대로 두고 상태만 확정한다.
+  await execD1(
+    `UPDATE attendance SET check_out = NULL, status = ? WHERE staff_id = ? AND date = ?`,
+    [legacyStatus, staffId, date],
+  );
 
-  if (result instanceof Promise) {
-    await result;
-  }
-
-  // attendances(복수) upsert
-  const attResult = await db
-    .from('attendances')
-    .upsert(
-      {
-        staff_id: staffId,
-        work_date: date,
-        check_in_time: checkIn,
-        check_out_time: null,
-        status: modernStatus,
-        work_hours_minutes: workMinutes,
-      },
-      { onConflict: 'staff_id,work_date' },
-    );
-
-  if (attResult instanceof Promise) {
-    await attResult;
-  }
+  // attendances(복수) upsert — 이미 행이 있으면 상태·근무시간을 갱신한다.
+  await execD1(
+    `INSERT INTO attendances (id, staff_id, work_date, check_in_time, check_out_time, status, work_hours_minutes)
+     VALUES (?, ?, ?, ?, NULL, ?, ?)
+     ON CONFLICT(staff_id, work_date) DO UPDATE SET
+       check_in_time = excluded.check_in_time,
+       check_out_time = NULL,
+       status = excluded.status,
+       work_hours_minutes = excluded.work_hours_minutes`,
+    [crypto.randomUUID(), staffId, date, checkIn, modernStatus, workMinutes],
+  );
 }
 
 export interface AbsentAutoCreateResult {

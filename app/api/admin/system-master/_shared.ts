@@ -13,14 +13,43 @@ import {
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
 
+/**
+ * 운영 패널에 표시되는 크론 목록.
+ *
+ * ⚠ 이 목록은 wrangler.toml 의 [triggers] crons 와 cloudflare-worker.ts 의
+ *   CRON_ROUTES_BY_SCHEDULE 에 실제로 배선된 것만 담아야 한다.
+ *   예전에는 todo-reminders 를 '매시간' 이라고 표시했지만 어느 스케줄에도 매핑돼 있지 않아
+ *   관리자가 "돌고 있다"고 믿는 잡이 실제로는 한 번도 실행되지 않았다.
+ *   chat-push-dispatch 도 '매일 08:00' 으로 표시됐지만 실제로는 5분 주기다.
+ *   표기 시각은 KST 기준이며 wrangler 의 UTC 표현식을 환산한 값이다.
+ */
 export const OPERATION_CRONS = [
+  { path: '/api/cron/chat-push-dispatch', schedule: '5분마다', label: '채팅 푸시 큐 처리' },
   { path: '/api/cron/backup', schedule: '매일 00:00', label: '정기 전체 백업' },
   { path: '/api/cron/chat-retention', schedule: '매일 02:00', label: '채팅 보관정책 정리' },
-  { path: '/api/cron/push-subscription-cleanup', schedule: '매일 12:00', label: '푸시 구독 정리' },
-  { path: '/api/cron/chat-push-dispatch', schedule: '매일 08:00', label: '채팅 푸시 큐 백업 처리' },
+  { path: '/api/cron/absent-auto-create', schedule: '매일 02:00', label: '전날 결근 자동 생성' },
+  { path: '/api/cron/push-subscription-cleanup', schedule: '매일 12:00', label: '푸시 구독 정리 (+ 면허 만료·계약 만료 알림)' },
+  { path: '/api/cron/unread-notification-repush', schedule: '매일 09:00', label: '미열람 알림 재발송' },
   { path: '/api/cron/leave-notice-announcements', schedule: '매일 09:00', label: '연차 휴무 공지메시지 발송' },
   { path: '/api/cron/birthday-announcements', schedule: '매일 09:00', label: '생일 및 경조사 축하 공지 발송' },
-  { path: '/api/cron/todo-reminders', schedule: '매시간', label: '할일 리마인더 처리' },
+  { path: '/api/cron/annual-leave-accrual', schedule: '매일 09:00', label: '연차 자동 발생' },
+  { path: '/api/cron/annual-leave-promotion', schedule: '매일 09:00', label: '연차 사용 촉진' },
+  { path: '/api/cron/annual-leave-expiry', schedule: '매일 09:00', label: '연차 소멸 처리' },
+  { path: '/api/cron/substitute-holiday', schedule: '매일 09:00', label: '대체휴무 부여' },
+  { path: '/api/cron/payroll-notice', schedule: '매일 09:00', label: '급여명세 발송 안내' },
+  { path: '/api/cron/appointment-apply', schedule: '매일 09:00', label: '예약 인사발령 반영' },
+] as const;
+
+/**
+ * 라우트는 있으나 어느 스케줄에도 배선되지 않은 잡.
+ * 필요하면 수동 호출(Bearer CRON_SECRET)로만 실행된다 — 자동 실행되지 않는다.
+ * 자동화하려면 wrangler [triggers] 와 CRON_ROUTES_BY_SCHEDULE 양쪽에 함께 추가해야 한다.
+ */
+export const UNSCHEDULED_CRONS = [
+  { path: '/api/cron/todo-reminders', label: '할일 리마인더 처리' },
+  { path: '/api/cron/auto-report', label: '자동 보고서 생성' },
+  { path: '/api/cron/inapp-notifications', label: '인앱 알림 보강' },
+  { path: '/api/cron/license-expiry-check', label: '면허 만료 점검 (push-subscription-cleanup 에 통합 실행됨)' },
 ] as const;
 
 export type PushSubscriptionRow = {

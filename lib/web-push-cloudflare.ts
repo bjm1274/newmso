@@ -183,9 +183,20 @@ async function encryptPayload(
   return { body, serverPublicKey: serverPublicKeyRaw, salt };
 }
 
+/**
+ * Web Push TTL(초) 기본값.
+ *
+ * 예전 값은 60초였다. 기기가 1분만 오프라인이어도 푸시 서비스가 메시지를 버리고,
+ * 재알림은 시도 횟수 제한이 있어 결국 영구 미도달로 끝났다.
+ * 결재·공지처럼 늦게라도 도착해야 하는 알림에는 맞지 않는 값이다.
+ * 12시간이면 하룻밤 기기를 꺼둬도 켜는 즉시 전달된다.
+ */
+const DEFAULT_WEB_PUSH_TTL_SECONDS = 12 * 60 * 60;
+
 export async function sendWebPushNotification(
   subscription: { endpoint: string; p256dh: string; auth: string },
   payload: string,
+  options: { ttlSeconds?: number } = {},
 ): Promise<Response> {
   const clientPublicKey = b64urlToBytes(subscription.p256dh);
   const authSecret = b64urlToBytes(subscription.auth);
@@ -205,7 +216,7 @@ export async function sendWebPushNotification(
       'Content-Encoding': 'aes128gcm',
       // Content-Length 는 fetch forbidden header — 런타임이 본문 길이로 자동 설정하므로 명시 불필요.
       Authorization: `vapid t=${jwt}, k=${bytesToB64url(publicKeyBytes)}`,
-      TTL: '60',
+      TTL: String(Math.max(0, Math.floor(options.ttlSeconds ?? DEFAULT_WEB_PUSH_TTL_SECONDS))),
       Urgency: 'high' },
     body: buf(body) });
 

@@ -68,6 +68,32 @@ function isRepushEligible(row: NotificationRow): boolean {
   return false;
 }
 
+/** D1 행을 NotificationRow 로 정규화한다. metadata 는 TEXT 로 저장되므로 JSON.parse 한다. */
+function toNotificationRow(row: Record<string, unknown>): NotificationRow {
+  let parsedMetadata: Record<string, unknown> | null = null;
+  const raw = row.metadata;
+  if (typeof raw === 'string' && raw.length > 0) {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        parsedMetadata = parsed as Record<string, unknown>;
+      }
+    } catch {
+      parsedMetadata = null;
+    }
+  } else if (raw && typeof raw === 'object') {
+    parsedMetadata = raw as Record<string, unknown>;
+  }
+  return {
+    id: String(row.id ?? ''),
+    user_id: String(row.user_id ?? ''),
+    type: (row.type as string | null) ?? null,
+    title: (row.title as string | null) ?? null,
+    body: (row.body as string | null) ?? null,
+    metadata: parsedMetadata,
+    created_at: (row.created_at as string | null) ?? null } satisfies NotificationRow;
+}
+
 function isChatNotification(row: NotificationRow): boolean {
   const typeCandidates = getNormalizedTypeCandidates(row);
   if (typeCandidates.some((value) => CHAT_NOTIFICATION_TYPES.has(value))) return true;
@@ -174,42 +200,54 @@ export async function processUnreadNotificationRepushServer(
     : baseConditions;
 
   const { asc } = await import('drizzle-orm');
-  const rawRows = await db
-    .select({
-      id: notificationsTable.id,
-      user_id: notificationsTable.user_id,
-      type: notificationsTable.type,
-      title: notificationsTable.title,
-      body: notificationsTable.body,
-      metadata: notificationsTable.metadata,
-      created_at: notificationsTable.created_at })
-    .from(notificationsTable)
-    .where(and(...(conditions as Parameters<typeof and>)))
-    .orderBy(asc(notificationsTable.created_at))
-    .limit(limit);
 
-  // D1 metadata는 TEXT → JSON.parse
-  const notifications: NotificationRow[] = rawRows.map((row) => {
-    let parsedMetadata: Record<string, unknown> | null = null;
-    if (typeof row.metadata === 'string' && row.metadata.length > 0) {
-      try {
-        const parsed = JSON.parse(row.metadata) as unknown;
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          parsedMetadata = parsed as Record<string, unknown>;
-        }
-      } catch { parsedMetadata = null; }
-    } else if (row.metadata && typeof row.metadata === 'object') {
-      parsedMetadata = row.metadata as Record<string, unknown>;
+  // 예전에는 여기서 곧장 .limit(limit) 을 걸고, 아래 루프에서 채팅/비대상 타입을 걸러 냈다.
+  // 그래서 가장 오래된 미열람 알림 50건이 전부 일반 채팅이면 적격 항목이 0건이 되고,
+  // 다음 날에도 같은 50건이 창을 점유해 결재·공지 재알림이 영원히 굶었다.
+  //
+  // 적격 여부가 metadata(JSON) 내용에 달려 있어 SQL 로 그대로 옮길 수 없으므로,
+  // 적격 항목이 limit 개 모일 때까지 페이지 단위로 훑는다. 무한 스캔을 막기 위해
+  // 총 조회량에 상한을 둔다.
+  const PAGE_SIZE = Math.max(limit, 50);
+  const MAX_SCAN_ROWS = Math.max(limit * 20, 1000);
+
+  const rawRows: Array<Record<string, unknown>> = [];
+  let offset = 0;
+  let scannedRows = 0;
+
+  while (rawRows.length < limit && scannedRows < MAX_SCAN_ROWS) {
+    const page = await db
+      .select({
+        id: notificationsTable.id,
+        user_id: notificationsTable.user_id,
+        type: notificationsTable.type,
+        title: notificationsTable.title,
+        body: notificationsTable.body,
+        metadata: notificationsTable.metadata,
+        created_at: notificationsTable.created_at })
+      .from(notificationsTable)
+      .where(and(...(conditions as Parameters<typeof and>)))
+      .orderBy(asc(notificationsTable.created_at))
+      .limit(PAGE_SIZE)
+      .offset(offset);
+
+    if (page.length === 0) break;
+    scannedRows += page.length;
+    offset += page.length;
+
+    for (const row of page) {
+      if (rawRows.length >= limit) break;
+      // 아래 루프와 같은 판정을 여기서 미리 적용해, limit 을 '적격 항목' 기준으로 채운다.
+      const candidate = toNotificationRow(row);
+      if (isChatNotification(candidate)) continue;
+      if (!isRepushEligible(candidate)) continue;
+      rawRows.push(row);
     }
-    return {
-      id: String(row.id ?? ''),
-      user_id: String(row.user_id ?? ''),
-      type: row.type ?? null,
-      title: row.title ?? null,
-      body: row.body ?? null,
-      metadata: parsedMetadata,
-      created_at: row.created_at ?? null } satisfies NotificationRow;
-  });
+
+    if (page.length < PAGE_SIZE) break;
+  }
+
+  const notifications: NotificationRow[] = rawRows.map(toNotificationRow);
 
   if (notifications.length === 0) {
     return { ok: true, scanned: 0, eligible: 0, sent: 0, failed: 0, skipped: 0, pushDisabled: false, errors: [] };
