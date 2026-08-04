@@ -306,7 +306,7 @@ export default function LicenseCEReviewModal({ onClose, onChanged, staffs }: Pro
                   <div className="mt-2 rounded-[var(--radius-md)] border border-[var(--border)] overflow-hidden bg-[var(--muted)]">
                     {/* 이미지면 미리보기, PDF면 iframe */}
                     {/\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(selected.file_url) ? (
-                      // eslint-disable-next-line @next/next/no-img-element
+                       
                       <img
                         src={selected.file_url}
                         alt="이수증 미리보기"

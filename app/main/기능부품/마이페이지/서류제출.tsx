@@ -107,7 +107,7 @@ export default function MyDocuments(props: MyDocumentsProps) {
             const filtered = prev.filter((contract) => String(contract.id) !== String(next.id));
             return [next, ...filtered];
         });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+         
     }, [latestContractId, latestContractStatus, latestContractSignedAt, latestContractRequestedAt]);
 
     useEffect(() => {

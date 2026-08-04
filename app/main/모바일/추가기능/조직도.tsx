@@ -1,5 +1,5 @@
 'use client';
-/* eslint-disable react-hooks/rules-of-hooks */
+ 
 
 /**
  * 조직도 — 부서 트리 + 카드 + 검색.

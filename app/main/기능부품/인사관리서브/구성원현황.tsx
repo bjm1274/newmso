@@ -472,7 +472,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     const [sh, sm] = start.split(':').map(Number);
     const [eh, em] = end.split(':').map(Number);
     if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return 0;
-    let sMins = sh * 60 + sm;
+    const sMins = sh * 60 + sm;
     let eMins = eh * 60 + em;
     if (eMins <= sMins) {
       eMins += 24 * 60; // Overnight
@@ -543,7 +543,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
               const [bsh, bsm] = primaryShift.break_start_time.split(':').map(Number);
               const [beh, bem] = primaryShift.break_end_time.split(':').map(Number);
               if (!isNaN(bsh) && !isNaN(beh)) {
-                let bdiff = (beh * 60 + bem - (bsh * 60 + bsm)) / 60;
+                const bdiff = (beh * 60 + bem - (bsh * 60 + bsm)) / 60;
                 if (bdiff > 0) breakDiff = bdiff;
               }
             }
@@ -564,7 +564,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           const [bsh, bsm] = primaryShift.break_start_time.split(':').map(Number);
           const [beh, bem] = primaryShift.break_end_time.split(':').map(Number);
           if (!isNaN(bsh) && !isNaN(beh)) {
-            let bdiff = (beh * 60 + bem - (bsh * 60 + bsm)) / 60;
+            const bdiff = (beh * 60 + bem - (bsh * 60 + bsm)) / 60;
             if (bdiff > 0) breakDiff = bdiff;
           }
         }
@@ -685,7 +685,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
   const 선택근무형태IDs = useMemo(
     () => getStaffFormShiftIds(신규직원),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     [신규직원.근무형태ID, 신규직원.근무형태IDs],
   );
   const 추가가능근무형태목록 = useMemo(
@@ -693,7 +693,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       getVisibleShiftOptions(신규직원.사업체).filter(
         (shift: StaffMember) => !선택근무형태IDs.includes(String(shift.id)),
       ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     [신규직원.사업체, 선택근무형태IDs, 근무형태목록],
   );
 
@@ -1068,7 +1068,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         근무형태ID: filteredIds[0] || '',
         근무형태IDs: filteredIds }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [신규직원.사업체, 선택근무형태IDs.join('|'), 근무형태목록]);
 
   useEffect(() => {
@@ -2038,7 +2038,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           )}
         </div>
       ) },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   ], [근무형태목록, licensesByStaff, onOpenDocumentRepoForStaff]);
 
   return (

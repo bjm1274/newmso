@@ -477,7 +477,7 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
 
     const { data } = await withMissingColumnsFallback<BoardPostRow[]>(
       async (omittedColumns): Promise<QueryResult<BoardPostRow[]>> => {
-        let query = db
+        const query = db
           .from('board_posts')
           .select(buildSelectColumns(listRequiredColumns, BOARD_POST_OPTIONAL_COLUMNS, omittedColumns))
           .in('board_type', boardTypeVariants);

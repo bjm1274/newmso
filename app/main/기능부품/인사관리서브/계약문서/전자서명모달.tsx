@@ -224,7 +224,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
         // JM2: contract/user 객체를 통째로 deps에 두면 상위에서 매 렌더마다 새 참조가
         // 들어올 때마다 fetchTemplateAndCompany가 재호출되어 무한 fetch → setState →
         // 부모 리렌더 루프의 원인이 된다. 실제 fetch에 영향을 주는 primitive만 deps에 둔다.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+         
     }, [
         contract?.id,
         contract?.shift_id,

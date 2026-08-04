@@ -71,7 +71,7 @@ export function useApproverLine(staffId: string | null, company: string): UseApp
       cancelled = true;
     };
     // approverManual은 의도적으로 의존성 제외 — manual 토글로 재fetch하면 안 됨
-  }, [staffId, company]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [staffId, company]);  
 
   const applyPick = useCallback(
     (next: ApproverPick[]) => {

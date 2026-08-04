@@ -130,7 +130,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
       const staffIds = Array.from(
         new Set(rawRows.map((r) => String(r.staff_id || '')).filter(Boolean)),
       );
-      let staffLookup: Map<string, { name: string | null; company: string | null }> = new Map();
+      const staffLookup: Map<string, { name: string | null; company: string | null }> = new Map();
       if (staffIds.length > 0) {
         const { data: staffData } = await d1
           .from('staff_members')

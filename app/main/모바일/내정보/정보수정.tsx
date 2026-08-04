@@ -309,7 +309,7 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
         >
           <div style={{ position: 'relative', width: 80, height: 80 }}>
             {photoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
+               
               <img
                 src={photoUrl}
                 alt="프로필"

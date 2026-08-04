@@ -120,7 +120,7 @@ export default function AttendanceForms({
       delegateName: delegate?.name || '',
       delegateDepartment: String(delegate?.department || delegate?.team || '').trim(),
       delegatePosition: String(delegate?.position || '').trim() });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [formType]);
 
   const handleQueryOvertime = async () => {

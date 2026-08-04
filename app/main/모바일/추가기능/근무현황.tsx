@@ -1,5 +1,5 @@
 'use client';
-/* eslint-disable react-hooks/rules-of-hooks */
+ 
 
 /**
  * 근무현황 — 실시간 상태판.

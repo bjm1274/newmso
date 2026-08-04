@@ -345,7 +345,7 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     return () => {
       window.removeEventListener('erp-attendance-updated', handleAttendanceUpdated as EventListener);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [effectiveUserId]);
 
   // NOTE: 별도의 fetchTodayLog 호출 effect는 제거됨 — 위 initCommuteData effect가

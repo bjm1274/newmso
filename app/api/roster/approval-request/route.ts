@@ -481,7 +481,7 @@ export async function POST(request: Request) {
     }
 
     let requestId = '';
-    let storage: 'roster_approval_requests' | 'approvals' = 'approvals';
+    const storage: 'roster_approval_requests' | 'approvals' = 'approvals';
 
     try {
       requestId = await insertLegacyApprovalRequest({

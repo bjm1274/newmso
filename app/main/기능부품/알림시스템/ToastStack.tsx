@@ -11,7 +11,7 @@ export type ToastItem = {
   type: string;
   senderName?: string;
   createdAt: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- notification metadata is heterogeneous
+   
   data?: any;
   exiting?: boolean;
 };

@@ -135,7 +135,7 @@ export function useIOData(userCompany?: string): IOWorkcenterData & { refresh: (
           )
           .order('created_at', { ascending: false })
           .limit(50);
-        let suppliersQ = db
+        const suppliersQ = db
           .from('suppliers')
           .select('id, name, category, contact_name, phone')
           .order('name')

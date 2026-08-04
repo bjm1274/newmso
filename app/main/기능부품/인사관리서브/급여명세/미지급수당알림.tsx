@@ -28,7 +28,7 @@ function calculateNightHours(checkInStr: string | null, checkOutStr: string | nu
   if (checkOut <= checkIn) return 0;
 
   let nightMinutes = 0;
-  let current = new Date(checkIn.getTime());
+  const current = new Date(checkIn.getTime());
   while (current < checkOut) {
     const hour = current.getHours();
     if (hour >= 22 || hour < 6) {

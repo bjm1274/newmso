@@ -275,7 +275,7 @@ export default function LicenseTracking({ staffs, selectedCo }: Record<string, u
           )}
         </div>
       ) },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   ], []);
 
   const handleSendNotification = async (item: LicenseItem) => {

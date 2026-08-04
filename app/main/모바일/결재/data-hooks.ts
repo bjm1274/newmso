@@ -116,7 +116,7 @@ export function useApprovalList(staffId: string | null, company?: string | null)
     try {
       const { data, error: queryError } = await withMissingColumnsFallback(
         (omittedColumns) => {
-          let q = db
+          const q = db
             .from('approvals')
             .select(buildApprovalSelect(omittedColumns))
             .order('created_at', { ascending: false })

@@ -86,7 +86,7 @@ export function useSuppliesForm({ setExtraData, initialItems, initialNote, initi
         .map((item) => item.dept)
         .find(Boolean) || ''
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []); // 초기값 고정 — 이후 변경은 setRequesterDepartment로
 
   const [requesterDepartment, setRequesterDepartment] = useState<string>(initialDepartment);

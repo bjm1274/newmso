@@ -245,7 +245,7 @@ export default function JobCategoryTrainingMatrix({ staffs, selectedCo }: Props)
     } finally {
       setLoading(false);
     }
-  }, [activeStaffIds.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeStaffIds.join(',')]);  
 
   useEffect(() => {
     void loadMatrix();
