@@ -14,6 +14,8 @@
  */
 import { execSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
+import { d1Query as sharedD1Query, extractJson } from './_lib/d1.mjs';
+import { kstToday } from './_lib/kst.mjs';
 import { writeFileSync, unlinkSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -37,15 +39,6 @@ if (!process.argv.includes('--dry-run') && !process.argv.includes('--yes')) {
 const NOTICE_ROOM_ID = '00000000-0000-0000-0000-000000000000';
 const WORK = mkdtempSync(join(tmpdir(), 'bday-'));
 
-function kstToday() {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
-}
-
 const TODAY = dateArg ? dateArg.split('=')[1] : kstToday();
 if (!/^\d{4}-\d{2}-\d{2}$/.test(TODAY)) {
   console.error('Invalid --date=YYYY-MM-DD');
@@ -56,37 +49,10 @@ const kstMonth = Number(TODAY.slice(5, 7));
 const kstDay = Number(TODAY.slice(8, 10));
 const nowIso = `${TODAY}T00:00:00.000Z`;
 
-function extractJson(out) {
-  const start = out.indexOf('[');
-  const startObj = out.indexOf('{');
-  let jsonStr = out;
-  if (start >= 0 && (startObj < 0 || start <= startObj)) jsonStr = out.slice(start);
-  else if (startObj >= 0) jsonStr = out.slice(startObj);
-  return JSON.parse(jsonStr);
-}
-
+// 셸을 거치지 않는 공통 헬퍼를 쓴다 — 예전 방식은 SQL 의 `%VAR%` 가 cmd.exe 에서
+// 환경변수로 치환돼 조건이 조용히 바뀌었다. 자세한 내용은 scripts/_lib/d1.mjs 참고.
 function d1Query(commandSql) {
-  const escaped = commandSql.replace(/"/g, '\\"');
-  const cmd = `npx wrangler d1 execute ${DB} --remote --json --command "${escaped}"`;
-  const out = execSync(cmd, {
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024,
-    cwd: process.cwd(),
-    shell: true,
-  });
-  const parsed = extractJson(out);
-  if (Array.isArray(parsed)) {
-    for (const block of parsed) {
-      const rows = block?.results;
-      if (Array.isArray(rows) && rows.length > 0) {
-        const k = Object.keys(rows[0] || {});
-        if (!k.includes('Total queries executed')) return rows;
-      }
-      if (Array.isArray(rows)) return rows;
-    }
-    return parsed[0]?.results ?? [];
-  }
-  return parsed?.results ?? [];
+  return sharedD1Query(commandSql, { db: DB });
 }
 
 function d1File(sql) {

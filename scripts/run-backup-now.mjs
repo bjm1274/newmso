@@ -11,19 +11,16 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { applyEnvLocal } from './_lib/env.mjs';
+import { d1Query } from './_lib/d1.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 process.chdir(root);
 
-// load .env.local
-const envPath = path.join(root, '.env.local');
-if (fs.existsSync(envPath)) {
-  for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
-    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
-    if (!m || process.env[m[1]]) continue;
-    process.env[m[1]] = m[2].replace(/^['"]|['"]$/g, '');
-  }
-}
+// .env.local 로드 — 파서는 scripts/_lib/env.mjs 하나로 통일했다.
+// 예전 인라인 정규식은 키를 대문자로만 받고 값의 따옴표를 앞뒤에서 잘라내,
+// 값 안에 따옴표가 든 자격증명이 조용히 망가질 수 있었다.
+applyEnvLocal(root);
 
 const FULL_BACKUP_TABLES = [
   'companies', 'staff_members', 'staff_transfer_history', 'employment_contracts',
@@ -44,29 +41,10 @@ const DB = 'pchos-d1-v2';
 const R2_BUCKET = 'pchos-files';
 const PAGE = 500;
 
+// 셸을 거치지 않는 공통 헬퍼를 쓴다 — 예전 방식은 SQL 의 `%VAR%` 가 cmd.exe 에서
+// 환경변수로 치환돼 조건이 조용히 바뀌었다. 자세한 내용은 scripts/_lib/d1.mjs 참고.
 function d1Json(sql) {
-  const escaped = sql.replace(/"/g, '\\"');
-  const cmd = `npx wrangler d1 execute ${DB} --remote --json --command "${escaped}"`;
-  const out = execSync(cmd, {
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024,
-    cwd: root,
-    shell: true,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-  const start = out.indexOf('[');
-  const startObj = out.indexOf('{');
-  let jsonStr = out;
-  if (start >= 0 && (startObj < 0 || start <= startObj)) jsonStr = out.slice(start);
-  else if (startObj >= 0) jsonStr = out.slice(startObj);
-  const parsed = JSON.parse(jsonStr);
-  if (Array.isArray(parsed)) {
-    for (const block of parsed) {
-      if (Array.isArray(block?.results)) return block.results;
-    }
-    return [];
-  }
-  return parsed?.results ?? [];
+  return d1Query(sql, { db: DB, cwd: root });
 }
 
 function amzDate(d = new Date()) {

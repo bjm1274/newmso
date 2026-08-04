@@ -13,6 +13,8 @@ import { writeFileSync, unlinkSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { d1Query as sharedD1Query, extractJson } from './_lib/d1.mjs';
+import { kstToday } from './_lib/kst.mjs';
 
 const args = process.argv.slice(2);
 const DRY = args.includes('--dry-run');
@@ -32,49 +34,13 @@ if (!process.argv.includes('--dry-run') && !process.argv.includes('--yes')) {
 }
 const WORK = mkdtempSync(join(tmpdir(), 'leave-accrual-'));
 
-function kstToday() {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
-}
-
 const TODAY = dateArg ? dateArg.split('=')[1] : kstToday();
 const YEAR = Number(TODAY.slice(0, 4));
 
-function extractJson(out) {
-  const start = out.indexOf('[');
-  const startObj = out.indexOf('{');
-  let jsonStr = out;
-  if (start >= 0 && (startObj < 0 || start <= startObj)) jsonStr = out.slice(start);
-  else if (startObj >= 0) jsonStr = out.slice(startObj);
-  return JSON.parse(jsonStr);
-}
-
+// 셸을 거치지 않는 공통 헬퍼를 쓴다 — 예전 방식은 SQL 의 `%VAR%` 가 cmd.exe 에서
+// 환경변수로 치환돼 조건이 조용히 바뀌었다. 자세한 내용은 scripts/_lib/d1.mjs 참고.
 function d1Query(commandSql) {
-  const escaped = commandSql.replace(/"/g, '\\"');
-  const cmd = `npx wrangler d1 execute ${DB} --remote --json --command "${escaped}"`;
-  const out = execSync(cmd, {
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024,
-    cwd: process.cwd(),
-    shell: true,
-  });
-  const parsed = extractJson(out);
-  if (Array.isArray(parsed)) {
-    for (const block of parsed) {
-      const rows = block?.results;
-      if (Array.isArray(rows) && rows.length > 0) {
-        const k = Object.keys(rows[0] || {});
-        if (!k.includes('Total queries executed')) return rows;
-      }
-      if (Array.isArray(rows)) return rows;
-    }
-    return parsed[0]?.results ?? [];
-  }
-  return parsed?.results ?? [];
+  return sharedD1Query(commandSql, { db: DB });
 }
 
 function d1File(sql) {
@@ -290,9 +256,12 @@ for (let i = 0; i < inserts.length; i += batchSize) {
 }
 
 // affected staff balance recompute via rebalance script
+// 하위 스크립트도 같은 실행 게이트를 갖고 있다. 부모가 통과한 모드를 그대로 넘겨주지 않으면
+// 자식이 게이트에 걸려 exit 1 로 죽고, 정상 운영 경로(--yes)가 항상 실패한다.
 console.log('[accrual-d1] rebalance leave_balances…');
+const rebalanceGateFlag = DRY ? '--dry-run' : '--yes';
 try {
-  execSync('node scripts/rebalance-leave-balances.mjs --active-only', {
+  execSync(`node scripts/rebalance-leave-balances.mjs --active-only ${rebalanceGateFlag}`, {
     encoding: 'utf8',
     cwd: process.cwd(),
     stdio: 'inherit',

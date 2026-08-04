@@ -1,6 +1,14 @@
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { refuseArchivedScript } from './_archived-guard.mjs';
+
+refuseArchivedScript({
+  name: 'restore-d1-safe.mjs',
+  what: '덤프에서 위험 구문을 걸러낸 뒤 D1 에 복원한다',
+  risk: '대상 DB 의 기존 데이터와 충돌하거나 덮어쓴다',
+  insteadUse: '관리자 화면의 복원 기능 또는 scripts/run-backup-now.mjs 로 받은 최신 백업을 사용하세요.',
+});
 
 delete process.env.CLOUDFLARE_API_TOKEN;
 

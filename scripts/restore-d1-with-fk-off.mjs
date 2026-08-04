@@ -1,6 +1,14 @@
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
+import { refuseArchivedScript } from './_archived-guard.mjs';
+
+refuseArchivedScript({
+  name: 'restore-d1-with-fk-off.mjs',
+  what: '외래키 검사를 끄고 덤프를 D1 에 복원한다',
+  risk: '무결성 검사를 끈 채로 쓰므로 깨진 참조가 그대로 들어간다',
+  insteadUse: '관리자 화면의 복원 기능 또는 scripts/run-backup-now.mjs 로 받은 최신 백업을 사용하세요.',
+});
 
 delete process.env.CLOUDFLARE_API_TOKEN;
 
@@ -13,7 +21,7 @@ function runWrangler(cmd) {
 }
 
 const dumpPath = path.join('backups', 'pchos-d1-dump.sql');
-let dumpSql = fs.readFileSync(dumpPath, 'utf-8');
+const dumpSql = fs.readFileSync(dumpPath, 'utf-8');
 
 // Prepend PRAGMA foreign_keys = OFF; and PRAGMA defer_foreign_keys = TRUE;
 const modifiedSql = `PRAGMA foreign_keys = OFF;\nPRAGMA defer_foreign_keys = TRUE;\n` + dumpSql;

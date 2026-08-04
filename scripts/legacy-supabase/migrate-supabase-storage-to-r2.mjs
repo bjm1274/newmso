@@ -57,7 +57,9 @@ import { createClient } from '@supabase/supabase-js';
 // 상수
 // ---------------------------------------------------------------------------
 const DEFAULT_R2_BUCKET = 'pchos-files';
-const D1_DB_NAME = 'pchos-d1';
+// 운영 DB 이름. 구 DB 'pchos-d1' 을 가리키던 동안에는 실행해도 아무 데이터에 닿지 않으면서
+// "성공"으로 끝났다. wrangler.toml 의 database_name 과 일치해야 한다.
+const D1_DB_NAME = 'pchos-d1-v2';
 
 /**
  * Supabase 버킷 → R2 prefix 매핑

@@ -11,6 +11,7 @@ import { execSync } from 'node:child_process';
 import { writeFileSync, unlinkSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { d1Query as sharedD1Query, extractJson } from './_lib/d1.mjs';
 
 const args = process.argv.slice(2);
 const yearArg = args.find((a) => a.startsWith('--year='));
@@ -35,43 +36,13 @@ if (!process.argv.includes('--dry-run') && !process.argv.includes('--yes')) {
 }
 const WORK = mkdtempSync(join(tmpdir(), 'leave-rebalance-'));
 
-function extractJson(out) {
-  const start = out.indexOf('[');
-  const startObj = out.indexOf('{');
-  let jsonStr = out;
-  if (start >= 0 && (startObj < 0 || start <= startObj)) {
-    jsonStr = out.slice(start);
-  } else if (startObj >= 0) {
-    jsonStr = out.slice(startObj);
-  }
-  return JSON.parse(jsonStr);
-}
-
-/** SELECT 결과는 --command 로 받아야 행 데이터가 옴 (--file 은 요약만 반환) */
+/**
+ * SELECT 결과는 --command 로 받아야 행 데이터가 옴 (--file 은 요약만 반환).
+ * 공통 헬퍼는 셸을 거치지 않는다 — 예전 방식은 SQL 의 `%VAR%` 가 cmd.exe 에서
+ * 환경변수로 치환돼 조건이 조용히 바뀌었다. 자세한 내용은 scripts/_lib/d1.mjs 참고.
+ */
 function d1Query(commandSql) {
-  // ASCII-only SQL preferred; escape double-quotes for shell
-  const escaped = commandSql.replace(/"/g, '\\"');
-  const cmd = `npx wrangler d1 execute ${DB} --remote --json --command "${escaped}"`;
-  const out = execSync(cmd, {
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024,
-    cwd: process.cwd(),
-    shell: true,
-  });
-  const parsed = extractJson(out);
-  if (Array.isArray(parsed)) {
-    // multi-statement: return first result set that has row objects (not summary)
-    for (const block of parsed) {
-      const rows = block?.results;
-      if (Array.isArray(rows) && rows.length > 0) {
-        const k = Object.keys(rows[0] || {});
-        if (!k.includes('Total queries executed')) return rows;
-      }
-      if (Array.isArray(rows)) return rows;
-    }
-    return parsed[0]?.results ?? [];
-  }
-  return parsed?.results ?? [];
+  return sharedD1Query(commandSql, { db: DB });
 }
 
 function d1File(sql) {

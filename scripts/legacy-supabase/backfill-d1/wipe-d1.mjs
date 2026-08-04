@@ -8,6 +8,14 @@
 // ============================================================
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+import { refuseArchivedScript } from '../../_archived-guard.mjs';
+
+refuseArchivedScript({
+  name: 'legacy-supabase/backfill-d1/wipe-d1.mjs',
+  what: '백필 대상 125개 테이블의 D1 데이터를 전부 DELETE 한다',
+  risk: '대상 DB 의 해당 테이블이 전부 비워진다',
+  insteadUse: 'Supabase 백필은 2026 D1 컷오버로 종료되었습니다. 이 절차는 더 이상 쓰이지 않습니다.',
+});
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TABLE_DEFS } from './tables-full.mjs';

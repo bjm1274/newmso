@@ -50,7 +50,9 @@ function readEnv(name, fallback = '') {
 
 const SUPABASE_HOST = 'supabase.co';
 const R2_BASE = (readEnv('NEXT_PUBLIC_R2_PUBLIC_BASE_URL') || 'https://r2.pchos.kr').replace(/\/+$/, '');
-const D1_DB_NAME = 'pchos-d1';
+// 운영 DB 이름. 구 DB 'pchos-d1' 을 가리키던 동안에는 실행해도 아무 데이터에 닿지 않으면서
+// "성공"으로 끝났다. wrangler.toml 의 database_name 과 일치해야 한다.
+const D1_DB_NAME = 'pchos-d1-v2';
 const ACCOUNT_ID = readEnv('CLOUDFLARE_ACCOUNT_ID') || process.env.CLOUDFLARE_ACCOUNT_ID || '';
 
 const dryRun = !process.argv.includes('--remote');

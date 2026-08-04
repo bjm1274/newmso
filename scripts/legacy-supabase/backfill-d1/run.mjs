@@ -29,7 +29,7 @@
 //   --resume    .backfill-progress.json의 완료 테이블 건너뜀
 //   --only=T    콤마 구분 테이블명만 처리
 //   --output=D  SQL 파일 출력 디렉터리 (기본: ./tmp/backfill)
-//   --db=NAME   D1 DB 이름 (기본: pchos-d1)
+//   --db=NAME   D1 DB 이름 (필수 — 기본값 없음. 운영은 pchos-d1-v2)
 //
 // 출력:
 //   각 테이블 성공/실패/행수를 실시간 출력.
@@ -63,7 +63,9 @@ function parseArgs(argv) {
     resume: false,
     only: null,       // string[] | null
     outputDir: join(__dir, '../../tmp/backfill'),
-    dbName: 'pchos-d1',
+    // 기본값 없음 — 예전 기본값이 구 DB 'pchos-d1' 이라 --db 를 빼먹으면
+    // 엉뚱한 DB 에 백필하면서도 조용히 성공했다. 대상은 항상 명시하게 한다.
+    dbName: null,
   };
 
   for (const arg of argv.slice(2)) {
@@ -85,6 +87,13 @@ function parseArgs(argv) {
     args.dryRun = true;
   }
 
+  // 실제로 D1 에 쓰는 모드라면 대상 DB 를 반드시 명시해야 한다.
+  // SQL 을 다 만들어 놓고 마지막에 죽지 않도록 여기서 먼저 막는다.
+  if (!args.dryRun && !args.dbName) {
+    console.error('오류: --db=NAME 으로 대상 D1 데이터베이스를 명시해야 합니다. (운영: pchos-d1-v2)');
+    process.exit(1);
+  }
+
   return args;
 }
 
@@ -102,7 +111,7 @@ D1 전체 백필 오케스트레이터 (125개 테이블)
   --resume         이미 성공한 테이블 건너뜀
   --only=T1,T2     특정 테이블만 처리 (콤마 구분)
   --output=DIR     SQL 출력 디렉터리 (기본: ./tmp/backfill)
-  --db=NAME        D1 DB 이름 (기본: pchos-d1)
+  --db=NAME        D1 DB 이름 (--local/--remote 시 필수. 운영: pchos-d1-v2)
   --help           도움말
 `);
 }

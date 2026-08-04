@@ -1,4 +1,12 @@
 import { execSync } from 'child_process';
+import { refuseArchivedScript } from './_archived-guard.mjs';
+
+refuseArchivedScript({
+  name: 'restore-d1.mjs',
+  what: '백업 덤프 전체를 D1 에 그대로 밀어 넣는다',
+  risk: '대상 DB 의 기존 데이터와 충돌하거나 덮어쓴다',
+  insteadUse: '관리자 화면의 복원 기능 또는 scripts/run-backup-now.mjs 로 받은 최신 백업을 사용하세요.',
+});
 
 delete process.env.CLOUDFLARE_API_TOKEN;
 

@@ -24,7 +24,7 @@ export type D1Client = DrizzleD1Database<typeof schema & typeof relations>;
  * wrangler.toml 예시:
  *   [[d1_databases]]
  *   binding = "DB"
- *   database_name = "pchos-d1"
+ *   database_name = "pchos-d1-v2"
  *   database_id = "..."
  */
 export function getD1Drizzle(d1: D1Database): D1Client {

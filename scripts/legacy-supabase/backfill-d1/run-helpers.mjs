@@ -134,7 +134,12 @@ export async function buildSqlFile(supabase, def, outPath) {
 // ---------------------------------------------------------------------------
 // wrangler d1 execute 실행
 // ---------------------------------------------------------------------------
-export function applyToD1(sqlPath, mode, dbName = 'pchos-d1') {
+// dbName 에 기본값을 두지 않는다. 예전 기본값이 구 DB 'pchos-d1' 이라, 호출부가 이름을
+// 넘기지 않으면 엉뚱한 DB 에 쓰면서도 조용히 성공했다. 대상 DB 는 항상 명시해야 한다.
+export function applyToD1(sqlPath, mode, dbName) {
+  if (!dbName) {
+    throw new Error('applyToD1: 대상 D1 데이터베이스 이름을 명시해야 합니다 (예: pchos-d1-v2).');
+  }
   const flag = mode === 'remote' ? '--remote' : '--local';
   const cmd = `npx wrangler d1 execute ${dbName} --file="${sqlPath}" ${flag}`;
   execSync(cmd, { stdio: 'inherit', cwd: join(__dir, '../..') });

@@ -25,6 +25,18 @@ const args = process.argv.slice(2);
 const DRY = args.includes('--dry-run');
 const dateArg = args.find((a) => a.startsWith('--date='));
 const DB = 'pchos-d1-v2';
+
+// 이 스크립트는 연차 원장을 전량 재계산해 운영 데이터를 직접 덮어쓴다.
+// 같은 계열의 다른 운영 스크립트(run-leave-accrual-d1, rebalance-leave-balances,
+// reset-leave-usage, run-birthday-announcements-d1)에는 게이트가 들어갔는데
+// 이 파일만 빠져 있었다. 게이트 정책을 일관되게 맞춘다.
+if (!args.includes('--dry-run') && !args.includes('--yes')) {
+  console.error(
+    `[${DB}] 운영 데이터베이스를 수정합니다. 확인했으면 --yes 를 붙여 다시 실행하세요. (먼저 --dry-run 으로 확인하세요)`,
+  );
+  process.exit(1);
+}
+
 const WORK = mkdtempSync(join(tmpdir(), 'leave-full-recalc-'));
 const wranglerJs = join(ROOT, 'node_modules/wrangler/bin/wrangler.js');
 

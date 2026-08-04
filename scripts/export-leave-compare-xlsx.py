@@ -17,9 +17,14 @@ ROOT = Path(__file__).resolve().parents[1]
 TODAY = date(2026, 7, 15)
 
 
+# 운영 DB 이름. wrangler.toml 의 database_name 과 일치해야 한다.
+# 구 DB 'pchos-d1' 을 가리키던 동안에는 조회 결과가 비어 리포트가 조용히 빈 채로 나왔다.
+D1_DB_NAME = "pchos-d1-v2"
+
+
 def d1(sql: str) -> list[dict]:
     r = subprocess.run(
-        ["npx", "wrangler", "d1", "execute", "pchos-d1", "--remote", "--json", "--command", sql],
+        ["npx", "wrangler", "d1", "execute", D1_DB_NAME, "--remote", "--json", "--command", sql],
         capture_output=True,
         cwd=str(ROOT),
         shell=True,
@@ -439,7 +444,7 @@ def main():
         ["직원별 연차 비교 — DB 기준 vs 입사일 기준", ""],
         ["생성일시", datetime.now().strftime("%Y-%m-%d %H:%M")],
         ["기준일", TODAY.isoformat()],
-        ["DB", "Cloudflare D1 pchos-d1"],
+        ["DB", f"Cloudflare D1 {D1_DB_NAME}"],
         ["", ""],
         ["【DB 기준】", "leave_balances (year=2026) 저장값"],
         ["DB_총부여", "total_days (없으면 staff.annual_leave_total)"],

@@ -111,7 +111,9 @@ supabase/.temp/
 __pycache__/
 *.pyc
 scripts/**/산출물/
-scripts/backfill-d1/.backfill-progress.json
+# 경로가 scripts/legacy-supabase/backfill-d1/ 로 옮겨졌는데 패턴이 따라가지 않아
+# 진행상태 파일이 계속 추적되고 있었다.
+scripts/legacy-supabase/backfill-d1/.backfill-progress.json
 .open-next-yesterday-46bdac3f/
 
 # Local agent scratch & helper scripts
@@ -153,3 +155,27 @@ scripts/backfill-d1/.backfill-progress.json
 # Electron packaged app output (regenerable build artifact — do not commit)
 electron-app/AllERP-Windows-Updated/
 electron-app/*-Windows-*/
+
+# ---------------------------------------------------------------------------
+# 8차 전수조사 위생 (2026-08-03)
+# ---------------------------------------------------------------------------
+
+# 애드혹 D1 조회 덤프 — 재생성 가능하고, 조회 내용에 따라 개인정보가 섞인다
+/query_result*.json
+/query_result*.txt
+/patch_remote.sql
+/scratch_query*.js
+/scratch_query*.mjs
+
+# 인사·연차 산출물 (실명·입사일·급여성 정보 포함) — 저장소에 두지 않는다
+/annual_leave_status_*.csv
+/annual_leave_status_*.json
+/연차*.xlsx
+/*_명단.xlsx
+
+# 도구 사용 로그
+/claude-usage-log_*.md
+/.codex-chat-ttl.patch
+
+# 로컬 개발용 D1 sqlite (build 산출물이 아니라 빈 고아 파일이었다)
+/lib/db/local.sqlite

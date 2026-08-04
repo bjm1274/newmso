@@ -913,7 +913,10 @@ async function main() {
 
     if (!FLAG.cleanup) {
       log('');
-      log(`로그인 계정: ${TESTER_LOGIN_ID} / ${TESTER_PASSWORD}  (관리자: E2E-ADMIN)`);
+      // 비밀번호는 찍지 않는다. CI 로그는 보존되고 공유되므로, 기본값이라도
+  // 콘솔에 남기면 그 값이 어디서 왔는지 모르는 채 재사용되기 쉽다.
+  const passwordHint = process.env.E2E_TEST_PASSWORD ? '$E2E_TEST_PASSWORD' : '기본값 (scripts/seed-e2e-d1.mjs 참조)';
+  log(`로그인 계정: ${TESTER_LOGIN_ID} / 비밀번호: ${passwordHint}  (관리자: E2E-ADMIN)`);
       log('dev 서버가 이미 떠 있었다면 재시작해야 반영될 수 있습니다.');
     }
   } finally {
