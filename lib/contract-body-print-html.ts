@@ -99,7 +99,7 @@ export function buildContractBodyPrintHTML(templateText: string): string {
         while (i < lines.length) {
             const t = lines[i].trim();
             if (t.startsWith('시업시각:')) {
-                let startLine = t;
+                const startLine = t;
                 let endLine = '';
                 let breakLine = '';
                 let j = i + 1;

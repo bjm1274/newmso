@@ -47,12 +47,13 @@
     "backups",
     "tmp",
     "tmp_orphan",
-    "supabase/functions",
-    "_*.ts",
-    "_*.tsx",
     "analysis_artifacts",
-    "board",
     "scripts",
-    ".claude"
+    ".claude",
+    "scratch",
+    "scratch_zip",
+    "handoff",
+    "outputs",
+    "electron-app"
   ]
 }

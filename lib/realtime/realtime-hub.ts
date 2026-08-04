@@ -6,7 +6,7 @@
  * (CF 로그 일 ~수천 Uncaught 의 주원인)
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 declare const WebSocketPair: any;
 
 type WsAttachment = {

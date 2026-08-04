@@ -39,7 +39,7 @@ async function main() {
   const relSrc = join(MIGRATIONS_DIR, 'relations.ts');
   const relDst = join(DB_DIR, 'relations.ts');
   if (existsSync(relSrc)) {
-    let relContent = await readFile(relSrc, 'utf8');
+    const relContent = await readFile(relSrc, 'utf8');
     // import 경로는 같은 디렉토리라 './schema'로 그대로 OK
     await writeFile(relDst, relContent);
     await unlink(relSrc);

@@ -1,0 +1,58 @@
+name: Quality Gate
+
+# 타입체크·린트·D1 정책 검증을 PR 과 main 푸시에서 강제한다.
+#
+# 8차 전수조사(2026-08-03) 이전에는 이 세 가지가 CI 어디에도 없었다.
+# jscpd(hygiene.yml)만 돌았고 그마저 continue-on-error 라 아무것도 막지 못했다.
+# 그 사이 정책 회귀·타입 오류가 배포까지 그대로 나갔다.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Typecheck · Lint · Policies
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # --incremental false: tsconfig.tsbuildinfo 캐시에 기대지 않고 매번 전체 검사한다.
+      - name: Typecheck
+        run: npx tsc --noEmit --incremental false
+
+      - name: Lint
+        run: npm run lint
+
+      # 크론 3자 배선 대조 — wrangler.toml ↔ cloudflare-worker.ts ↔ app/api/cron/* ↔ 운영 패널.
+      # 파일만 읽는 정적 검사라 서버·DB 없이 CI 에서 그대로 돌릴 수 있다.
+      - name: Verify cron wiring
+        run: npm run verify:cron
+
+# 여기에 `npm run verify:policies`(360 케이스)를 넣지 않은 이유:
+# 그 하네스는 127.0.0.1:3000 에 뜬 dev 서버와 시드된 로컬 D1 을 전제로 한다.
+# CI 는 `next build` + `next start`(production)로 돌아서
+# next.config.ts 의 initOpenNextCloudflareForDev() 와
+# lib/db/get-binding.ts 의 로컬 폴백(NODE_ENV=development 한정)이 모두 비활성이다.
+# → 러너에 D1 바인딩 자체가 없어 시드해도 앱이 읽지 못하고, 스텝은 항상 실패한다.
+# 이 게이트를 CI 로 올리려면 webServer 를 `wrangler dev`(miniflare) 기반으로 바꿔야 하며,
+# 그 전까지는 권한 경계 수정(FB1·FB2) 전후로 로컬에서 수동 실행한다:
+#   npm run test:e2e:seed && npm run dev   # 별도 터미널
+#   npm run verify:policies

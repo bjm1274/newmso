@@ -771,7 +771,7 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   let leaveRequests = [...(fixtures.leaveRequests ?? [])];
   let attendanceDeductionRules = [...fixtures.attendanceDeductionRules];
   let taxInsuranceRates = [...fixtures.taxInsuranceRates];
-  let companyPayrollPolicies = [...(fixtures.companyPayrollPolicies ?? [])];
+  const companyPayrollPolicies = [...(fixtures.companyPayrollPolicies ?? [])];
   const legacyAttendanceCorrectionsSchema = fixtures.legacyAttendanceCorrectionsSchema;
   const legacyInventoryDepartmentSchema = fixtures.legacyInventoryDepartmentSchema;
   let messageInsertFailures = fixtures.messageInsertFailures;
@@ -1810,7 +1810,7 @@ export async function mockSupabase(page: Page, overrides: MockFixtures = {}) {
   await page.route('**/api/work-shifts', async (route) => {
     if (route.request().method() === 'POST') {
       const body = route.request().postDataJSON() || {};
-      let currentShifts = [...getTableArray('work_shifts')];
+      const currentShifts = [...getTableArray('work_shifts')];
       const id = body.id || `shift-${currentShifts.length + 1}`;
       
       const newShift = {

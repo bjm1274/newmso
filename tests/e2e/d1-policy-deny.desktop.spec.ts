@@ -1,7 +1,15 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * 보안 및 D1 정책 Default Deny / 403 권한 회귀 테스트 스위트
+ * D1 API Default Deny 회귀 테스트.
+ *
+ * 이 스위트는 원래 tests/security.spec.ts 와 tests/security/d1-policies.spec.ts
+ * 두 파일에 나뉘어 있었는데, 둘 다 playwright.config.ts 의 testDir(./tests/e2e, ./tests/a11y)
+ * 밖이라 **어떤 프로젝트에도 매칭되지 않아 한 번도 실행된 적이 없었다.**
+ * 내용도 한쪽이 다른 쪽의 상위집합이었으므로 여기 하나로 합쳤다.
+ *
+ * 검증 대상: 세션 없이 호출했을 때 서버가 거부하는가.
+ * (로그인한 사용자의 권한 경계 우회는 security-authorization.desktop.spec.ts 담당)
  */
 test.describe('D1 API Security & Policy Enforcement', () => {
   test('비인증 사용자 /api/d1/mutate 호출 시 401/403 거부', async ({ request }) => {

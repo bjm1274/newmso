@@ -4,7 +4,7 @@
  */
 
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __API_CALL_COUNTER__: number | undefined;
 }
 

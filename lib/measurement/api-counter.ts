@@ -12,13 +12,13 @@
 
 declare global {
   // fetcher.ts와 동일한 선언 (중복 선언 허용 — TypeScript merges them)
-  // eslint-disable-next-line no-var
+   
   var __API_CALL_COUNTER__: number | undefined;
 
   // 분 단위 스냅샷 기록용 (api-counter.ts가 관리)
-  // eslint-disable-next-line no-var
+   
   var __API_CALL_MINUTE_SNAPSHOT__: number | undefined;
-  // eslint-disable-next-line no-var
+   
   var __API_CALL_MINUTE_TIMESTAMP__: number | undefined;
 }
 

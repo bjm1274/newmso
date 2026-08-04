@@ -49,14 +49,9 @@ const nextConfig: NextConfig = {
     deviceSizes: [640, 750, 828, 1080, 1200],
     imageSizes: [16, 32, 48, 64, 96, 128, 256],
     minimumCacheTTL: 60 * 60 * 24 * 30,
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'rtleqrtcqucntnygzudv.supabase.co',
-        pathname: '/storage/v1/object/**',
-      },
-      ...(r2RemotePattern ? [r2RemotePattern] : []),
-    ],
+    // 이미지 원본은 R2 하나뿐이다. Supabase 스토리지 호스트는 D1 컷오버 이후
+    // 아무 이미지도 서빙하지 않으므로 허용 목록에서 제거했다.
+    remotePatterns: [...(r2RemotePattern ? [r2RemotePattern] : [])],
   },
   compress: true,
   poweredByHeader: false,

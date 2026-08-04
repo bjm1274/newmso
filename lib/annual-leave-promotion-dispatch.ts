@@ -160,7 +160,7 @@ export async function dispatchAnnualLeavePromotions(
   for (const r of logRows) {
     const st = Number(r.stage ?? r.step);
     if (!st || (st !== 1 && st !== 2)) continue;
-    let expiry = String(r.expiry_date || '').slice(0, 10);
+    const expiry = String(r.expiry_date || '').slice(0, 10);
     // 레거시 로그: expiry_date 없으면 target_year 로 약한 키 보강 (완전 일치는 어려움)
     if (!/^\d{4}-\d{2}-\d{2}$/.test(expiry) && r.target_year) {
       // stage 키만으로는 부족 — staff|stage|year 보조 키

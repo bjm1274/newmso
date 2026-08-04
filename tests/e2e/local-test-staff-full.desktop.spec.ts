@@ -44,7 +44,7 @@ const stepResults: StepResult[] = [];
 
 function record(step: string, pass: boolean, detail?: string) {
   stepResults.push({ step, pass, detail });
-  // eslint-disable-next-line no-console
+   
   console.log(`${pass ? '✅' : '❌'} ${step}${detail ? ` — ${detail}` : ''}`);
 }
 

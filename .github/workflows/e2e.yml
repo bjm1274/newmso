@@ -31,10 +31,10 @@ jobs:
             projects: "--project=desktop-chromium"
 
     env:
-      # Supabase (CI용 공개 anon key — read-only 테스트 계정 권장)
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      # Supabase 관련 secret 3종은 D1 영구 컷오버(wrangler.toml DATA_BACKEND="d1")로
+      # 앱이 더 이상 읽지 않으므로 주입을 중단했다. 특히 SERVICE_ROLE_KEY 는
+      # 전권 키라 쓰지도 않으면서 CI 러너에 노출할 이유가 없다.
+      # 저장소 secret 자체도 폐기 대상이다.
       # E2E 전용 자격증명 (실 로그인 테스트용 — 없으면 mock 세션으로 대체)
       E2E_TEST_USER_ID: ${{ secrets.E2E_TEST_USER_ID }}
       E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
@@ -76,9 +76,6 @@ jobs:
 
       - name: Build Next.js app
         run: npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       # 로컬 D1 시드(scripts/seed-e2e-d1.mjs)는 CI에서 의도적으로 건너뛴다.
       #  - CI는 `next build` + `next start`(production)로 돌기 때문에

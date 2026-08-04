@@ -50,7 +50,7 @@ async function executeStep(
   step: TransactionStep,
   resolvedPayload: Record<string, unknown> | Record<string, unknown>[],
 ): Promise<unknown> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   let q: any;
   const { kind, table, match } = step;
   const arr = Array.isArray(resolvedPayload) ? resolvedPayload : [resolvedPayload];

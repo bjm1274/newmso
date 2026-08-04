@@ -112,9 +112,9 @@ test("leave management tabs and actions stay clickable", async ({ page }) => {
 
   // 디버그: 현재 모달 HTML 출력
   const modalHtml = await approvalModal.innerHTML();
-  // eslint-disable-next-line no-console
+   
   console.log("=== MODAL HTML (first 2000 chars) ===");
-  // eslint-disable-next-line no-console
+   
   console.log(modalHtml.slice(0, 2000));
 
   // leave_requests 결재 처리 요청 대기 (D1 mutate API 경유)
