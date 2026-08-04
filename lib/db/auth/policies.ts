@@ -31,7 +31,7 @@
 
 import { eq } from 'drizzle-orm';
 import type { D1Client } from '../client-d1';
-import { messages } from '../schema';
+import { messages, board_posts } from '../schema';
 import {
   canAccessChatRoom,
   canChangeChatRoomMembers,
@@ -317,6 +317,37 @@ async function messagesSelfDeleteGuard(
 }
 
 /**
+ * board_posts UPDATE/DELETE: 작성자 본인 또는 관리 권한만.
+ *
+ * PUBLIC_ALL 이던 시절에는 로그인만 하면 누구나 타인의 게시글을, 공지까지 포함해
+ * 수정·삭제할 수 있었다. 클라이언트가 보낸 author_id 는 위조 가능하므로
+ * 항상 DB 의 작성자만 신뢰한다.
+ */
+async function boardPostsOwnerGuard(
+  db: D1Client,
+  claims: ErpClaims,
+  row: Record<string, unknown>,
+): Promise<boolean> {
+  if (erpIsAdmin(claims)) return true;
+  if (erpCanManageCompany(claims)) return true;
+
+  const me = claimsStaffIdRaw(claims);
+  if (me === null) return false;
+
+  const id = getField<string | number>(row, 'id');
+  if (id === null) return false;
+
+  const rows = await db
+    .select({ author_id: board_posts.author_id })
+    .from(board_posts)
+    .where(eq(board_posts.id, String(id)))
+    .limit(1);
+  const target = rows[0];
+  if (!target) return false;
+  return target.author_id !== null && String(target.author_id).trim() === me;
+}
+
+/**
  * claims.erp_staff_id 원문(시스템마스터 '9999' 등 non-UUID 포함).
  * erpStaffId는 UUID만 반환하므로 insert sender 강제에는 원문을 사용.
  */
@@ -357,7 +388,7 @@ async function messagesInsertGuard(
 
 /** chat_rooms INSERT: non-admins can create only their own regular room. */
 async function chatRoomsInsertGuard(
-  _db: D1Client,
+  db: D1Client,
   claims: ErpClaims,
   row: Record<string, unknown>,
 ): Promise<boolean> {
@@ -365,6 +396,20 @@ async function chatRoomsInsertGuard(
   const me = claimsStaffIdRaw(claims);
   if (me === null) return false;
   if (isNoticeRoomType(getField<string>(row, 'type'))) return false;
+
+  // upsert 는 mutate 경로에서 insert 로 판정된다. 그래서 이미 존재하는 방 id 를
+  // 넣으면 이 가드만 통과하고 실제로는 UPDATE 가 돌아 방이 통째로 덮였다.
+  // created_by 와 members 를 자기 자신으로 채워 보내면 아래 검사도 전부 통과하므로,
+  // 방 id 만 알면 남의 방을 탈취하고 기존 대화 이력을 볼 수 있었다.
+  // 기존 행이 있으면 신규 생성이 아니라 수정이므로 update 규칙으로 판정한다.
+  const id = getField<string | number>(row, 'id');
+  if (id !== null && String(id).trim() !== '') {
+    const existing = await loadChatRoomMembership(db, String(id));
+    if (existing) {
+      return chatRoomsUpdateGuard(db, claims, row);
+    }
+  }
+
   const createdBy = getField<string>(row, 'created_by');
   if (createdBy !== null && String(createdBy).trim() !== me) return false;
   return isRoomMember(parseMembersField(row.members), me);
@@ -454,7 +499,19 @@ export const POLICY_REGISTRY: Registry = {
     insert: 'ADMIN_OR_MANAGER',
     update: 'ADMIN_OR_MANAGER',
     delete: 'ADMIN_OR_MANAGER' },
-  board_posts: PUBLIC_ALL('board_posts'),
+  // 게시판: 목록·본문은 전 직원 열람(PUBLIC), 작성은 로그인 사용자.
+  // 수정·삭제는 작성자 본인 또는 관리 권한만 — PUBLIC_ALL 이던 시절에는
+  // 로그인만 하면 누구나 타인의 글과 공지를 고치거나 지울 수 있었다.
+  board_posts: {
+    table: 'board_posts',
+    select: 'PUBLIC',
+    insert: 'AUTHENTICATED',
+    update: 'AUTHENTICATED',
+    delete: 'AUTHENTICATED',
+    staffIdField: 'author_id',
+    asyncGuards: {
+      update: boardPostsOwnerGuard,
+      delete: boardPostsOwnerGuard } },
   // 마감보고: 환자명·수납금액·수표 정보가 들어 있다. PUBLIC_ALL 이던 시절에는
   // 로그인만 하면 타 회사 마감보고를 조회·삭제할 수 있었다(클라이언트 필터만 존재).
   // company_id 로 회사 스코프를 서버에서 강제한다.
@@ -507,10 +564,13 @@ export const POLICY_REGISTRY: Registry = {
   // insert/select 는 AUTHENTICATED 로 둔다. 다만 수정·삭제는 화면이 이미 admin 으로
   // 제한하고 있으므로(직원평가시스템.tsx:141) 서버에서도 같은 규칙을 강제한다.
   // PUBLIC_ALL 이던 시절에는 아무나 타인 평가를 수정·삭제할 수 있었다.
+  // 인사평가는 평가 대상 본인과 인사·관리자만 다룰 수 있어야 한다.
+  // select/insert 가 AUTHENTICATED 라 로그인만 하면 누구나 타인의 평가를 열람하고,
+  // 임의의 staff_id 로 평가를 새로 써 넣을 수도 있었다(update/delete 는 이미 ADMIN_ONLY).
   staff_evaluations: {
     table: 'staff_evaluations',
-    select: 'AUTHENTICATED',
-    insert: 'AUTHENTICATED',
+    select: 'STAFF_IN_SCOPE',
+    insert: 'ADMIN_OR_MANAGER',
     update: 'ADMIN_ONLY',
     delete: 'ADMIN_ONLY',
     staffIdField: 'staff_id' },

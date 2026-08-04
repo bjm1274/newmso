@@ -283,6 +283,32 @@ const EXPECT = {
     hr: { select_self: A, select_other: A, update_self: A, update_other: A, insert: A, delete_other: D },
     user: { select_self: A, select_other: D, update_self: D, update_other: D, insert: A, delete_other: D },
   },
+
+  /**
+   * 본인 열람 + 인사가 작성 — 수정·삭제는 관리자만 (인사평가).
+   * 평가는 평가 대상 본인과 인사·관리자만 봐야 하고, 확정된 평가를 인사팀이라도
+   * 임의로 고치거나 지울 수 없어야 감사 기록으로서 의미가 있다.
+   * 예전에는 select/insert 가 AUTHENTICATED 라 로그인만 하면 누구나 타인의 평가를
+   * 열람하고 임의 staff_id 로 평가를 써 넣을 수 있었다(8차 D03-D09).
+   */
+  SELF_HR_READ_HR_INSERT_ADMIN_WRITE: {
+    admin: all(A),
+    hr: { select_self: A, select_other: A, update_self: D, update_other: D, insert: A, delete_other: D },
+    user: { select_self: A, select_other: D, update_self: D, update_other: D, insert: D, delete_other: D },
+  },
+
+  /**
+   * 전 직원 열람·작성, 수정·삭제는 작성자 본인 또는 관리 권한 (게시판).
+   * PUBLIC_ALL 이던 시절에는 로그인만 하면 누구나 타인 글과 공지를
+   * 수정·삭제할 수 있었다(8차 D07-010).
+   * hr 이 update_other/delete_other 에서 허용인 것은 erpCanManageCompany 가
+   * admin/mso/hr 을 포함하기 때문이다 — 게시판 운영 권한으로 의도된 것이다.
+   */
+  BOARD_OWNER_WRITE: {
+    admin: all(A),
+    hr: { select_self: A, select_other: A, update_self: A, update_other: A, insert: A, delete_other: A },
+    user: { select_self: A, select_other: A, update_self: A, update_other: D, insert: A, delete_other: D },
+  },
 };
 
 /** 검증 대상 테이블 → 기대치 그룹. */
@@ -304,6 +330,16 @@ const TARGETS = [
   ['org_teams', 'MASTER_REF'],
   ['surgery_templates', 'MASTER_REF_ADMIN_WRITE'],
   ['approval_form_types', 'MASTER_REF_ADMIN_WRITE'],
+
+  // 8차 FB2 에서 정책을 조인 테이블 — 오차단·과다개방 양쪽을 여기서 잡는다.
+  //
+  // staff_evaluations 는 admin/hr 의 insert·update 가 이 하네스에서 ERR 500 으로 뜬다.
+  // 정책 문제가 아니라 픽스처 한계다 — 정책을 예전(AUTHENTICATED)으로 되돌려도
+  // 같은 4건이 똑같이 500 이고, 그 상태에서는 'user 타인 select' 가 추가로 실패한다
+  // (일반 직원이 남의 인사평가를 실제로 읽는다). 즉 이 표의 관심사인 접근 통제는
+  // 정상 판정되며, 500 은 그와 무관한 기존 환경 이슈다.
+  ['staff_evaluations', 'SELF_HR_READ_HR_INSERT_ADMIN_WRITE'],
+  ['board_posts', 'BOARD_OWNER_WRITE'],
 
   ['access_logs', 'ADMIN_ONLY'],
   ['budget_settings', 'ADMIN_ONLY'],
