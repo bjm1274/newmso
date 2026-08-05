@@ -31,7 +31,7 @@ type UploadPlanRequest = {
   fileName?: string;
   mimeType?: string;
   fileSize?: number;
-  /** 선택: 전달 시 방 멤버십(notice 예외) 검증 */
+  /** 필수: 방 멤버십(notice 예외) 검증용. 없으면 400. roomId 는 오프라인 큐 옛 표기 호환. */
   room_id?: string;
   roomId?: string;
 };
@@ -80,15 +80,26 @@ function validateUploadTarget(fileName: string, mimeType: string, fileSize: numb
 }
 
 /**
- * room_id가 있으면 멤버십 검증. 없으면 하위호환으로 통과
- * (클라가 room_id를 보내기 시작하면 완전 강제).
+ * room_id 필수 + 방 멤버십 검증.
+ *
+ * 예전에는 room_id 가 없으면 그냥 통과시키는 opt-in 구조였다("클라가 보내기 시작하면
+ * 강제한다"는 전제). 그런데 실제로 보내는 곳은 오프라인 큐뿐이었고 PC 훅과 모바일
+ * 온라인 경로는 둘 다 빼고 보냈다 — 즉 이 검사는 사실상 항상 no-op 이었고, 아무나
+ * 남의 방 첨부용 presigned URL 을 발급받을 수 있었다(8차 D06-006).
+ * 호출부(PC 플랜·PC formData·모바일 플랜·모바일 formData·오프라인 큐)를 모두 고친 뒤
+ * 여기서 필수화한다. 큐에 남아 있는 옛 항목 호환을 위해 roomId 표기도 함께 받는다.
  */
-async function assertOptionalRoomMembership(
+async function assertRoomMembership(
   userId: string,
   roomIdRaw: unknown,
 ): Promise<NextResponse | null> {
   const roomId = String(roomIdRaw ?? '').trim();
-  if (!roomId) return null;
+  if (!roomId) {
+    return NextResponse.json(
+      { error: '대화방 정보(room_id)가 필요합니다.' },
+      { status: 400 },
+    );
+  }
 
   const d1 = await getD1Binding();
   if (!d1) {
@@ -107,7 +118,7 @@ async function createSignedUploadPlan(
   payload: UploadPlanRequest,
   userId: string,
 ): Promise<NextResponse> {
-  const roomDenied = await assertOptionalRoomMembership(
+  const roomDenied = await assertRoomMembership(
     userId,
     payload.room_id ?? payload.roomId,
   );
@@ -178,7 +189,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: '업로드할 파일이 없습니다.' }, { status: 400 });
     }
 
-    const roomDenied = await assertOptionalRoomMembership(
+    const roomDenied = await assertRoomMembership(
       userId,
       formData.get('room_id') ?? formData.get('roomId'),
     );

@@ -202,14 +202,19 @@ export function useChatUploads({
         // /api/chat/upload 의 assertOptionalRoomMembership 은 room_id 가 없으면 그냥
         // 통과시키는 opt-in 구조인데, PC 훅은 JSON 플랜·formData 폴백 어느 쪽에도
         // room_id 를 안 실어서 **방 멤버십 검증이 항상 건너뛰어졌다**(8차 D06-006).
-        // 모바일 업로드(모바일/채팅/업로드.ts)는 이미 싣고 있어 두 클라이언트가 서로 다른
-        // 검증을 받고 있었다. 서버를 필수화하기 전에 이쪽을 먼저 맞춘다.
+        // 모바일 온라인 경로(모바일/채팅/업로드.ts)도 똑같이 빠져 있었고 지금은 같이 맞췄다.
+        // 서버는 이제 room_id 없는 요청을 400 으로 거부한다.
+        // 메시지 insert 도 selectedRoomId 로 들어가므로(메신저전송훅 handleSendMessage)
+        // 업로드 인가도 같은 방으로 물어야 검사와 실제 저장 위치가 어긋나지 않는다.
         const uploadRoomId = String(selectedRoomId || '').trim();
+        if (!uploadRoomId) {
+          throw new Error('대화방을 먼저 선택해 주세요.');
+        }
 
         const uploadViaAppServer = async () => {
           const formData = new FormData();
           formData.append('file', file, uploadFileName);
-          if (uploadRoomId) formData.append('room_id', uploadRoomId);
+          formData.append('room_id', uploadRoomId);
 
           const fallbackResponse = await fetch('/api/chat/upload', {
             method: 'POST',
@@ -238,7 +243,7 @@ export function useChatUploads({
               fileName: uploadFileName,
               mimeType: uploadContentType,
               fileSize: file.size,
-              room_id: uploadRoomId || undefined }) });
+              room_id: uploadRoomId }) });
           return { res, payload: (await res.json().catch(() => null)) as {
             provider?: 'supabase' | 'r2';
             bucket?: string;

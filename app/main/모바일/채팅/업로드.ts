@@ -96,7 +96,18 @@ export function validateMobileUploadTarget(file: File): { ok: true } | { ok: fal
   return { ok: true };
 }
 
-async function requestUploadPlan(file: File): Promise<{ ok: true; payload: UploadPlanResponse } | { ok: false; error: string }> {
+/**
+ * room_id 는 반드시 싣는다.
+ * 예전에는 이 온라인 경로(플랜·서버 폴백)가 room_id 를 빼고 보냈다. 서버
+ * `/api/chat/upload` 의 멤버십 검증은 room_id 가 있을 때만 도는 opt-in 구조라,
+ * 결과적으로 모바일 온라인 업로드는 **방 멤버십 검사를 통째로 건너뛰었다**
+ * (오프라인 큐 경로만 planParams.roomId 로 싣고 있어 같은 화면에서도 온라인/오프라인이
+ * 서로 다른 검증을 받았다. 8차 D06-006). 서버를 필수화하기 전에 여기를 맞춘다.
+ */
+async function requestUploadPlan(
+  file: File,
+  roomId: string,
+): Promise<{ ok: true; payload: UploadPlanResponse } | { ok: false; error: string }> {
   try {
     const res = await fetch('/api/chat/upload', {
       method: 'POST',
@@ -105,7 +116,8 @@ async function requestUploadPlan(file: File): Promise<{ ok: true; payload: Uploa
       body: JSON.stringify({
         fileName: file.name,
         mimeType: normalizeMimeType(file),
-        fileSize: file.size }) });
+        fileSize: file.size,
+        room_id: roomId }) });
     const payload = (await res.json().catch(() => null)) as UploadPlanResponse | null;
     if (!res.ok || !payload?.signedUrl || !payload?.url) {
       return { ok: false, error: payload?.error || `업로드 준비 실패 (HTTP ${res.status})` };
@@ -117,10 +129,15 @@ async function requestUploadPlan(file: File): Promise<{ ok: true; payload: Uploa
   }
 }
 
-async function uploadViaServerFallback(file: File): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+/** 서버 multipart 폴백. 위와 같은 이유로 room_id 를 formData 에도 반드시 넣는다. */
+async function uploadViaServerFallback(
+  file: File,
+  roomId: string,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   try {
     const formData = new FormData();
     formData.append('file', file, file.name);
+    formData.append('room_id', roomId);
     const res = await fetch('/api/chat/upload', {
       method: 'POST',
       credentials: 'same-origin',
@@ -185,7 +202,7 @@ export async function sendMobileFileMessage(
 
   // 온라인 경로 — 직접 업로드 먼저, 실패 시 enqueueUpload로 폴백 큐잉
   let publicUrl = '';
-  const plan = await requestUploadPlan(input.file);
+  const plan = await requestUploadPlan(input.file, input.roomId);
   if (plan.ok) {
     try {
       const putRes = await fetch(plan.payload.signedUrl as string, {
@@ -198,7 +215,7 @@ export async function sendMobileFileMessage(
       publicUrl = String(plan.payload.url || '');
     } catch {
       // R2 PUT 실패 — 서버 fallback 시도
-      const fb = await uploadViaServerFallback(input.file);
+      const fb = await uploadViaServerFallback(input.file, input.roomId);
       if (fb.ok) {
         publicUrl = fb.url;
       } else {
@@ -227,7 +244,7 @@ export async function sendMobileFileMessage(
     }
   } else {
     // plan 실패 → 서버 multipart fallback
-    const fb = await uploadViaServerFallback(input.file);
+    const fb = await uploadViaServerFallback(input.file, input.roomId);
     if (!fb.ok) return { ok: false, error: fb.error };
     publicUrl = fb.url;
   }
