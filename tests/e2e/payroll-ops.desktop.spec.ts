@@ -128,7 +128,10 @@ test('regular payroll settlement stores dependent deductions in the finalized re
   await page.getByTestId('salary-settlement-next-button').click();
   const settlementCard = page.getByTestId(`salary-settlement-card-${payrollStaff.id}`);
   await expect(settlementCard).toBeVisible();
-  await expect(settlementCard.getByText(/10분 단위 1 =/)).toHaveCount(3);
+  // 10분 단위 입력 필드는 정산 카드에 6개다 — 고정연장·고정야간·휴일수당·
+  // 야간/당직·연장근무수당·근태/기타차감. 스펙이 3개이던 시절 기준이라
+  // 2026-06-05 에 필드가 늘어난 뒤로 두 달간 실패하고 있었다.
+  await expect(settlementCard.getByText(/10분 단위 1 =/)).toHaveCount(6);
 
   await page.getByTestId(`salary-settlement-night-duty-${payrollStaff.id}-increase`).click({ delay: 500 });
   await expect(page.getByTestId(`salary-settlement-night-duty-${payrollStaff.id}-quick-input-panel`)).toBeVisible();
@@ -138,7 +141,8 @@ test('regular payroll settlement stores dependent deductions in the finalized re
   expect(oneTenMinuteUnit).toBeGreaterThan(1);
 
   await page.getByTestId(`salary-settlement-dependent-count-${payrollStaff.id}`).fill('2');
-  await page.getByTestId(`salary-settlement-custom-deduction-${payrollStaff.id}`).fill('10000');
+  // 기타공제 입력란은 정산 카드에서 의도적으로 제거됐다(요청 #3·#4).
+  // 계산은 여전히 custom_deduction 을 읽지만 입력 경로가 없어 항상 0 이다.
   const displayedTotalDeduction = parseWon(
     await page.getByTestId(`salary-settlement-total-deduction-${payrollStaff.id}`).textContent()
   );
@@ -164,7 +168,6 @@ test('regular payroll settlement stores dependent deductions in the finalized re
   expect(record.attendance_deduction).toBeGreaterThan(0);
   expect(record.deduction_detail.dependent_count).toBe(2);
   expect(record.deduction_detail.dependent_tax_credit).toBe(31170);
-  expect(record.deduction_detail.custom_deduction).toBe(10000);
   expect(record.total_deduction).toBe(
     Number(record.deduction_detail.national_pension || 0) +
       Number(record.deduction_detail.health_insurance || 0) +
@@ -182,7 +185,16 @@ test('regular payroll settlement stores dependent deductions in the finalized re
 // Test 2: regular payroll settlement subtracts advance pay
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('regular payroll settlement subtracts advance pay from net pay and refreshes the payroll ledger status', async ({ page }) => {
+/**
+ * 선지급 입력란이 정산 카드에서 제거돼(요청 #3·#4) 이 테스트의 전제가 사라졌다.
+ *
+ * 스펙을 UI 에 맞춰 깎으면 남는 게 없어서 — 이 테스트는 "선지급 입력 → 실지급액
+ * 차감 → 저장" 하나의 흐름이다 — 지우는 대신 건너뛴다. 계산 쪽은 아직 살아 있어
+ * 급여정산이 advance_pay 를 읽고 실지급액에서 빼지만, 입력 경로가 없어 값이 항상
+ * 0 이고 저장된 기록에서만 복원된다. 입력란이 되살아나면 이 테스트를 그대로
+ * 되살리면 된다.
+ */
+test.skip('regular payroll settlement subtracts advance pay from net pay and refreshes the payroll ledger status', async ({ page }) => {
   await page.addInitScript(() => {
     window.confirm = () => true;
   });
@@ -309,7 +321,6 @@ test('regular payroll settlement restores draft values and saved status when reo
   await page.getByTestId(`salary-settlement-dependent-count-${payrollStaff.id}`).fill('3');
   await page.getByTestId(`salary-settlement-child-count-${payrollStaff.id}`).fill('1');
   await page.getByTestId(`salary-settlement-withholding-rate-${payrollStaff.id}`).selectOption('80');
-  await page.getByTestId(`salary-settlement-custom-deduction-${payrollStaff.id}`).fill('15000');
 
   const saveRequestPromise = page.waitForRequest(
     (request) =>
@@ -329,7 +340,6 @@ test('regular payroll settlement restores draft values and saved status when reo
   expect(record.deduction_detail.dependent_count).toBe(3);
   expect(record.deduction_detail.child_count_8_20).toBe(1);
   expect(record.deduction_detail.withholding_rate_percent).toBe(80);
-  expect(record.deduction_detail.custom_deduction).toBe(15000);
 
   await page.reload();
 
@@ -343,7 +353,6 @@ test('regular payroll settlement restores draft values and saved status when reo
   await expect(page.getByTestId(`salary-settlement-dependent-count-${payrollStaff.id}`)).toHaveValue('3');
   await expect(page.getByTestId(`salary-settlement-child-count-${payrollStaff.id}`)).toHaveValue('1');
   await expect(page.getByTestId(`salary-settlement-withholding-rate-${payrollStaff.id}`)).toHaveValue('80');
-  await expect(page.getByTestId(`salary-settlement-custom-deduction-${payrollStaff.id}`)).toHaveValue('15,000');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
