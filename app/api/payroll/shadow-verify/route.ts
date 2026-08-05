@@ -40,6 +40,18 @@ type ShadowVerifyRequest = {
   companyName?: string;
   targetStatus?: string;
   staffs?: ShadowVerifyStaffInput[];
+  /**
+   * 과거 확정분 대조용 읽기 전용 모드.
+   *
+   * 저장 직전 검증과 두 가지가 다르다.
+   *   1) 마감 잠금이 걸려 있어도 조기 반환하지 않는다 — 대조 대상은 **이미 확정돼
+   *      잠긴 달**이므로, 잠금에서 끊으면 애초에 비교를 할 수 없다.
+   *   2) 불일치를 감사로그에 남기지 않는다. 수십 개월을 훑는 배치라 남기면
+   *      로그가 대조 결과로 뒤덮인다. 결과는 호출자가 받아서 본다.
+   *
+   * 어느 쪽이든 이 라우트는 금액을 쓰지 않는다.
+   */
+  dryRun?: boolean;
 };
 
 export type ShadowVerifyResponse = {
@@ -99,7 +111,9 @@ export async function POST(request: NextRequest) {
       lockScopes.length > 0 &&
       (companyName === '전체' || lockScopes.some((scope) => scope === '전체' || scope === companyName));
 
-    if (locked) {
+    const dryRun = body.dryRun === true;
+
+    if (locked && !dryRun) {
       return NextResponse.json({
         ok: true,
         locked: true,
@@ -142,7 +156,7 @@ export async function POST(request: NextRequest) {
       .map((input) => verifyPayrollRecordShadow(input, rates))
       .filter((result) => result.mismatches.length > 0);
 
-    if (mismatches.length > 0) {
+    if (mismatches.length > 0 && !dryRun) {
       await logAudit(
         '급여서버재계산불일치',
         'payroll',
@@ -165,7 +179,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      locked: false,
+      // 저장 경로는 잠겨 있으면 위에서 이미 반환했으므로 여기선 항상 false 다.
+      // dryRun 은 잠긴 달도 통과해 오므로 잠금 사실을 그대로 알린다(비교는 수행).
+      locked,
       lockScopes,
       officialWithholdingTable,
       ratesConfigured: rates.configured === true,
