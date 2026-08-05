@@ -225,6 +225,59 @@ export function buildStaffSettlementSelect(omittedColumns: ReadonlySet<string> =
 
 export const STAFF_SETTLEMENT_SELECT = buildStaffSettlementSelect();
 
+// ---------------------------------------------------------------------------
+// 증명서 발급 / 문서보관함 직원 컨텍스트 (8차 FB4 · D03-005 · D03-018)
+//
+// 왜 SSOT 로 뽑았나: 두 화면 모두 `duty, job_duty, responsibility, rank, grade,
+// level, base, meal, resigned_reason, resign_reason, profile_photo_url` 같은
+// **D1 에 존재하지 않는 레거시 컬럼**을 셀렉트에 나열하고 있었다. `/api/d1/query`
+// 는 컬럼명을 `sql.identifier` 로 큰따옴표 인용하는데, SQLite 는 "컬럼으로 해석되지
+// 않는 큰따옴표 토큰을 문자열 리터럴로 취급"하는 관용 동작이 있어 에러 대신
+// `{"\"duty\"": "duty"}` 처럼 **키 이름에 따옴표가 박힌 쓰레기 컬럼**을 돌려줬다.
+// 즉 화면은 조용히 undefined 를 읽으며 정상처럼 보였고, 드리프트가 몇 년을 살아남았다.
+// 실컬럼만 나열해 그 회색지대를 없애고, 두 화면이 같은 목록을 쓰게 한다.
+// ---------------------------------------------------------------------------
+
+/** 증명서 발급 인쇄 컨텍스트용 (급여계열 증명서의 기준급여 포함) */
+export const STAFF_CERT_CONTEXT_SELECT = [
+  'id',
+  'name',
+  'company',
+  'department',
+  'position',
+  'role',
+  'employee_no',
+  'joined_at',
+  'join_date',
+  'status',
+  'resigned_at',
+  'resign_date',
+  'base_salary',
+  'meal_allowance',
+  'profile_photo_path',
+  'profile_photo_updated_at',
+  'avatar_url',
+  'photo_url',
+  'permissions',
+].join(', ');
+
+/** 문서보관함 직원 컨텍스트용 (급여 제외 — 문서 목록 화면에 급여를 실을 이유가 없다) */
+export const STAFF_DOC_CONTEXT_SELECT = [
+  'id',
+  'name',
+  'company',
+  'department',
+  'position',
+  'role',
+  'employee_no',
+  'joined_at',
+  'join_date',
+  'profile_photo_path',
+  'profile_photo_updated_at',
+  'avatar_url',
+  'photo_url',
+].join(', ');
+
 const STAFF_ORG_CHART_COLUMNS = [
   'id',
   'name',

@@ -93,18 +93,48 @@ export default function SharedCalendar() {
         }
 
         // 2. 게시판 일정 — 세부 권한 calendar_게시판일정
+        //
+        // 예전에는 `.select('… category').eq('category','일정')` 이었다. board_posts 에
+        // `category` 컬럼은 없고(실제 이름은 `board_type`), SQLite 가 큰따옴표 토큰을
+        // 문자열 리터럴로 해석하는 바람에 조건이 `'category' = '일정'` 즉 상시 거짓이 되어
+        // 에러 없이 늘 0건이었다. 게다가 설령 컬럼명을 고쳤어도 반환 행에 `day` 가 없어
+        // 렌더 필터(`e.day != null`)를 통과할 수 없었다 — 이중으로 죽어 있었다.
+        //
+        // 이제 "일정 메타(schedule_date)를 가진 글"을 이번 달 범위로 조회하고,
+        // schedule_date 에서 day 를 파생시켜 근무표 행과 같은 모양으로 만든다.
+        // (board_type 에 '일정' 이라는 값은 실제로 존재한 적이 없다. 수술일정·MRI일정 등
+        //  일정성 게시글은 모두 schedule_date 로 식별된다.)
         if (canViewBoard) {
           try {
+            const monthStart = `${ym}-01`;
+            const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+            const monthEnd = `${ym}-${String(lastDay).padStart(2, '0')}`;
             const boardRes = await db
               .from('board_posts')
-              .select('id, title, created_at, category')
-              .eq('category', '일정')
-              .limit(100);
-            if (!boardRes.error && Array.isArray(boardRes.data)) {
-              boardEvents = boardRes.data;
+              .select('id, title, board_type, schedule_date, schedule_time')
+              .gte('schedule_date', monthStart)
+              .lte('schedule_date', monthEnd)
+              .limit(200);
+            if (boardRes.error) {
+              console.warn('[공유캘린더] board_posts:', boardRes.error);
+            } else if (Array.isArray(boardRes.data)) {
+              boardEvents = boardRes.data
+                .map((row) => {
+                  const r = row as Record<string, unknown>;
+                  const dayNum = Number(String(r.schedule_date ?? '').slice(8, 10));
+                  if (!Number.isFinite(dayNum) || dayNum <= 0) return null;
+                  return {
+                    id: r.id,
+                    kind: 'board' as const,
+                    day: dayNum,
+                    title: String(r.title ?? '(제목 없음)'),
+                    board_type: String(r.board_type ?? ''),
+                    schedule_time: r.schedule_time ? String(r.schedule_time) : '' };
+                })
+                .filter(Boolean);
             }
-          } catch {
-            /* ignore */
+          } catch (err) {
+            console.warn('[공유캘린더] board_posts exception:', err);
           }
         }
 
@@ -238,7 +268,8 @@ export default function SharedCalendar() {
             <span className="block mt-1 text-[11px] font-medium opacity-80">{loadError}</span>
           </div>
         )}
-        {!loading && !loadError && canViewShifts && events.filter((e) => e && e.day != null).length === 0 && (
+        {/* 안내 문구가 '근무표' 를 말하므로 게시판 일정은 이 판정에서 제외한다. */}
+        {!loading && !loadError && canViewShifts && events.filter((e) => e && e.kind !== 'board' && e.day != null).length === 0 && (
           <div className="mb-3 rounded-xl border border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-[12px] font-bold text-[var(--toss-gray-4)]">
             이번 달 등록된 근무표 일정이 없습니다. 간호근무표에서 편성·저장하면 여기에 표시됩니다.
           </div>
@@ -250,18 +281,31 @@ export default function SharedCalendar() {
             endDate={endDate}
             renderCell={(cell) => {
               const dayNum = cell.date.getDate();
-              const dayShifts = events.filter((e) => e && e.day != null && Number(e.day) === dayNum);
+              const dayEvents = events.filter((e) => e && e.day != null && Number(e.day) === dayNum);
 
               return (
                 <div className="flex flex-col gap-1 w-full h-full p-1 overflow-y-auto">
-                  {dayShifts.map((shift, i) => (
-                    <div
-                      key={i}
-                      className="px-1.5 py-0.5 text-[10px] rounded bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 font-bold truncate"
-                    >
-                      [직원{String(shift.staff_id ?? '').slice(0, 4)}] {shift.shift_code}
-                    </div>
-                  ))}
+                  {dayEvents.map((ev, i) =>
+                    // 게시판 일정은 shift_code 가 없다 — 예전 렌더는 근무표 모양만 알고 있어서
+                    // 게시글 행이 들어와도 "[직원] undefined" 로 찍혔을 것이다. 종류별로 나눠 표기한다.
+                    ev.kind === 'board' ? (
+                      <div
+                        key={`b-${i}`}
+                        title={`${ev.board_type ? `[${ev.board_type}] ` : ''}${ev.title}`}
+                        className="px-1.5 py-0.5 text-[10px] rounded bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 font-bold truncate"
+                      >
+                        {ev.schedule_time ? `${String(ev.schedule_time).slice(0, 5)} ` : ''}
+                        {ev.title}
+                      </div>
+                    ) : (
+                      <div
+                        key={`s-${i}`}
+                        className="px-1.5 py-0.5 text-[10px] rounded bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 font-bold truncate"
+                      >
+                        [직원{String(ev.staff_id ?? '').slice(0, 4)}] {ev.shift_code}
+                      </div>
+                    ),
+                  )}
                 </div>
               );
             }}

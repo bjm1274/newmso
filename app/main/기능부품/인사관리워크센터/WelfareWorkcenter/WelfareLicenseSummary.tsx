@@ -47,24 +47,49 @@ export default function WelfareLicenseSummary() {
       setLoading(true);
       setErrMsg(null);
       try {
+        // staff_licenses 에는 `staff_name`·`sub_category` 컬럼이 없다(18컬럼 어디에도).
+        // 예전 셀렉트는 그 둘을 함께 요청했고, SQLite 관용 동작 때문에 에러 대신 빈 값이
+        // 돌아와 모든 카드가 '직원' + 빈 부제로 렌더됐다 — 누구의 자격증인지 알 수 없었다.
+        // 이름은 staff_id 로 staff_members 를 별도 조회해 해석하고, 부제는 실컬럼
+        // license_type 을 쓴다.
         const { data, error } = await db
           .from('staff_licenses')
-          .select('id, staff_id, staff_name, license_name, sub_category, expiry_date')
+          .select('id, staff_id, license_name, license_type, expiry_date')
           .order('expiry_date', { ascending: true, nullsFirst: false })
           .limit(60);
         if (cancelled) return;
         if (error) throw error;
         const list = (data as Array<Record<string, unknown>> | null) ?? [];
+
+        const staffIds = Array.from(
+          new Set(list.map((r) => String(r.staff_id ?? '')).filter(Boolean)),
+        );
+        const nameById = new Map<string, string>();
+        if (staffIds.length > 0) {
+          const { data: staffRows, error: staffError } = await db
+            .from('staff_members')
+            .select('id, name')
+            .in('id', staffIds);
+          if (staffError) {
+            // 이름 해석 실패는 카드 자체를 죽일 이유가 아니다 — '직원' 폴백으로 계속 간다.
+            console.warn('[WelfareLicenseSummary] staff name resolve failed', staffError);
+          }
+          for (const s of (staffRows as Array<Record<string, unknown>> | null) ?? []) {
+            nameById.set(String(s.id ?? ''), String(s.name ?? ''));
+          }
+        }
+        if (cancelled) return;
+
         const items: LicenseCardData[] = list.map((r) => {
           const expDateStr = r.expiry_date ? String(r.expiry_date) : null;
           const days = daysUntil(expDateStr);
-          const name = String(r.staff_name ?? '직원');
+          const name = nameById.get(String(r.staff_id ?? '')) || '직원';
           return {
             id: String(r.id ?? ''),
             staffName: name,
             initial: name.charAt(0),
             cert: String(r.license_name ?? '자격'),
-            sub: String(r.sub_category ?? ''),
+            sub: String(r.license_type ?? ''),
             exp: formatExp(expDateStr, days),
             days,
             tone: expiryTone(days),

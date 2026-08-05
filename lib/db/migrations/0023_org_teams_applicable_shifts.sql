@@ -1,0 +1,16 @@
+-- 0023_org_teams_applicable_shifts.sql
+-- 8차 전수조사 FB4 · D03-006 — 관리자 팀관리 저장 실패 복구.
+--
+-- 문제: lib/data/org.ts 의 createOrgTeam/updateOrgTeam 이 클라이언트·서버 양 경로 모두
+-- `applicable_shifts`(팀별 적용 근무조 JSON 배열)를 페이로드에 넣는데, 운영/로컬 D1 의
+-- org_teams 는 id/company_name/division/team_name/sort_order/created_at 6컬럼뿐이었다.
+-- 이 컬럼은 lib/db/schema.ts 와 meta/0010_snapshot.json 에만 존재했고, **스냅샷이
+-- "이미 있다"고 기록하고 있어 `drizzle generate` 가 CREATE/ALTER 를 영구히 만들지 않는
+-- 사각지대**였다. 게다가 /api/d1/mutate 의 "미존재 컬럼 드롭" 방어는 실 DB 가 아니라
+-- schema.ts 를 기준으로 하므로, 이 컬럼만은 방어를 통과해 그대로 SQL 에 실려
+-- `no such column: applicable_shifts` 로 INSERT/UPDATE 가 통째로 실패했다.
+-- (읽기는 select('*') 라 무증상 → 증상이 "저장 버튼만 안 먹는다"로만 나타났다.)
+--
+-- 기존 행 보존: DEFAULT 를 주지 않으므로 기존 팀은 NULL 로 남는다.
+-- NULL = "적용 근무조 미지정" 이며 팀관리 UI 는 이미 falsy 를 미지정으로 처리한다(회귀 없음).
+ALTER TABLE `org_teams` ADD COLUMN `applicable_shifts` text;

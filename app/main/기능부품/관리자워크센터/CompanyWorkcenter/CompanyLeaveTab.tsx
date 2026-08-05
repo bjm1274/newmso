@@ -29,6 +29,18 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null;
 }
 
+/** crypto.randomUUID 미지원 브라우저 폴백 (CompanyPayrollTab 과 동일 규칙). */
+function safeUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 function toHolidayItem(r: Record<string, unknown>): HolidayItem {
   const kindRaw = typeof r.note === 'string' ? r.note : '법정';
   const kind: HolidayItem['kind'] =
@@ -125,6 +137,7 @@ export default function CompanyLeaveTab() {
   const [loading, setLoading] = useState(true);
   const [savingWelfare, setSavingWelfare] = useState(false);
   const [welfareSavedAt, setWelfareSavedAt] = useState<string | null>(null);
+  const [welfareSaveError, setWelfareSaveError] = useState<string | null>(null);
 
   // New Holiday Modal State
   const [showAddHolidayModal, setShowAddHolidayModal] = useState(false);
@@ -190,9 +203,25 @@ export default function CompanyLeaveTab() {
   const handleSaveWelfare = async () => {
     setSavingWelfare(true);
     setWelfareSavedAt(null);
+    setWelfareSaveError(null);
     try {
+      // 기존 행의 id 를 규정명 기준으로 재사용한다. company_welfare_policies.id 는
+      // PK NOT NULL 인데 예전 payload 에는 id 가 아예 없어, 테이블이 생긴 뒤에도
+      // INSERT 가 NOT NULL 제약으로 실패했을 코드였다(자매 탭 CompanyPayrollTab 과 동일 패턴).
+      const { data: existing, error: existingError } = await db
+        .from('company_welfare_policies')
+        .select('id, rule_name')
+        .eq('company_name', selectedCompany);
+      if (existingError) throw existingError;
+      const idByName = new Map(
+        (Array.isArray(existing) ? existing : [])
+          .filter(isRecord)
+          .map((r) => [String(r.rule_name), String(r.id)] as const),
+      );
+
       const { error } = await db.from('company_welfare_policies').upsert(
         welfareRules.map(r => ({
+          id: idByName.get(r.name) || safeUUID(),
           company_name: selectedCompany,
           rule_name: r.name,
           rule_value: r.rule })),
@@ -201,8 +230,12 @@ export default function CompanyLeaveTab() {
       if (error) throw error;
       setWelfareSavedAt(new Date().toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul' }));
     } catch (e) {
-      console.warn('[CompanyLeaveTab] save welfare error:', e);
-      setWelfareSavedAt(new Date().toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul' }) + ' (로컬 임시저장)');
+      // 예전에는 실패해도 "(로컬 임시저장)" 이라고 표시했다. 그런데 이 파일에는
+      // localStorage/sessionStorage/indexedDB 가 한 줄도 없어서 실제로는 React state 뿐이었고,
+      // 새로고침하면 편집 내용이 그대로 증발했다. 사용자는 저장됐다고 믿었다.
+      // → 실패는 실패라고 말한다.
+      console.error('[CompanyLeaveTab] save welfare error:', e);
+      setWelfareSaveError('저장 실패 — 다시 시도해 주세요');
     } finally {
       setSavingWelfare(false);
     }
@@ -357,6 +390,11 @@ export default function CompanyLeaveTab() {
                 {welfareSavedAt && (
                   <span className="text-[10px] text-emerald-600 font-semibold">
                     저장됨 {welfareSavedAt}
+                  </span>
+                )}
+                {welfareSaveError && (
+                  <span role="alert" className="text-[10px] text-red-600 font-semibold">
+                    {welfareSaveError}
                   </span>
                 )}
                 <SmBtn primary onClick={handleSaveWelfare} ariaLabel="경조사 규정 저장">

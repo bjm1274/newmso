@@ -100,9 +100,12 @@ const INITIAL_COUNTS: DocsCounts = {
   pendingSubmissions: 0 };
 
 // ─── DB row 타입 (KPI 집계용 — 좁게) ────────────────────────────────
+// employment_contracts 에는 계약 종료일 컬럼이 아예 없다(effective_date/start_date 뿐).
+// 예전 타입은 end_date / contract_end_date 를 선언하고 셀렉트에도 넣었지만 둘 다 부재
+// 컬럼이라 항상 null 이었고, 그래서 모든 계약이 "영구 계약 → 활성"으로 분류되고
+// **만료 임박은 구조적으로 언제나 0** 이었다. 만료일 정본은 크론(lib/contract-expiry-jobs)이
+// 쓰는 staff_members.permissions.contract_end_date 다 → 만료 집계는 그쪽으로 옮긴다.
 interface ContractLite {
-  end_date: string | null;
-  contract_end_date?: string | null;
   status?: string | null;
 }
 interface CertificateLite {
@@ -179,13 +182,15 @@ export default function DocsWorkcenter({
         const [contractRes, approvalsRes, staffRes, repoRes] = await Promise.all([
           d1
             .from('employment_contracts')
-            .select('end_date, contract_end_date, status'),
+            .select('status'),
+          // approvals 의 문서종류 컬럼은 `doc_type`(및 레거시 `type`)이다. `form_type` 은
+          // 없는 컬럼이라 증명서 판별이 항상 거짓 → 발급 대기 증명서 KPI 가 상시 0 이었다.
           d1
             .from('approvals')
-            .select('status, form_type'),
+            .select('status, doc_type, type'),
           d1
             .from('staff_members')
-            .select('id, status'),
+            .select('id, status, permissions, employment_type'),
           d1
             .from('document_repository')
             .select('created_by, category'),
@@ -197,37 +202,54 @@ export default function DocsWorkcenter({
         if (staffRes.error) throw staffRes.error;
         if (repoRes.error) throw repoRes.error;
 
-        // 계약: 활성/만료임박 집계
+        // 계약: 체결된 계약서 건수 = 활성 계약 (종료일 컬럼이 없어 이전과 동일 기준 유지)
         const contractRows = (contractRes.data as ContractLite[] | null) ?? [];
-        let activeContracts = 0;
-        let expiringContracts = 0;
-        for (const r of contractRows) {
-          const endDate = r.end_date ?? r.contract_end_date ?? null;
-          if (!endDate) {
-            // 영구 계약 — 활성으로 간주
-            activeContracts += 1;
-            continue;
-          }
-          const d = daysUntil(endDate);
-          if (d === null) continue;
-          if (d < 0) continue; // 이미 종료된 계약 제외
-          activeContracts += 1;
-          if (d <= 90) expiringContracts += 1;
-        }
+        const activeContracts = contractRows.length;
 
-        // 증명서: approvals 테이블에서 대기중/진행중인 증명서결재 건수 합산
-        const approvalRows = (approvalsRes.data || []) as Array<{ status: string | null; form_type: string | null }>;
+        // 증명서: approvals 에서 대기/진행중인 증명서 결재 건수.
+        // doc_type 이 정본이고 type 은 레거시 — 둘 다 본다.
+        const approvalRows = (approvalsRes.data || []) as Array<{
+          status: string | null;
+          doc_type: string | null;
+          type: string | null;
+        }>;
         const pendingCertificates = approvalRows.filter((r) => {
-          const isCert = String(r.form_type || '').includes('증명서') || String(r.form_type || '').includes('certificate');
+          const kind = `${r.doc_type || ''} ${r.type || ''}`;
+          const isCert = kind.includes('증명서') || kind.includes('certificate');
           const isPending = r.status === '대기' || r.status === 'pending' || r.status === '진행중' || r.status === '결재중';
           return isCert && isPending;
         }).length;
 
         // 서류: 직원별 미제출 서류 합산
-        const staffRows = (staffRes.data || []) as Array<{ id: string; status: string | null }>;
+        const staffRows = (staffRes.data || []) as Array<{
+          id: string;
+          status: string | null;
+          permissions: Record<string, unknown> | string | null;
+          employment_type: string | null;
+        }>;
         const repoRows = (repoRes.data || []) as Array<{ created_by: string | null; category: string | null }>;
 
         const activeStaff = staffRows.filter((s) => s.status === '재직');
+
+        // 만료 임박: 재직 계약직의 permissions.contract_end_date 기준 90일 이내.
+        // 크론(lib/contract-expiry-jobs)이 쓰는 것과 같은 SSOT 라 알림과 KPI 가 어긋나지 않는다.
+        let expiringContracts = 0;
+        for (const s of activeStaff) {
+          let perms: Record<string, unknown> = {};
+          try {
+            perms =
+              typeof s.permissions === 'string'
+                ? (JSON.parse(s.permissions) as Record<string, unknown>)
+                : (s.permissions as Record<string, unknown>) || {};
+          } catch {
+            perms = {};
+          }
+          const endRaw = perms.contract_end_date;
+          if (typeof endRaw !== 'string' || !endRaw.trim()) continue;
+          const d = daysUntil(endRaw.trim());
+          if (d === null || d < 0) continue;
+          if (d <= 90) expiringContracts += 1;
+        }
         let pendingSubmissions = 0;
 
         for (const staff of activeStaff) {

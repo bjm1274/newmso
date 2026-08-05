@@ -55,9 +55,12 @@ export default function WelfareDeviceSummary() {
       setLoading(true);
       setErrMsg(null);
       try {
+        // `manager_name` 은 medical_devices 에 없는 컬럼이다(11컬럼 어디에도 담당자가 없다).
+        // 셀렉트에 남아 있어도 SQLite 관용 동작 탓에 에러 없이 값만 비어 늘 '내부 관리' 로
+        // 렌더됐다 — 즉 없는 컬럼을 조회하는 비용만 내고 결과는 상수였다. 상수로 확정한다.
         const { data, error } = await db
           .from('medical_devices')
-          .select('id, name, location, last_inspection_date, next_inspection_date, manager_name')
+          .select('id, name, location, last_inspection_date, next_inspection_date')
           .order('next_inspection_date', { ascending: true, nullsFirst: false })
           .limit(6);
         if (cancelled) return;
@@ -73,7 +76,7 @@ export default function WelfareDeviceSummary() {
               location: String(r.location ?? '-'),
               last: formatDate(r.last_inspection_date),
               next: formatDate(r.next_inspection_date),
-              who: String(r.manager_name ?? '내부 관리'),
+              who: '내부 관리',
               status,
               tone,
             };

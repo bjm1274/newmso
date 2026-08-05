@@ -21,6 +21,7 @@ import { toast } from '@/lib/toast';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import { resolveCompanySealUrl } from '@/lib/company-brand-assets';
+import { STAFF_CERT_CONTEXT_SELECT } from '@/lib/staff-query-columns';
 import {
   openIssuedCertificatePrintView,
   type IssuedCertificate,
@@ -52,32 +53,27 @@ function getSessionUserId(): string | null {
   }
 }
 
+// D1 staff_members 실컬럼만 선언한다. 예전에는 duty/job_duty/responsibility/rank/
+// grade/level/base/meal/resigned_reason/resign_reason/profile_photo_url 11개를 함께
+// 선언·조회했는데 그 컬럼들은 D1 에 아예 없다. SQLite 관용 동작 탓에 쿼리가 실패하지
+// 않고 값 없는 키만 돌아와, "폴백이 동작하는 것처럼 보이지만 실은 항상 폴백"인 상태가
+// 조용히 유지됐다. 지금은 폴백 원천을 실컬럼(role / base_salary / meal_allowance)으로
+// 명시해 같은 결과를 정직하게 만든다.
 type StaffRow = {
   id?: string | null;
   name?: string | null;
   company?: string | null;
   department?: string | null;
   position?: string | null;
+  role?: string | null;
   joined_at?: string | null;
   join_date?: string | null;
   employee_no?: string | null;
-  duty?: string | null;
-  job_duty?: string | null;
-  responsibility?: string | null;
-  role?: string | null;
-  rank?: string | null;
-  grade?: string | null;
-  level?: string | null;
   base_salary?: number | null;
-  base?: number | null;
   meal_allowance?: number | null;
-  meal?: number | null;
   status?: string | null;
   resigned_at?: string | null;
   resign_date?: string | null;
-  resigned_reason?: string | null;
-  resign_reason?: string | null;
-  profile_photo_url?: string | null;
   profile_photo_path?: string | null;
   profile_photo_updated_at?: string | null;
   avatar_url?: string | null;
@@ -117,9 +113,7 @@ export async function issueAndPrintMyCert(
     // 본인 1건만 조회 (JM5: staffId 고정).
     const { data: staffData, error: staffError } = await db
       .from('staff_members')
-      .select(
-        'id, name, company, department, position, joined_at, join_date, employee_no, duty, job_duty, responsibility, role, rank, grade, level, base_salary, base, meal_allowance, meal, status, resigned_at, resign_date, resigned_reason, resign_reason, profile_photo_url, profile_photo_path, profile_photo_updated_at, avatar_url, photo_url, permissions',
-      )
+      .select(STAFF_CERT_CONTEXT_SELECT)
       .eq('id', staffId)
       .maybeSingle();
     if (staffError) throw staffError;
@@ -172,22 +166,21 @@ export async function issueAndPrintMyCert(
     const joinedAt = str(staff.joined_at) || str(staff.join_date);
     const resignedAt = str(staff.resigned_at) || str(staff.resign_date);
     const isResigned = String(staff.status ?? '').trim() === '퇴사';
-    const dutyLabel =
-      str(staff.duty) ||
-      str(staff.job_duty) ||
-      str(staff.responsibility) ||
-      str(staff.role) ||
-      null;
-    const rankLabel = str(staff.rank) || str(staff.grade) || str(staff.level) || null;
+    // 담당업무: 예전에는 duty→job_duty→responsibility→role 4단 폴백이었으나 앞 3개는
+    // 부재 컬럼이라 언제나 role 로 떨어졌다. 실제 동작을 그대로 남기고 표기만 정직하게.
+    const dutyLabel = str(staff.role) || null;
+    // 직급: rank/grade/level 3개 모두 부재 컬럼이라 이 값은 처음부터 항상 null 이었다.
+    // 직급 표기는 position 이 담당하므로 여기서는 null 을 유지한다(렌더 결과 동일).
+    const rankLabel: string | null = null;
     const employeeNo = str(staff.employee_no) || (staff.id ? String(staff.id) : null);
 
     // 급여계열 증명서의 기준 급여(base_salary 등) 의존 — 누락 시 '-' 표기.
     let extraInfoRows: Array<{ label: string; value: string }> | null = null;
     if (SALARY_CERT_TYPES.has(certType)) {
-      const base = Number(staff.base_salary ?? staff.base ?? 0);
-      const meal = Number(staff.meal_allowance ?? staff.meal ?? 0);
-      const hasSalary =
-        (staff.base_salary != null || staff.base != null) && Number.isFinite(base);
+      // base/meal 는 부재 컬럼이라 폴백이 발동한 적이 없다 → 실컬럼만 사용.
+      const base = Number(staff.base_salary ?? 0);
+      const meal = Number(staff.meal_allowance ?? 0);
+      const hasSalary = staff.base_salary != null && Number.isFinite(base);
       const total = (Number.isFinite(base) ? base : 0) + (Number.isFinite(meal) ? meal : 0);
       extraInfoRows = [
         { label: '기준 급여', value: hasSalary ? `${total.toLocaleString()}원` : '-' },
@@ -216,7 +209,8 @@ export async function issueAndPrintMyCert(
       profilePhotoUrl: getProfilePhotoUrl(staff),
       extraInfoRows,
       resignedAt,
-      resignationReason: str(staff.resigned_reason) || str(staff.resign_reason) || '일신상의 사정',
+      // 퇴사사유 컬럼(resigned_reason/resign_reason)은 D1 에 없다 → 기본 문구 고정.
+      resignationReason: '일신상의 사정',
       isResigned };
 
     openIssuedCertificatePrintView(cert, context);

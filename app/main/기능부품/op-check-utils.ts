@@ -203,7 +203,10 @@ export function normalizeInventoryRows(rows: unknown) {
     .map((row) => {
       const item = (row || {}) as Record<string, unknown>;
       const id = String(item.id || '').trim();
-      const name = String(item.name || '').trim();
+      // 재고 마스터(`inventory`)의 품목명 정본은 `item_name` 이다. `name` 은 뒤늦게
+      // 추가된 별칭 컬럼이라 대부분의 행이 NULL 이다. 예전에는 `name` 만 보고 비어 있으면
+      // 행을 통째로 버렸는데, 그러면 실재 품목이 조회돼도 매칭 맵이 비어 차감이 전량 skip 된다.
+      const name = String(item.item_name || item.name || '').trim();
       if (!id || !name) return null;
 
       return {

@@ -816,84 +816,15 @@ export async function requestAttendanceClarificationMulti(input: {
   }
 }
 
-/**
- * 팀 근태이상 row 정상 처리.
- *
- * PC AbnormalWorkcenter.tsx + resolveStaffAbnormalRecords 와 같은 정책:
- *   1) attendances(복수) status='present', late_minutes=0, early_leave_minutes=0
- *   2) attendance(단수) status='정상'  ← 마이페이지가 보는 테이블
- *   3) 'erp-attendance-updated' CustomEvent dispatch
- *
- * 모바일은 row 단위로 단순화 — 최근 ABNORMAL_LOOKBACK_DAYS(28)일 abnormal row 전체를 일괄 보정한다
- * (TeamTab 카드가 staff 단위 집계이므로 정책 일치).
- * lookback 윈도우는 lib/attendance-abnormal SSOT. clarify 쓰기 경로는 모바일 전용.
- */
-export async function resolveTeamAbnormalForStaff(input: {
-  user: ErpUser | null;
-  targetStaffId: string;
-}): Promise<AbnormalActionResult> {
-  const { user, targetStaffId } = input;
-  if (!canMutateTeamAbnormal(user)) {
-    return { ok: false, reason: 'no_permission' };
-  }
-  if (!targetStaffId) return { ok: false, reason: 'not_found' };
-
-  try {
-    // PC AbnormalWorkcenter 와 동일 28일 lookback (오늘 포함)
-    const sinceStr = getAbnormalLookbackSince(ABNORMAL_LOOKBACK_DAYS);
-
-    // 1) 어떤 날짜가 abnormal 인지 식별 — attendance(단수) 기준
-    const { data: rawDates, error: fetchErr } = await db
-      .from('attendance')
-      .select('date, status')
-      .eq('staff_id', targetStaffId)
-      .gte('date', sinceStr)
-      .in('status', ['late', 'early_leave', 'missing']);
-
-    if (fetchErr) throw fetchErr;
-
-    const dates = Array.from(
-      new Set(
-        ((rawDates ?? []) as Record<string, unknown>[])
-          .map((r) => String(r.date ?? ''))
-          .filter(Boolean),
-      ),
-    ).sort();
-
-    if (dates.length === 0) {
-      return { ok: true, updatedDates: [] };
-    }
-
-    // 2) dual-write SSOT — attendance + attendances status 동시 정상화
-    const { writeAttendanceStatus } = await import('@/lib/attendance-sync');
-    await Promise.all(
-      dates.map((d) =>
-        writeAttendanceStatus({
-          staffId: targetStaffId,
-          date: d,
-          legacyStatus: '정상',
-          modernStatus: 'present',
-        }),
-      ),
-    );
-
-    // 4) 마이페이지 KPI 재집계용 broadcast
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('erp-attendance-updated', {
-          detail: {
-            staffId: targetStaffId,
-            dates,
-            source: 'mobile-abnormal' } }),
-      );
-    }
-
-    return { ok: true, updatedDates: dates };
-  } catch (err) {
-    console.error('[mobile-hr] resolveTeamAbnormalForStaff failed', err);
-    return { ok: false, reason: 'unknown' };
-  }
-}
+// [삭제됨] resolveTeamAbnormalForStaff (8차 FB4 · D09-012)
+//
+// 직원 단위로 최근 28일 근태이상을 한 번에 정상 처리하던 함수였다. 그런데
+// `attendance`(단수) 테이블의 status 는 한글('지각'/'조퇴'/'결근'/'정상')인데
+// 필터가 영문 `['late','early_leave','missing']` 이라 **어떤 행도 매치되지 않았다** —
+// 항상 `{ ok: true, updatedDates: [] }` 를 돌려주는 no-op 이었고, 호출부도 0곳이었다
+// (실사용 경로는 아래 resolveTeamAbnormalForStaffOnDate 하나뿐이다).
+// 한글 status 로 고쳐 되살리면 지금까지 한 번도 검증된 적 없는 일괄 변경 경로가
+// 갑자기 살아나 28일치 근태를 한꺼번에 덮어쓰게 된다 → 되살리지 않고 제거한다.
 
 // ─────────────────────────────────────────────────────────────
 // 팀 근태이상 — 일자별 row 단위 hook & 액션 (JM2, JM3, JM5)

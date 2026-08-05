@@ -64,11 +64,16 @@ export async function fetchTodayCheckedInCount(): Promise<number> {
   return fetcher(
     `dashboard:attendances:count:checked-in:${today}`,
     async () => {
+      // 예전에는 `.eq('date', today).not('check_in', 'is', null)` 이었다. 두 컬럼은
+      // 구 `attendance`(단수) 테이블 이름이라 `attendances` 에는 없다. SQLite 가
+      // 큰따옴표 토큰을 문자열 리터럴로 해석하는 바람에 WHERE 가 `'date' = '2026-08-05'`
+      // 즉 상시 거짓이 되어, 에러 없이 카운트가 항상 0 이었다. `count ?? 0` 폴백까지
+      // 겹쳐 "오늘 출근자 0명"이 정상값처럼 보였다.
       const { count } = await db
         .from('attendances')
         .select('id', { count: 'exact', head: true })
-        .eq('date', today)
-        .not('check_in', 'is', null);
+        .eq('work_date', today)
+        .not('check_in_time', 'is', null);
       return count ?? 0;
     },
     { ttl: WIDGET_TTL },

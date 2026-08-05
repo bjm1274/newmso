@@ -534,25 +534,29 @@ export default function OperationCheckView({
             relationNames: ['surgery_templates'],
             columnNames: ['sort_order', 'is_active'] },
         ),
+        // 재고 마스터는 `inventory` 다. 예전에는 `inventory_items` 라는 **존재한 적 없는
+        // 테이블**을 조회했고, isMissingRelationError 가 그 실패를 삼켜 항상 빈 배열로
+        // 폴백했다. 그 결과 inventoryNameMap 이 늘 비어 차감이 전량 skip 됐는데도
+        // "소모품 0종 차감" 이 success 토스트로 떴다(D07-019).
         withOptionalQueryFallback<InventoryItem[]>(
           async (): Promise<QueryResult<InventoryItem[]>> =>
             withMissingColumnsFallback<InventoryItem[]>(
               async (omittedColumns): Promise<QueryResult<InventoryItem[]>> => {
-                const selectedColumns = ['id', 'name', 'unit', 'quantity', 'company', 'company_id', 'department']
+                const selectedColumns = ['id', 'name', 'item_name', 'quantity', 'company', 'company_id', 'department']
                   .filter((columnName) => !omittedColumns.has(columnName))
                   .join(', ');
                 const result = await db
-                  .from('inventory_items')
+                  .from('inventory')
                   .select(selectedColumns)
-                  .order('name', { ascending: true });
+                  .order('item_name', { ascending: true });
                 return result as QueryResult<InventoryItem[]>;
               },
-              ['unit', 'quantity', 'company', 'company_id', 'department'],
+              ['item_name', 'quantity', 'company', 'company_id', 'department'],
             ),
           {
             fallbackData: [] as InventoryItem[],
-            relationNames: ['inventory_items', 'inventory'],
-            columnNames: ['unit', 'quantity', 'company', 'company_id', 'department'] },
+            relationNames: ['inventory'],
+            columnNames: ['item_name', 'quantity', 'company', 'company_id', 'department'] },
         ),
       ]);
 
@@ -1902,23 +1906,62 @@ export default function OperationCheckView({
   const deductInventoryItems = useCallback(async (items: ChecklistItemDraft[]) => {
     setDeductingInventory(true);
     try {
+      // 예전 구현은 `inventory_items` 를 직접 UPDATE 했다. 문제가 넷이었다.
+      //  (a) 그 테이블이 없어 항상 no-op — 그런데도 success 토스트가 떴다
+      //  (b) 직접 UPDATE 라 inventory_logs 에 이력이 남지 않았다(재고 SSOT 우회)
+      //  (c) 읽어 둔 quantity 기반 read-modify-write 라 동시 차감에 취약했다
+      //  (d) Math.max(0, ...) 이 부족분을 소리 없이 절삭했다
+      // → 재고 전표 API(postStockMovement)로 일원화한다. 수량·로그·마감/음수 가드가
+      //    서버 한 곳에서 처리되고, 실패는 실패로 보고된다.
+      const { postStockMovement } = await import('@/lib/inventory-stock-client');
       let successCount = 0;
+      const unmatched: string[] = [];
+      const failed: string[] = [];
+
       for (const item of items) {
         const match = inventoryNameMap[normalizeLookupValue(item.name)];
-        if (!match) continue;
-        const newQty = Math.max(0, (match.quantity || 0) - Number(item.quantity || 0));
-        const { error } = await db
-          .from('inventory_items')
-          .update({ quantity: newQty })
-          .eq('id', match.id);
-        if (!error) {
+        if (!match) {
+          unmatched.push(String(item.name || '').trim() || '(이름 없음)');
+          continue;
+        }
+        const qty = Number(item.quantity || 0);
+        if (!Number.isFinite(qty) || qty <= 0) continue;
+
+        const res = await postStockMovement({
+          itemId: String(match.id),
+          mode: 'delta',
+          delta: -qty,
+          type: '소모',
+          changeType: 'OP사용',
+          notes: `OP체크 소모품 차감 — ${item.name}` });
+        if (res.ok) {
           setInventoryItems((prev) =>
-            prev.map((inv) => (inv.id === match.id ? { ...inv, quantity: newQty } : inv))
+            prev.map((inv) =>
+              inv.id === match.id ? { ...inv, quantity: Math.max(0, (inv.quantity || 0) - qty) } : inv,
+            ),
           );
           successCount++;
+        } else {
+          failed.push(`${item.name}(${res.error || '실패'})`);
         }
       }
-      toast(`소모품 ${successCount}종 재고를 차감했습니다.`, 'success');
+
+      // 성공/미매칭/실패를 구분해 알린다. 예전에는 전부 skip 돼도 success 였다.
+      if (successCount > 0) {
+        toast(`소모품 ${successCount}종 재고를 차감했습니다.`, 'success');
+      }
+      if (unmatched.length > 0) {
+        toast(
+          `재고에서 찾지 못해 차감하지 못한 품목 ${unmatched.length}종: ${unmatched.join(', ')}`,
+          'warning',
+        );
+      }
+      if (failed.length > 0) {
+        toast(`차감 실패 ${failed.length}종: ${failed.join(', ')}`, 'error');
+      }
+      if (successCount === 0 && unmatched.length === 0 && failed.length === 0) {
+        toast('차감할 소모품이 없습니다.', 'warning');
+      }
     } catch (err) {
       console.error('재고 차감 실패', err);
       toast('재고 차감 중 오류가 발생했습니다.', 'error');

@@ -34,6 +34,7 @@ import {
   type IssuedCertificateContext,
 } from '../마이페이지/certificate-print-utils';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
+import { STAFF_DOC_CONTEXT_SELECT } from '@/lib/staff-query-columns';
 import ArchivedDocumentView from './ArchivedDocumentView';
 import LaborContractViewer from './LaborContractViewer';
 import { openDocumentPrintView } from './document-print-utils';
@@ -49,14 +50,7 @@ type StaffRow = {
   joined_at?: string | null;
   join_date?: string | null;
   employee_no?: string | null;
-  duty?: string | null;
-  job_duty?: string | null;
-  responsibility?: string | null;
   role?: string | null;
-  rank?: string | null;
-  grade?: string | null;
-  level?: string | null;
-  profile_photo_url?: string | null;
   profile_photo_path?: string | null;
   profile_photo_updated_at?: string | null;
   avatar_url?: string | null;
@@ -182,11 +176,11 @@ export default function DocumentRepository({
         shouldFetchCerts
           ? certQuery
           : Promise.resolve({ data: [] as IssuedCertRow[], error: null }),
-        db
-          .from('staff_members')
-          .select(
-            'id, name, company, department, position, joined_at, join_date, employee_no, duty, job_duty, responsibility, role, rank, grade, level, profile_photo_url, profile_photo_path, profile_photo_updated_at, avatar_url, photo_url',
-          ),
+        // 예전에는 duty/job_duty/responsibility/rank/grade/level/profile_photo_url 처럼
+        // D1 에 없는 컬럼 7개를 함께 셀렉트했다. 쿼리가 에러로 죽지는 않았지만(SQLite 가
+        // 큰따옴표 토큰을 문자열 리터럴로 봐줌) 반환 키가 `"duty"` 형태로 망가져 들어와
+        // 어디서도 읽히지 않았고, 그래서 아무도 드리프트를 눈치채지 못했다.
+        db.from('staff_members').select(STAFF_DOC_CONTEXT_SELECT),
         db.from('contract_templates').select('company_name, seal_url'),
         db.from('companies').select('name, logo_url'),
       ]);
@@ -215,6 +209,11 @@ export default function DocumentRepository({
           );
         });
 
+      // 직원 컨텍스트 조회 실패는 화면을 죽이지 않지만(문서 목록은 살아 있다) 조용히
+      // 사라지면 부서/직위/사진이 통째로 비는 원인을 추적할 수 없다 → 최소한 로그는 남긴다.
+      if (staffRes.error) {
+        console.warn('[문서보관함] staff_members 조회 실패 — 직원 컨텍스트 누락', staffRes.error);
+      }
       const staffList = (staffRes.data || []) as StaffRow[];
       const newStaffMap: Record<string, StaffRow> = {};
       for (const s of staffList) {
@@ -408,9 +407,10 @@ export default function DocumentRepository({
       ).trim();
       const sealUrl = sealMap[companyName] || '';
       const companyLogoUrl = logoMap[companyName] || '';
-      const duty =
-        staff?.duty || staff?.job_duty || staff?.responsibility || staff?.role || null;
-      const rank = staff?.rank || staff?.grade || staff?.level || null;
+      // duty/job_duty/responsibility 및 rank/grade/level 은 D1 에 없는 컬럼이라
+      // 폴백 체인이 언제나 마지막 항목까지 흘렀다. 실제 동작(role 사용 / rank 없음)만 남긴다.
+      const duty = staff?.role || null;
+      const rank: string | null = null;
       return {
         companyLabel: companyName || 'SY INC.',
         staffName: staff?.name || cert.staff_members?.name || null,

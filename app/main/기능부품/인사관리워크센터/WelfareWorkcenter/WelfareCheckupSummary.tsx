@@ -50,9 +50,12 @@ export default function WelfareCheckupSummary() {
         const year = new Date().getFullYear();
         const yearStart = `${year}-01-01`;
         const yearEnd = `${year}-12-31`;
+        // 검진기관 컬럼은 `hospital` 이다. 예전에는 `place` 를 셀렉트했는데 D1 에 없는
+        // 컬럼이라, SQLite 의 큰따옴표-문자열 관용 동작 때문에 에러 없이 값만 사라졌고
+        // 화면에는 언제나 '-' 가 찍혔다(에러가 아니라 조용한 공백이라 아무도 신고하지 않았다).
         const { data, error } = await db
           .from('health_checkups')
-          .select('id, staff_name, place, scheduled_date, status')
+          .select('id, staff_name, hospital, scheduled_date, status')
           .gte('scheduled_date', yearStart)
           .lte('scheduled_date', yearEnd)
           .order('scheduled_date', { ascending: false })
@@ -73,7 +76,7 @@ export default function WelfareCheckupSummary() {
         const display: CheckupRow[] = list.slice(0, 4).map((r) => ({
           id: String(r.id ?? ''),
           staffName: String(r.staff_name ?? '직원'),
-          place: String(r.place ?? '-'),
+          place: String(r.hospital ?? '-'),
           when: formatDateCompact(r.scheduled_date),
           status: String(r.status ?? '미수검'),
           tone: STATUS_TONE[String(r.status ?? '')] ?? 'muted',
