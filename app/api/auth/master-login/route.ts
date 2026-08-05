@@ -214,7 +214,10 @@ export async function POST(request: NextRequest) {
   // 아이디 단위로 차단 (IP 기반 X → 다른 사람에게 영향 없음)
   const MAX_FAILED_ATTEMPTS = 10; // 동일 아이디로 10회 연속 실패 시 차단
   const WINDOW_MS = 15 * 60 * 1000; // 15분
-  const rateCheck = await checkRateLimit(loginId, MAX_FAILED_ATTEMPTS, WINDOW_MS);
+  // failClosed: D1 장애·미바인딩으로 판정이 불가능하면 통과가 아니라 차단이다.
+  // 예전에는 이 실패 경로가 조용히 allowed:true 로 떨어져, D1 이 죽은 동안
+  // 15분·10회 잠금이 통째로 사라지고 무제한 대입이 가능했다.
+  const rateCheck = await checkRateLimit(loginId, MAX_FAILED_ATTEMPTS, WINDOW_MS, { failClosed: true });
   if (!rateCheck.allowed) {
     return failureResponse('비밀번호를 너무 많이 틀렸습니다. 15분 후 다시 시도해주세요.', 429);
   }

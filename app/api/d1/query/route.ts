@@ -371,7 +371,21 @@ export async function POST(request: Request) {
       const countResult = await db.run(buildSelectSql(countPayload));
       const rawRows = ((countResult as { results?: unknown[] }).results ?? []) as Array<Record<string, unknown>>;
       const filtered = await filterByPolicy(db, claims, payload.table, rawRows);
-      return NextResponse.json({ ok: true, count: filtered.length });
+
+      // 캡에 닿았으면 이 count 는 전체가 아니라 "최대 MAX_LIMIT 행까지 세어 본 값"이다.
+      // 예전에는 이 사실을 응답에 전혀 싣지 않아, 1000행이 넘는 테이블에서
+      // 비관리자만 조용히 과소 집계된 숫자를 진짜 총계로 표시했다
+      // (관리자는 SQL COUNT 경로라 정확해서 증상이 재현되지 않았다).
+      const capped = rawRows.length >= MAX_LIMIT;
+      if (capped) {
+        console.warn(
+          `[d1/query] count 캡 도달: table=${payload.table} scanned=${rawRows.length} (MAX_LIMIT=${MAX_LIMIT}) — 과소 집계 가능`,
+        );
+      }
+      return NextResponse.json({
+        ok: true,
+        count: filtered.length,
+        ...(capped ? { approximate: true, capped: true, scanLimit: MAX_LIMIT } : {}) });
     }
 
     // ─────────────────────────────────────────────────────────────

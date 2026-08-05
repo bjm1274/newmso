@@ -16,13 +16,29 @@ async function authorizeWebhookRequest(request: NextRequest) {
   const url = new URL(request.url);
   const headerToken = request.headers.get('x-webhook-token')?.trim();
   const queryToken = url.searchParams.get('token')?.trim();
-  const providedToken = headerToken || queryToken;
 
-  // 보안: query string token은 URL/액세스 로그/리퍼러에 노출 위험.
-  // header(`x-webhook-token`)로 전환 권장 — 외부 발신측 전환 확인 후 query fallback 제거 예정.
+  // query string token 폴백은 기본 거부다.
+  //
+  // 예전에는 `headerToken || queryToken` 으로 무조건 받아 주고 console.warn 만 남겼다.
+  // 토큰이 URL 에 실리면 CDN·리버스프록시·브라우저 리퍼러 로그에 평문으로 남는다 —
+  // 즉 "경고를 찍는다"는 것 외에 아무 강제력이 없어 전환이 영원히 미뤄졌다.
+  // 발신측 전환이 아직 안 끝난 상황에 대비해 탈출구만 환경변수로 남기고,
+  // 그 경우에도 만료 안내를 로그로 남긴다.
+  const allowQueryToken =
+    String(process.env.VIRTUAL_ACCOUNT_WEBHOOK_ALLOW_QUERY_TOKEN ?? '').trim() === '1';
   if (queryToken && !headerToken) {
-    console.warn('[virtual-account-webhook] DEPRECATED: query string token detected. Sender must switch to x-webhook-token header.');
+    if (allowQueryToken) {
+      console.warn(
+        '[virtual-account-webhook] DEPRECATED: query string token 을 한시 허용 중입니다. ' +
+          '발신측을 x-webhook-token 헤더로 전환한 뒤 VIRTUAL_ACCOUNT_WEBHOOK_ALLOW_QUERY_TOKEN 을 제거하세요.',
+      );
+    } else {
+      console.error(
+        '[virtual-account-webhook] query string token 거부 — 발신측은 x-webhook-token 헤더를 사용해야 합니다.',
+      );
+    }
   }
+  const providedToken = headerToken || (allowQueryToken ? queryToken : undefined);
 
   if (expectedToken && providedToken === expectedToken) {
     return {

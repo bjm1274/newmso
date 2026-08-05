@@ -6,6 +6,7 @@ import {
   resolveLatestSessionUser } from '@/lib/server-session';
 // SSOT size: @/lib/upload-constants
 import { MAX_FILE_SIZE_BYTES } from '@/lib/upload-constants';
+import { ALLOWED_APPLICATION_MIME_TYPES, hasBlockedUploadExtension } from '@/lib/upload-mime';
 
 /**
  * POST /api/approval/upload
@@ -17,12 +18,11 @@ import { MAX_FILE_SIZE_BYTES } from '@/lib/upload-constants';
 
 export const dynamic = 'force-dynamic';
 
-const ALLOWED_MIME_PREFIXES = ['image/', 'application/pdf', 'text/', 'application/'];
-const BLOCKED_MIMES = new Set([
-  'application/x-msdownload',
-  'application/x-executable',
-  'application/x-sh',
-]);
+// 예전에는 `ALLOWED_MIME_PREFIXES` 마지막 원소가 `'application/'` 이었다.
+// 즉 application/* 전체가 허용이고 실행파일 3종만 블랙리스트로 빠지는 구조라,
+// 목록에 없는 이름(application/x-msdos-program 등)으로 신고하면 무엇이든 통과했다.
+// 화이트리스트(ALLOWED_APPLICATION_MIME_TYPES) + 확장자 블록으로 뒤집는다.
+const ALLOWED_MIME_PREFIXES = ['image/', 'video/', 'audio/', 'text/'];
 
 type ApprovalUploadRequest = {
   fileName?: string;
@@ -39,7 +39,7 @@ function normalizeMime(raw: string): string {
 }
 
 function isAllowedMime(mime: string): boolean {
-  if (BLOCKED_MIMES.has(mime)) return false;
+  if (ALLOWED_APPLICATION_MIME_TYPES.has(mime)) return true;
   return ALLOWED_MIME_PREFIXES.some((prefix) => mime.startsWith(prefix));
 }
 
@@ -70,6 +70,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     if (!rawFileName) {
       return NextResponse.json({ error: '파일명이 필요합니다.' }, { status: 400 });
+    }
+    // 신고 MIME 은 클라이언트가 자유롭게 바꿀 수 있으므로 확장자도 함께 본다.
+    if (hasBlockedUploadExtension(rawFileName)) {
+      return NextResponse.json(
+        { error: '실행 파일 형식은 첨부할 수 없습니다.' },
+        { status: 415 },
+      );
     }
     if (!isAllowedMime(mime)) {
       return NextResponse.json(

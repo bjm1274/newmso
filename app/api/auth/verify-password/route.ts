@@ -31,7 +31,11 @@ export async function POST(request: Request) {
 
     // Rate limit: 5분당 10회 per user
     const rateKey = `verify-password:${String(session.user.id)}`;
-    const rate = await checkRateLimit(rateKey, VERIFY_PW_RATE_LIMIT_MAX, VERIFY_PW_RATE_LIMIT_WINDOW_MS);
+    // failClosed: 판정 불가(D1 장애·미바인딩) 시 통과가 아니라 차단.
+    // 예전에는 조용히 통과시켜 본인확인 비밀번호 대입의 상한이 사라졌다.
+    const rate = await checkRateLimit(rateKey, VERIFY_PW_RATE_LIMIT_MAX, VERIFY_PW_RATE_LIMIT_WINDOW_MS, {
+      failClosed: true,
+    });
     if (!rate.allowed) {
       return NextResponse.json(
         { verified: false, error: '비밀번호 확인 요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.' },

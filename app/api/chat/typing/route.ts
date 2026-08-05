@@ -149,6 +149,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const userId = String(session.user.id ?? session.user.user_id ?? '').trim();
   const roomId = (req.nextUrl.searchParams.get('room_id') ?? '').trim();
 
+  // SessionUser.id 는 `string | null` 이라 빈 문자열이 될 수 있다.
+  // 예전에는 GET 만 빈 userId 를 통과시키고 아래 멤버십 검사를 `if (userId)` 로 감싸
+  // **검사 자체를 건너뛰었다** — 같은 파일의 POST/DELETE 는 빈 userId 를 401 로 막는데
+  // GET 만 비대칭으로 열려 있어, 세션 id 가 비면 임의 방의 입력중 목록을 읽을 수 있었다.
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   if (!roomId) {
     return NextResponse.json({ error: 'room_id required' }, { status: 400 });
   }
@@ -160,11 +168,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const db = getD1Drizzle(d1);
 
-  if (userId) {
-    const membership = await assertChatRoomMember(db, roomId, userId);
-    if (!membership.ok) {
-      return NextResponse.json({ error: membership.error }, { status: membership.status });
-    }
+  const membership = await assertChatRoomMember(db, roomId, userId);
+  if (!membership.ok) {
+    return NextResponse.json({ error: membership.error }, { status: membership.status });
   }
 
   // updated_at이 TTL 이내인 행 — SQLite datetime 연산으로 필터

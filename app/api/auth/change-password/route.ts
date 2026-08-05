@@ -28,7 +28,11 @@ export async function POST(request: Request) {
 
     // Rate limit: 5분당 10회 per user
     const rateKey = `change-password:${String(session.user.id)}`;
-    const rate = await checkRateLimit(rateKey, CHANGE_PW_RATE_LIMIT_MAX, CHANGE_PW_RATE_LIMIT_WINDOW_MS);
+    // failClosed: 판정 불가(D1 장애·미바인딩) 시 통과가 아니라 차단.
+    // 예전에는 조용히 통과시켜 현재 비밀번호 대입 시도의 상한이 사라졌다.
+    const rate = await checkRateLimit(rateKey, CHANGE_PW_RATE_LIMIT_MAX, CHANGE_PW_RATE_LIMIT_WINDOW_MS, {
+      failClosed: true,
+    });
     if (!rate.allowed) {
       return NextResponse.json(
         { ok: false, error: '비밀번호 변경 요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.' },

@@ -47,18 +47,29 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     // 멤버십 필터: 비멤버 방 커서 쓰기를 차단. 존재하지 않거나 비멤버인 방은 제외.
     // (배치 갱신 중 일부 방만 실패해도 멤버 방 커서는 저장)
+    //
+    // 예전에는 `let allowedRoomIds = roomIds;`(= 전부 통과)로 시작해
+    // `if (d1)` 일 때만 좁혔다. 즉 바인딩이 없으면 멤버십 필터가 통째로 사라지는
+    // fail-open 구조였다. 지금은 upsertRoomReadCursors 가 D1 없이 throw 해서
+    // 결과적으로 500 이 나지만, 나중에 로컬 폴백이 하나 추가되는 순간
+    // 비멤버 방 커서 쓰기가 그대로 열린다. 순서를 뒤집어 fail-closed 로 둔다.
     const d1 = await getD1Binding();
-    let allowedRoomIds = roomIds;
-    if (d1) {
+    if (!d1) {
+      console.error('[chat/read-cursors] D1 binding 없음 — 멤버십 검증 불가로 거부');
+      return NextResponse.json(
+        { ok: false, error: 'D1 binding not available' },
+        { status: 500 },
+      );
+    }
+    const allowedRoomIds: string[] = [];
+    {
       const db = getD1Drizzle(d1);
-      const filtered: string[] = [];
       for (const roomId of roomIds) {
         const room = await loadChatRoomMembership(db, roomId);
         if (room && canAccessChatRoom(room, userId)) {
-          filtered.push(roomId);
+          allowedRoomIds.push(roomId);
         }
       }
-      allowedRoomIds = filtered;
     }
 
     if (allowedRoomIds.length === 0) {

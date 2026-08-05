@@ -5,9 +5,19 @@
  * 레이트리밋이 사실상 무효다. D1 테이블(rate_limit_attempts)에 상태를 영속해
  * Workers 전체에서 실질적인 차단이 동작하도록 한다.
  *
- * Graceful Degradation:
+ * Graceful Degradation (failClosed 미지정 시):
  *   D1 binding을 가져올 수 없는 환경(로컬 dev 등)에서는 레이트리밋을 건너뛰되
- *   로그를 남기고 로그인 자체는 막지 않는다.
+ *   로그를 남기고 요청 자체는 막지 않는다.
+ *
+ * fail-closed 옵션:
+ *   예전에는 실패 경로가 **전부** `allowed: true` 였다. D1 장애·바인딩 누락·
+ *   `rate_limit_attempts` 테이블/인덱스 유실 중 하나만 발생해도 로그인 잠금이
+ *   조용히 사라져 무제한 온라인 대입이 가능했다(관측 수단도 console 뿐이었다).
+ *   MEMORY 의 "D1 복원은 인덱스를 잃는다" 사례처럼 실제로 일어난 적 있는
+ *   시나리오라, 인증 계열 호출부는 `{ failClosed: true }` 로 넘겨
+ *   판정 불가 = 차단(429)으로 바꾼다.
+ *   운영 중 D1 이 오래 죽어 전면 로그인 불가가 되는 최악을 대비해
+ *   `RATE_LIMIT_FAIL_OPEN=1` 환경변수로만 예전 동작으로 되돌릴 수 있다.
  *
  * 윈도우 리셋:
  *   다음 접근 시 window_start + windowMs < now 이면 카운트를 초기화한다.
@@ -50,6 +60,46 @@ async function resolveD1(): Promise<D1Database | undefined> {
     console.warn('[rate-limit] D1 binding 획득 실패, 레이트리밋 건너뜀:', err);
     return undefined;
   }
+}
+
+/** 레이트리밋 판정이 불가능했던 횟수 — 조용한 무력화를 관측 가능하게 하는 카운터. */
+let degradedCount = 0;
+
+export function getRateLimitDegradedCount(): number {
+  return degradedCount;
+}
+
+export interface RateLimitOptions {
+  /**
+   * 판정 불가(D1 미바인딩·쿼리 오류·RETURNING 공백) 시 차단할지 여부.
+   * 로그인/잠금해제 등 인증 계열은 true 로 넘긴다.
+   */
+  failClosed?: boolean;
+}
+
+/** fail-closed 강제 해제 탈출구 — 운영 장애 시에만 사용한다. */
+function failOpenOverride(): boolean {
+  return String(process.env.RATE_LIMIT_FAIL_OPEN ?? '').trim() === '1';
+}
+
+/**
+ * 판정 불가 상황의 단일 처리점.
+ * 예전에는 각 경로가 조용히 `{ allowed: true }` 를 돌려줘 로그 한 줄 외에
+ * 아무 흔적이 없었다. 여기로 모아 카운터를 올리고 태그를 고정한다.
+ */
+function degrade(
+  where: string,
+  reason: string,
+  options?: RateLimitOptions,
+): { allowed: boolean; retryAfterSec?: number; degraded: true } {
+  degradedCount += 1;
+  const closed = options?.failClosed === true && !failOpenOverride();
+  console.error(
+    `[rate-limit][DEGRADED] ${where}: ${reason} — ${closed ? 'fail-closed(차단)' : 'fail-open(통과)'} (누적 ${degradedCount}회)`,
+  );
+  return closed
+    ? { allowed: false, retryAfterSec: 30, degraded: true }
+    : { allowed: true, degraded: true };
 }
 
 /**
@@ -108,11 +158,12 @@ export async function checkRateLimit(
   key: string,
   maxAttempts: number,
   windowMs: number,
-): Promise<{ allowed: boolean; retryAfterSec?: number }> {
+  options?: RateLimitOptions,
+): Promise<{ allowed: boolean; retryAfterSec?: number; degraded?: boolean }> {
   const d1 = await resolveD1();
   if (!d1) {
-    // 로컬 dev 환경 — 레이트리밋 비활성
-    return { allowed: true };
+    // 로컬 dev 환경 — 레이트리밋 비활성 (인증 계열은 failClosed 로 차단)
+    return degrade('checkRateLimit', 'D1 binding 없음', options);
   }
 
   try {
@@ -134,8 +185,7 @@ export async function checkRateLimit(
 
     return { allowed: true };
   } catch (err) {
-    console.error('[rate-limit] checkRateLimit D1 오류, 레이트리밋 건너뜀:', err);
-    return { allowed: true };
+    return degrade('checkRateLimit', `D1 오류: ${err instanceof Error ? err.message : String(err)}`, options);
   }
 }
 
@@ -149,18 +199,21 @@ export async function consumeRateLimit(
   key: string,
   maxAttempts: number,
   windowMs: number,
-): Promise<{ allowed: boolean; retryAfterSec?: number; count?: number }> {
+  options?: RateLimitOptions,
+): Promise<{ allowed: boolean; retryAfterSec?: number; count?: number; degraded?: boolean }> {
   const d1 = await resolveD1();
   if (!d1) {
-    return { allowed: true };
+    return degrade('consumeRateLimit', 'D1 binding 없음', options);
   }
 
   try {
     const now = Date.now();
     const row = await upsertAndReturn(d1, key, windowMs);
     if (!row) {
-      // RETURNING 실패 시 허용(가용성 우선) — 다음 요청에서 재시도
-      return { allowed: true };
+      // RETURNING 이 비면 카운트가 올랐는지조차 알 수 없다.
+      // 예전에는 "가용성 우선"으로 무조건 통과시켜, 이 상태가 지속되면
+      // 총량 제한이 통째로 사라지는데도 아무도 몰랐다.
+      return degrade('consumeRateLimit', 'RETURNING 공백', options);
     }
 
     const count = Number(row.count) || 0;
@@ -173,8 +226,7 @@ export async function consumeRateLimit(
     }
     return { allowed: true, count };
   } catch (err) {
-    console.error('[rate-limit] consumeRateLimit D1 오류, 레이트리밋 건너뜀:', err);
-    return { allowed: true };
+    return degrade('consumeRateLimit', `D1 오류: ${err instanceof Error ? err.message : String(err)}`, options);
   }
 }
 
@@ -187,12 +239,16 @@ export async function consumeRateLimit(
  */
 export async function recordFailedAttempt(key: string, windowMs: number): Promise<void> {
   const d1 = await resolveD1();
-  if (!d1) return;
+  if (!d1) {
+    // 기록이 안 되면 checkRateLimit 가 영원히 통과시킨다 — 조용히 넘기지 않는다.
+    degrade('recordFailedAttempt', 'D1 binding 없음');
+    return;
+  }
 
   try {
     await upsertAndReturn(d1, key, windowMs);
   } catch (err) {
-    console.error('[rate-limit] recordFailedAttempt D1 오류:', err);
+    degrade('recordFailedAttempt', `D1 오류: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 

@@ -23,6 +23,44 @@ function encodeObjectKey(objectKey: string): string {
   return objectKey.split('/').map(encodeURIComponent).join('/');
 }
 
+/**
+ * 객체 키 프리픽스별 ACL.
+ *
+ * 예전에는 이 라우트의 ACL 이 `chat/` 하나뿐이었다. 그래서 세션만 있으면
+ * 버킷 안의 **아무 키나** 그대로 스트리밍됐다 — 결재 첨부(`approval/`·`approvals/`),
+ * 서류제출(`submission/`), 증빙(`certs/`) 은 물론 크론이 올리는 D1 전체 덤프
+ * (`backup/24h/...`, `backup/6h/...`)까지 일반 직원 계정으로 내려받을 수 있었다.
+ *
+ * 이제 프리픽스를 명시 등록하고 **미등록 프리픽스는 관리자만** 접근한다.
+ * (완전 거부가 아니라 관리자 허용으로 둔 이유: 과거 업로드분 중 여기 없는
+ *  프리픽스가 남아 있을 경우 전면 404 가 되는 대신 관리자가 확인할 수 있어야 한다.
+ *  새 프리픽스를 추가하는 업로드 라우트는 반드시 이 표에도 등록할 것.)
+ */
+type ObjectAclMode = 'public' | 'authenticated' | 'chat';
+
+const OBJECT_KEY_ACL: ReadonlyArray<{ prefix: string; mode: ObjectAclMode }> = [
+  // 인증 없이도 <img src>·인쇄창에서 떠야 하는 자산
+  { prefix: 'logos/', mode: 'public' },
+  { prefix: 'seals/', mode: 'public' },
+  { prefix: 'profiles/', mode: 'public' },
+  { prefix: 'popups/', mode: 'public' },
+  // 대화방 멤버십 검증
+  { prefix: 'chat/', mode: 'chat' },
+  // 로그인 사용자 공용 (도메인별 세부 ACL 은 후속 과제)
+  { prefix: 'approval/', mode: 'authenticated' },
+  { prefix: 'approvals/', mode: 'authenticated' },
+  { prefix: 'board/', mode: 'authenticated' },
+  { prefix: 'submission/', mode: 'authenticated' },
+  { prefix: 'submissions/', mode: 'authenticated' },
+  { prefix: 'contracts/', mode: 'authenticated' },
+  { prefix: 'certs/', mode: 'authenticated' },
+];
+
+function resolveObjectAclMode(objectKey: string): ObjectAclMode | null {
+  const hit = OBJECT_KEY_ACL.find((entry) => objectKey.startsWith(entry.prefix));
+  return hit ? hit.mode : null;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await readSessionFromRequest(request);
@@ -47,18 +85,23 @@ export async function GET(request: NextRequest) {
     }
 
     // 퍼블릭 리소스 (로고, 직인, 프로필 사진, 팝업 이미지)는 세션 미인증 상태(<img src> 태그, 인쇄창 포함)에서도 조회 허용
-    const isPublicAsset =
-      objectKey.startsWith('logos/') ||
-      objectKey.startsWith('seals/') ||
-      objectKey.startsWith('profiles/') ||
-      objectKey.startsWith('popups/');
+    const aclMode = resolveObjectAclMode(objectKey);
+    const isPublicAsset = aclMode === 'public';
 
     if (!isPublicAsset && !session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // 미등록 프리픽스(backup/ 등 운영 산출물 포함)는 관리자만.
+    if (aclMode === null && !isAdminSession(session?.user)) {
+      return NextResponse.json(
+        { error: '해당 경로의 파일에 접근할 권한이 없습니다.' },
+        { status: 403 },
+      );
+    }
+
     // 채팅 객체 경로일 경우 대화방 멤버십 ACL 검증 (chat/room_id/filename 패턴)
-    if (objectKey.startsWith('chat/') || objectKey.includes('/chat/')) {
+    if (aclMode === 'chat' || objectKey.includes('/chat/')) {
       if (!session?.user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }

@@ -60,13 +60,111 @@ const MAX_SUBSCRIPTIONS_PER_SOCKET = 100;
 const SIGNAL_WINDOW_MS = 1000;
 const MAX_SIGNALS_PER_WINDOW = 20;
 
+/**
+ * 방 스코프 채널 패턴 — `messages:room_id=eq.<roomId>` 형태.
+ * 이 형태의 채널만 대화방 멤버십을 요구한다(테이블 전역 채널은 종전대로).
+ */
+const ROOM_SCOPED_CHANNEL_RE = /^[A-Za-z0-9_]+:room_id=eq\.(.+)$/;
+
+/** 멤버십 판정 캐시 유효시간. 방 멤버 추가가 이 시간 안에 반영된다. */
+const ROOM_ACL_TTL_MS = 60 * 1000;
+
+function parseRoomScopedChannel(channel: string): string | null {
+  const m = ROOM_SCOPED_CHANNEL_RE.exec(channel);
+  return m ? m[1] : null;
+}
+
+/** lib/chat-room-membership.ts 의 parseMembersField 와 같은 규칙(DO 번들 최소화를 위해 인라인). */
+function parseMembers(raw: unknown): string[] {
+  let parsed: unknown = raw;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      return [trimmed];
+    }
+  }
+  if (Array.isArray(parsed)) {
+    return parsed.map((m) => String(m ?? '').trim()).filter(Boolean);
+  }
+  if (parsed && typeof parsed === 'object') {
+    return Object.values(parsed as Record<string, unknown>)
+      .map((m) => String(m ?? '').trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 export class RealtimeHub {
   state: any;
   env: any;
 
+  /**
+   * `${userId}\n${roomId}` → { allowed, at }.
+   *
+   * attachment 에 넣지 않는 이유: serializeAttachment 는 용량 제한이 빡빡한데
+   * subscriptions 만으로도 이미 크다. 캐시는 성능용이라 hibernation 으로
+   * 날아가도 다음 조회에서 다시 채워지면 그만이다.
+   */
+  private roomAclCache = new Map<string, { allowed: boolean; at: number }>();
+
   constructor(state: any, env: any) {
     this.state = state;
     this.env = env;
+  }
+
+  /**
+   * 대화방 접근 가능 여부. notice 방은 전원 허용, 그 외는 members 포함 여부.
+   *
+   * 예전에는 이 검사가 아예 없었다. subscribe 는 클라이언트가 보낸 채널 문자열을
+   * 정규화·슬라이스만 해서 그대로 저장했고, typing 브로드캐스트도 발신자 멤버십을
+   * 보지 않았다. 그래서 로그인만 하면 `messages:room_id=eq.<남의 방>` 을 구독해
+   * 그 방의 활동(변경 신호)을 관측하고, 그 방에 "입력 중" 표시를 위조할 수 있었다.
+   */
+  private async canAccessRoom(userId: string, roomId: string): Promise<boolean> {
+    const uid = String(userId || '').trim();
+    const rid = String(roomId || '').trim();
+    if (!uid || !rid) return false;
+
+    const cacheKey = `${uid}\n${rid}`;
+    const now = Date.now();
+    const cached = this.roomAclCache.get(cacheKey);
+    if (cached && now - cached.at < ROOM_ACL_TTL_MS) return cached.allowed;
+
+    const db = this.env?.DB;
+    if (!db || typeof db.prepare !== 'function') {
+      // 바인딩 자체가 없으면 판정 수단이 없다. 여기서 전부 막으면 설정 실수 하나로
+      // 실시간이 통째로 죽으므로 통과시키되, 조용히 넘어가지 않도록 로그를 남긴다.
+      console.error('[RealtimeHub] DB binding 없음 — 방 멤버십 검증을 건너뜀');
+      return true;
+    }
+
+    let allowed = false;
+    try {
+      const row = await db
+        .prepare('SELECT type, members FROM chat_rooms WHERE id = ? LIMIT 1')
+        .bind(rid)
+        .first();
+      if (row) {
+        allowed =
+          String(row.type ?? '').trim() === 'notice' ||
+          parseMembers(row.members).some((m) => m === uid);
+      }
+    } catch (err) {
+      // 조회 실패는 fail-closed — 판정 못 한 방을 구독시키지 않는다.
+      console.error(
+        '[RealtimeHub] 방 멤버십 조회 실패:',
+        err instanceof Error ? err.message : err,
+      );
+      return false;
+    }
+
+    this.roomAclCache.set(cacheKey, { allowed, at: now });
+    // 캐시가 무한히 커지지 않게 상한을 둔다(소켓 수 × 방 수).
+    if (this.roomAclCache.size > 2000) this.roomAclCache.clear();
+    return allowed;
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -204,13 +302,30 @@ export class RealtimeHub {
         // 약 15회 전환 후 상한이 포화되면 **새로 연 방의 messages 채널이 잘려나가**
         // 그 방만 실시간 갱신이 멈췄다(새로고침하면 복구되던 증상).
         const newSubs = Array.isArray(data.channels) ? data.channels : [];
-        attachment.subscriptions = Array.from(
+        const requestedSubs = Array.from(
           new Set(
             newSubs
               .map((c) => String(c || '').trim())
               .filter(Boolean),
           ),
         ).slice(0, MAX_SUBSCRIPTIONS_PER_SOCKET);
+
+        // 방 스코프 채널(`...:room_id=eq.X`)은 멤버십을 확인한 것만 남긴다.
+        // 방 단위로 한 번만 조회하고 결과를 재사용한다(같은 방의 5개 채널이 한 번에 온다).
+        const roomVerdicts = new Map<string, boolean>();
+        const acceptedSubs: string[] = [];
+        for (const channel of requestedSubs) {
+          const roomId = parseRoomScopedChannel(channel);
+          if (!roomId) {
+            acceptedSubs.push(channel);
+            continue;
+          }
+          if (!roomVerdicts.has(roomId)) {
+            roomVerdicts.set(roomId, await this.canAccessRoom(attachment.userId, roomId));
+          }
+          if (roomVerdicts.get(roomId)) acceptedSubs.push(channel);
+        }
+        attachment.subscriptions = acceptedSubs;
         ws.serializeAttachment(attachment);
         try {
           ws.send(
@@ -239,6 +354,13 @@ export class RealtimeHub {
       if (data.type === 'typing:start' || data.type === 'typing:stop') {
         const roomId = data.roomId;
         if (!roomId) return;
+
+        // 발신자가 그 방의 멤버일 때만 중계한다.
+        // 예전에는 검사가 없어 비멤버가 임의 방에 "입력 중" 표시를 띄울 수 있었다.
+        if (!(await this.canAccessRoom(attachment.userId, roomId))) {
+          ws.serializeAttachment(attachment);
+          return;
+        }
 
         const websockets = this.state.getWebSockets();
         const isTyping = data.type === 'typing:start';

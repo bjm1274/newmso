@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readSessionFromRequest } from '@/lib/server-session';
+import { readAuthorizedExtraFeatureUser } from '@/lib/server-extra-feature-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,10 +36,18 @@ const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com';
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. 인증 확인
-    const session = await readSessionFromRequest(request);
-    if (!session?.user?.id) {
-      return NextResponse.json({ ok: false, error: '인증이 필요합니다.' }, { status: 401 });
+    // 1. 인증 + 추가기능 권한 확인
+    //
+    // 예전에는 세션 id 유무만 봤다. 같은 수술상담 기능의 짝 라우트인
+    // /api/consultation/transcribe 는 readAuthorizedExtraFeatureUser(req,'수술상담') 을
+    // 요구하는데 이 쪽만 열려 있어, 수술상담 권한이 없는 로그인 사용자도
+    // 상담 오디오 분석(Gemini 호출)을 그대로 돌릴 수 있었다. 게이트를 같은 것으로 맞춘다.
+    const authorized = await readAuthorizedExtraFeatureUser(request, '수술상담');
+    if (!authorized.user || authorized.status || authorized.error) {
+      return NextResponse.json(
+        { ok: false, error: authorized.status === 401 ? '인증이 필요합니다.' : '권한이 없습니다.' },
+        { status: authorized.status ?? 500 },
+      );
     }
 
     // 2. 서버 사이드 API 키 (클라이언트에 노출하지 않음)

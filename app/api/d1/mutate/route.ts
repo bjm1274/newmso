@@ -596,16 +596,32 @@ export async function POST(request: Request) {
         const bgResults = [...allResults];
         // (1)+(2) 응답 전 완료 — 목록 preview·큐 영속성
         try {
-          const { updateChatRoomLastMessage } = await import('@/lib/db/functions/triggers');
+          const { updateChatRoomLastMessage, refreshChatRoomLastMessage } = await import(
+            '@/lib/db/functions/triggers'
+          );
           const seenRoomIds = new Set<string>();
           for (const r of bgResults) {
             const row = r as Record<string, unknown>;
             const roomId = String(row.room_id ?? '').trim();
             if (!roomId || seenRoomIds.has(roomId)) continue;
             seenRoomIds.add(roomId);
+
+            // RETURNING 에 created_at 이 없을 수 있다 — 호출자가 `.select('id, room_id')`
+            // 처럼 일부 컬럼만 지정하면 mutation-builders 가 그 컬럼만 RETURNING 에 넣는다
+            // (예: insertRoomSystemMessage).
+            // 예전에는 이때 `new Date().toISOString()` 을 폴백으로 넣었다.
+            // messages.created_at 은 DEFAULT 로 공백형('YYYY-MM-DD HH:MM:SS')이 저장되는데
+            // chat_rooms.last_message_at 에만 ISO('...T...')가 섞여 들어가,
+            // 사전순 비교(' ' < 'T')에 기대는 방 정렬·변경감지가 그 방에서 어긋났다.
+            // 이제는 만들어 넣지 않고, 정본(messages 테이블)을 다시 읽는 경로로 우회한다.
+            const createdAt = String(row.created_at ?? '').trim();
+            if (!createdAt) {
+              await refreshChatRoomLastMessage(db, roomId);
+              continue;
+            }
             await updateChatRoomLastMessage(db, {
               room_id: roomId,
-              created_at: String(row.created_at ?? new Date().toISOString()),
+              created_at: createdAt,
               content: row.content != null ? String(row.content) : null,
               file_name: row.file_name != null ? String(row.file_name) : null });
           }

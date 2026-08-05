@@ -6,10 +6,17 @@ import { checkRateLimit, recordFailedAttempt, resetAttempts } from '@/lib/rate-l
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 5 * 60 * 1000; // 5분
 
-function getRateLimitKey(req: Request, userId: string) {
-  const forwarded = req.headers.get('x-forwarded-for');
-  const ip = forwarded?.split(',')[0]?.trim() || 'unknown';
-  return `unlock:${ip}:${userId}`;
+/**
+ * 잠금해제 시도 카운터 키.
+ *
+ * 예전에는 `unlock:${x-forwarded-for 첫 값}:${userId}` 였다.
+ * `x-forwarded-for` 는 클라이언트가 그대로 써 보낼 수 있는 헤더라
+ * 매 요청 헤더를 바꾸면 키가 매번 달라졌고, 5회/5분 잠금이 사실상 무한 시도가 됐다.
+ * 세션에서만 나오는 userId 로 키를 고정한다 —
+ * 어차피 이 라우트는 관리자 세션이 있어야 도달하므로 IP 를 섞을 이유가 없다.
+ */
+function getRateLimitKey(userId: string) {
+  return `unlock:${userId}`;
 }
 
 export async function POST(req: Request) {
@@ -19,8 +26,9 @@ export async function POST(req: Request) {
   }
 
   const userId = String(session.user?.id || session.user?.user_id || 'unknown');
-  const rateLimitKey = getRateLimitKey(req, userId);
-  const rateCheck = await checkRateLimit(rateLimitKey, MAX_ATTEMPTS, LOCKOUT_MS);
+  const rateLimitKey = getRateLimitKey(userId);
+  // failClosed: 판정 불가 시 통과가 아니라 차단 (RESET_SECRET 대입 방어).
+  const rateCheck = await checkRateLimit(rateLimitKey, MAX_ATTEMPTS, LOCKOUT_MS, { failClosed: true });
 
   if (!rateCheck.allowed) {
     return NextResponse.json(
