@@ -29,9 +29,9 @@
 // Phase 4 — 미등록 테이블은 erpIsAdmin only로 default-deny 유지.
 // ============================================================
 
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import type { D1Client } from '../client-d1';
-import { messages, board_posts } from '../schema';
+import { messages, board_posts, daily_closures } from '../schema';
 import {
   canAccessChatRoom,
   canChangeChatRoomMembers,
@@ -317,6 +317,38 @@ async function messagesSelfDeleteGuard(
 }
 
 /**
+ * daily_closure_items: 부모 마감보고(daily_closures)의 회사 스코프를 따른다.
+ *
+ * 이 테이블에는 company_id 가 없고 closure_id 만 있어서 기존 패턴으로는 회사 격리를
+ * 표현할 수 없었고, 그래서 4개 op 가 모두 AUTHENTICATED 였다.
+ * 그런데 이 행에는 환자명과 수납금액이 들어 있다 — 로그인만 하면 타 회사 환자 정보를
+ * 열람·수정·삭제할 수 있었다. 부모를 한 번 조회해 회사 스코프를 강제한다.
+ */
+async function dailyClosureItemsScopeGuard(
+  db: D1Client,
+  claims: ErpClaims,
+  row: Record<string, unknown>,
+): Promise<boolean> {
+  if (erpIsAdmin(claims)) return true;
+
+  const closureId = getField<string | number>(row, 'closure_id');
+  // 부모를 알 수 없으면 회사 판정이 불가능하다 — 열어두지 않는다.
+  if (closureId === null || String(closureId).trim() === '') return false;
+
+  const rows = await db
+    .select({ company_id: daily_closures.company_id })
+    .from(daily_closures)
+    .where(eq(daily_closures.id, String(closureId)))
+    .limit(1);
+  const parent = rows[0];
+  if (!parent) return false;
+
+  // 부모 정책(COMPANY_SCOPE_OR_NULL)과 같은 기준: 회사가 비어 있으면 전사 공용으로 본다.
+  if (parent.company_id === null || String(parent.company_id).trim() === '') return true;
+  return erpCompanyMatches(claims, String(parent.company_id));
+}
+
+/**
  * board_posts UPDATE/DELETE: 작성자 본인 또는 관리 권한만.
  *
  * PUBLIC_ALL 이던 시절에는 로그인만 하면 누구나 타인의 게시글을, 공지까지 포함해
@@ -522,15 +554,20 @@ export const POLICY_REGISTRY: Registry = {
     update: 'COMPANY_SCOPE_OR_NULL',
     delete: 'COMPANY_SCOPE_OR_NULL',
     companyIdField: 'company_id' },
-  // 하위 항목에는 company_id 가 없고 closure_id 만 있다(부모로만 스코프 가능).
-  // 현재 패턴으로는 부모 참조 스코프를 표현할 수 없어 AUTHENTICATED 로 둔다 —
-  // PUBLIC 보다는 좁지만 회사 격리는 되지 않는다. 부모 기준 asyncGuard 가 후속 과제.
+  // 하위 항목에는 company_id 가 없고 closure_id 만 있어 부모로만 스코프할 수 있다.
+  // 패턴으로는 표현할 수 없으므로 부모를 조회하는 asyncGuard 로 회사 격리를 건다
+  // (예전에는 4개 op 가 모두 AUTHENTICATED 라 환자명·수납금액이 전사 공개였다).
   daily_closure_items: {
     table: 'daily_closure_items',
     select: 'AUTHENTICATED',
     insert: 'AUTHENTICATED',
     update: 'AUTHENTICATED',
-    delete: 'AUTHENTICATED' },
+    delete: 'AUTHENTICATED',
+    asyncGuards: {
+      select: dailyClosureItemsScopeGuard,
+      insert: dailyClosureItemsScopeGuard,
+      update: dailyClosureItemsScopeGuard,
+      delete: dailyClosureItemsScopeGuard } },
   daily_checks: {
     table: 'daily_checks',
     select: 'AUTHENTICATED',
@@ -1949,6 +1986,45 @@ function stripStaffSecrets<T extends Record<string, unknown>>(rows: T[], claims?
   });
 }
 
+/**
+ * daily_closure_items 를 부모 마감보고의 회사로 거른다 (배치).
+ * closure_id 를 모아 부모를 한 번에 조회하므로 쿼리는 1건이다.
+ */
+async function filterDailyClosureItemsByCompany<T extends Record<string, unknown>>(
+  db: D1Client,
+  claims: ErpClaims,
+  rows: T[],
+): Promise<T[]> {
+  if (rows.length === 0) return rows;
+
+  const closureIds = [
+    ...new Set(
+      rows
+        .map((row) => getField<string>(row, 'closure_id'))
+        .filter((v): v is string => v !== null && v.trim() !== ''),
+    ),
+  ];
+  if (closureIds.length === 0) return [];
+
+  const parents = await db
+    .select({ id: daily_closures.id, company_id: daily_closures.company_id })
+    .from(daily_closures)
+    .where(inArray(daily_closures.id, closureIds));
+
+  const companyByClosure = new Map<string, string | null>();
+  for (const p of parents) companyByClosure.set(String(p.id), p.company_id ?? null);
+
+  return rows.filter((row) => {
+    const closureId = getField<string>(row, 'closure_id');
+    if (closureId === null) return false;
+    if (!companyByClosure.has(closureId)) return false; // 부모를 못 찾으면 열지 않는다
+    const companyId = companyByClosure.get(closureId) ?? null;
+    // 부모 정책(COMPANY_SCOPE_OR_NULL)과 같은 기준 — 회사가 비면 전사 공용.
+    if (companyId === null || companyId.trim() === '') return true;
+    return erpCompanyMatches(claims, companyId);
+  });
+}
+
 export async function filterByPolicy<T extends Record<string, unknown>>(
   db: D1Client,
   claims: ErpClaims,
@@ -1964,6 +2040,14 @@ export async function filterByPolicy<T extends Record<string, unknown>>(
   if (cfg.select === 'PUBLIC') {
     return stripSecrets ? stripStaffSecrets(rows, claims) : rows;
   }
+  // 마감보고 하위 항목은 부모의 회사 스코프를 따른다.
+  // 이 테이블에는 company_id 가 없어 패턴으로 표현할 수 없고, select 는 배치 경로라
+  // asyncGuards 를 거치지 않는다(아래 AUTHENTICATED 단축 반환). 그래서 여기서
+  // 부모 회사 id 를 한 번에 모아 메모리에서 거른다 — 행마다 조회하면 N+1 이 된다.
+  if (table === 'daily_closure_items' && !erpIsAdmin(claims)) {
+    return filterDailyClosureItemsByCompany(db, claims, rows);
+  }
+
   if (cfg.select === 'AUTHENTICATED') {
     const ok = erpStaffId(claims) !== null ? rows : [];
     return stripSecrets ? stripStaffSecrets(ok as T[], claims) : ok;
