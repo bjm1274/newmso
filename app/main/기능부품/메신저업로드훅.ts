@@ -198,9 +198,18 @@ export function useChatUploads({
       setFileUploading(true);
 
       try {
+        // room_id 를 반드시 싣는다.
+        // /api/chat/upload 의 assertOptionalRoomMembership 은 room_id 가 없으면 그냥
+        // 통과시키는 opt-in 구조인데, PC 훅은 JSON 플랜·formData 폴백 어느 쪽에도
+        // room_id 를 안 실어서 **방 멤버십 검증이 항상 건너뛰어졌다**(8차 D06-006).
+        // 모바일 업로드(모바일/채팅/업로드.ts)는 이미 싣고 있어 두 클라이언트가 서로 다른
+        // 검증을 받고 있었다. 서버를 필수화하기 전에 이쪽을 먼저 맞춘다.
+        const uploadRoomId = String(selectedRoomId || '').trim();
+
         const uploadViaAppServer = async () => {
           const formData = new FormData();
           formData.append('file', file, uploadFileName);
+          if (uploadRoomId) formData.append('room_id', uploadRoomId);
 
           const fallbackResponse = await fetch('/api/chat/upload', {
             method: 'POST',
@@ -228,7 +237,8 @@ export function useChatUploads({
             body: JSON.stringify({
               fileName: uploadFileName,
               mimeType: uploadContentType,
-              fileSize: file.size }) });
+              fileSize: file.size,
+              room_id: uploadRoomId || undefined }) });
           return { res, payload: (await res.json().catch(() => null)) as {
             provider?: 'supabase' | 'r2';
             bucket?: string;

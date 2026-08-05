@@ -12,13 +12,23 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { db } from '@/lib/db-client';
+import {
+  canDeleteBoardCommentByAdminFlag,
+  canDeleteBoardPostByAdminFlag,
+  canEditBoardPostByAdminFlag } from '@/lib/board-permissions';
 import type { BoardListPost } from './data-hooks';
 
 // ─────────────────────────────────────────────
-// 권한 — PC canEditPost / canDeletePost 미러
+// 권한 — 판정은 lib/board-permissions 정본에 위임
+//
+// 예전에는 PC `게시판.tsx` 의 canEditPost/canDeletePost 를 import 가 아니라 여기에
+// **'미러 구현'** 으로 다시 써 두었고, 그러다 실제로 갈라졌다(8차 D09-016).
+// 대표적으로 익명 글이면 여기만 작성자 본인까지 막아서, 같은 사람이 PC 에서는 자기
+// 익명 글을 수정할 수 있고 모바일에서는 못 했다. 아래 래퍼는 호출부 시그니처만 유지하고
+// 판정은 정본 하나만 쓰도록 남겨 둔 얇은 층이다.
 // ─────────────────────────────────────────────
 
-/** 익명 작성 게시글 — 수정/삭제 권한용 (작성자 UI 식별 불가) */
+/** 익명 작성 게시글 — 읽음 추적 판정용 */
 function isAnonymousAuthorPost(post: BoardListPost | null): boolean {
   if (!post) return false;
   return Boolean((post as { is_anonymous?: boolean | null }).is_anonymous);
@@ -48,44 +58,31 @@ export function isAnonymousReadStatusPost(post: BoardListPost | null): boolean {
   return isAnonymousAuthorPost(post) || hasAnonymousPoll(post);
 }
 
-function isOwnPost(post: BoardListPost | null, userId: string | null | undefined): boolean {
-  if (!post || !userId) return false;
-  const authorId = String(post.author_id ?? '').trim();
-  return authorId !== '' && authorId === String(userId).trim();
-}
-
-/** 수정 가능 — 작성자 본인 또는 관리자(부서장/시스템관리자). PC canEditPost 미러. */
+/** 수정 가능 — 작성자 본인 또는 관리자. 판정은 lib/board-permissions 정본. */
 export function canEditMobilePost(
   post: BoardListPost | null,
   userId: string | null | undefined,
   canAdmin: boolean,
 ): boolean {
-  if (!post) return false;
-  // 익명 작성 글만 작성자 식별 불가 → 관리자만 (익명 투표 글은 작성자 수정 가능)
-  if (isAnonymousAuthorPost(post)) return canAdmin;
-  return isOwnPost(post, userId) || canAdmin;
+  return canEditBoardPostByAdminFlag(post, userId, canAdmin);
 }
 
-/** 삭제 가능 — 작성자 본인 또는 관리자(시스템관리자). PC canDeletePost 미러. */
+/** 삭제 가능 — 작성자 본인 또는 관리자. 판정은 lib/board-permissions 정본. */
 export function canDeleteMobilePost(
   post: BoardListPost | null,
   userId: string | null | undefined,
   canAdmin: boolean,
 ): boolean {
-  if (!post) return false;
-  if (isAnonymousAuthorPost(post)) return canAdmin;
-  return isOwnPost(post, userId) || canAdmin;
+  return canDeleteBoardPostByAdminFlag(post, userId, canAdmin);
 }
 
-/** 댓글 삭제 가능 — 댓글 작성자 본인 또는 관리자. PC handleDeleteComment 게이트 미러. */
+/** 댓글 삭제 가능 — 댓글 작성자 본인 또는 관리자. 판정은 lib/board-permissions 정본. */
 export function canDeleteMobileComment(
   commentAuthorId: string | null | undefined,
   userId: string | null | undefined,
   canAdmin: boolean,
 ): boolean {
-  if (canAdmin) return true;
-  const a = String(commentAuthorId ?? '').trim();
-  return a !== '' && a === String(userId ?? '').trim();
+  return canDeleteBoardCommentByAdminFlag(commentAuthorId, userId, canAdmin);
 }
 
 // ─────────────────────────────────────────────

@@ -24,6 +24,14 @@ import {
 
 export const dynamic = 'force-dynamic';
 
+// 이관출고·이관입고 는 여기 없다.
+// 예전에는 두 타입이 이 목록에 들어 있어 stock-post 로 '이관출고' 전표 1건만 단독 생성할 수
+// 있었다. 이관은 출발지 차감·목적지 증가·inventory_transfers 이력이 한 배치로 묶여야
+// 대사(출발 합계 = 도착 합계)가 성립하는데, 단독 전표는 그 짝이 없는 반쪽 이관 로그를 만든다.
+// 8차 D07-021 실측: type:'이관출고', delta:-5 → 200, inventory_logs 에 이관출고 1건이
+// 생겼지만 inventory_transfers 는 0건이었다. 이관은 /api/inventory/stock-transfer 전용.
+const TRANSFER_ONLY_TYPES = ['이관출고', '이관입고'] as const;
+
 const TYPES = [
   '입고',
   '출고',
@@ -35,8 +43,6 @@ const TYPES = [
   '대여',
   '반납',
   '발주입고',
-  '이관출고',
-  '이관입고',
 ] as const;
 
 const PayloadSchema = z.object({
@@ -74,6 +80,24 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json().catch(() => null);
+
+    // zod 의 'Invalid payload' 로 떨어지면 호출자가 원인을 알 수 없어, 이관 타입만 따로 안내한다.
+    const requestedType = (body as { type?: unknown } | null)?.type;
+    if (
+      typeof requestedType === 'string' &&
+      (TRANSFER_ONLY_TYPES as readonly string[]).includes(requestedType)
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            '이관출고/이관입고 전표는 단독으로 만들 수 없습니다. /api/inventory/stock-transfer 를 사용하세요.',
+          code: 'TRANSFER_ONLY',
+        },
+        { status: 400 },
+      );
+    }
+
     const parsed = PayloadSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(

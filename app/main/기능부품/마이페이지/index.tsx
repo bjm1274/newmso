@@ -197,9 +197,16 @@ function MyPageMain({
         if (cancelled) return;
 
         const nextLatestContract = (nextLatest as EmploymentContractRecord | null) ?? null;
-        const nextPendingContract =
-          (nextPending as EmploymentContractRecord | null) ??
-          (nextLatestContract && !nextLatestContract.signed_at ? nextLatestContract : null);
+        // 서명 모달은 status='서명대기' 인 계약에만 뜬다.
+        //
+        // 예전에는 여기에 `?? (nextLatestContract && !nextLatestContract.signed_at ? … )`
+        // 폴백이 있어서 **미서명이기만 하면** 상태와 무관하게 서명패드가 떴다. 그런데
+        // employment_contracts.status 에는 '서명대기'/'서명완료' 말고도 '미발송'·'반려'
+        // (계약관리.tsx:305 가 이 둘을 '서명대기' 로 승격시킨다)·'종료'·'해지' 가 실제로
+        // 존재하고 이들은 전부 signed_at 이 비어 있다. 그래서 인사가 아직 **보내지도 않은**
+        // 계약이나 이미 반려된 계약에 대해 직원이 서명을 요구받을 수 있었다.
+        // 모바일 셸(MobileShell)은 처음부터 '서명대기' 만 봤다 — 같은 판정으로 맞춘다(8차 D09-014).
+        const nextPendingContract = (nextPending as EmploymentContractRecord | null) ?? null;
 
         setLatestContract((prev) => (isSameContract(prev, nextLatestContract) ? prev : nextLatestContract));
 

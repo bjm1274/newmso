@@ -1851,9 +1851,17 @@ export default function OperationCheckView({
           }
         }
         if (roomId) {
+          // `.select()` 가 반드시 있어야 한다.
+          // /api/d1/mutate 의 messages 후처리(방 미리보기 갱신 · chat_push_jobs 적재 ·
+          // 즉시 디스패치)는 `allResults.length > 0` 가드 뒤에 있고, allResults 는 RETURNING
+          // 결과다. d1-compat 은 `.select()` 를 호출했을 때만 returning 을 붙이므로,
+          // 예전처럼 `.insert()` 만 하면 RETURNING 이 비어 후처리 블록이 통째로 건너뛰어졌다.
+          // 그 결과 병동 메시지는 저장은 되는데 **푸시 알림이 한 건도 나가지 않았고**
+          // 방 목록의 last_message 도 갱신되지 않아 수신자가 도착 사실을 몰랐다(8차 D10-014).
           const { error: msgErr } = await db
             .from('messages')
-            .insert({ room_id: roomId, sender_id: senderId, content: storedWardMessageText });
+            .insert({ room_id: roomId, sender_id: senderId, content: storedWardMessageText })
+            .select('id, room_id, created_at');
           if (msgErr) {
             failedCount++;
             console.error('메시지 저장 실패', msgErr);

@@ -60,6 +60,65 @@ export function canAccessStaffRecord(
   return hasStaffRecordScope(user);
 }
 
+/** 회사 경계를 넘어 조회할 수 있는 진짜 관리자(전사 권한). hr 은 여기 포함되지 않는다. */
+function hasCrossCompanyStaffScope(user: SessionUser | null | undefined): boolean {
+  if (!user) return false;
+  const perms = (user.permissions ?? {}) as Record<string, unknown>;
+  return Boolean(
+    user.is_system_master || user.role === 'admin' || perms.admin || perms.mso || perms.system_master,
+  );
+}
+
+/**
+ * `canAccessStaffRecord` 의 **회사 스코프 판**.
+ *
+ * 왜 따로 필요한가 — `hasStaffRecordScope` 에는 회사 비교가 전혀 없다. 그래서 A사 인사담당이
+ * 타 회사 직원의 staffId 로 `GET /api/annual-leave/summary` 를 호출하면 **휴가 사유가 포함된
+ * 연차 원장**을 200 으로 받아갔다(7차 A7-02 → 8차 D03-D07). IDOR 자체는 닫혔지만
+ * "권한자면 전 직원" 이라는 전제가 남아 다회사 운영에서 경계가 없었다.
+ * 전사 권한(admin·mso·시스템 마스터)은 그대로 통과시키고, `hr` 권한만 가진 계정은
+ * 자기 회사 직원으로 제한한다.
+ *
+ * 대상의 회사는 세션에 없으므로 조회가 필요하다 — 그래서 async 다.
+ * 조회 실패 시에는 열어주지 않는다(fail-closed).
+ */
+export async function canAccessStaffRecordInCompany(
+  user: SessionUser | null | undefined,
+  targetStaffId: string | null | undefined,
+): Promise<boolean> {
+  if (!canAccessStaffRecord(user, targetStaffId)) return false;
+
+  const target = String(targetStaffId ?? '').trim();
+  const me = userId(user);
+  if (me && me === target) return true;
+  if (hasCrossCompanyStaffScope(user)) return true;
+
+  const userCompany = String(user?.company ?? '').trim();
+  const userCompanyId = String(user?.company_id ?? '').trim();
+  if (!userCompany && !userCompanyId) return false;
+
+  try {
+    const { getD1Binding } = await import('@/lib/db');
+    const d1 = await getD1Binding();
+    if (!d1) return false;
+    const row = await d1
+      .prepare('SELECT company, company_id FROM staff_members WHERE id = ? LIMIT 1')
+      .bind(target)
+      .first<{ company?: string | null; company_id?: string | null }>();
+    if (!row) return false;
+
+    const targetCompany = String(row.company ?? '').trim();
+    const targetCompanyId = String(row.company_id ?? '').trim();
+    return (
+      (Boolean(userCompanyId) && userCompanyId === targetCompanyId) ||
+      (Boolean(userCompany) && userCompany === targetCompany)
+    );
+  } catch (err) {
+    console.warn('[canAccessStaffRecordInCompany] 회사 스코프 확인 실패', err);
+    return false;
+  }
+}
+
 /**
  * 재무 권한 보유 여부.
  *

@@ -240,24 +240,6 @@ export async function postInventoryMovement(
     }
   }
 
-  // 수량 원자 갱신 (expression + 가드)
-  const updated = await db
-    .update(inventory)
-    .set({
-      quantity: nextQty,
-      stock: nextQty,
-      last_updated: new Date().toISOString(),
-    })
-    .where(
-      sql`${inventory.id} = ${itemId} AND COALESCE(${inventory.quantity}, ${inventory.stock}, 0) = ${prevQty}`,
-    )
-    .returning({ id: inventory.id, quantity: inventory.quantity });
-
-  if (updated.length === 0) {
-    // 경합 — 재조회 후 재시도 1회 대신 명확 에러
-    throw new Error('STOCK_CONFLICT: 재고가 다른 요청에 의해 변경되었습니다. 다시 시도하세요.');
-  }
-
   const changeType = input.changeType || input.type;
   const logId = crypto.randomUUID();
   const unitPrice =
@@ -267,31 +249,70 @@ export async function postInventoryMovement(
 
   const mergedNotes = [input.notes, fefoNote].filter(Boolean).join(' · ') || null;
 
-  await db.insert(inventory_logs).values({
-    id: logId,
-    item_id: itemId,
-    inventory_id: itemId,
-    type: input.type,
-    change_type: changeType,
-    quantity: Math.abs(delta),
-    prev_quantity: prevQty,
-    next_quantity: nextQty,
-    actor_name: input.actorName ?? null,
-    actor_id: input.actorId ?? null,
-    company,
-    company_id: input.companyId ?? row.company_id ?? null,
-    department: input.department ?? row.department ?? null,
-    notes: mergedNotes,
-    location: input.location ?? null,
-    lot_number: input.lotNumber ?? row.lot_number ?? null,
-    expiry_date: input.expiryDate ?? resolveItemExpiryDate(row),
-    serial_number: input.serialNumber ?? null,
-    unit_price: unitPrice,
-    supplier_name: input.supplierName ?? null,
-    purchase_order_id: input.purchaseOrderId ?? null,
-    approval_id: input.approvalId ?? null,
-    created_at: new Date().toISOString(),
-  });
+  // 수량 갱신 + 이력 INSERT 를 하나의 D1 batch(단일 트랜잭션)로 커밋한다.
+  //
+  // 왜 batch 로 묶었는가 — 예전에는 CAS UPDATE 를 먼저 await 로 커밋하고 그 다음에 별도
+  // await 로 inventory_logs 를 INSERT 했다. D1 은 문장 단위 자동커밋이라 로그 INSERT 가
+  // 실패하면(스키마 드리프트·일시 오류) 수량은 이미 바뀐 채 500 이 나갔고, 사용자가 재시도하면
+  // 같은 수량이 한 번 더 빠져 이중 전표가 됐다. 정작 구형 함수 atomicStockConsumeWithLog 는
+  // 바로 그 이유로 db.batch 를 쓰고 있어서, SSOT 엔진이 구형보다 약한 보장을 갖고 있었다.
+  // 8차 D07-008 실측: 로그 INSERT 만 실패시키자 HTTP 500 + 수량 100→90 + 로그 0건.
+  //
+  // CAS 실패(경합)는 batch 안에서 0행 UPDATE 가 되어 조용히 통과해버리므로, 선두에
+  // '조건이 깨졌을 때만 NOT NULL 컬럼에 NULL 을 쓰는' 가드 문장을 두어 제약 위반으로
+  // batch 전체를 롤백시킨다. SQLite 에는 트리거 밖 RAISE 가 없어 이 우회가 필요하다.
+  try {
+    await db.batch([
+      db
+        .update(inventory)
+        .set({ item_name: sql`NULL` })
+        .where(
+          sql`${inventory.id} = ${itemId} AND COALESCE(${inventory.quantity}, ${inventory.stock}, 0) <> ${prevQty}`,
+        ),
+      db
+        .update(inventory)
+        .set({
+          quantity: nextQty,
+          stock: nextQty,
+          last_updated: new Date().toISOString(),
+        })
+        .where(
+          sql`${inventory.id} = ${itemId} AND COALESCE(${inventory.quantity}, ${inventory.stock}, 0) = ${prevQty}`,
+        ),
+      db.insert(inventory_logs).values({
+        id: logId,
+        item_id: itemId,
+        inventory_id: itemId,
+        type: input.type,
+        change_type: changeType,
+        quantity: Math.abs(delta),
+        prev_quantity: prevQty,
+        next_quantity: nextQty,
+        actor_name: input.actorName ?? null,
+        actor_id: input.actorId ?? null,
+        company,
+        company_id: input.companyId ?? row.company_id ?? null,
+        department: input.department ?? row.department ?? null,
+        notes: mergedNotes,
+        location: input.location ?? null,
+        lot_number: input.lotNumber ?? row.lot_number ?? null,
+        expiry_date: input.expiryDate ?? resolveItemExpiryDate(row),
+        serial_number: input.serialNumber ?? null,
+        unit_price: unitPrice,
+        supplier_name: input.supplierName ?? null,
+        purchase_order_id: input.purchaseOrderId ?? null,
+        approval_id: input.approvalId ?? null,
+        created_at: new Date().toISOString(),
+      }),
+    ]);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (/NOT NULL/i.test(message) && /item_name/i.test(message)) {
+      // 경합 — 재조회 후 재시도 1회 대신 명확 에러
+      throw new Error('STOCK_CONFLICT: 재고가 다른 요청에 의해 변경되었습니다. 다시 시도하세요.');
+    }
+    throw err;
+  }
 
   // 입고 + 단가 → 이동평균 및 가격 이력
   if (delta > 0 && input.applyMovingAverage !== false && unitPrice != null && unitPrice > 0) {

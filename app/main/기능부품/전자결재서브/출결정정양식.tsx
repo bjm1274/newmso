@@ -6,6 +6,7 @@ import { db } from '@/lib/db-client';
 import { isMissingColumnError } from '@/lib/db-compat';
 import { getPrimaryShift } from '@/lib/staff-shift-resolver';
 import { formatKoreanDateKey, formatKoreanTimeLabel } from '@/lib/seoul-time';
+import { parseDbTimestamp } from '@/lib/date-formatter';
 import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 import { applyAttendanceCorrectionStatus } from '@/lib/attendance-sync';
 
@@ -425,17 +426,26 @@ export default function AttendanceCorrectionForm({
   const myCorrections = corrections.filter((item) => item.staff_id === staffId);
 
   /* ── 날짜 포맷 헬퍼 ── */
+  // dateStr 은 'YYYY-MM-DD' 날짜키다. 예전에는 `new Date(dateStr)`(=UTC 자정) 을
+  // getMonth/getDate 로 읽어 디바이스 로컬 TZ 로 되돌렸고, 음수 오프셋 TZ 에서는
+  // 하루 전 날짜·요일이 나왔다(8차 D12-020). 문자열을 그대로 쓰고 요일만 UTC 로 계산한다.
   const fmtDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
+    const [yy, mm, dd] = String(dateStr).slice(0, 10).split('-');
+    const d = new Date(`${yy}-${mm}-${dd}T00:00:00Z`);
     const days = ['일', '월', '화', '수', '목', '금', '토'];
-    return { short: `${mm}/${dd}`, day: days[d.getDay()] };
+    return { short: `${mm}/${dd}`, day: days[d.getUTCDay()] };
   };
 
+  // 지각/조퇴 판정은 KST(formatKoreanTimeLabel)로 하는데 표시만 디바이스 로컬 TZ
+  // (`toTimeString()`)여서, 비-KST 디바이스에서는 '지각' 배지와 화면의 시각이
+  // 서로 모순됐다(8차 D12-020). 표시도 KST 로 고정한다.
+  // 덧붙여 `new Date(iso)` 는 공백형 타임스탬프를 로컬 TZ 로 해석해 9시간 더 어긋났으므로
+  // 파싱도 정본 파서(parseDbTimestamp, 공백형=UTC)로 바꾼다.
   const fmtTime = (iso: string | null | undefined) => {
     if (!iso) return null;
-    try { return new Date(iso).toTimeString().slice(0, 5); } catch { return null; }
+    const parsed = parseDbTimestamp(iso);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return formatKoreanTimeLabel(parsed);
   };
 
   return (

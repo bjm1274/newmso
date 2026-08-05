@@ -33,7 +33,13 @@ export default function 교육자격탭({ staffs = [], company, user }: EduTabPr
   // 등록 폼 상태
   const [newStaffId, setNewStaffId] = useState('');
   const [newLicenseName, setNewLicenseName] = useState('');
-  const [newExpiryDate, setNewExpiryDate] = useState(getKoreanTodayString().replaceAll('-', '.'));
+  // 만료일자는 'YYYY-MM-DD' 로만 들고 다닌다.
+  // 예전에는 `type="text"` + placeholder 'YYYY.MM.DD' 자유 입력이었고 검증은 공백 여부뿐이라,
+  // '내년', '2026/13/45', 오타 등이 그대로 `staff_licenses.expiry_date` 에 저장됐다.
+  // 그 컬럼은 TEXT·CHECK 없음이고 insert 도 범용 /api/d1/mutate 경로라 컬럼별 검증이 전혀 없어
+  // DB 도 걸러주지 못했다. 그렇게 저장된 값은 만료 D-day 계산(daysUntil)과 정렬을 조용히
+  // 망가뜨린다 — 화면에는 그냥 '만료일 내년' 으로 뜬다(8차 D12-019).
+  const [newExpiryDate, setNewExpiryDate] = useState(getKoreanTodayString());
 
   const isHrAdmin = useMemo(() => {
     if (!user) return false;
@@ -104,12 +110,18 @@ export default function 교육자격탭({ staffs = [], company, user }: EduTabPr
       toast('만료일자를 입력해 주세요.', 'warning');
       return;
     }
+    // date 입력을 지원하지 않는 브라우저는 text 로 폴백하므로 형식·실재 날짜를 여기서 한 번 더 본다.
+    const expiryDate = newExpiryDate.trim().replaceAll('.', '-').replaceAll('/', '-');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(expiryDate) || Number.isNaN(new Date(`${expiryDate}T00:00:00Z`).getTime())) {
+      toast('만료일자는 YYYY-MM-DD 형식이어야 합니다.', 'warning');
+      return;
+    }
 
     try {
       const insertData = {
         staff_id: newStaffId,
         license_name: newLicenseName.trim(),
-        expiry_date: newExpiryDate.replaceAll('.', '-'),
+        expiry_date: expiryDate,
       };
 
       const { error } = await db.from('staff_licenses').insert([insertData]);
@@ -120,7 +132,7 @@ export default function 교육자격탭({ staffs = [], company, user }: EduTabPr
       // 폼 리셋
       setNewStaffId('');
       setNewLicenseName('');
-      setNewExpiryDate(getKoreanTodayString().replaceAll('-', '.'));
+      setNewExpiryDate(getKoreanTodayString());
       void fetchLicenses();
     } catch (err) {
       console.error('[mobile-hr] 면허/자격 등록 오류:', err);
@@ -290,10 +302,10 @@ export default function 교육자격탭({ staffs = [], company, user }: EduTabPr
               <div>
                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--z-600)' }}>만료일자</span>
                 <input
-                  type="text"
+                  type="date"
                   value={newExpiryDate}
                   onChange={(e) => setNewExpiryDate(e.target.value)}
-                  placeholder="YYYY.MM.DD"
+                  placeholder="YYYY-MM-DD"
                   style={{
                     width: '100%',
                     padding: '10px 12px',

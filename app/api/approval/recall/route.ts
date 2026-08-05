@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
     const [approvalRow] = await db
       .select({
         id: approvalsTable.id,
+        type: approvalsTable.type,
         status: approvalsTable.status,
         sender_id: approvalsTable.sender_id,
         meta_data: approvalsTable.meta_data })
@@ -145,6 +146,20 @@ export async function POST(request: NextRequest) {
         console.error('[api/approval/recall] attendance_corrections 회수 상태 갱신 실패:', attErr);
       }
     }
+
+    // 모바일 연차신청이 approvals 보다 먼저 넣어둔 leave_requests '대기' 행 정리.
+    // 예전에는 이 회수 경로가 attendance_corrections 만 되돌리고 leave_requests 는 손대지
+    // 않아서, 회수한 연차가 인사 화면(휴가관리·LeaveWorkcenter·모바일 연차관리자)에는
+    // 계속 '대기' 로 떠 있는 유령 신청으로 남았다. 그 화면들은 status 필터 없이 조회한다.
+    // 반려 경로와 판정을 공유하려고 server-approval-transition 의 정리 함수를 그대로 쓴다.
+    const { cleanupPendingLeaveRequestOnTermination } = await import(
+      '@/lib/server-approval-transition'
+    );
+    await cleanupPendingLeaveRequestOnTermination(
+      { type: approvalRow.type, sender_id: approvalRow.sender_id },
+      existingMeta,
+      '회수',
+    );
 
     // ── 7. 관련 알림 읽음 처리 (실패해도 메인 응답에 영향 없음) ──
     // 정본 notifications 스키마: user_id / read_at / metadata (approval_id·read·staff_id 컬럼 없음)

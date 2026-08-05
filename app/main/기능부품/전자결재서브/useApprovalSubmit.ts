@@ -34,6 +34,7 @@ import {
   type SupplyInventoryReviewRow,
   type SupplyInventoryReviewState } from '../전자결재-types';
 import { normalizeApprovalCcUsers } from '../전자결재-utils';
+import { toUtcSqlTimestamp } from '@/lib/chat-read-cursors';
 
 type ApprovalRecord = Record<string, unknown>;
 type ApprovalHistoryEntry = Parameters<typeof appendApprovalHistory>[1];
@@ -382,11 +383,21 @@ export function useApprovalSubmit({
     const dayEnd = new Date(dayStart);
     dayEnd.setDate(dayEnd.getDate() + 1);
 
+    // 경계값을 공백형(UTC)으로 맞춘다. approvals.created_at 은 DEFAULT CURRENT_TIMESTAMP 의
+    // 공백형이고 d1 query 라우트는 값을 그대로 바인딩하므로 이 비교는 TEXT 사전순이다.
+    // 예전처럼 toISOString() 을 넘기면 11번째 문자에서 ' '(0x20) < 'T'(0x54) 라 하루의
+    // 앞부분(KST 00:00~09:00) 기안분이 창에서 통째로 빠졌고, 문서번호 dateStamp 는
+    // KST 기준이라 그 새벽 문서들이 모두 sequence 1 을 받아 **같은 문서번호가 중복 발급**될
+    // 수 있었다(8차 D10-005). approvals.doc_number 에 UNIQUE 인덱스도 없어 DB 도 못 막는다.
+    // 모바일 사본(generateMobileDocNumber)은 이미 같은 방식으로 고쳐져 있다.
+    const windowStart = toUtcSqlTimestamp(dayStart.toISOString());
+    const windowEnd = toUtcSqlTimestamp(dayEnd.toISOString());
+
     let countQuery = db
       .from('approvals')
       .select('id', { count: 'exact', head: true })
-      .gte('created_at', dayStart.toISOString())
-      .lt('created_at', dayEnd.toISOString());
+      .gte('created_at', windowStart)
+      .lt('created_at', windowEnd);
 
     if (params.companyId) countQuery = countQuery.eq('company_id', params.companyId);
     else if (params.companyName) countQuery = countQuery.eq('sender_company', params.companyName);
@@ -418,14 +429,19 @@ export function useApprovalSubmit({
     const dayEnd = new Date(dayStart);
     dayEnd.setDate(dayEnd.getDate() + 1);
 
+    // 채번 창과 같은 이유로 공백형(UTC) 경계 — 예전에는 오전(KST 00:00~09:00) 제출분이
+    // 창에서 빠져 중복 물품신청 경고가 뜨지 않았다(8차 D10-005 동반 증상).
+    const windowStart = toUtcSqlTimestamp(dayStart.toISOString());
+    const windowEnd = toUtcSqlTimestamp(dayEnd.toISOString());
+
     const { data, error } = await db
       .from('approvals')
       .select('id, title, created_at, meta_data')
       .eq('sender_id', user.id)
       .eq('type', formType)
       .eq('status', '대기')
-      .gte('created_at', dayStart.toISOString())
-      .lt('created_at', dayEnd.toISOString())
+      .gte('created_at', windowStart)
+      .lt('created_at', windowEnd)
       .order('created_at', { ascending: false })
       .limit(10);
 

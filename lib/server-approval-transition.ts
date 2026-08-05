@@ -211,8 +211,12 @@ function applyNextStepDelegationMeta(
  * 반려 경로는 attendance_corrections 만 되돌렸다. 그래서 반려된 연차가 인사
  * 화면(휴가관리·LeaveWorkcenter·모바일 연차관리자)에는 계속 '대기' 로 떠 있는
  * 유령 신청으로 남았다 — 그 화면들은 status 필터 없이 조회한다.
+ *
+ * 회수(app/api/approval/recall)도 같은 비대칭을 갖고 있어 export 한다. 두 경로가
+ * 조건(직원 + 유형 별칭 + 기간 + status '대기')을 각자 재구현하면 승격 경로와 어긋난 순간
+ * 다시 유령 행이 생기므로 판정은 이 함수 하나만 갖는다.
  */
-async function cleanupPendingLeaveRequestOnTermination(
+export async function cleanupPendingLeaveRequestOnTermination(
   item: ApprovalRow,
   metaData: Record<string, unknown> | null | undefined,
   nextStatus: '반려' | '회수',

@@ -6,7 +6,15 @@ import {
   resolveLatestSessionUser } from '@/lib/server-session';
 // SSOT size: @/lib/upload-constants
 import { MAX_FILE_SIZE_BYTES } from '@/lib/upload-constants';
-import { ALLOWED_APPLICATION_MIME_TYPES, hasBlockedUploadExtension } from '@/lib/upload-mime';
+// 8차 D12-011: `normalizeMime`(축약 사본)·확장자 정제 인라인 사본을 lib/upload-mime 정본으로 교체.
+// 축약 사본은 확장자→MIME 보충이 없어 클라이언트가 mimeType 을 비워 보내면 무조건
+// application/octet-stream 이었다. 정본은 파일명 확장자로 보충한다(허용/차단 판정 결과는
+// 두 경우 모두 화이트리스트에 걸려 동일 — 'report.pdf' 는 어느 쪽이든 통과).
+import {
+  ALLOWED_APPLICATION_MIME_TYPES,
+  hasBlockedUploadExtension,
+  normalizeUploadMimeType,
+  toSafeObjectKeyExtension } from '@/lib/upload-mime';
 
 /**
  * POST /api/approval/upload
@@ -31,27 +39,31 @@ type ApprovalUploadRequest = {
   approvalId?: string;
 };
 
-function normalizeMime(raw: string): string {
-  const t = String(raw || '').trim().toLowerCase();
-  if (t === 'image/jpg' || t === 'image/pjpeg') return 'image/jpeg';
-  if (t === 'image/x-png') return 'image/png';
-  return t || 'application/octet-stream';
-}
-
 function isAllowedMime(mime: string): boolean {
   if (ALLOWED_APPLICATION_MIME_TYPES.has(mime)) return true;
   return ALLOWED_MIME_PREFIXES.some((prefix) => mime.startsWith(prefix));
 }
 
-function buildFilePath(fileName: string, mime: string): string {
-  const ext = (() => {
-    const dot = fileName.lastIndexOf('.');
-    if (dot > -1) return fileName.slice(dot + 1).toLowerCase().replace(/[^a-z0-9]/g, '');
-    const sub = mime.split('/')[1]?.toLowerCase() ?? 'bin';
-    return sub || 'bin';
-  })();
-  const safeExt = /^[a-z0-9]+$/.test(ext) ? ext : 'bin';
-  return `approval/${Date.now()}_${crypto.randomUUID()}.${safeExt}`;
+/** R2 오브젝트 키에 쓸 수 있게 정제 — 경로 조작·구분자 제거. */
+function safeKeySegment(raw: string): string {
+  return String(raw || '')
+    .trim()
+    .replace(/[^A-Za-z0-9_-]/g, '')
+    .slice(0, 64);
+}
+
+// 8차 D09-018.
+// 예전에는 approvalId 가 요청 타입 선언에만 있고 본문에서 한 번도 읽히지 않았다.
+// 클라이언트(오프라인 업로드 큐)는 그 값을 실어 보내면서 "서버가 문서에 연결해 준다"고
+// 기대했지만 서버는 조용히 버렸고, 그래서 오프라인 첨부가 R2 에는 올라가는데 어느 결재
+// 문서의 첨부인지 아무 데도 남지 않았다(D09-001 의 근인).
+// 이 라우트는 presign 만 발급하므로 문서 meta 연결은 여전히 클라이언트 몫이지만,
+// 최소한 오브젝트 키에 문서 id 를 새겨 사후 추적이 가능하게 한다. 값이 없으면 예전 경로 그대로.
+function buildFilePath(fileName: string, mime: string, approvalId?: string): string {
+  const ext = toSafeObjectKeyExtension(fileName, mime);
+  const scope = safeKeySegment(approvalId ?? '');
+  const prefix = scope ? `approval/${scope}` : 'approval';
+  return `${prefix}/${Date.now()}_${crypto.randomUUID()}.${ext}`;
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -65,7 +77,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const body = (await request.json().catch(() => ({}))) as ApprovalUploadRequest;
     const rawFileName = String(body.fileName || '').trim();
-    const mime = normalizeMime(body.mimeType ?? '');
+    const mime = normalizeUploadMimeType(rawFileName, body.mimeType ?? '');
     const fileSize = Number(body.fileSize ?? 0);
 
     if (!rawFileName) {
@@ -91,7 +103,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const filePath = buildFilePath(rawFileName, mime);
+    const filePath = buildFilePath(rawFileName, mime, body.approvalId);
     const plan = await createChatAttachmentUploadPlan(filePath, mime);
     if (!plan) {
       return NextResponse.json(

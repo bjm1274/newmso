@@ -45,6 +45,61 @@ function canManageClosing(user: SessionUser | null | undefined): boolean {
   );
 }
 
+/**
+ * 잠금 해제 전용 권한.
+ * 예전에는 lock/unlock 이 같은 canManageClosing 하나로 통과해, 일반 재고 담당자가
+ * 확정된 월마감을 스스로 풀고 수량을 손댄 뒤 다시 잠글 수 있었다(회계 스냅샷 통제 무력화).
+ * 잠그는 것은 재고 담당의 일상 업무지만 푸는 것은 통제 되돌리기이므로 상위 권한으로 올린다.
+ */
+function canUnlockClosing(user: SessionUser | null | undefined): boolean {
+  if (!user) return false;
+  if (isAdminSession(user)) return true;
+  const perms = user.permissions || {};
+  return Boolean(perms.inventory_월마감 || perms.mso || perms.admin);
+}
+
+/**
+ * 대상 회사 확정.
+ *
+ * 예전에는 `parsed.data.company?.trim() || 세션회사` 로 요청자가 준 값을 그대로 썼다.
+ * 같은 재고 도메인의 다른 6개 라우트가 쓰는 assertInventoryCompanyScope 가 이 파일에는
+ * import 조차 되지 않아, 재고 권한만 가진 일반 직원이 company:'타사' 를 실어 보내면
+ * 그 회사의 월마감을 잠그고 풀 수 있었다.
+ * 8차 D07-014 실측: E2E-002(admin=false, inventory=true)로
+ * POST {action:'lock', company:'FOREIGN CO'} → 200, 스냅샷 status='locked' 생성.
+ * 관리자만 임의 회사를 지정할 수 있고, 그 외에는 세션 회사로 강제(불일치 403)한다.
+ */
+function resolveClosingCompany(
+  user: SessionUser | null | undefined,
+  requested: string | undefined,
+): { ok: true; company: string } | { ok: false; response: NextResponse } {
+  const sessionCompany = String(user?.company || '').trim();
+  const asked = String(requested || '').trim();
+
+  if (isAdminSession(user) || user?.permissions?.mso || user?.permissions?.admin) {
+    return { ok: true, company: asked || sessionCompany || 'SY INC.' };
+  }
+  if (!sessionCompany) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { ok: false, error: '세션에 회사 정보가 없어 월마감 대상을 확정할 수 없습니다.', code: 'FORBIDDEN' },
+        { status: 403 },
+      ),
+    };
+  }
+  if (asked && asked !== sessionCompany) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { ok: false, error: '다른 회사의 월마감은 조회·변경할 수 없습니다.', code: 'FORBIDDEN' },
+        { status: 403 },
+      ),
+    };
+  }
+  return { ok: true, company: sessionCompany };
+}
+
 async function findSnapshot(
   db: ReturnType<typeof getD1Drizzle>,
   company: string,
@@ -92,10 +147,14 @@ export async function GET(request: Request) {
     }
 
     const url = new URL(request.url);
-    const company =
-      url.searchParams.get('company')?.trim() ||
-      String(session?.user?.company || '').trim() ||
-      'SY INC.';
+    // GET 도 회사 스코프를 태운다. 예전에는 권한 검사 없이 임의 company 를 받아
+    // 인증만 있으면 타사 스냅샷의 품목수·수량·평가액 총계를 그대로 읽을 수 있었다.
+    const companyScope = resolveClosingCompany(
+      session?.user,
+      url.searchParams.get('company') ?? undefined,
+    );
+    if (!companyScope.ok) return companyScope.response;
+    const company = companyScope.company;
     const month = url.searchParams.get('month')?.trim() || getKoreanMonthString();
 
     const d1 = await getD1Binding();
@@ -159,10 +218,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const company =
-      parsed.data.company?.trim() ||
-      String(user?.company || '').trim() ||
-      'SY INC.';
+    if (parsed.data.action === 'unlock' && !canUnlockClosing(user)) {
+      return NextResponse.json(
+        { ok: false, error: '월마감 잠금 해제 권한이 없습니다.', code: 'FORBIDDEN' },
+        { status: 403 },
+      );
+    }
+
+    const companyScope = resolveClosingCompany(user, parsed.data.company);
+    if (!companyScope.ok) return companyScope.response;
+    const company = companyScope.company;
     const month = parsed.data.closingMonth || getKoreanMonthString();
     const actorName = user?.name || null;
 

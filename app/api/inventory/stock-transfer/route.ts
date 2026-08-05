@@ -26,6 +26,7 @@ import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
 import { StockError, getD1Binding, getD1Drizzle } from '@/lib/db';
 import { inventory, inventory_logs, inventory_transfers } from '@/lib/db/schema';
 import { assertInventoryCompanyScope, assertInventoryItemCompanyScope } from '@/lib/inventory-scope-guard';
+import { inventoryErrorResponse } from '@/lib/inventory-http-errors';
 
 export const dynamic = 'force-dynamic';
 
@@ -113,17 +114,9 @@ export async function POST(request: Request) {
     const result = await executeTransfer(db, payload, user);
     return NextResponse.json({ ok: true, data: result });
   } catch (err) {
-    if (err instanceof StockError) {
-      const statusMap: Record<string, number> = {
-        INSUFFICIENT_STOCK: 409,
-        SOURCE_NOT_FOUND: 404,
-        DEST_NOT_FOUND: 404,
-        ITEM_NOT_FOUND: 404 };
-      const status = statusMap[err.code] ?? 500;
-      return NextResponse.json({ ok: false, error: err.message, code: err.code }, { status });
-    }
-    const message = err instanceof Error ? err.message : 'Internal error';
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    // 매핑은 lib/inventory-http-errors 로 통합 (D07-016). 여기에만 있던 statusMap 은
+    // STOCK_CONFLICT 를 몰라 경합을 500 으로 내보냈고, 클라이언트가 재시도 안내를 못 띄웠다.
+    return inventoryErrorResponse(err);
   }
 }
 
@@ -140,8 +133,16 @@ interface TransferOutcome {
 
 /**
  * 출발지 차감 + 목적지 증가/생성 + 이력 + 로그를 단일 D1 batch로 처리.
- * 현재 수량을 먼저 조회·검증한 뒤 절대값으로 batch UPDATE/INSERT한다.
  * D1 batch는 단일 트랜잭션(all-or-nothing)이라 모두 함께 커밋되거나 롤백된다.
+ *
+ * 왜 증분식(CAS)인가 — 예전에는 현재 수량을 SELECT 한 뒤 `set({quantity: srcNext})` 처럼
+ * **읽은 값에서 계산한 절대값**으로 덮어썼고 WHERE 절은 `id` 뿐이었다. D1 batch 는 묶인
+ * 쓰기의 원자성만 보장할 뿐 선행 SELECT 와의 격리는 주지 않으므로, 읽기~쓰기 사이에 다른
+ * 이관/전표가 끼어들면 그 변경분이 통째로 덮여 사라졌다.
+ * 8차 D07-007 실측: 같은 품목에 수량 1 이관 8건을 동시 요청 → 8건 모두 200 인데
+ * 출발지는 100→99, 목적지는 0→1 로 7개가 증발했다(이관 이력·로그는 8건 생성).
+ * 그래서 절대값 대입을 `COALESCE(quantity,stock,0) ± 수량` 증분식으로 바꾸고,
+ * 재고 부족은 batch 선두의 가드 문장이 제약 위반을 일으켜 batch 전체를 롤백시키게 했다.
  */
 async function executeTransfer(
   db: DbClient,
@@ -172,7 +173,22 @@ async function executeTransfer(
   const destCreated = !destId;
 
   const ops: BatchItem<'sqlite'>[] = [
-    db.update(inventory).set({ quantity: srcNext, stock: srcNext }).where(eq(inventory.id, sourceId)),
+    // 재고 부족 가드. SQLite 에는 트리거 밖 RAISE 가 없으므로, 조건이 깨진 경우에만
+    // NOT NULL 인 item_name 에 NULL 을 쓰려 시도해 제약 위반으로 batch 전체를 롤백시킨다.
+    // 충분한 경우 WHERE 가 0행이라 아무것도 건드리지 않는다.
+    db
+      .update(inventory)
+      .set({ item_name: sql`NULL` })
+      .where(
+        sql`${inventory.id} = ${sourceId} AND COALESCE(${inventory.quantity}, ${inventory.stock}, 0) < ${quantity}`,
+      ),
+    db
+      .update(inventory)
+      .set({
+        quantity: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) - ${quantity}`,
+        stock: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) - ${quantity}`,
+      })
+      .where(eq(inventory.id, sourceId)),
   ];
 
   if (destId) {
@@ -180,9 +196,14 @@ async function executeTransfer(
     if (!dstRow) throw new StockError('DEST_NOT_FOUND');
     resolvedDestId = destId;
     dstPrev = Number(dstRow.prev ?? 0);
-    const dstNext = dstPrev + quantity;
     ops.push(
-      db.update(inventory).set({ quantity: dstNext, stock: dstNext }).where(eq(inventory.id, destId)),
+      db
+        .update(inventory)
+        .set({
+          quantity: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) + ${quantity}`,
+          stock: sql`COALESCE(${inventory.quantity}, ${inventory.stock}, 0) + ${quantity}`,
+        })
+        .where(eq(inventory.id, destId)),
     );
   } else {
     // 신규 목적지 품목 생성 — 출발지에서 복사한 필드 + 이관 수량.
@@ -238,6 +259,9 @@ async function executeTransfer(
   );
 
   // 이관출고 로그(출발지).
+  // prev/next 를 선행 SELECT 값이 아니라 batch 안에서 다시 읽는 이유: 위 UPDATE 가 이미
+  // 실행된 시점이므로 현재 수량이 곧 next 이고, 여기에 이관 수량을 더하면 실제 prev 가 된다.
+  // 예전처럼 읽기 시점 값을 그대로 박으면 동시 이관 시 로그의 prev/next 가 실수량과 어긋났다.
   ops.push(
     db.insert(inventory_logs).values({
       id: crypto.randomUUID(),
@@ -246,8 +270,8 @@ async function executeTransfer(
       type: '이관',
       change_type: '이관출고',
       quantity,
-      prev_quantity: srcPrev,
-      next_quantity: srcNext,
+      prev_quantity: sql`(SELECT COALESCE(${inventory.quantity}, ${inventory.stock}, 0) FROM ${inventory} WHERE ${inventory.id} = ${sourceId}) + ${quantity}`,
+      next_quantity: sql`(SELECT COALESCE(${inventory.quantity}, ${inventory.stock}, 0) FROM ${inventory} WHERE ${inventory.id} = ${sourceId})`,
       serial_number: meta?.serial_number ?? null,
       actor_name: actorName(user),
       company: meta?.from_company ?? null,
@@ -263,21 +287,41 @@ async function executeTransfer(
       type: '이관',
       change_type: '이관입고',
       quantity,
-      prev_quantity: dstPrev,
-      next_quantity: dstNext,
+      prev_quantity: sql`(SELECT COALESCE(${inventory.quantity}, ${inventory.stock}, 0) FROM ${inventory} WHERE ${inventory.id} = ${resolvedDestId}) - ${quantity}`,
+      next_quantity: sql`(SELECT COALESCE(${inventory.quantity}, ${inventory.stock}, 0) FROM ${inventory} WHERE ${inventory.id} = ${resolvedDestId})`,
       serial_number: meta?.serial_number ?? null,
       actor_name: actorName(user),
       company: meta?.to_company ?? newDest?.company ?? null,
       notes: meta?.dest_notes ?? null }),
   );
 
-  await db.batch(ops as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
+  try {
+    await db.batch(ops as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
+  } catch (err) {
+    // 위 가드가 걸리면 NOT NULL 제약 위반으로 올라온다 — 경합으로 재고가 모자라진 경우다.
+    const message = err instanceof Error ? err.message : String(err);
+    if (/NOT NULL/i.test(message) && /item_name/i.test(message)) {
+      // inventory-http-errors 는 이 접두어로 409 + code:'STOCK_CONFLICT' 를 만든다.
+      throw new Error(
+        `STOCK_CONFLICT: 재고가 다른 요청에 의해 변경되어 이관할 수량이 부족합니다. qty=${quantity}`,
+      );
+    }
+    throw err;
+  }
+
+  // 실제 커밋된 수량을 다시 읽어 응답한다. 선행 SELECT 값은 동시 요청이 있으면 이미 낡았다.
+  const finalRows = await db
+    .select({ id: inventory.id, qty: qtyExpr })
+    .from(inventory)
+    .where(inArray(inventory.id, [sourceId, resolvedDestId]));
+  const srcFinal = Number(finalRows.find((r) => r.id === sourceId)?.qty ?? srcNext);
+  const dstFinal = Number(finalRows.find((r) => r.id === resolvedDestId)?.qty ?? dstNext);
 
   return {
-    src_prev: srcPrev,
-    src_next: srcNext,
-    dst_prev: dstPrev,
-    dst_next: dstNext,
+    src_prev: srcFinal + quantity,
+    src_next: srcFinal,
+    dst_prev: dstFinal - quantity,
+    dst_next: dstFinal,
     destId: resolvedDestId,
     destCreated };
 }

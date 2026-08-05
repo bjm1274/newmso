@@ -158,6 +158,8 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     distance: number;
     capturedAt: number;
   } | null>(null);
+  /** 직전 위치 확인이 bypass_gps/localhost 우회로 통과했는지 — 서버 신고용. */
+  const bypassedRef = useRef(false);
 
   const [staffShifts, setStaffShifts] = useState<StaffShiftEntry[]>([]);
   const [staffShiftNames, setStaffShiftNames] = useState<Map<string, string>>(new Map());
@@ -622,14 +624,26 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     preferCached?: boolean;
   } = {}): Promise<boolean> => {
     // localhost 접속이거나 localStorage의 bypass_gps가 'true'인 경우 우회 허용
+    //
+    // 이 우회는 개발용으로 들어왔는데 환경 분기가 없어 프로덕션 번들에도 그대로 남아 있었다 —
+    // devtools 에서 `localStorage.setItem('bypass_gps','true')` 한 줄이면 반경 검사가 사라졌다.
+    // 게다가 여기서 `setDistance(0)` 까지 해서 화면 배지가 **'GPS 인증 · 0m 확인'** 으로 떴다.
+    // 실제로 측정한 적이 없는데 "병원 안에서 인증됨" 이라고 표시한 것이라, 우회 사실이
+    // 화면에서도 지워졌다(8차 D01-012·D09-007, PC 경로).
+    //
+    // 지금 단계에서 이 경로를 없애면 위치 권한이 막힌 단말이 출근을 못 하게 되므로 통과는
+    // 그대로 두되, ① 거리 표시를 위조하지 않고(측정 없음 = 배지 미표시) ② 우회로 통과했다는
+    // 사실을 서버에 신고해 감사 기록으로 남긴다(handleCommute 의 verifyOnServer).
+    // 모바일 출퇴근체크인이 이미 같은 방식이다.
     if (typeof window !== 'undefined') {
       const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       const hasBypassFlag = window.localStorage.getItem('bypass_gps') === 'true';
       if (isLocal || hasBypassFlag) {
-        setDistance(0);
+        bypassedRef.current = true;
         return true;
       }
     }
+    bypassedRef.current = false;
 
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       if (showErrors) {
@@ -799,6 +813,48 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     [effectiveUserId, resolvedUser],
   );
 
+  /**
+   * 서버에 좌표·시각을 제출하고 **서버 시계**를 받아온다.
+   *
+   * 예전에는 기록 시각이 `new Date().toISOString()` — 단말 시계였다. 단말 시계를 되돌리면
+   * 지각이 정상이 되고 서버에는 그것을 알 방법이 없었다. 반경 판정도 전부 브라우저에만
+   * 있었고 쓰기 경로가 범용 `/api/d1/mutate` 라서 서버는 좌표를 볼 기회조차 없었다.
+   * 이제 기록 시각은 서버가 준 값을 쓰고, 반경은 서버가 좌표에서 다시 계산해 위반이면
+   * audit_logs 에 남긴다. **차단이 아니라 서버 판정·기록이다** — 위치 권한이 꺼진 단말이
+   * 출근을 못 하게 되면 안 되기 때문이다(라우트 상단 주석 참고).
+   *
+   * 오프라인·라우트 장애 시 null 을 돌려 기존 동작(단말 시계)으로 폴백한다.
+   */
+  const verifyCommuteOnServer = async (
+    action: 'check_in' | 'check_out',
+    dateKey: string,
+  ): Promise<string | null> => {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return null;
+    const loc = lastResolvedLocationRef.current;
+    const isBypassed = bypassedRef.current;
+    // 우회로 통과한 건은 좌표를 새로 잰 적이 없다 — 낡은 캐시를 진짜 측정값인 양 보내지 않는다.
+    const coords = isBypassed ? null : loc;
+    try {
+      const res = await fetch('/api/attendance/geo-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          date: dateKey,
+          latitude: coords?.latitude ?? null,
+          longitude: coords?.longitude ?? null,
+          accuracy: null,
+          clientTime: new Date().toISOString(),
+          clientBypass: isBypassed }),
+      });
+      if (!res.ok) return null;
+      const json = (await res.json()) as { serverTime?: string };
+      return typeof json.serverTime === 'string' ? json.serverTime : null;
+    } catch {
+      return null; // 검증 실패가 출퇴근을 막지는 않는다.
+    }
+  };
+
   // 출퇴근 처리 (위치 검증 포함)
   const handleCommute = async (type: 'in' | 'out') => {
     if (isProcessing) return;
@@ -811,8 +867,16 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       return; // 위치가 안 맞으면 여기서 중단!
     }
 
-    // 2. 위치 인증 성공 시 DB 기록 시작
-    const now = new Date();
+    // 2. 서버 검증 — 좌표를 서버가 다시 재고, 기록에 쓸 권위 시각을 받는다.
+    const serverTime = await verifyCommuteOnServer(
+      type === 'in' ? 'check_in' : 'check_out',
+      formatLocalDateKey(new Date()),
+    );
+
+    // 3. 위치 인증 성공 시 DB 기록 시작
+    //    지각 판정까지 서버 시각 기준으로 한다 — 단말 시계를 되돌려 지각을 정상으로
+    //    만드는 경로가 여기서 닫힌다. 서버가 응답하지 못하면 단말 시계로 폴백한다.
+    const now = serverTime ? new Date(serverTime) : new Date();
     const today = formatLocalDateKey(now);
     const timeString = now.toISOString();
     const userId = effectiveUserId;
