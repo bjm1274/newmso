@@ -453,10 +453,14 @@ export function resolveSalaryAmountForSettlement({
   status?: string | null;
 }) {
   const calculation = calculateSalaryAmountWithChanges({ fallback, field, yearMonth, salaryChanges, staff });
-  let amount = resolveSavedOrCalculatedAmount({ savedValue, fallback, calculation, status });
-  if (field === 'base_salary') {
-    amount = calculation.amount;
-  }
+  // 확정된 급여는 그대로 보존한다.
+  //
+  // 예전에는 base_salary 만 예외를 두어, 확정 저장값이 있어도 마스터의 현재
+  // base_salary 로 매번 다시 계산해 덮어썼다. 그래서 급여를 인상하면 **이미
+  // 확정한 과거 월의 기본급까지 인상 후 금액으로 바뀌었고**, 지급명세서·원천징수
+  // 이행상황신고서를 다시 열면 실제 지급액과 다른 숫자가 나왔다. 4대보험 정산
+  // 기준액도 함께 흔들린다.
+  const amount = resolveSavedOrCalculatedAmount({ savedValue, fallback, calculation, status });
   return {
     amount,
     summary: calculation.summary ? { ...calculation.summary, amount } : null };

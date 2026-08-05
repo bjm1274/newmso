@@ -4,6 +4,10 @@
  * 매일 자정 이후(새벽) 전날 근태 기록이 없는 재직 직원에 대해
  * attendance / attendances 양 테이블에 '결근(absent)' 행을 자동 생성한다.
  *
+ * 단, **전날이 그 직원의 소정근로일일 때만** 생성한다.
+ *   - 교대 근무자: 그날 근무 배정이 있어야 결근이다. 배정이 없으면 오프다.
+ *   - 배정표 미사용 직원: 평일이고 공휴일이 아닐 때만 결근이다.
+ *
  * 또한 출근 체크인만 하고 퇴근 체크아웃을 하지 않은 직원도 자동으로 처리한다:
  *   - 출근 후 4시간 이상 근무한 경우 → '조퇴(early_leave)' 처리
  *   - 출근 후 4시간 미만 근무한 경우 → '결근(absent)' 처리
@@ -18,6 +22,7 @@ import { getD1Binding } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { syncAttendanceToAttendances, LEGACY_STATUS_TO_MODERN } from '@/lib/attendance-sync';
 import { getKoreanTodayString, formatKoreanDateKey } from '@/lib/seoul-time';
+import { isKoreanPublicHoliday } from '@/lib/korean-public-holidays';
 
 /** 전날 날짜(YYYY-MM-DD)를 KST 기준으로 반환 */
 function getYesterdayKST(now: Date = new Date()): string {
@@ -25,6 +30,21 @@ function getYesterdayKST(now: Date = new Date()): string {
   d.setDate(d.getDate() - 1);
   return formatKoreanDateKey(d);
 }
+
+/** YYYY-MM-DD 에 일수를 더한 날짜 키 */
+function shiftDateKey(dateKey: string, days: number): string {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+/**
+ * 휴무/오프 성격의 근무유형. 배정이 있어도 소정근로일이 아니다.
+ * (급여정산 화면의 소정근로일수 집계와 같은 판정 기준을 쓴다.)
+ */
+const OFF_LIKE_SHIFT_NAME = /off|휴무|휴일|연차|leave/i;
+
+/** 교대 근무자 판정에 쓸 배정표 조회 범위(전날 기준 ±일) */
+const SHIFT_LOOKUP_WINDOW_DAYS = 30;
 
 interface StaffMember {
   id: string;
@@ -91,6 +111,69 @@ async function fetchStaffsWithoutYesterdayAttendance(yesterday: string): Promise
     [yesterday, yesterday, yesterday],
   );
   return rows as unknown as StaffMember[];
+}
+
+export interface ScheduleContext {
+  /** 전날 실제 근무가 배정된 직원 (오프·휴무 배정은 제외) */
+  scheduledYesterday: Set<string>;
+  /** 배정표로 근무일이 정해지는 직원 (= 교대 근무자) */
+  shiftWorkers: Set<string>;
+  /** 전날이 주말이거나 공휴일인가 — 배정표를 쓰지 않는 직원의 판정 기준 */
+  yesterdayIsNonWorkingDay: boolean;
+}
+
+/**
+ * 전날이 **누구의 소정근로일이었는지** 판정하기 위한 자료를 모은다.
+ *
+ * 예전에는 이 판정이 아예 없어서, 근태 행이 없는 재직자를 전부 결근으로 만들었다.
+ * 토·일요일마다 전 직원에게 결근이 찍히고 공휴일도 마찬가지였으며, 교대 근무자의
+ * 오프도 결근이 됐다. `absent_use_daily_rate` 가 켜져 있으면 그 결근 하나하나가
+ * 일급만큼 급여에서 빠지므로, 한 달이면 존재하지 않는 결근 8~10건이 쌓인다.
+ */
+async function loadScheduleContext(yesterday: string): Promise<ScheduleContext> {
+  const rows = await queryD1(
+    `SELECT sa.staff_id, sa.work_date, sa.shift_name AS assigned_shift_name, ws.name AS shift_name
+       FROM shift_assignments sa
+       LEFT JOIN work_shifts ws ON ws.id = sa.shift_id
+      WHERE sa.work_date >= ? AND sa.work_date <= ?`,
+    [
+      shiftDateKey(yesterday, -SHIFT_LOOKUP_WINDOW_DAYS),
+      shiftDateKey(yesterday, SHIFT_LOOKUP_WINDOW_DAYS),
+    ],
+  );
+
+  const scheduledYesterday = new Set<string>();
+  const shiftWorkers = new Set<string>();
+
+  for (const row of rows) {
+    const staffId = String(row.staff_id || '').trim();
+    if (!staffId) continue;
+    // 전날 전후로 배정이 하나라도 있으면 배정표로 근무일이 정해지는 직원이다.
+    shiftWorkers.add(staffId);
+
+    if (String(row.work_date || '').slice(0, 10) !== yesterday) continue;
+    const shiftName = String(row.shift_name || row.assigned_shift_name || '');
+    if (OFF_LIKE_SHIFT_NAME.test(shiftName)) continue;
+    scheduledYesterday.add(staffId);
+  }
+
+  const [year, month, day] = yesterday.split('-').map(Number);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+
+  return {
+    scheduledYesterday,
+    shiftWorkers,
+    yesterdayIsNonWorkingDay: weekday === 0 || weekday === 6 || isKoreanPublicHoliday(yesterday),
+  };
+}
+
+/** 전날이 이 직원의 소정근로일이었는가 (판정 규칙 단위 테스트 대상) */
+export function wasScheduledToWork(staffId: string, ctx: ScheduleContext): boolean {
+  if (ctx.scheduledYesterday.has(staffId)) return true;
+  // 교대 근무자는 근무 일정이 없으면 오프다 — 결근이 아니다.
+  if (ctx.shiftWorkers.has(staffId)) return false;
+  // 배정표를 쓰지 않는 직원은 평일·비공휴일만 소정근로일로 본다.
+  return !ctx.yesterdayIsNonWorkingDay;
 }
 
 /**
@@ -211,6 +294,8 @@ export interface AbsentAutoCreateResult {
   absentCreated: number;
   /** 결근 처리 건너뜀 */
   absentSkipped: number;
+  /** 전날이 소정근로일이 아니어서 건너뜀 (주말·공휴일·교대 오프) */
+  absentSkippedNotScheduled: number;
   /** 퇴근 미체크 직원 수 */
   uncheckedTotal: number;
   /** 퇴근 미체크 처리된 직원 수 (조퇴/결근) */
@@ -245,8 +330,13 @@ export async function runAbsentAutoCreate(
   let absentTotal = 0;
   let absentCreated = 0;
   let absentSkipped = 0;
+  let absentSkippedNotScheduled = 0;
 
   try {
+    // 근무 일정을 먼저 읽는다. 이게 실패하면 결근 생성을 통째로 건너뛴다 —
+    // 일정을 모르는 채로 만들면 주말·오프에 없는 결근을 찍고, 그건 곧 급여 공제다.
+    const schedule = await loadScheduleContext(yesterday);
+
     const staffsWithoutAttendance = await fetchStaffsWithoutYesterdayAttendance(yesterday);
     absentTotal = staffsWithoutAttendance.length;
     logger.info(`[absent-auto-create] 출근 기록 없는 직원: ${absentTotal}명`);
@@ -254,6 +344,10 @@ export async function runAbsentAutoCreate(
     for (const staff of staffsWithoutAttendance) {
       if (!staff.id) {
         absentSkipped++;
+        continue;
+      }
+      if (!wasScheduledToWork(String(staff.id), schedule)) {
+        absentSkippedNotScheduled++;
         continue;
       }
       try {
@@ -270,7 +364,7 @@ export async function runAbsentAutoCreate(
     }
   } catch (err) {
     errors++;
-    logger.error('[absent-auto-create] 재직 직원 조회 실패:', err);
+    logger.error('[absent-auto-create] 결근 대상 판정 실패 — 결근 생성을 건너뜁니다:', err);
   }
 
   // ── 2단계: 출근은 했으나 퇴근을 안 한 직원 → 상태 판정 후 업데이트 ──
@@ -315,7 +409,8 @@ export async function runAbsentAutoCreate(
   }
 
   const details = [
-    `결근 자동 생성: 전체 ${absentTotal}명 중 ${absentCreated}명 생성, ${absentSkipped}명 건너뜀`,
+    `결근 자동 생성: 전체 ${absentTotal}명 중 ${absentCreated}명 생성, ` +
+      `${absentSkippedNotScheduled}명 소정근로일 아님, ${absentSkipped}명 건너뜀`,
     `퇴근 미체크 처리: 전체 ${uncheckedTotal}명 중 ${uncheckedProcessed}명 처리 (조퇴 ${uncheckedEarlyLeave} / 결근 ${uncheckedAbsent})`,
     errors > 0 ? `오류: ${errors}건` : null,
   ]
@@ -328,6 +423,7 @@ export async function runAbsentAutoCreate(
     absentTotal,
     absentCreated,
     absentSkipped,
+    absentSkippedNotScheduled,
     uncheckedTotal,
     uncheckedProcessed,
     uncheckedEarlyLeave,

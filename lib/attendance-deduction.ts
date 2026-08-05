@@ -48,14 +48,6 @@ export function getHourlyRate(baseSalary: number, yearMonth: string, divisorDays
   return Math.floor(dailyRate / DAILY_STANDARD_HOURS);
 }
 
-function getRecordedWorkDays(attendances: AttendanceRecord[]) {
-  return new Set(
-    attendances
-      .map((attendance) => String(attendance.work_date || '').slice(0, 10))
-      .filter(Boolean)
-  ).size;
-}
-
 /** 지각/조퇴 분수를 10분 단위 내림으로 반환 (기본 10분, 최소 10분) */
 function resolveMinuteAmount(value: number | null | undefined) {
   if (typeof value === 'boolean') return 10;
@@ -77,10 +69,17 @@ export function calculateAttendanceDeduction(
     early_leave_deduction_type: rule.early_leave_deduction_type ?? DEFAULT_RULE.early_leave_deduction_type,
     early_leave_deduction_amount: rule.early_leave_deduction_amount ?? DEFAULT_RULE.early_leave_deduction_amount,
     absent_use_daily_rate: rule.absent_use_daily_rate ?? DEFAULT_RULE.absent_use_daily_rate };
+  // 일급 분모는 **소정근로일수**다. 배정표가 있으면 그 일수를, 없으면 그 달의
+  // 평일 수(getDailyRate 내부 기본값)를 쓴다.
+  //
+  // 예전에는 배정표가 없을 때 "그 달 근태 행의 고유 날짜 수"를 분모로 썼다.
+  // 근태 기록이 5일뿐인 직원은 일급이 기본급/5 가 되어 정상 분모(21~22일) 대비
+  // 4배 이상 부풀었고, absent_use_daily_rate 가 켜져 있으면 결근 1건마다 그
+  // 금액이 공제됐다. 기록이 적을수록 공제가 커지는, 방향이 뒤집힌 계산이었다.
   const divisorDays =
     options.scheduledWorkDays && options.scheduledWorkDays > 0
       ? options.scheduledWorkDays
-      : getRecordedWorkDays(attendances);
+      : undefined;
   const dailyRate = getDailyRate(baseSalary, yearMonth, divisorDays);
   const hourlyRate = getHourlyRate(baseSalary, yearMonth, divisorDays);
 
