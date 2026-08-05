@@ -22,11 +22,20 @@ import {
   REALTIME_ALLOWED_TABLE_SET as ALLOWED_TABLES,
   REALTIME_TABLE_TIMESTAMP_COLUMN as TABLE_TIMESTAMP_COLUMN,
   getRealtimeTimestampColumn,
+  isRealtimeAllowedFilterColumn,
 } from '@/lib/realtime/allowed-tables';
 
 export const dynamic = 'force-dynamic';
 
 const MAX_TABLES_PER_REQUEST = 10;
+
+/** 허용되지 않은 필터 컬럼·연산자 요청 — 400 으로 거부하기 위한 표식. */
+class RealtimeFilterNotAllowedError extends Error {
+  constructor(table: string, column: string, op: string) {
+    super(`허용되지 않은 필터입니다: ${table}:${column}=${op}`);
+    this.name = 'RealtimeFilterNotAllowedError';
+  }
+}
 
 // D1에서 테이블의 최신 변경 timestamp 조회 — allowedTables whitelist 내에서만 호출됨.
 // 컬럼명은 TABLE_TIMESTAMP_COLUMN 매핑에서 우선 결정, 없으면 created_at.
@@ -49,12 +58,19 @@ async function fetchMaxCreatedAtD1(
       if (dotIdx !== -1) {
         const op = opAndVal.substring(0, dotIdx);
         const val = opAndVal.substring(dotIdx + 1);
-        
-        // SQL 인젝션 방지를 위한 컬럼명 및 연산자 검증
-        if (/^[a-zA-Z0-9_]+$/.test(col) && op === 'eq') {
-          query += ` WHERE "${col}" = ?`;
-          params.push(val);
+
+        // 컬럼은 화이트리스트로 제한한다.
+        //
+        // 예전에는 `/^[a-zA-Z0-9_]+$/` 만 검사했다. SQL 인젝션은 막았지만
+        // 조회 결과 유무가 그대로 응답에 드러나므로 **임의 컬럼 값의 존재 여부를
+        // 확인하는 오라클**이 됐다(비밀번호 해시·주민번호 등).
+        // 필터를 못 쓰는 컬럼이 오면 조건을 조용히 무시하지 않고 요청을 거부한다 —
+        // 무시하면 필터 없는 전체 조회가 되어 더 넓은 결과를 돌려주게 된다.
+        if (op !== 'eq' || !isRealtimeAllowedFilterColumn(col)) {
+          throw new RealtimeFilterNotAllowedError(tableName, col, op);
         }
+        query += ` WHERE "${col}" = ?`;
+        params.push(val);
       }
     }
   }
@@ -66,6 +82,8 @@ async function fetchMaxCreatedAtD1(
     const result = await (params.length > 0 ? statement.bind(...params) : statement).first<{ ts: string | null }>();
     return result?.ts ?? null;
   } catch (err) {
+    // 필터 거부는 삼키지 않는다 — null 로 뭉개면 호출자가 "변경 없음"으로 읽는다.
+    if (err instanceof RealtimeFilterNotAllowedError) throw err;
     console.error(`[fetchMaxCreatedAtD1] query failed: ${query}`, err);
     return null;
   }
@@ -99,11 +117,18 @@ export async function GET(request: Request) {
 
     const d1 = await getD1Binding();
     if (!d1) throw new Error('[realtime/tail] D1 binding not available');
-    await Promise.all(
-      tables.map(async (t) => {
-        tail[t] = await fetchMaxCreatedAtD1(d1, t);
-      }),
-    );
+    try {
+      await Promise.all(
+        tables.map(async (t) => {
+          tail[t] = await fetchMaxCreatedAtD1(d1, t);
+        }),
+      );
+    } catch (err) {
+      if (err instanceof RealtimeFilterNotAllowedError) {
+        return NextResponse.json({ ok: false, error: err.message }, { status: 400 });
+      }
+      throw err;
+    }
 
     return NextResponse.json({ ok: true, tail });
   } catch (err) {
