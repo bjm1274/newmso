@@ -106,4 +106,5 @@ export const SUPPORTED_MIME: Record<string, string> = {
   'video/webm': 'video/webm',
   'video/mp4':  'video/mp4' };
 
-export const LS_KEY = 'erp_consultation_records';
+/** 상담 기록 보관 기간. 지나면 로드 시점에 버린다. */
+export const CONSULT_RECORD_TTL_MS = 12 * 60 * 60 * 1000;

@@ -113,6 +113,12 @@ export async function performClientLogout(): Promise<void> {
   try {
     localStorage.removeItem(STORAGE_KEYS.USER);
     localStorage.removeItem(STORAGE_KEYS.LOGIN_AT);
+    // 수술상담 기록은 환자명·차트번호·진단·수술계획을 담은 환자정보다.
+    // 지금은 sessionStorage 에만 두지만, 예전 localStorage 사본이 남아 있는
+    // 단말이 있으므로 로그아웃 때도 함께 지운다. 공용 단말에서 다음 사용자가
+    // 앱 인증 없이 이전 환자 기록을 읽는 일이 없어야 한다.
+    localStorage.removeItem(STORAGE_KEYS.CONSULTATION_RECORDS_LEGACY);
+    sessionStorage.removeItem(STORAGE_KEYS.CONSULTATION_RECORDS_SESSION);
   } catch {
     // ignore
   }

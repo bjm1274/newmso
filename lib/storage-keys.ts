@@ -35,6 +35,19 @@ export const STORAGE_KEYS = {
   /** 마지막 로그인 시각 (ISO string) */
   LOGIN_AT: 'erp_login_at',
 
+  /**
+   * 수술상담 기록의 레거시 localStorage 키.
+   *
+   * 상담 기록에는 환자명·차트번호·진단·수술계획이 들어간다. 예전에는 이 키로
+   * 최대 30건을 만료 없이 평문 보관했고 로그아웃해도 남았다 — 공용 단말이라면
+   * 브라우저 프로필을 여는 것만으로 앱 인증 없이 읽힌다. 지금은 쓰지 않지만
+   * 이미 단말에 쌓인 기록을 지워야 하므로 상수는 남겨 둔다.
+   */
+  CONSULTATION_RECORDS_LEGACY: 'erp_consultation_records',
+
+  /** 수술상담 기록 보관 위치 — 탭을 닫으면 사라지는 sessionStorage */
+  CONSULTATION_RECORDS_SESSION: 'erp_consultation_records_session',
+
   /** 채팅 금지어 목록 */
   BANNED_WORDS: 'erp-banned-words',
 

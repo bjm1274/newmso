@@ -6,8 +6,14 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 
 import type { ConsultationResult, SavedRecord, PatientGroup } from './수술상담-types';
-import { SUPPORTED_MIME, LS_KEY } from './수술상담-types';
-import { formatDuration, groupByPatient, deriveKpi } from './수술상담-utils';
+import { SUPPORTED_MIME } from './수술상담-types';
+import {
+  formatDuration,
+  groupByPatient,
+  deriveKpi,
+  loadConsultationRecords,
+  saveConsultationRecords,
+} from './수술상담-utils';
 import { KpiGrid, ResultPanel } from './수술상담-components';
 
 // ─── 메인 컴포넌트 ─────────────────────────────────────────────────────────────
@@ -48,12 +54,11 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
   // 우측 입력 모드
   const [inputMode, setInputMode] = useState<'record' | 'upload'>('record');
 
-  // ─── localStorage 로드 ──────────────────────────────────────────────────────
+  // ─── 상담 기록 로드 ─────────────────────────────────────────────────────────
+  // 환자정보라 탭 세션 동안만 보관한다. 레거시 localStorage 기록은 옮겨 담고
+  // 원본을 지운다 (수술상담-utils 의 loadConsultationRecords 참조).
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      if (raw) setRecords(JSON.parse(raw));
-    } catch { /* ignore */ }
+    setRecords(loadConsultationRecords());
   }, []);
 
   const saveRecord = useCallback((filename: string, res: ConsultationResult, name: string, chartNo: string) => {
@@ -66,7 +71,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
       result: res };
     setRecords((prev) => {
       const next = [rec, ...prev].slice(0, 30);
-      try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      saveConsultationRecords(next);
       return next;
     });
   }, []);
@@ -74,7 +79,7 @@ export default function SurgeryConsultationView({ user }: { user?: unknown }) {
   const deleteRecord = useCallback((id: string) => {
     setRecords((prev) => {
       const next = prev.filter((r) => r.id !== id);
-      try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      saveConsultationRecords(next);
       return next;
     });
     if (selectedRecord?.id === id) setSelectedRecord(null);
