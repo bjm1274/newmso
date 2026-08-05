@@ -289,9 +289,16 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
    * 오프라인·라우트 장애 시에는 null 을 돌려 기존 동작(단말 시계)으로 폴백한다.
    * 출퇴근이 네트워크 상태에 인질로 잡히면 안 되기 때문이다.
    */
+  // 검증 결과. serverTime 은 기록에 쓸 권위 시각, blocked 는 서버의 차단 판정이다.
+  // 차단 여부를 여기서 다시 계산하지 않는다 — 정책이 화면마다 갈라지지 않게
+  // 라우트 한 곳에서만 정한다.
+  type GeoVerifyOutcome = { serverTime: string | null; blocked: boolean; blockReason: string | null };
+  // 오프라인이거나 검증 라우트가 죽었을 때. 검증 실패는 위반이 아니므로 막지 않는다.
+  const OFFLINE_OUTCOME: GeoVerifyOutcome = { serverTime: null, blocked: false, blockReason: null };
+
   const verifyOnServer = useCallback(
-    async (action: 'check_in' | 'check_out', dateKey: string): Promise<string | null> => {
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) return null;
+    async (action: 'check_in' | 'check_out', dateKey: string): Promise<GeoVerifyOutcome> => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return OFFLINE_OUTCOME;
       try {
         const res = await fetch('/api/attendance/geo-verify', {
           method: 'POST',
@@ -305,11 +312,19 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
             clientTime: new Date().toISOString(),
             clientBypass: isBypassed && !withinRangeByDistance }),
         });
-        if (!res.ok) return null;
-        const json = (await res.json()) as { serverTime?: string };
-        return typeof json.serverTime === 'string' ? json.serverTime : null;
+        if (!res.ok) return OFFLINE_OUTCOME;
+        const json = (await res.json()) as {
+          serverTime?: string;
+          blocked?: boolean;
+          blockReason?: string | null;
+        };
+        return {
+          serverTime: typeof json.serverTime === 'string' ? json.serverTime : null,
+          blocked: json.blocked === true,
+          blockReason: json.blockReason ?? null };
       } catch {
-        return null; // 검증 실패가 출퇴근을 막지는 않는다.
+        // 검증 자체가 실패한 것은 위반이 아니다 — 막지 않고 단말 시계로 폴백한다.
+        return OFFLINE_OUTCOME;
       }
     },
     [coords, isBypassed, withinRangeByDistance],
@@ -342,7 +357,12 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
     try {
       const today = getKoreanTodayString();
       // 서버 시계 우선 — 실패 시에만 단말 시계로 폴백한다(verifyOnServer 주석 참고).
-      const serverTime = await verifyOnServer(state === 'before' ? 'check_in' : 'check_out', today);
+      const verified = await verifyOnServer(state === 'before' ? 'check_in' : 'check_out', today);
+      if (verified.blocked) {
+        toast(verified.blockReason || '사업장 반경 밖에서는 출퇴근을 기록할 수 없습니다.', 'error');
+        return;
+      }
+      const serverTime = verified.serverTime;
       const nowIso = serverTime ?? new Date().toISOString();
       if (state === 'before') {
         // 근무유형(work_shifts) 시작시각 기준 지각 판정. 1일근무1일휴무는 근무표(shift_assignments) 배정 기준.
@@ -496,7 +516,12 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
     try {
       const dateKey = staleLog.date;
       const checkInIso = staleLog.check_in;
-      const serverTime = await verifyOnServer('check_out', dateKey);
+      const verified = await verifyOnServer('check_out', dateKey);
+      if (verified.blocked) {
+        toast(verified.blockReason || '사업장 반경 밖에서는 출퇴근을 기록할 수 없습니다.', 'error');
+        return;
+      }
+      const serverTime = verified.serverTime;
       const nowIso = serverTime ?? new Date().toISOString();
 
       let finalStatus = staleLog.status || '정상';
