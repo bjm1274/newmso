@@ -58,6 +58,21 @@ test.describe('권한 상승 차단', () => {
     }
   });
 
+  test('인사담당자는 타인의 비밀번호 재설정 플래그를 켤 수 없다', async ({ page }) => {
+    // master-login 은 password_reset_required=1 이면 그 로그인에 입력된 비밀번호를
+    // 새 비밀번호로 확정하고 통과시킨다. 즉 이 플래그를 켤 수 있으면
+    // 그 계정을 자기가 아는 비밀번호로 갈아치워 그대로 로그인할 수 있다.
+    const response = await page.request.post('/api/d1/mutate', {
+      data: {
+        op: 'update',
+        table: 'staff_members',
+        set: { password_reset_required: 1 },
+        where: [{ field: 'id', op: 'eq', value: '10000000-0000-0000-0000-000000000003' }],
+      },
+    });
+    expect(response.status()).toBe(403);
+  });
+
   test('인사담당자는 D1 게이트웨이로도 예약 사번 계정을 만들 수 없다', async ({ page }) => {
     const response = await page.request.post('/api/d1/mutate', {
       data: {

@@ -1,12 +1,39 @@
 import { NextResponse } from 'next/server';
-import { isAdminSession, readSessionFromRequest } from '@/lib/server-session';
+import { isAdminSession, isSystemMasterSession, readSessionFromRequest } from '@/lib/server-session';
 import { clearStaffPasswordWithFallback, updateStaffPasswordWithFallback } from '@/lib/staff-password';
+import { SYSTEM_MASTER_ACCOUNT_ID } from '@/lib/system-master';
 import {
   getD1Binding,
   getD1Drizzle,
   staff_members as staffMembersTable,
   audit_logs as auditLogsTable,
   eq } from '@/lib/db';
+
+/**
+ * 대상 계정이 시스템마스터인가.
+ *
+ * 세 가지 표식 중 하나라도 걸리면 시스템마스터로 본다. 어느 하나만 검사하면
+ * 나머지 표식을 가진 계정이 그물을 빠져나간다 — 사번 '9999' 는 권한 컬럼이
+ * 비어 있어도 lib/d1-api-helpers.ts 의 userId() 가 시스템마스터로 되돌려준다.
+ */
+function isSystemMasterRow(row: {
+  employee_no?: string | null;
+  is_system_master?: number | boolean | null;
+  permissions?: string | null;
+}): boolean {
+  if (row.is_system_master === 1 || row.is_system_master === true) return true;
+  if (String(row.employee_no ?? '').trim() === SYSTEM_MASTER_ACCOUNT_ID) return true;
+  if (typeof row.permissions === 'string' && row.permissions.length > 0) {
+    try {
+      const parsed = JSON.parse(row.permissions) as Record<string, unknown> | null;
+      if (parsed && typeof parsed === 'object' && parsed.system_master === true) return true;
+    } catch {
+      // 권한 JSON 이 깨져 있으면 판정할 수 없다 — 호출부에서 거부로 처리한다.
+      return true;
+    }
+  }
+  return false;
+}
 
 async function insertAuditLogToD1(row: {
   action: string;
@@ -65,6 +92,42 @@ export async function POST(request: Request) {
         { ok: false, error: `비밀번호는 ${MIN_PASSWORD_LENGTH}자 이상이어야 합니다.` },
         { status: 400 },
       );
+    }
+
+    // 시스템마스터 계정의 비밀번호는 시스템마스터만 바꿀 수 있다.
+    //
+    // 예전에는 대상 행을 아예 보지 않았다. isAdminSession 은 permissions.admin 만
+    // 있어도 통과하므로, 일반 관리자가 시스템마스터 계정의 비밀번호를 재설정하고
+    // 그 계정으로 로그인하면 시스템마스터센터·연차수동부여·백업복구가 전부 열렸다.
+    //
+    // 대상 행을 읽지 못하면 거부한다 — 시스템마스터가 아니라는 것을 확인하지
+    // 못한 채로 비밀번호를 바꾸면 이 검사가 없는 것과 같다.
+    if (!isSystemMasterSession(session.user)) {
+      const d1 = await getD1Binding();
+      if (!d1) {
+        return NextResponse.json(
+          { ok: false, error: '대상 계정을 확인할 수 없어 요청을 거부했습니다.' },
+          { status: 503 },
+        );
+      }
+      const rows = await getD1Drizzle(d1)
+        .select({
+          employee_no: staffMembersTable.employee_no,
+          is_system_master: staffMembersTable.is_system_master,
+          permissions: staffMembersTable.permissions })
+        .from(staffMembersTable)
+        .where(eq(staffMembersTable.id, staffId))
+        .limit(1);
+
+      if (rows.length === 0) {
+        return NextResponse.json({ ok: false, error: '대상 직원을 찾을 수 없습니다.' }, { status: 404 });
+      }
+      if (isSystemMasterRow(rows[0])) {
+        return NextResponse.json(
+          { ok: false, error: '시스템마스터 계정의 비밀번호는 변경할 수 없습니다.' },
+          { status: 403 },
+        );
+      }
     }
 
     const adminUserId = String(session.user?.id ?? session.user?.user_id ?? 'unknown');

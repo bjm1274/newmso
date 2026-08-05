@@ -165,6 +165,16 @@ const PRIVILEGED_STAFF_COLUMNS = [
   'passwd',
   'is_system_master',
   'force_logout_at',
+  // 로그인 자격에 직결되는 컬럼. 매니저·인사담당자에게 열려 있으면 안 된다.
+  //
+  // password_reset_required 는 이름과 달리 단순 표시 플래그가 아니다.
+  // master-login 은 이 값이 1 이면 그 로그인에 입력된 비밀번호를 **새 비밀번호로
+  // 확정하고 통과시킨다.** 즉 이 플래그를 켤 수 있는 사람은 그 계정의 비밀번호를
+  // 자기가 아는 값으로 바꿔 그대로 로그인할 수 있다 — 관리자 계정도 마찬가지다.
+  // 예전에는 SENSITIVE 목록에도 없어서 회사 매니저가 임의 직원 행에 켤 수 있었다.
+  'password_reset_required',
+  // auth_user_id 는 외부 인증 신원과의 연결고리라 바꿔치기하면 사칭이 된다.
+  'auth_user_id',
 ] as const;
 
 const SENSITIVE_STAFF_COLUMNS = [
@@ -207,18 +217,46 @@ function touchesColumn(
  */
 const RESERVED_SYSTEM_MASTER_EMPLOYEE_NO = '9999';
 
+/**
+ * 이 행이 시스템마스터 계정인가.
+ *
+ * update 판정 행에는 DB 정본이 병합돼 있으므로 대상 계정의 표식을 그대로 읽을 수 있고,
+ * insert 는 요청 본문이 그대로 들어오므로 "시스템마스터로 만들려는 시도"가 걸린다.
+ */
+function isSystemMasterStaffRow(row: Record<string, unknown>): boolean {
+  if (String(getField<string>(row, 'employee_no') ?? '').trim() === RESERVED_SYSTEM_MASTER_EMPLOYEE_NO) {
+    return true;
+  }
+  const flag = row.is_system_master;
+  if (flag === 1 || flag === true) return true;
+
+  const perms = row.permissions;
+  if (perms && typeof perms === 'object' && !Array.isArray(perms)) {
+    return (perms as Record<string, unknown>).system_master === true;
+  }
+  if (typeof perms === 'string' && perms.length > 0) {
+    try {
+      const parsed = JSON.parse(perms) as Record<string, unknown> | null;
+      return Boolean(parsed && typeof parsed === 'object' && parsed.system_master === true);
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
 function staffPrivilegeGuard(
   claims: ErpClaims,
   row: Record<string, unknown>,
   changedKeys?: ReadonlySet<string>,
 ): boolean {
-  // 예약 사번은 시스템마스터 본인만 다룰 수 있다. (update 판정 행에는 새 값이
-  // 병합돼 있으므로, 이 값으로 바꾸려는 시도도 여기서 걸린다.)
-  if (
-    touchesColumn(row, changedKeys, 'employee_no') &&
-    String(getField<string>(row, 'employee_no') ?? '').trim() === RESERVED_SYSTEM_MASTER_EMPLOYEE_NO &&
-    erpStaffId(claims) !== RESERVED_SYSTEM_MASTER_EMPLOYEE_NO
-  ) {
+  // 시스템마스터 계정은 본인만 건드릴 수 있다.
+  //
+  // 컬럼 단위로만 막으면 그물이 계속 새 나갔다. 사번 '9999' 는 권한 컬럼이 비어
+  // 있어도 게이트웨이가 시스템마스터로 인식하고, password_reset_required 처럼
+  // 이름만으로는 위험해 보이지 않는 컬럼이 로그인 우회 수단이 된다. 그래서
+  // 컬럼이 아니라 **행**을 기준으로 잠근다 — 만들려는 시도든 고치려는 시도든.
+  if (isSystemMasterStaffRow(row) && erpStaffId(claims) !== RESERVED_SYSTEM_MASTER_EMPLOYEE_NO) {
     return false;
   }
 
