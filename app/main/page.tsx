@@ -796,13 +796,20 @@ function MainPageContent() {
         setMainMenu('내정보');
         setInitialMyPageTab(openMyPageTab);
       }
+      // 예전에는 open_inventory_view / open_inventory_approval 쿼리가 오면 권한을 보지
+      // 않고 무조건 setMainMenu('재고관리') 를 했다. 그래서 재고 권한이 없는 계정도
+      // 딥링크 한 줄로 재고 화면을 마운트시킬 수 있었고, 서버 정책이 데이터를 막더라도
+      // 최소한 1렌더 사이클 동안 화면이 뜨고 조회 요청이 발사됐다.
+      // 사이드바 클릭 경로에는 이미 canAccessMainMenu 필터가 있는데 딥링크에만 없었다.
       if (targetMenu === '재고관리' || openInventoryView || openInventoryApproval) {
-        setMainMenu('재고관리');
-        if (openInventoryView) {
-          setSubView(openInventoryView);
-        }
-        if (openInventoryApproval) {
-          setInitialInventoryWorkflowApprovalId(openInventoryApproval);
+        if (canAccessMainMenu(user, '재고관리')) {
+          setMainMenu('재고관리');
+          if (openInventoryView) {
+            setSubView(openInventoryView);
+          }
+          if (openInventoryApproval) {
+            setInitialInventoryWorkflowApprovalId(openInventoryApproval);
+          }
         }
       }
       const openBoard = navigationIntent.openBoard;
@@ -1154,16 +1161,21 @@ function MainPageContent() {
     setInitialOpenChatRequestToken((value) => value + 1);
   }, []);
 
+  // 알림 클릭 → 관리자/재고 화면 이동. 예전에는 두 핸들러 모두 권한 검사가 없어서
+  // 권한 없는 계정에게 잘못 발송된 알림 한 건이 곧바로 관리자·재고 화면 마운트가 됐다.
+  // (딥링크 쿼리 경로와 같은 결함 — D09-011. 사이드바 경로에만 필터가 있었다.)
   const handleOpenAdmin = useCallback((nextSubView?: string) => {
+    if (!canAccessMainMenu(user, '관리자')) return;
     setMainMenu('관리자');
     setSubView(nextSubView || '감사센터');
-  }, []);
+  }, [user]);
 
   const handleOpenInventory = useCallback((intent: { view?: string | null; approvalId?: string | null } | undefined) => {
+    if (!canAccessMainMenu(user, '재고관리')) return;
     setMainMenu('재고관리');
     setSubView(intent?.view || '현황');
     setInitialInventoryWorkflowApprovalId(intent?.approvalId || null);
-  }, []);
+  }, [user]);
 
   const handleOpenBoard = useCallback((boardId?: string) => {
     setMainMenu('게시판');

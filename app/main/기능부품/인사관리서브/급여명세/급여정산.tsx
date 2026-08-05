@@ -28,7 +28,8 @@ import {
 import { decideCheckInStatus } from '../../마이페이지/출퇴근기록/late-status';
 import { upsertPayrollRecordsWithFallback } from '@/lib/payroll-record-upsert';
 import { NP_INCOME_CEILING, NP_INCOME_FLOOR, NIGHT_DUTY_TAX_FREE_LIMIT } from '@/lib/tax-free-limits';
-import { calcStatutoryDeductions } from '@/lib/payroll-deductions';
+import { calcStatutoryDeductions, type StatutoryDeductionOptions } from '@/lib/payroll-deductions';
+import { verifyPayrollBeforeSave } from '@/lib/payroll-shadow-verify';
 import { getPayrollInsuranceSettings, resolvePayrollAsOfDate, hasAnyEmployeePayrollInsurance } from '@/lib/payroll-insurance-settings';
 import RiskActionDialog from '../RiskActionDialog';
 import type {
@@ -1026,7 +1027,9 @@ export default function SalarySettlement({
         deduction: 0,
         deductionDetail: {},
         attendance_deduction: 0,
-        net: 0 };
+        net: 0,
+        // 서버 shadow 재계산(D04-008)에 넘길 옵션. 저장되지 않는다.
+        statutoryOptions: null as StatutoryDeductionOptions | null };
     }
     const hasExactWithholdingTable = hasExactIncomeTaxBracket(taxInsuranceRates);
 
@@ -1083,7 +1086,9 @@ export default function SalarySettlement({
 
     const resolvedIns = getPayrollInsuranceSettings(staff, resolvePayrollAsOfDate(yearMonth));
 
-    const deductions = calcStatutoryDeductions(total_taxable, taxInsuranceRates, {
+    // 서버가 같은 입력으로 재계산할 수 있도록 옵션을 한 번만 만들어 공유한다.
+    // (예전에는 이 옵션이 이 함수 안에만 있어서 서버가 재현할 방법이 없었다 — D04-008)
+    const statutoryOptions: StatutoryDeductionOptions = {
       applyInsurance: data.apply_insurance !== false,
       applyTax: data.apply_tax !== false,
       isDuruNuriActive,
@@ -1096,7 +1101,9 @@ export default function SalarySettlement({
       applyEmploymentInsurance: resolvedIns.employment,
       nationalPensionAmount: insSettings.national_amount != null ? Number(insSettings.national_amount) : null,
       joinedAt: (staff?.joined_at || staff?.join_date || null) as string | null,
-      yearMonth: yearMonth });
+      yearMonth: yearMonth };
+
+    const deductions = calcStatutoryDeductions(total_taxable, taxInsuranceRates, statutoryOptions);
 
     const national_pension = deductions.national_pension;
     const health_insurance = deductions.health_insurance;
@@ -1153,39 +1160,14 @@ export default function SalarySettlement({
       deduction,
       deductionDetail,
       attendance_deduction,
-      net: total_payment - deduction
+      net: total_payment - deduction,
+      statutoryOptions
     };
   };
 
   const persistSettlement = async (targetStatus: '임시저장' | '확정') => {
     setLoading(true);
     try {
-      // E-1: 마감 잠금된 월은 임시저장·확정을 모두 차단한다(클라이언트 가드).
-      // 잠금 스코프는 '전체' 또는 선택 회사. 조회 실패 시 막지 않음(fail-open).
-      const { data: lockRows, error: lockError } = await db
-        .from('payroll_locks')
-        .select('year_month, company_name')
-        .eq('year_month', yearMonth);
-      
-      let isSaveLocked = false;
-      if (lockRows && lockRows.length > 0) {
-        if (selectedCo === '전체') {
-          isSaveLocked = true;
-        } else {
-          isSaveLocked = lockRows.some((row: any) => row.company_name === '전체' || row.company_name === selectedCo);
-        }
-      }
-
-      if (lockError) {
-        console.error('payroll lock check failed:', lockError);
-      } else if (isSaveLocked) {
-        toast(
-          `${yearMonth} 급여가 마감 잠금되어 저장할 수 없습니다.\n재오픈 승인 후 다시 시도해 주세요.`,
-          'error',
-        );
-        return null;
-      }
-
       const records = selectedStaffs.map((staff) => {
         const staffId = String(staff.id);
         const data = settlementData[staffId];
@@ -1248,6 +1230,46 @@ export default function SalarySettlement({
           record_type: 'regular',
           status: targetStatus };
       });
+
+      // 서버 권위 검증 (D04-008).
+      //
+      // 예전에는 마감 잠금 판정도, 금액 검산도 전부 이 브라우저 안에 있었다.
+      // 특히 잠금 조회가 실패하면 그대로 저장이 진행되는 fail-open 이라, 조회
+      // 한 번을 실패시키는 것만으로 마감이 무력화됐다. 이제 서버가 판정하고,
+      // **판정을 못 하면 저장을 중단한다**(돈이 걸린 가드에서 "모르겠으면 통과"는
+      // 성립하지 않는다). 금액 쪽은 아직 shadow 단계라 서버가 대조·기록만 하고
+      // 값을 바꾸지 않는다 — 라우트 주석 참고.
+      const verifyOutcome = await verifyPayrollBeforeSave({
+        yearMonth,
+        companyName: selectedCo,
+        targetStatus,
+        staffs: selectedStaffs.map((staff) => {
+          const staffId = String(staff.id);
+          const calc = calculateSalary(staffId);
+          const record = records.find((row) => String(row.staff_id) === staffId);
+          return {
+            staff_id: staffId,
+            total_taxable: Math.round(Number(calc?.taxable || 0)),
+            total_taxfree: Math.round(Number(calc?.taxfree || 0)),
+            custom_deduction: Number(settlementData[staffId]?.custom_deduction || 0),
+            advance_pay: Math.round(Number(settlementData[staffId]?.advance_pay || 0)),
+            options: calc?.statutoryOptions ?? {},
+            client: {
+              national_pension: Number(record?.national_pension || 0),
+              health_insurance: Number(record?.health_insurance || 0),
+              long_term_care: Number(record?.long_term_care || 0),
+              employment_insurance: Number(record?.employment_insurance || 0),
+              income_tax: Number(record?.income_tax || 0),
+              local_tax: Number(record?.local_tax || 0),
+              total_deduction: Number(record?.total_deduction || 0),
+              gross_pay: Number(record?.gross_pay || 0),
+              net_pay: Number(record?.net_pay || 0) } };
+        }) });
+
+      if (verifyOutcome.blocked) {
+        toast(verifyOutcome.message, 'error');
+        return null;
+      }
 
       const { error: payrollSaveError } = await upsertPayrollRecordsWithFallback({
         records: records as Record<string, unknown>[],

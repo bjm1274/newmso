@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { readAuthorizedExtraFeatureUser } from '@/lib/server-extra-feature-access';
+import { isAllowedPublicStorageUrl } from '@/lib/object-storage';
 import { withTimeout } from '@/lib/promise-timeout';
 
 const MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro'];
@@ -108,7 +109,17 @@ export async function POST(req: Request) {
         }
 
         // 1. R2로부터 오디오 스트림(ReadableStream) 획득
-        const r2Response = await fetch(audioUrl);
+        //
+        // 예전에는 body 의 audioUrl 을 그대로 fetch 했다. 그래서 인증만 통과하면
+        // 이 라우트가 임의 URL 을 대신 요청해 주는 통로가 됐다 — Workers 런타임에서
+        // 내부 서비스 바인딩·메타데이터 엔드포인트를 찌를 수 있는 SSRF 다.
+        // 같은 저장소의 /api/download 는 이미 isAllowedPublicStorageUrl 화이트리스트를
+        // 갖고 있었는데 이 경로에만 빠져 있었다. 같은 판정을 여기에도 적용한다.
+        if (!isAllowedPublicStorageUrl(audioUrl)) {
+            return NextResponse.json({ error: '허용되지 않는 음성 파일 URL입니다.' }, { status: 403 });
+        }
+
+        const r2Response = await fetch(audioUrl, { signal: AbortSignal.timeout(30_000) });
         if (!r2Response.ok || !r2Response.body) {
             return NextResponse.json({ error: `R2 파일 스트림 획득 실패 (Status: ${r2Response.status})` }, { status: 500 });
         }

@@ -256,6 +256,12 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
   const distanceLabel = distance === null ? null : Math.floor(distance);
 
   // localhost 접속이거나 localStorage의 bypass_gps가 'true'인 경우 우회 허용
+  //
+  // 이 우회는 개발용으로 들어왔는데 환경 분기가 없어 프로덕션 번들에도 그대로
+  // 남아 있었다 — devtools 에서 한 줄이면 반경 검사가 사라졌다(D01-012·D09-007).
+  // 지금 단계에서 이 경로를 없애면 위치 권한이 막힌 단말이 출근을 못 하게 되므로
+  // 동작은 유지하되, 우회로 통과했다는 사실을 서버에 신고해 감사 기록으로 남긴다.
+  // (아래 verifyOnServer 의 clientBypass)
   const isBypassed = useMemo(() => {
     if (typeof window === 'undefined') return false;
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -263,12 +269,51 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
     return isLocal || hasBypassFlag;
   }, []);
 
-  const withinRange = isBypassed || (distance !== null && distance <= ALLOWED_DISTANCE_M);
+  // 우회 플래그를 빼고 실제 좌표만으로 본 판정 — 서버 신고용으로 분리해 둔다.
+  const withinRangeByDistance = distance !== null && distance <= ALLOWED_DISTANCE_M;
+  const withinRange = isBypassed || withinRangeByDistance;
   const accuracyTooLow = !isBypassed && !!coords && coords.accuracy > ACCURACY_WARN_M;
 
   const state: 'before' | 'in' | 'done' =
     !todayLog?.check_in ? 'before' : !todayLog?.check_out ? 'in' : 'done';
   const canAct = !!staffId && !submitting;
+
+  /**
+   * 서버에 좌표·시각을 제출하고 **서버 시계**를 받아온다.
+   *
+   * 예전에는 기록 시각이 `new Date().toISOString()` — 단말 시계였다. 단말 시계를
+   * 되돌리면 지각이 정상이 되고 서버에는 그것을 알 방법이 없었다. 이제 기록 시각은
+   * 서버가 준 값을 쓰고, 반경 판정도 서버가 좌표에서 다시 계산해 위반이면 감사로그로
+   * 남긴다(라우트 주석 참고).
+   *
+   * 오프라인·라우트 장애 시에는 null 을 돌려 기존 동작(단말 시계)으로 폴백한다.
+   * 출퇴근이 네트워크 상태에 인질로 잡히면 안 되기 때문이다.
+   */
+  const verifyOnServer = useCallback(
+    async (action: 'check_in' | 'check_out', dateKey: string): Promise<string | null> => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return null;
+      try {
+        const res = await fetch('/api/attendance/geo-verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action,
+            date: dateKey,
+            latitude: coords?.latitude ?? null,
+            longitude: coords?.longitude ?? null,
+            accuracy: coords?.accuracy ?? null,
+            clientTime: new Date().toISOString(),
+            clientBypass: isBypassed && !withinRangeByDistance }),
+        });
+        if (!res.ok) return null;
+        const json = (await res.json()) as { serverTime?: string };
+        return typeof json.serverTime === 'string' ? json.serverTime : null;
+      } catch {
+        return null; // 검증 실패가 출퇴근을 막지는 않는다.
+      }
+    },
+    [coords, isBypassed, withinRangeByDistance],
+  );
 
   const handleAction = async () => {
     if (!staffId) {
@@ -296,7 +341,9 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
     setSubmitting(true);
     try {
       const today = getKoreanTodayString();
-      const nowIso = new Date().toISOString();
+      // 서버 시계 우선 — 실패 시에만 단말 시계로 폴백한다(verifyOnServer 주석 참고).
+      const serverTime = await verifyOnServer(state === 'before' ? 'check_in' : 'check_out', today);
+      const nowIso = serverTime ?? new Date().toISOString();
       if (state === 'before') {
         // 근무유형(work_shifts) 시작시각 기준 지각 판정. 1일근무1일휴무는 근무표(shift_assignments) 배정 기준.
         // 온라인일 때만 정확 판정하고, 오프라인/조회 실패 시 '정상'으로 폴백한다.
@@ -449,7 +496,8 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
     try {
       const dateKey = staleLog.date;
       const checkInIso = staleLog.check_in;
-      const nowIso = new Date().toISOString();
+      const serverTime = await verifyOnServer('check_out', dateKey);
+      const nowIso = serverTime ?? new Date().toISOString();
 
       let finalStatus = staleLog.status || '정상';
       let earlyLeaveMinutes = 0;

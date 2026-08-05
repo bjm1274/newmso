@@ -13,6 +13,9 @@ export const dynamic = 'force-dynamic';
 
 const MAX_FILE_SIZE_BYTES = 200 * 1024 * 1024;
 const MAX_VIDEO_SIZE_BYTES = 200 * 1024 * 1024;
+// 이미지에는 상한이 아예 없었다(아래 validateUploadTarget 주석 참고). 다른 종류와
+// 같은 상한을 적용해 "무제한" 만 닫는다 — 지금 통과하는 파일은 그대로 통과한다.
+const MAX_IMAGE_SIZE_BYTES = 200 * 1024 * 1024;
 const R2_BUCKET = 'pchos-files';
 const DEFAULT_CONTENT_TYPE = 'application/octet-stream';
 const MIME_BY_EXTENSION: Record<string, string> = {
@@ -117,7 +120,13 @@ function validateUploadTarget(fileName: string, mimeType: string, fileSize: numb
     throw new Error('업로드할 파일 이름이 없습니다.');
   }
 
+  // 예전에는 여기서 이미지가 무조건 early return 이었다. 그래서 image/* 로만 신고하면
+  // 크기 검사를 통째로 건너뛰었고, 서명 URL 플랜 경로에서는 서버가 본문을 아예 보지
+  // 않으므로 그 신고값이 유일한 방어였다 — 즉 이미지는 상한이 없었다.
   if (mimeType.startsWith('image/')) {
+    if (fileSize > MAX_IMAGE_SIZE_BYTES) {
+      throw new Error('이미지 크기는 200MB 이하여야 합니다.');
+    }
     return;
   }
 
@@ -180,6 +189,17 @@ async function createSignedUploadPlan(payload: UploadPlanRequest): Promise<NextR
   const mimeType = normalizeUploadMimeType(rawFileName, payload.mimeType || DEFAULT_CONTENT_TYPE);
   const fileName = normalizeUploadFileName(rawFileName, mimeType);
   const fileSize = Number(payload.fileSize || 0);
+
+  // 서명 URL 플랜 경로에서 fileSize 는 클라이언트 신고값이고 서버는 본문을 보지 못한다.
+  // 예전에는 이미지가 early return 이라 0·NaN·음수도 그대로 통과해 "신고를 안 하면
+  // 무제한" 이 됐다. 최소한 신고 자체는 강제해, 상한 검사를 우회하려면 명시적으로
+  // 거짓 값을 보내야 하도록 만든다(그 거짓은 아래 R2 실물 검증 과제로 남는다).
+  if (!Number.isFinite(fileSize) || fileSize <= 0) {
+    return NextResponse.json(
+      { error: '업로드할 파일 크기(fileSize)가 필요합니다.' },
+      { status: 400 },
+    );
+  }
 
   validateUploadTarget(fileName, mimeType, fileSize);
 

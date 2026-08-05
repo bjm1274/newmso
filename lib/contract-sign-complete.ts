@@ -46,8 +46,28 @@ export type CompleteContractSigningInput = {
 export async function completeContractSigning(input: CompleteContractSigningInput): Promise<void> {
   const signedAt = input.signedAt ?? new Date().toISOString();
 
-  const { encryptContract } = await import('@/lib/contract-crypto');
-  const encryptedContractText = await encryptContract(input.contractText);
+  // 계약 본문 암호화 (D04-001).
+  //
+  // 예전에는 `encryptContract` 가 키를 못 찾으면 조용히 평문을 돌려줬다. 이 함수는
+  // 브라우저에서만 실행되고 CONTRACT_ENCRYPTION_KEY 는 NEXT_PUBLIC_ 이 아니므로
+  // 브라우저 번들에 들어오지 않는다 — 즉 **여기서 암호화가 성공한 적이 한 번도 없다.**
+  // 그런데도 로그는 최초 1회 warn 뿐이라 아무도 눈치채지 못했다.
+  //
+  // 지금은 평문으로 나간다는 사실이 반환값에 드러나고, 나갈 때마다 error 로그가 남는다.
+  // 여기서 저장을 실패시키지 않는 이유: 키가 어떤 환경에도 설정돼 있지 않아
+  // (저장소 전체 grep 0건) 실패시키면 **모든 계약 서명이 즉시 불가능**해진다.
+  // 진짜 수정은 이 저장을 서버 라우트로 옮겨 서버에서 암호화하는 것이고,
+  // 그 전까지 이 로그가 "통제가 꺼져 있다" 는 사실을 계속 드러내는 역할을 한다.
+  const { tryEncryptContract } = await import('@/lib/contract-crypto');
+  const encryptAttempt = await tryEncryptContract(input.contractText);
+  if (!encryptAttempt.encrypted) {
+    console.error(
+      `[contract-sign-complete] 계약 본문이 평문으로 저장됩니다 (사유: ${encryptAttempt.reason}). `
+      + '서명 이미지·주소·연락처가 document_repository.content 에 평문으로 들어갑니다. '
+      + '서버 저장 경로 이전 전까지 이 상태가 유지됩니다.',
+    );
+  }
+  const encryptedContractText = encryptAttempt.value;
 
   const { error: insertDocError } = await db.from('document_repository').insert({
     title: `${input.staffName} 근로계약서 (${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })})`,
