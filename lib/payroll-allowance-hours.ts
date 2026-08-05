@@ -13,15 +13,25 @@
 // ---------------------------------------------------------------------------
 
 /**
- * Statutory premium multipliers per allowance field.
+ * Premium multipliers per allowance field.
  *
  * Legal basis (근로기준법 제56조):
  *   - 연장·휴일근로: 통상임금의 100분의 50 이상 가산 → ×1.5
- *   - 야간근로(22:00–06:00): 통상임금의 100분의 50 이상 가산 (가산분만 ×0.5)
+ *   - 야간근로(22:00–06:00): 통상임금의 100분의 50 이상 가산
  *   - 연차휴가수당: 통상임금 × 1일 → ×1.0 (가산 없음)
  *
- * `agreed_*` fields are contractual pre-payments of the same statutory
- * premiums, so they share the same multiplier as their runtime counterparts.
+ * `agreed_*` fields are contractual pre-payments of the same premiums,
+ * so they share the same multiplier as their runtime counterparts.
+ *
+ * 야간수당 ×1.5 에 대하여 —
+ * 법 §56③ 만 보면 "가산분 50%" 라 ×0.5 로 둘 수도 있다(그 시간의 기본 임금이
+ * 이미 기본급에 포함돼 있다는 전제). 이 회사는 야간근로분을 기본급과 별도로
+ * 전액(통상임금 100% + 가산 50%) 지급하는 정책이므로 ×1.5 로 둔다.
+ * 연장·휴일과 같은 기준이다.
+ *
+ * 예전에는 여기만 ×0.5 였고 정산 화면(급여정산-SettlementStaffCard)은 ×1.5 라
+ * 같은 야간 8시간이 48,000원과 144,000원으로 갈렸다. 이제 두 곳이 일치한다.
+ * **정책이 바뀌면 이 상수 하나만 고치면 된다 — 화면에 숫자를 다시 박지 말 것.**
  */
 export const ALLOWANCE_MULTIPLIERS = {
   /** 약정연장수당 — 연장근로 사전약정 지급분 (근로기준법 제56조 제1항) */
@@ -30,10 +40,10 @@ export const ALLOWANCE_MULTIPLIERS = {
   overtime_allowance: 1.5,
   /** 휴일근로수당 — 휴일 8시간 이내 근로 가산분 (근로기준법 제56조 제2항) */
   holiday_work_allowance: 1.5,
-  /** 약정야간수당 — 야간근로 사전약정 지급분·가산분만 (근로기준법 제56조 제3항) */
-  agreed_night_allowance: 0.5,
-  /** 야간근로수당 — 실제 야간근로(22:00–06:00) 가산분 (근로기준법 제56조 제3항) */
-  night_work_allowance: 0.5,
+  /** 약정야간수당 — 야간근로 사전약정 지급분 (통상임금 100% + 가산 50%) */
+  agreed_night_allowance: 1.5,
+  /** 야간근로수당 — 실제 야간근로(22:00–06:00) 지급분 (통상임금 100% + 가산 50%) */
+  night_work_allowance: 1.5,
   /** 연차휴가수당 — 미사용 연차 보상, 가산 없음 (근로기준법 제60조 제5항) */
   annual_leave_pay: 1.0 } as const;
 

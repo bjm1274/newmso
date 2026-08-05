@@ -7,6 +7,10 @@ import { useState, useEffect } from 'react';
 import type { StaffMember } from '@/types';
 import type { SettlementEntry, TaxableAllowanceBreakdown } from './급여정산-types';
 import { TenMinuteUnitAmountField } from './급여정산-TenMinuteUnitAmountField';
+// 가산 배수는 lib/payroll-allowance-hours.ts 가 정본이다.
+// 예전에는 이 화면이 1.5 를 직접 박아 두어 SSOT(야간 0.5)와 갈렸고,
+// 같은 야간 8시간이 화면에서는 144,000원, 마스터 입력에서는 48,000원이 됐다.
+import { ALLOWANCE_MULTIPLIERS } from '@/lib/payroll-allowance-hours';
 
 interface SalaryCalcResult {
   taxable: number;
@@ -197,7 +201,7 @@ export function SettlementStaffCard({
             labelClassName="text-[var(--toss-gray-4)]"
             inputClassName="text-[var(--foreground)]"
             allowManualAmountInput
-            multiplier={1.5}
+            multiplier={ALLOWANCE_MULTIPLIERS.overtime_allowance}
           />
           <TenMinuteUnitAmountField
             label="고정야간"
@@ -208,7 +212,7 @@ export function SettlementStaffCard({
             labelClassName="text-[var(--toss-gray-4)]"
             inputClassName="text-[var(--foreground)]"
             allowManualAmountInput
-            multiplier={1.5}
+            multiplier={ALLOWANCE_MULTIPLIERS.night_work_allowance}
           />
           <TenMinuteUnitAmountField
             label="휴일수당"
@@ -219,7 +223,7 @@ export function SettlementStaffCard({
             labelClassName="text-[var(--toss-gray-4)]"
             inputClassName="text-[var(--foreground)]"
             allowManualAmountInput
-            multiplier={1.5}
+            multiplier={ALLOWANCE_MULTIPLIERS.holiday_work_allowance}
           />
         </div>
       </div>
@@ -264,7 +268,7 @@ export function SettlementStaffCard({
             labelClassName="text-[var(--toss-gray-4)]"
             inputClassName="text-[var(--foreground)]"
             allowManualAmountInput
-            multiplier={1.5}
+            multiplier={ALLOWANCE_MULTIPLIERS.overtime_allowance}
           />
           <CompactAmountField
             label="상여금"
