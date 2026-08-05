@@ -22,13 +22,20 @@
 //   { ok: false, error: string }
 //
 // 권한: admin, mso, hr 권한 보유자만 (직원 등록 기능).
+//       단, 등록자보다 높은 권한의 계정은 만들 수 없다 — findPrivilegeEscalation 참조.
 // ============================================================
 import { NextResponse } from 'next/server';
 import { userId } from '@/lib/d1-api-helpers';
 import { z } from 'zod';
-import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
+import {
+  readSessionFromRequest,
+  isAdminSession,
+  isSystemMasterSession,
+  type SessionUser,
+} from '@/lib/server-session';
 import { getD1Binding, getD1Drizzle } from '@/lib/db';
 import { registerStaffFull } from '@/lib/db/functions/staff';
+import { SYSTEM_MASTER_ACCOUNT_ID } from '@/lib/system-master';
 
 export const dynamic = 'force-dynamic';
 
@@ -109,16 +116,86 @@ function hasHrPermission(user: SessionUser | null | undefined): boolean {
   );
 }
 
+/**
+ * 관리자만 부여할 수 있는 권한 키. `system_master` 는 시스템마스터만 부여할 수 있다.
+ */
+const ADMIN_ONLY_PERMISSION_KEYS = new Set(['admin', 'mso', 'hr']);
+/** 관리자 계정으로 취급되는 role 값 */
+const ADMIN_ROLES = new Set(['admin']);
+const SYSTEM_MASTER_ROLES = new Set(['system_master', 'master']);
+
+/**
+ * 등록자가 **자기보다 높은 권한의 계정을 만들지 못하게** 막는다.
+ *
+ * 이 라우트는 hr 권한만 있으면 통과하는데, 저장되는 role·permissions·employee_no 를
+ * 전부 요청 본문에서 그대로 받아 썼다. 그래서 인사담당자가
+ *   - `role: 'admin'` 또는 `permissions: { admin: true }` 로 관리자 계정을,
+ *   - `employee_no: '9999'` 로 시스템마스터 계정을
+ * 만들 수 있었다. 특히 employee_no 는 lib/d1-api-helpers.ts 의 userId() 가
+ * '9999' 를 시스템마스터 신원으로 되돌려주므로, 권한 객체를 손대지 않아도
+ * D1 게이트웨이가 그 계정을 시스템마스터로 인식한다.
+ *
+ * 조용히 강등하지 않고 거부한다 — 권한을 넘겨 요청한 것 자체가 드러나야 한다.
+ *
+ * @returns 위반 사유. 문제가 없으면 null.
+ */
+function findPrivilegeEscalation(
+  staff: z.infer<typeof StaffRowSchema>,
+  actor: SessionUser,
+): string | null {
+  const actorIsAdmin = isAdminSession(actor);
+  const actorIsSystemMaster = isSystemMasterSession(actor);
+  const actorPerms = (actor.permissions ?? {}) as Record<string, unknown>;
+
+  if (String(staff.employee_no).trim() === SYSTEM_MASTER_ACCOUNT_ID && !actorIsSystemMaster) {
+    return `사번 ${SYSTEM_MASTER_ACCOUNT_ID} 는 시스템마스터 전용입니다.`;
+  }
+
+  const role = String(staff.role ?? '').trim();
+  if (SYSTEM_MASTER_ROLES.has(role) && !actorIsSystemMaster) {
+    return `role '${role}' 은 시스템마스터만 부여할 수 있습니다.`;
+  }
+  if (ADMIN_ROLES.has(role) && !actorIsAdmin) {
+    return `role '${role}' 은 관리자만 부여할 수 있습니다.`;
+  }
+
+  for (const [key, value] of Object.entries(staff.permissions ?? {})) {
+    if (value !== true) continue; // false·미지정은 아무것도 부여하지 않는다
+    if (key === 'system_master') {
+      if (!actorIsSystemMaster) return `권한 '${key}' 은 시스템마스터만 부여할 수 있습니다.`;
+      continue;
+    }
+    if (ADMIN_ONLY_PERMISSION_KEYS.has(key)) {
+      if (!actorIsAdmin) return `권한 '${key}' 은 관리자만 부여할 수 있습니다.`;
+      continue;
+    }
+    // 나머지 일반 권한은 등록자가 실제로 가진 것만 넘겨줄 수 있다.
+    if (!actorIsAdmin && actorPerms[key] !== true) {
+      return `본인에게 없는 권한 '${key}' 은 부여할 수 없습니다.`;
+    }
+  }
+
+  // 소속: 관리자가 아니면 자기 회사에만 등록할 수 있다.
+  const actorCompany = String(actor.company ?? '').trim();
+  const targetCompany = String(staff.company ?? '').trim();
+  if (!actorIsAdmin && actorCompany && targetCompany !== actorCompany) {
+    return `다른 소속(${targetCompany})으로는 등록할 수 없습니다.`;
+  }
+
+  return null;
+}
+
 // ─── 핸들러 ─────────────────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
   try {
     const session = await readSessionFromRequest(request);
-    const uid = userId(session?.user);
-    if (!uid) {
+    const actor = session?.user;
+    const uid = userId(actor);
+    if (!uid || !actor) {
       return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
     }
-    if (!hasHrPermission(session?.user)) {
+    if (!hasHrPermission(actor)) {
       return NextResponse.json(
         { ok: false, error: 'Permission denied: hr/admin required' },
         { status: 403 },
@@ -132,6 +209,11 @@ export async function POST(request: Request) {
         { ok: false, error: 'Invalid payload', details: parsed.error.flatten() },
         { status: 400 },
       );
+    }
+
+    const escalation = findPrivilegeEscalation(parsed.data.p_staff, actor);
+    if (escalation) {
+      return NextResponse.json({ ok: false, error: escalation }, { status: 403 });
     }
 
     const d1 = await getD1Binding();

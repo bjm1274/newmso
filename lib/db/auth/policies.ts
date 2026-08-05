@@ -196,11 +196,32 @@ function touchesColumn(
   return Object.prototype.hasOwnProperty.call(row, col);
 }
 
+/**
+ * 시스템마스터 신원으로 예약된 사번.
+ *
+ * `lib/d1-api-helpers.ts` 의 userId() 는 employee_no 가 이 값이면 권한 컬럼을
+ * 보지도 않고 '9999'(시스템마스터 신원)를 돌려준다. 즉 이 사번을 쓰는 계정은
+ * permissions·role 을 전혀 건드리지 않고도 게이트웨이 전체에서 시스템마스터로
+ * 인식된다. employee_no 는 SENSITIVE_STAFF_COLUMNS 라 회사 매니저·인사담당자도
+ * 쓸 수 있었으므로, 그들이 이 사번의 계정을 만들면 그대로 권한 상승이 됐다.
+ */
+const RESERVED_SYSTEM_MASTER_EMPLOYEE_NO = '9999';
+
 function staffPrivilegeGuard(
   claims: ErpClaims,
   row: Record<string, unknown>,
   changedKeys?: ReadonlySet<string>,
 ): boolean {
+  // 예약 사번은 시스템마스터 본인만 다룰 수 있다. (update 판정 행에는 새 값이
+  // 병합돼 있으므로, 이 값으로 바꾸려는 시도도 여기서 걸린다.)
+  if (
+    touchesColumn(row, changedKeys, 'employee_no') &&
+    String(getField<string>(row, 'employee_no') ?? '').trim() === RESERVED_SYSTEM_MASTER_EMPLOYEE_NO &&
+    erpStaffId(claims) !== RESERVED_SYSTEM_MASTER_EMPLOYEE_NO
+  ) {
+    return false;
+  }
+
   const touchesPrivileged = PRIVILEGED_STAFF_COLUMNS.some(
     (col) => touchesColumn(row, changedKeys, col),
   );
