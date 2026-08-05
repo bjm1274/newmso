@@ -3,10 +3,13 @@
  * 근로기준법 제61조 - 촉진 절차 완료 후 미사용 연차 보상 의무 소멸
  */
 
-import { calculateAnnualLeaveExpiryDate } from './annual-leave-promotion';
 import { hasCompletedBothPromotions } from './annual-leave-promotion-dispatch';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
 import { mirrorNotificationsToD1, type NotificationRow } from './notification-utils';
+import {
+  getLeaveCycle,
+  getLeaveCycleBalance,
+  recordLeaveExpiry } from './unified-leave-ledger';
 import {
   getD1Binding,
   getD1Drizzle,
@@ -16,9 +19,13 @@ import {
   companies as companiesTable,
   eq,
   and,
-  isNull,
-  lte,
-  gt } from './db';
+  notInArray } from './db';
+
+/** YYYY-MM-DD 에 일수를 더한 날짜 키 */
+function shiftDateKey(dateKey: string, days: number): string {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
 
 export type ExpiryResult = {
   staffId: string;
@@ -35,6 +42,7 @@ export async function processStaffLeaveExpiry(
   staffName: string,
   remainingDays: number,
   expiryDate: Date,
+  cycleKey?: string,
 ): Promise<ExpiryResult | null> {
   if (remainingDays <= 0) return null;
 
@@ -45,6 +53,29 @@ export async function processStaffLeaveExpiry(
   const d1 = await getD1Binding();
   if (!d1) throw new Error('[annual-leave-expiry] D1 binding not available (processStaffLeaveExpiry)');
   const db = getD1Drizzle(d1);
+
+  // 원장(SSOT)에 소멸을 먼저 기록한다.
+  //
+  // 예전에는 leave_balances 만 갱신했다. 그런데 요약 조회가 원장을 재집계해
+  // leave_balances 를 통째로 덮어쓰므로, **원장에 없는 소멸은 다음 조회 때
+  // 사라지고 잔여연차가 되살아났다.** 순서도 중요하다 — 원장 기록이 실패하면
+  // 미러만 0 이 된 채 다음 조회에서 되살아나므로, 원장이 먼저다.
+  const companyRows = await db
+    .select({ company_id: staffMembersTable.company_id })
+    .from(staffMembersTable)
+    .where(eq(staffMembersTable.id, staffId))
+    .limit(1);
+
+  await recordLeaveExpiry({
+    staffId,
+    companyId: companyRows[0]?.company_id ?? null,
+    days: remainingDays,
+    // 만료일은 다음 주기의 첫날(입사기념일)이다. 그 날짜로 적으면 집계 범위가
+    // `주기시작 <= 날짜 < 주기끝` 이라 소멸 항목이 **자기 주기 밖으로 빠져나가**
+    // 잔여가 줄지 않고, 소멸이 매일 다시 집행된다. 주기 마지막 날로 적는다.
+    occurredOn: shiftDateKey(expiryDateStr, -1),
+    cycleKey: cycleKey || expiryDateStr,
+    note: `미사용 연차 소멸 (만료일 ${expiryDateStr})` });
 
   // leave_balances 업데이트 (소멸 처리) — remaining_days 도 0 으로 맞춤
   await db
@@ -153,33 +184,49 @@ export async function batchProcessExpiredLeaves(): Promise<{
   if (!d1) throw new Error('[annual-leave-expiry] D1 binding not available (batchProcessExpiredLeaves)');
   const db = getD1Drizzle(d1);
 
-  // leave_balances JOIN staff_members: expiry_date <= today, expired_at IS NULL, remaining_days > 0
-  const balances = await db
+  // 소멸 대상은 **직원의 입사일 주기**로 판정한다.
+  //
+  // 예전에는 `leave_balances.expiry_date <= today` 로 골랐다. 그런데 이 컬럼을
+  // 채우는 코드가 신규 직원 등록뿐이라 2년차 이후 주기의 행은 NULL 이었고,
+  // 그 조건에 영원히 걸리지 않았다 — 즉 소멸이 실질적으로 집행되지 않았다.
+  // 입사일에서 주기를 계산하면 미러 컬럼의 상태와 무관하게 대상을 잡을 수 있다.
+  const staffRows = await db
     .select({
-      staff_id: leaveBalancesTable.staff_id,
-      remaining_days: leaveBalancesTable.remaining_days,
-      expiry_date: leaveBalancesTable.expiry_date,
-      staff_name: staffMembersTable.name })
-    .from(leaveBalancesTable)
-    .innerJoin(staffMembersTable, eq(leaveBalancesTable.staff_id, staffMembersTable.id))
-    .where(
-      and(
-        isNull(leaveBalancesTable.expired_at),
-        lte(leaveBalancesTable.expiry_date, todayStr),
-        gt(leaveBalancesTable.remaining_days, 0),
-      ),
-    );
+      id: staffMembersTable.id,
+      name: staffMembersTable.name,
+      hire_date: staffMembersTable.hire_date,
+      join_date: staffMembersTable.join_date,
+      joined_at: staffMembersTable.joined_at })
+    .from(staffMembersTable)
+    .where(notInArray(staffMembersTable.status, ['퇴사', '퇴직']));
 
-  if (balances.length === 0) {
-    return { processed: 0, results, skippedNoPromotion };
-  }
+  for (const staff of staffRows) {
+    const staffId = String(staff.id);
+    const staffName = String(staff.name ?? '');
+    const hireDate = String(staff.hire_date || staff.join_date || staff.joined_at || '').slice(0, 10);
+    if (!hireDate) continue;
 
-  for (const balance of balances) {
-    const staffId = String(balance.staff_id);
-    const staffName = String(balance.staff_name ?? '');
-    const remaining = Number(balance.remaining_days) || 0;
-    const expiryDateKey = String(balance.expiry_date).slice(0, 10);
-    const expiryDate = new Date(`${balance.expiry_date}T00:00:00`);
+    const currentCycle = getLeaveCycle(hireDate, todayStr);
+    // 첫 주기(입사 1년 미만)에는 소멸시킬 직전 주기가 없다.
+    if (!currentCycle || currentCycle.completedYears === 0) continue;
+
+    // 직전 주기 = 지금 주기가 시작하기 하루 전이 속한 주기.
+    const dayBeforeCurrent = shiftDateKey(currentCycle.start, -1);
+    const previousCycle = getLeaveCycle(hireDate, dayBeforeCurrent);
+    if (!previousCycle) continue;
+
+    const expiryDateKey = previousCycle.end; // = currentCycle.start (다음 입사기념일)
+    if (todayStr < expiryDateKey) continue;
+
+    let remaining = 0;
+    try {
+      remaining = (await getLeaveCycleBalance(staffId, previousCycle)).remaining;
+    } catch (err) {
+      console.error('[annual-leave-expiry] 직전 주기 잔여 조회 실패:', staffId, err);
+      continue;
+    }
+    // 이미 소멸 처리된 주기는 원장에 음수 항목이 있어 잔여가 0 이 된다 — 자연 멱등.
+    if (remaining <= 0) continue;
 
     // 적법 요건: 1차·2차 촉진을 모두 이행한 경우에만 보상의무 소멸(자동소멸) 가능 (근로기준법 제61조).
     // 촉진 미이행 시 소멸시키지 않고 건너뛴다 — 미사용 연차 보상의무가 살아있기 때문.
@@ -194,7 +241,13 @@ export async function batchProcessExpiredLeaves(): Promise<{
       continue;
     }
 
-    const result = await processStaffLeaveExpiry(staffId, staffName, remaining, expiryDate);
+    const result = await processStaffLeaveExpiry(
+      staffId,
+      staffName,
+      remaining,
+      new Date(`${expiryDateKey}T00:00:00`),
+      previousCycle.key,
+    );
     if (result) results.push(result);
   }
 

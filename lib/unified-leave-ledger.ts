@@ -274,32 +274,33 @@ export async function recordSubstituteLeaveGrant(input: {
   });
 }
 
-export async function getUnifiedAnnualLeaveSummary(
-  staffId: string,
-  asOfDate = formatKoreanDateKey(new Date()),
-): Promise<UnifiedLeaveSummary> {
-  const { db, staff, hireDate } = await getStaffLeaveContext(staffId);
-  const cycle = getLeaveCycle(hireDate, asOfDate) ?? {
-    key: `fallback:${asOfDate.slice(0, 4)}`,
-    start: `${asOfDate.slice(0, 4)}-01-01`,
-    end: `${asOfDate.slice(0, 4)}-12-31`,
-    completedYears: 0,
-  };
+type LedgerRow = {
+  id: unknown;
+  entry_type: unknown;
+  days: unknown;
+  occurred_on: string | null;
+  period_key: unknown;
+  source_id: string | null;
+  note: string | null;
+};
 
-  const rows = await db
-    .select({
-      id: leaveLedgerTable.id,
-      entry_type: leaveLedgerTable.entry_type,
-      days: leaveLedgerTable.days,
-      occurred_on: leaveLedgerTable.occurred_on,
-      period_key: leaveLedgerTable.period_key,
-      source_id: leaveLedgerTable.source_id,
-      note: leaveLedgerTable.note,
-    })
-    .from(leaveLedgerTable)
-    .where(eq(leaveLedgerTable.staff_id, staff.id));
+export type LedgerCycleTotals = {
+  entries: UnifiedLeaveSummary['entries'];
+  total: number;
+  used: number;
+  expired: number;
+  compensated: number;
+  remaining: number;
+};
 
-  let entries = rows
+/**
+ * 원장 행을 한 주기 기준으로 집계한다.
+ *
+ * 요약 조회와 소멸 배치가 **같은 계산을 써야** 한다. 화면에 15일 남았다고
+ * 보여주고 배치는 다른 수치로 소멸시키면 근거가 어긋나므로, 집계는 여기 한 곳에만 둔다.
+ */
+export function aggregateLedgerEntries(rows: LedgerRow[], cycle: LeaveCycle): LedgerCycleTotals {
+  const entries = rows
     .map((row) => ({
       id: String(row.id),
       entryType: String(row.entry_type),
@@ -311,24 +312,22 @@ export async function getUnifiedAnnualLeaveSummary(
     }))
     .filter((row) => {
       if (!row.occurredOn) return false;
+      // 법정 자동 발생은 processAnnualLeaveAccrual / 백필 스크립트만 기록한다.
+      // 조회 경로에서 1년 미만 11일 시드 등 write side-effect 를 두지 않는다.
+      // (과거 auto-seed 잔존분은 집계에서 제외)
+      if (row.periodKey.startsWith('auto-seed:')) return false;
+      // 수동 조정과 최초 부여는 주기와 무관하게 항상 반영한다.
       if (
         row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_ADJUSTMENT ||
         row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_USED_ADJUSTMENT ||
         row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_EXPIRE_ADJUSTMENT ||
         row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_COMPENSATE_ADJUSTMENT ||
-        row.entryType === 'initial_grant' ||
-        row.periodKey.startsWith('auto-seed:')
+        row.entryType === 'initial_grant'
       ) {
         return true;
       }
       return isWithinCycle(row.occurredOn, cycle);
     });
-
-  // 법정 자동 발생은 processAnnualLeaveAccrual / 백필 스크립트만 기록한다.
-  // 조회 경로에서 1년 미만 11일 시드 등 write side-effect를 두지 않는다.
-  // (과거 auto-seed 잔존분은 집계에서 제외)
-
-  entries = entries.filter((row) => !row.periodKey.startsWith('auto-seed:'));
 
   let total = 0;
   let used = 0;
@@ -358,9 +357,166 @@ export async function getUnifiedAnnualLeaveSummary(
     }
   }
 
-  const finalTotal = roundDays(total);
-  const finalUsed = roundDays(Math.max(0, used));
-  const finalRemaining = roundDays(Math.max(0, remainingRaw));
+  return {
+    entries,
+    total: roundDays(total),
+    used: roundDays(Math.max(0, used)),
+    expired: roundDays(Math.max(0, expired)),
+    compensated: roundDays(Math.max(0, compensated)),
+    remaining: roundDays(Math.max(0, remainingRaw)),
+  };
+}
+
+/**
+ * 특정 주기의 원장 잔여를 읽는다. **쓰기 부작용이 없다.**
+ *
+ * getUnifiedAnnualLeaveSummary 는 조회하면서 staff_members·leave_balances 를
+ * 현재 주기 수치로 덮어쓰므로, 지난 주기를 확인하려고 그걸 호출하면
+ * 현재 미러가 과거 값으로 오염된다. 소멸 배치는 이 함수를 쓴다.
+ */
+export async function getLeaveCycleBalance(
+  staffId: string,
+  cycle: LeaveCycle,
+): Promise<LedgerCycleTotals> {
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[unified-leave-ledger] D1 binding not available');
+  const db = getD1Drizzle(d1);
+  const rows = await db
+    .select({
+      id: leaveLedgerTable.id,
+      entry_type: leaveLedgerTable.entry_type,
+      days: leaveLedgerTable.days,
+      occurred_on: leaveLedgerTable.occurred_on,
+      period_key: leaveLedgerTable.period_key,
+      source_id: leaveLedgerTable.source_id,
+      note: leaveLedgerTable.note,
+    })
+    .from(leaveLedgerTable)
+    .where(eq(leaveLedgerTable.staff_id, staffId));
+  return aggregateLedgerEntries(rows, cycle);
+}
+
+/**
+ * 미사용 연차 소멸을 원장에 기록한다.
+ *
+ * 예전에는 소멸 처리가 leave_balances 만 갱신하고 원장에는 아무것도 남기지
+ * 않았다 — 저장소 전체에 expire 를 쓰는 코드가 0건이었다. 그런데 요약 조회는
+ * 원장을 재집계해 leave_balances 를 덮어쓰므로, **원장에 없는 소멸은 다음 조회
+ * 때 0 이 되고 잔여연차가 되살아났다.** 법정 소멸과 미사용 수당 정산의 근거가
+ * 함께 무너진다.
+ *
+ * period_key 는 주기 단위라 (staff_id, entry_type, period_key) 유니크 인덱스가
+ * 재실행을 흡수한다 — 같은 주기를 두 번 소멸시켜도 행이 늘지 않는다.
+ */
+export async function recordLeaveExpiry(input: {
+  staffId: string;
+  companyId?: string | null;
+  days: number;
+  occurredOn: string;
+  cycleKey: string;
+  note?: string | null;
+}) {
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[unified-leave-ledger] D1 binding not available');
+  const db = getD1Drizzle(d1);
+  await upsertLedgerEntry(db, {
+    staffId: input.staffId,
+    companyId: input.companyId,
+    entryType: LEAVE_LEDGER_ENTRY_TYPE.EXPIRE,
+    // 소멸은 잔여를 깎으므로 음수로 적는다 (집계가 부호로 구분한다).
+    days: -Math.abs(input.days),
+    occurredOn: input.occurredOn,
+    periodKey: `expire:${input.cycleKey}`,
+    sourceId: input.cycleKey,
+    note: input.note ?? null,
+  });
+}
+
+/**
+ * leave_balances 미러를 원장 수치로 맞춘다.
+ *
+ * 예전에는 `onConflictDoUpdate({ target: [staff_id, year] })` 로 upsert 했는데,
+ * leave_balances 에는 (staff_id, year) 유니크 제약이 없다. D1 은
+ * "ON CONFLICT clause does not match any PRIMARY KEY or UNIQUE constraint" 로
+ * 거부하므로 **이 동기화는 한 번도 성공한 적이 없다.** 실패는 catch 로 삼켜져
+ * 로그에만 남았고, 그래서 expiry_date 를 비롯한 미러 컬럼이 계속 비어 있었다.
+ *
+ * 제약을 새로 만들려면 기존 중복 행 정리가 선행돼야 해서(운영 DB 마이그레이션),
+ * 여기서는 조회 후 갱신/삽입으로 처리한다. 동시 호출이 겹치면 행이 둘 생길 수
+ * 있는데, 제약이 없는 지금은 upsert 였어도 마찬가지다. 근본 해결은
+ * (staff_id, year) 유니크 인덱스 추가다.
+ */
+async function syncLeaveBalanceMirror(
+  db: ReturnType<typeof getD1Drizzle>,
+  input: {
+    staffId: string;
+    year: number;
+    total: number;
+    used: number;
+    remaining: number;
+    expired: number;
+    compensated: number;
+    expiryDate: string;
+  },
+) {
+  const values = {
+    total_days: input.total,
+    used_days: input.used,
+    remaining_days: input.remaining,
+    expired_days: input.expired,
+    compensated_days: input.compensated,
+    expiry_date: input.expiryDate,
+    updated_at: new Date().toISOString(),
+  };
+
+  const existing = await db
+    .select({ id: leaveBalancesTable.id })
+    .from(leaveBalancesTable)
+    .where(and(eq(leaveBalancesTable.staff_id, input.staffId), eq(leaveBalancesTable.year, input.year)))
+    .limit(1);
+
+  if (existing[0]) {
+    await db.update(leaveBalancesTable).set(values).where(eq(leaveBalancesTable.id, existing[0].id));
+    return;
+  }
+
+  await db.insert(leaveBalancesTable).values({
+    id: crypto.randomUUID(),
+    staff_id: input.staffId,
+    year: input.year,
+    ...values,
+  });
+}
+
+export async function getUnifiedAnnualLeaveSummary(
+  staffId: string,
+  asOfDate = formatKoreanDateKey(new Date()),
+): Promise<UnifiedLeaveSummary> {
+  const { db, staff, hireDate } = await getStaffLeaveContext(staffId);
+  const cycle = getLeaveCycle(hireDate, asOfDate) ?? {
+    key: `fallback:${asOfDate.slice(0, 4)}`,
+    start: `${asOfDate.slice(0, 4)}-01-01`,
+    end: `${asOfDate.slice(0, 4)}-12-31`,
+    completedYears: 0,
+  };
+
+  const rows = await db
+    .select({
+      id: leaveLedgerTable.id,
+      entry_type: leaveLedgerTable.entry_type,
+      days: leaveLedgerTable.days,
+      occurred_on: leaveLedgerTable.occurred_on,
+      period_key: leaveLedgerTable.period_key,
+      source_id: leaveLedgerTable.source_id,
+      note: leaveLedgerTable.note,
+    })
+    .from(leaveLedgerTable)
+    .where(eq(leaveLedgerTable.staff_id, staff.id));
+
+  const { entries, total, used, expired, compensated, remaining: finalRemaining } =
+    aggregateLedgerEntries(rows, cycle);
+  const finalTotal = total;
+  const finalUsed = used;
 
   // staff_members 및 leave_balances 레거시 테이블을 원장 수치로 완전 동기화 (Clean-up)
   void Promise.all([
@@ -371,30 +527,18 @@ export async function getUnifiedAnnualLeaveSummary(
         annual_leave_used: finalUsed,
       })
       .where(eq(staffMembersTable.id, staff.id)),
-    db
-      .insert(leaveBalancesTable)
-      .values({
-        id: crypto.randomUUID(),
-        staff_id: staff.id,
-        year: Number(asOfDate.slice(0, 4)) || new Date().getFullYear(),
-        total_days: finalTotal,
-        used_days: finalUsed,
-        remaining_days: finalRemaining,
-        expired_days: roundDays(Math.max(0, expired)),
-        compensated_days: roundDays(Math.max(0, compensated)),
-        updated_at: new Date().toISOString(),
-      })
-      .onConflictDoUpdate({
-        target: [sql`staff_id`, sql`year`],
-        set: {
-          total_days: finalTotal,
-          used_days: finalUsed,
-          remaining_days: finalRemaining,
-          expired_days: roundDays(Math.max(0, expired)),
-          compensated_days: roundDays(Math.max(0, compensated)),
-          updated_at: new Date().toISOString(),
-        },
-      }),
+    syncLeaveBalanceMirror(db, {
+      staffId: staff.id,
+      year: Number(asOfDate.slice(0, 4)) || new Date().getFullYear(),
+      total: finalTotal,
+      used: finalUsed,
+      remaining: finalRemaining,
+      expired,
+      compensated,
+      // 주기 만료일을 함께 채운다. 예전에는 신규 직원 등록에서만 넣어서
+      // 2년차 이후 행은 expiry_date 가 NULL 이었다.
+      expiryDate: cycle.end,
+    }),
   ]).catch((err) => console.error('[getUnifiedAnnualLeaveSummary] DB sync failed:', err));
 
   return {
@@ -403,8 +547,8 @@ export async function getUnifiedAnnualLeaveSummary(
     cycle,
     total: finalTotal,
     used: finalUsed,
-    expired: roundDays(Math.max(0, expired)),
-    compensated: roundDays(Math.max(0, compensated)),
+    expired,
+    compensated,
     remaining: finalRemaining,
     entries,
   };
