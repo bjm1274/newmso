@@ -1025,7 +1025,7 @@ const UNCLASSIFIED_ADMIN_ONLY_TABLES: string[] = [
   'congratulations_condolences', // 경조사관리
   'early_leave_records',         // 조기퇴근감지
   'generated_contracts',         // 계약서자동생성
-  'board_post_stars',            // 게시판 별표(즐겨찾기)
+  // board_post_stars 는 아래에서 SELF_ONLY 로 명시 등록한다 (이 목록에 두면 ADMIN_ONLY 가 된다).
   'as_repair_records',           // AS 수리 접수
   'return_records',              // 반품
   'message_templates',           // 관리자 메시지 템플릿
@@ -1506,6 +1506,18 @@ const ADMIN_ONLY_TABLES: string[] = [
   'op_consultations',
   'password_reset_tokens',
 ];
+
+// 게시판 별표(즐겨찾기)는 전적으로 개인 상태다.
+// 미분류 목록에 있어 ADMIN_ONLY 였고, 일반 직원의 별표 토글이 403 으로 막혔다.
+// 본인 행만 다루도록 등록한다.
+POLICY_REGISTRY.board_post_stars = {
+  table: 'board_post_stars',
+  select: 'SELF_ONLY',
+  insert: 'SELF_ONLY',
+  update: 'SELF_ONLY',
+  delete: 'SELF_ONLY',
+  staffIdField: 'user_id',
+};
 
 // 감사로그: 열람은 관리자만, **기록은 행위자 누구나**.
 //

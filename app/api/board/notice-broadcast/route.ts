@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readSessionFromRequest } from '@/lib/server-session';
+import { readSessionFromRequest, isAdminSession } from '@/lib/server-session';
 import { dispatchChatPushForMessage } from '@/lib/chat-push-dispatch';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
 import {
@@ -151,10 +151,10 @@ export async function POST(request: NextRequest) {
       sessionStaff = null;
     }
 
-    const isMasterOrAdmin = Boolean(
-      (session.user as Record<string, unknown>).is_master ||
-        (session.user as Record<string, unknown>).is_admin,
-    );
+    // 세션에는 is_master·is_admin 이라는 필드가 없다(is_system_master 와 permissions 뿐).
+    // 그래서 이 조건은 항상 false 였고, 판정이 사실상 staff.role 하나에만 의존했다 —
+    // 시스템마스터나 permissions 로만 관리자인 계정이 403 으로 막혔다.
+    const isMasterOrAdmin = isAdminSession(session.user);
     const isManagerRole = isAdminRole(sessionStaff?.role);
     const allowed = isMasterOrAdmin || isManagerRole;
 

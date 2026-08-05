@@ -7,8 +7,11 @@ type ScopeResult = { ok: true } | { ok: false; response: NextResponse };
 function isInventoryAdmin(user: SessionUser): boolean {
   const role = String(user.role || '').toLowerCase();
   const perms = user.permissions || {};
+  // is_master·is_admin 은 세션에 존재하지 않는 필드다(is_system_master 만 있다).
+  // 항상 false 인 조건이라 판정에 기여하지 않았다 — 제거해도 동작은 같고, 읽는 사람이
+  // "마스터도 통과한다"고 오해하지 않게 된다.
   return Boolean(
-    user.is_system_master || user.is_master || user.is_admin ||
+    user.is_system_master ||
     role === 'admin' || role === 'mso' || perms.admin || perms.mso,
   );
 }

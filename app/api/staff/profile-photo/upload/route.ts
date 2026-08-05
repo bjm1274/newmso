@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildR2AccessUrl, isR2ChatStorageEnabled, uploadToR2 } from '@/lib/object-storage';
-import { readSessionFromRequest } from '@/lib/server-session';
+import { readSessionFromRequest, isAdminSession } from '@/lib/server-session';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,11 +51,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // 요청자 본인이거나 관리자만 타인 사진 업로드 가능
     const requestorId = String(session.user.id || '');
+    // 존재하지 않는 is_admin 필드 대신 실제 판정 헬퍼를 쓴다(인사 권한은 별도로 허용).
     const isAdmin =
-      session.user.role === 'admin' ||
-      (session.user as Record<string, unknown>).is_admin === true ||
-      (session.user as any).permissions?.hr === true ||
-      (session.user as any).permissions?.mso === true;
+      isAdminSession(session.user) ||
+      (session.user as { permissions?: Record<string, unknown> }).permissions?.hr === true;
     if (requestorId !== staffId && !isAdmin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

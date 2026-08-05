@@ -3,7 +3,7 @@ import {
   createR2DownloadUrl,
   getConfiguredR2ChatBucket,
 } from '@/lib/object-storage';
-import { readSessionFromRequest } from '@/lib/server-session';
+import { readSessionFromRequest, isAdminSession } from '@/lib/server-session';
 import { assertChatRoomMember } from '@/lib/chat-room-membership';
 import { getD1Binding, getD1Drizzle } from '@/lib/db';
 import { sql } from 'drizzle-orm';
@@ -77,7 +77,9 @@ export async function GET(request: NextRequest) {
 
       const userId = String(session.user.id || session.user.user_id || '').trim();
       const role = String(session.user.role || '').toLowerCase();
-      const isMaster = Boolean(session.user.is_master || session.user.is_admin);
+      // 세션에 is_master·is_admin 필드는 없다 — 항상 false 인 죽은 조건이었다.
+      // 실제 관리자 판정은 isAdminSession(is_system_master·role·permissions)이 한다.
+      const isMaster = isAdminSession(session.user);
 
       if (!isMaster && role !== 'admin') {
         const d1 = await getD1Binding();

@@ -51,17 +51,27 @@ function writeLocal(userId: string | null, set: Set<string>): void {
 // ─────────────────────────────────────────────
 
 function isMissingOrDeniedError(err: unknown): boolean {
-  const e = err as { code?: string; message?: string } | null;
+  const e = err as { code?: string; message?: string; status?: number } | null;
   if (!e) return false;
+
+  // D1 은 정책 거부를 403 + "policy denied: <op> <table>" 로 돌려준다.
+  // 예전에는 Postgres 문구('permission denied')만 찾아서 이 경우가 걸리지 않았고,
+  // 폴백 대신 throw 로 빠져 별표가 롤백되고 오류 토스트까지 떴다.
+  // (정책 자체도 ADMIN_ONLY 였어서 일반 직원은 항상 이 경로였다.)
+  if (e.status === 403 || e.status === 404) return true;
+
   if (e.code === '42P01') return true; // table does not exist
   if (e.code === '42501') return true; // permission denied
   if (e.code === 'PGRST116') return true; // PostgREST not found
+
   const msg = String(e.message ?? '').toLowerCase();
   return (
     msg.includes('does not exist') ||
     msg.includes('schema cache') ||
     msg.includes('relation') ||
-    msg.includes('permission denied')
+    msg.includes('permission denied') ||
+    msg.includes('policy denied') ||
+    msg.includes('not allowed')
   );
 }
 
