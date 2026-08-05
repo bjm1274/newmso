@@ -49,7 +49,10 @@ export function calculateRetirementBenefitFromMonthlyWage(
 export function formatWorkPeriod(workDays: number): string {
   const y = Math.floor(workDays / 365);
   const m = Math.floor((workDays % 365) / 30);
-  const d = workDays % 30;
+  // 연/월을 뺀 '나머지 일'이므로 365 로 먼저 접은 뒤 30 으로 접어야 한다.
+  // 과거 `workDays % 30` 은 연 단위를 빼지 않아 400일 → "1년 1개월 10일"(정답 5일)로
+  // 표시됐다(8차 D04-012). 표시 전용이라 퇴직금 금액에는 영향이 없었다.
+  const d = (workDays % 365) % 30;
   const parts: string[] = [];
   if (y) parts.push(`${y}년`);
   if (m) parts.push(`${m}개월`);

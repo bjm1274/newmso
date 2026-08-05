@@ -101,14 +101,28 @@ export function calculateInsuranceRows(
           employment: acc.employment + r.employment_insurance }),
         { national: 0, health: 0, longTerm: 0, employment: 0 },
       )
-    : (() => {
-        const d = calculateEmployeeInsuranceDeductions(taxableSum, 30);
-        return {
-          national: d.nationalPension,
-          health: d.healthInsurance,
-          longTerm: d.longTermCare,
-          employment: d.employmentInsurance };
-      })();
+    : // 정산 레코드가 없는 달(정산 전·신규 회사)의 폴백.
+      // 과거에는 전 직원 급여 '합계'를 1인 소득 자리에 넣어 한 번만 호출했는데,
+      // calculateEmployeeInsuranceDeductions 는 국민연금에 1인 기준 상·하한
+      // (NP_INCOME_CEILING 637만 / NP_INCOME_FLOOR 40만)을 적용한다.
+      // 그래서 총급여가 637만을 넘는 순간 국민연금 합계가 상한에 고정돼
+      // 10명×300만 = 302,575원(정답 1,425,000원, 약 4.7배 과소)으로 표시됐다(8차 D04-003).
+      // 상·하한은 1인 단위 규정이므로 직원별로 계산해 합산한다.
+      // 건강보험·고용보험은 상한이 없어 선형이라 결과가 바뀌지 않는다.
+      data.staffs.reduce(
+        (acc, s) => {
+          const d = calculateEmployeeInsuranceDeductions(
+            s.salary ?? 0,
+            calculateAge(s.birth_date) ?? 30,
+          );
+          return {
+            national: acc.national + d.nationalPension,
+            health: acc.health + d.healthInsurance,
+            longTerm: acc.longTerm + d.longTermCare,
+            employment: acc.employment + d.employmentInsurance };
+        },
+        { national: 0, health: 0, longTerm: 0, employment: 0 },
+      );
 
   const accident = calculateIndustrialAccidentInsurance(taxableSum, companyName);
   const employerHealth = Math.floor(taxableSum * data.policy.insuranceEmployer.healthInsurance);

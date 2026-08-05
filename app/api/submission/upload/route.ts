@@ -4,6 +4,11 @@ import {
   normalizeSessionUser,
   readSessionFromRequest,
   resolveLatestSessionUser } from '@/lib/server-session';
+// 8차 D12-011: `normalizeMime` 축약 사본 + 확장자 정제 인라인 사본을 lib/upload-mime 정본으로 교체.
+// 사본은 확장자→MIME 보충이 없어 mimeType 미전송 시 항상 octet-stream 이었다.
+// 신고 MIME 도 파일명도 모두 클라이언트가 정하는 값이라 신뢰 수준은 같고,
+// 확장자 매핑 결과는 아래 ALLOWED_MIMES 화이트리스트를 그대로 통과해야 한다.
+import { normalizeUploadMimeType, toSafeObjectKeyExtension } from '@/lib/upload-mime';
 
 /**
  * POST /api/submission/upload
@@ -42,22 +47,8 @@ type SubmissionUploadRequest = {
   submissionType?: string;
 };
 
-function normalizeMime(raw: string): string {
-  const t = String(raw || '').trim().toLowerCase();
-  if (t === 'image/jpg' || t === 'image/pjpeg') return 'image/jpeg';
-  if (t === 'image/x-png') return 'image/png';
-  return t || 'application/octet-stream';
-}
-
 function buildFilePath(fileName: string, mime: string): string {
-  const ext = (() => {
-    const dot = fileName.lastIndexOf('.');
-    if (dot > -1) return fileName.slice(dot + 1).toLowerCase().replace(/[^a-z0-9]/g, '');
-    const sub = mime.split('/')[1]?.toLowerCase() ?? 'bin';
-    return sub || 'bin';
-  })();
-  const safeExt = /^[a-z0-9]+$/.test(ext) ? ext : 'bin';
-  return `submission/${Date.now()}_${crypto.randomUUID()}.${safeExt}`;
+  return `submission/${Date.now()}_${crypto.randomUUID()}.${toSafeObjectKeyExtension(fileName, mime)}`;
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -70,7 +61,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const body = (await request.json().catch(() => ({}))) as SubmissionUploadRequest;
     const rawFileName = String(body.fileName || '').trim();
-    const mime = normalizeMime(body.mimeType ?? '');
+    const mime = normalizeUploadMimeType(rawFileName, body.mimeType ?? '');
     const fileSize = Number(body.fileSize ?? 0);
     const submissionType = String(body.submissionType || '').trim();
 

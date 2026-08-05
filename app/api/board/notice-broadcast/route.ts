@@ -86,7 +86,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => null);
     const postId = String((body as { postId?: unknown } | null)?.postId || '').trim();
-    const useAnonymous = Boolean((body as { useAnonymous?: unknown } | null)?.useAnonymous);
+    // 요청 본문의 useAnonymous 는 읽지 않는다 — 공지 메시지 발신자는 '공지봇' 고정이라
+    // 예전에도 이 값이 결과에 전혀 반영되지 않았다(8차 D07-017).
     if (!postId) {
       return NextResponse.json({ error: 'postId is required.' }, { status: 400 });
     }
@@ -165,29 +166,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!sessionStaff) {
-      try {
-        const rows = await db
-          .select({
-            id: staffMembersTable.id,
-            name: staffMembersTable.name,
-            role: staffMembersTable.role })
-          .from(staffMembersTable)
-          .where(eq(staffMembersTable.id, sessionUserId))
-          .limit(1);
-        sessionStaff = (rows[0] as StaffSummary | undefined) ?? null;
-      } catch {
-        sessionStaff = null;
-      }
-    }
-    const senderName = useAnonymous ? '관리자' : String(sessionStaff?.name || '관리자');
+    // 8차 D07-017: 여기 있던 두 번째 staff 조회 블록(위 조회와 인자까지 동일)과 그 결과로
+    // 만들던 `senderName` 을 제거했다. 공지 메시지는 sender_name 을 '공지봇' 으로 고정해
+    // insert 하므로 senderName 은 계산만 되고 어디에도 쓰이지 않는 죽은 값이었다.
+    // (같은 이유로 요청 본문의 useAnonymous 도 이미 무의미한 값이었다.)
 
     // 1) 공지 채팅방에 메시지 insert — D1 직접
     const chatContent = buildChatContent(boardType, String(post.title || ''), post.content);
-    const messageId =
-      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    // 8차 D07-017: 예전에는 messageId 가 매번 새 UUID 라 같은 게시글로 이 라우트를 두 번
+    // 호출하면(작성 직후 재시도·중복 클릭·오프라인 큐 재전송) 공지방 메시지와 전 직원 알림이
+    // 그대로 두 번 쌓였다. messages.id 는 PK 이므로 postId 파생 결정적 키를 쓰면
+    // 두 번째 호출이 UNIQUE 로 막힌다 — 멱등 키를 별도 테이블 없이 얻는다.
+    const messageId = `notice-broadcast:${postId}`;
+
+    try {
+      const existing = await db
+        .select({ id: messagesTable.id })
+        .from(messagesTable)
+        .where(eq(messagesTable.id, messageId))
+        .limit(1);
+      if (existing.length > 0) {
+        return NextResponse.json({ ok: true, skipped: 'already-broadcast', messageId });
+      }
+    } catch {
+      // 선조회 실패는 무시 — 아래 insert 의 PK 충돌이 최종 방어선이다.
+    }
+
     try {
       await db.insert(messagesTable).values({
         id: messageId,
@@ -197,6 +201,10 @@ export async function POST(request: NextRequest) {
         content: chatContent });
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
+      // 선조회와 insert 사이의 경합은 PK 충돌로 나타난다 — 중복 발송이 아니라 '이미 발송됨'.
+      if (/unique|constraint/i.test(detail)) {
+        return NextResponse.json({ ok: true, skipped: 'already-broadcast', messageId });
+      }
       return NextResponse.json(
         {
           error: '공지 채팅방 메시지 저장에 실패했습니다.',

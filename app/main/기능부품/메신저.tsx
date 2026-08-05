@@ -243,6 +243,9 @@ export default function ChatView({
 
   const lastReadAtRef = useRef<string | null>(null);
   const isFocusedRef = useRef(true);
+  // 8차 D06-009: 창이 비활성인 동안 도착한 메시지의 읽음 처리를 보류해 두는 방 목록.
+  // 포커스가 돌아오면 한 번에 커서를 기록한다.
+  const pendingReadRoomIdsRef = useRef<Set<string>>(new Set());
 
   const [viewMode, setViewMode] = useState<'chat' | 'org'>('chat');
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
@@ -1518,6 +1521,29 @@ export default function ChatView({
       if (!isOwnMessage && user?.id) {
         const readAt = toUtcSqlTimestamp();
         const targetRoomIds = conversationRoomIds.length > 0 ? conversationRoomIds : [roomId];
+
+        // 8차 D06-009: 예전에는 '방이 열려 있다'는 사실만으로 문서 가시성·포커스와 무관하게
+        // 읽음 커서를 기록했다. 방을 켜 둔 채 다른 앱을 쓰는 동안(브라우저 창은 visible,
+        // 포커스 없음) 또는 Electron 셸이 트레이에 있는 동안 도착한 메시지가 매번 읽음 처리돼
+        // 배지·팝업이 사라지고 상대에게는 '읽음'으로 보였다. 실제로 화면을 보고 있을 때만
+        // 기록하고, 아니면 방 id 만 모아 뒀다가 포커스 복귀 시 한 번에 기록한다.
+        const isViewing =
+          isFocusedRef.current &&
+          (typeof document === 'undefined' || document.visibilityState === 'visible');
+
+        if (!isViewing) {
+          targetRoomIds.forEach((targetRoomId) => {
+            if (targetRoomId) pendingReadRoomIdsRef.current.add(String(targetRoomId));
+          });
+          if (currentConversationRoomId) {
+            pendingReadRoomIdsRef.current.add(String(currentConversationRoomId));
+          }
+          setRoomUnreadCounts((prev) => ({
+            ...prev,
+            [roomId]: Math.max(1, (prev[roomId] || 0) + 1) }));
+          return;
+        }
+
         void persistRoomReadCursors(targetRoomIds, readAt)
           .then(async (cursorWriteOk) => {
             await markConversationNotificationsAsRead(
@@ -2077,12 +2103,47 @@ export default function ChatView({
   }, []);
 
   useEffect(() => {
-    const onFocus = () => { isFocusedRef.current = true; };
+    // 8차 D06-009: 비활성 중 도착해 보류해 둔 읽음 커서를 포커스 복귀 시 한 번에 기록한다.
+    const flushPendingReads = () => {
+      const roomIds = Array.from(pendingReadRoomIdsRef.current).filter(Boolean);
+      pendingReadRoomIdsRef.current.clear();
+      if (roomIds.length === 0 || !user?.id) return;
+      const readAt = toUtcSqlTimestamp();
+      void persistRoomReadCursors(roomIds, readAt)
+        .then(async (cursorWriteOk) => {
+          await markConversationNotificationsAsRead(roomIds, readAt);
+          if (cursorWriteOk) broadcastChatSync('message-read', roomIds[0]);
+        })
+        .catch(() => {});
+      setRoomUnreadCounts((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        roomIds.forEach((targetRoomId) => {
+          if (!next[targetRoomId]) return;
+          next[targetRoomId] = 0;
+          changed = true;
+        });
+        return changed ? next : prev;
+      });
+    };
+
+    const onFocus = () => {
+      isFocusedRef.current = true;
+      flushPendingReads();
+    };
     const onBlur = () => { isFocusedRef.current = false; };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible' && isFocusedRef.current) flushPendingReads();
+    };
     window.addEventListener('focus', onFocus);
     window.addEventListener('blur', onBlur);
-    return () => { window.removeEventListener('focus', onFocus); window.removeEventListener('blur', onBlur); };
-  }, []);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('blur', onBlur);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [user?.id, persistRoomReadCursors, markConversationNotificationsAsRead, broadcastChatSync]);
 
   const isSelectedRoomTimelineReady = useMemo(() => {
     if (!selectedRoomId) return false;

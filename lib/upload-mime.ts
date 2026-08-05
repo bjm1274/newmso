@@ -132,3 +132,67 @@ export function normalizeUploadMimeType(fileName: string, mimeType: string): str
   const ext = getFileNameExtension(fileName);
   return MIME_BY_EXTENSION[ext] || rawMimeType || DEFAULT_CONTENT_TYPE;
 }
+
+/**
+ * 파일명(우선) 또는 신고 MIME 에서 저장용 확장자를 추정. 판정 불가면 'bin'.
+ *
+ * 8차 D07-013·D12-011: 같은 목적의 사본이 chat/board/approvals 세 라우트에 있었고
+ * MIME 폴백 규칙이 갈라져 있었다.
+ *  - board 판: `mimeType.split('/')[1]` 을 그대로 확장자로 썼다 →
+ *    'application/octet-stream' 이면 확장자가 'octet-stream',
+ *    Office MIME 이면 'vnd.openxmlformats-...' 같은 문자열이 나온다.
+ *  - chat 판: image/video 는 서브타입, pdf·text/plain 은 실제 확장자로 매핑하고
+ *    나머지는 'bin'.
+ * 정본은 chat 판이다 — 파일명에 붙일 수 있는 문자열만 돌려주기 때문이다.
+ * (board 판이 만든 쓰레기 확장자는 오브젝트 키 생성 시 `/^[a-z0-9]+$/` 로 걸러져
+ *  'bin' 이 됐지만, 폴백 **파일명**에는 'attachment.octet-stream' 처럼 그대로 남았다.)
+ */
+export function guessUploadFileExtension(fileName: string, mimeType: string): string {
+  const fromName = getFileNameExtension(fileName);
+  if (fromName) return fromName;
+
+  const mime = String(mimeType || '').trim().toLowerCase();
+  if (mime.startsWith('image/')) return mime.split('/')[1] || 'png';
+  if (mime.startsWith('video/')) return mime.split('/')[1] || 'mp4';
+  if (mime === 'application/pdf') return 'pdf';
+  if (mime === 'text/plain') return 'txt';
+  return 'bin';
+}
+
+/** 파일명이 비었을 때 쓸 대체 이름. */
+export function buildUploadFallbackFileName(mimeType: string, ext: string): string {
+  const mime = String(mimeType || '');
+  if (mime.startsWith('image/')) return `image.${ext}`;
+  if (mime.startsWith('video/')) return `video.${ext}`;
+  if (mime === 'application/pdf') return `document.${ext}`;
+  return `attachment.${ext}`;
+}
+
+/**
+ * 저장·표시용 파일명 정규화(경로 제거 + 파일시스템 금지문자 제거).
+ *
+ * 8차 D07-013: chat/approvals 사본의 문자클래스가 `[ -<>:"/\|?*]` 였다.
+ * 리터럴 공백으로 시작해 `' '`(0x20)~`'<'`(0x3C) **범위**로 해석되는 바람에
+ * 숫자·마침표·하이픈·괄호가 전부 공백으로 치환되고, 정작 막아야 할
+ * 제어문자(0x00-0x1F)는 통과했다. node 실측:
+ *   '결산 2026-07.pdf' → 손상판 '결산 pdf' / 정본 '결산 2026-07.pdf'
+ *   'a\x01b.txt'      → 손상판 'a\x01b txt'(제어문자 잔존) / 정본 'a b.txt'
+ * board/upload 만 `[\x00-\x1f…]` 로 올발랐고 그쪽을 정본으로 삼는다.
+ */
+export function normalizeUploadFileName(fileName: string, mimeType: string): string {
+  const ext = guessUploadFileExtension(fileName, mimeType);
+  const rawName = String(fileName || '').trim() || buildUploadFallbackFileName(mimeType, ext);
+  const withoutPath = rawName.split(/[/\\]/).pop() || rawName;
+  const sanitized = withoutPath
+    .replace(/[\x00-\x1f<>:"/\\|?*]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return sanitized || buildUploadFallbackFileName(mimeType, ext);
+}
+
+/** R2 오브젝트 키 확장자로 쓸 수 있게 정제(영숫자만, 아니면 'bin'). */
+export function toSafeObjectKeyExtension(fileName: string, mimeType: string): string {
+  const ext = guessUploadFileExtension(fileName, mimeType);
+  return /^[a-z0-9]+$/i.test(ext) ? ext.toLowerCase() : 'bin';
+}

@@ -37,6 +37,7 @@ import RiskActionDialog from './RiskActionDialog';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import { formatWon as libFormatWon } from '@/lib/date-formatter';
 import { getWeeklyRotationShiftIds } from '@/lib/contract-shift-rotation';
+import { formatResidentBirthDateKey, resolveResidentBirthCentury } from '@/lib/resident-number';
 import { averageShiftHoursAndDays, type Shift as WorkShift } from '@/lib/shift-working-hours';
 import {
   HOURS_BASED_ALLOWANCE_FIELDS,
@@ -1356,35 +1357,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         secondary_shift_id: selectedShiftIds[1] || null };
 
       // ── 주민번호 기반 생일 자동 추출 ──────────────────────────────
-      let birthDateStr: string | null = null;
-      if (신규직원.주민번호) {
-        const digits = String(신규직원.주민번호).replace(/[^0-9]/g, '');
-        if (digits.length >= 7) {
-          const yearPrefix = Number(digits.slice(0, 2));
-          const month = Number(digits.slice(2, 4));
-          const day = Number(digits.slice(4, 6));
-          const genderDigit = digits.slice(6, 7);
-          const century =
-            genderDigit === '1' || genderDigit === '2' || genderDigit === '5' || genderDigit === '6'
-              ? 1900
-              : genderDigit === '3' || genderDigit === '4' || genderDigit === '7' || genderDigit === '8'
-              ? 2000
-              : genderDigit === '9' || genderDigit === '0'
-              ? 1800
-              : null;
-          if (century !== null) {
-            const year = century + yearPrefix;
-            const date = new Date(year, month - 1, day);
-            if (
-              date.getFullYear() === year &&
-              date.getMonth() === month - 1 &&
-              date.getDate() === day
-            ) {
-              birthDateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            }
-          }
-        }
-      }
+      // 8차 D04-011: 여기 있던 30줄 사본은 lib/resident-number 정본과 글자 단위로 같았다.
+      const birthDateStr = formatResidentBirthDateKey(신규직원.주민번호);
 
       const commonData = {
         name: normalizeStaffName(신규직원.성명),
@@ -2275,11 +2249,14 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                               const raw = e.target.value.replace(/[^0-9]/g, '').slice(0, 13);
                               const formatted = raw.length > 6 ? `${raw.slice(0, 6)}-${raw.slice(6)}` : raw;
                               if (raw.length >= 7 && 신규직원.주민번호.replace(/[^0-9]/g, '').length < 7) {
+                                // 8차 D04-011: 축약 사본(1/2 만 1900, 나머지 2000)이라
+                                // 외국인 코드 5/6(1900년대)을 2000년대로 봐 만 60세 경고가 뜨지 않았다.
                                 const yearPrefix = parseInt(raw.slice(0, 2), 10);
-                                const genderDigit = parseInt(raw.slice(6, 7), 10);
-                                const birthYear = (genderDigit === 1 || genderDigit === 2) ? 1900 + yearPrefix : 2000 + yearPrefix;
-                                const age = new Date().getFullYear() - birthYear;
-                                if (age >= 60 && 신규직원.ins_national) toast(`만 ${age}세는 국민연금 의무 가입 대상이 아닙니다.\n국민연금 체크를 해제해 주세요.`);
+                                const century = resolveResidentBirthCentury(raw.slice(6, 7));
+                                if (century !== null) {
+                                  const age = new Date().getFullYear() - (century + yearPrefix);
+                                  if (age >= 60 && 신규직원.ins_national) toast(`만 ${age}세는 국민연금 의무 가입 대상이 아닙니다.\n국민연금 체크를 해제해 주세요.`);
+                                }
                               }
                               신규직원설정({ ...신규직원, 주민번호: formatted });
                             }}

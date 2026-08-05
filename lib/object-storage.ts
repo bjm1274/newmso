@@ -294,63 +294,45 @@ export async function createChatAttachmentUploadPlan(
     url: buildR2AccessUrl(config.chatBucket, objectKey) };
 }
 
+/**
+ * R2 Worker binding 이 있으면 op 를 실행하고, 없거나 실패하면 S3 presign 폴백으로 넘긴다.
+ *
+ * 8차 D12-014: 이 "binding 시도 → 실패하면 조용히 폴백" 골격이 업로드 2곳·삭제 1곳에
+ * 글자 단위로 반복돼 있었다. 캐시 헤더나 재시도 정책을 손볼 때 세 곳을 동시에
+ * 고쳐야 하는 구조라 예방적으로 뽑아낸다. `null` 은 "binding 경로를 못 썼다"는 뜻이고
+ * op 가 정상적으로 `null` 을 돌려줄 일이 없도록 호출부에서 sentinel 을 쓴다.
+ */
+async function withR2Binding<T>(
+  op: (binding: { put: (...args: unknown[]) => Promise<unknown>; delete: (key: string) => Promise<unknown> }) => Promise<T>,
+  requiredMethod: 'put' | 'delete',
+): Promise<{ used: true; value: T } | { used: false }> {
+  try {
+    const cfCtx = await getCloudflareContext();
+    const r2Binding = (cfCtx?.env as any)?.R2;
+    if (r2Binding && typeof r2Binding[requiredMethod] === 'function') {
+      return { used: true, value: await op(r2Binding) };
+    }
+  } catch {
+    // binding 자체가 없거나 put/delete 가 실패했다 — 아래 S3 presign 경로로 폴백한다.
+  }
+  return { used: false };
+}
+
+/**
+ * 채팅 첨부 R2 업로드.
+ *
+ * 8차 D12-014: binding 시도 → presign 폴백 골격 ~50줄이 uploadToR2 와 통째로 중복돼 있었다.
+ * 실제 차이는 **버킷을 어떻게 정하는가** 하나뿐이었다 — chat 계열만
+ * config.chatBucket 폴백(없으면 DEFAULT_R2_CHAT_BUCKET)을 쓰고 uploadToR2 는 인자를 그대로 쓴다.
+ * 그래서 버킷 결정만 여기 남기고 나머지는 위임한다(업로드 경로·헤더·에러 문구 모두 동일).
+ */
 export async function uploadChatAttachmentToR2(
   objectKey: string,
   body: Buffer,
   mimeType: string,
 ): Promise<Pick<R2UploadPlan, 'bucket' | 'path' | 'provider' | 'url'>> {
   const config = getR2Config();
-  const bucket = config?.chatBucket || DEFAULT_R2_CHAT_BUCKET;
-
-  // 1. Direct Cloudflare R2 Worker Binding Attempt (0.00초 직통 업로드 — S3 credentials 의존 제로)
-  try {
-    const cfCtx = await getCloudflareContext();
-    const r2Binding = (cfCtx?.env as any)?.R2;
-    if (r2Binding && typeof r2Binding.put === 'function') {
-      await r2Binding.put(objectKey, body, {
-        httpMetadata: {
-          contentType: mimeType,
-          cacheControl: DEFAULT_CACHE_CONTROL,
-        },
-      });
-      return {
-        provider: 'r2',
-        bucket,
-        path: objectKey,
-        url: buildR2AccessUrl(bucket, objectKey),
-      };
-    }
-  } catch {
-    // Fallback to S3 Presigned REST API
-  }
-
-  if (!config) {
-    throw new Error('Cloudflare R2 configuration is missing.');
-  }
-
-  const signedUrl = await createR2PresignedUrl({
-    method: 'PUT',
-    bucket,
-    objectKey,
-    expiresIn: DEFAULT_UPLOAD_EXPIRATION_SECONDS,
-    headers: {
-      'content-type': mimeType,
-      'cache-control': DEFAULT_CACHE_CONTROL } });
-  const response = await fetch(signedUrl, {
-    method: 'PUT',
-    headers: {
-      'content-type': mimeType,
-      'cache-control': DEFAULT_CACHE_CONTROL },
-    body: body as BodyInit });
-  if (!response.ok) {
-    throw new Error(`Cloudflare R2 upload failed with status ${response.status}.`);
-  }
-
-  return {
-    provider: 'r2',
-    bucket,
-    path: objectKey,
-    url: buildR2AccessUrl(bucket, objectKey) };
+  return uploadToR2(config?.chatBucket || DEFAULT_R2_CHAT_BUCKET, objectKey, body, mimeType);
 }
 
 /**
@@ -363,26 +345,19 @@ export async function uploadToR2(
   body: Buffer,
   mimeType: string,
 ): Promise<Pick<R2UploadPlan, 'bucket' | 'path' | 'provider' | 'url'>> {
-  // 1. Direct Cloudflare R2 Worker Binding Attempt
-  try {
-    const cfCtx = await getCloudflareContext();
-    const r2Binding = (cfCtx?.env as any)?.R2;
-    if (r2Binding && typeof r2Binding.put === 'function') {
-      await r2Binding.put(objectKey, body, {
-        httpMetadata: {
-          contentType: mimeType,
-          cacheControl: DEFAULT_CACHE_CONTROL,
-        },
-      });
-      return {
-        provider: 'r2',
-        bucket,
-        path: objectKey,
-        url: buildR2AccessUrl(bucket, objectKey),
-      };
-    }
-  } catch {
-    // Fallback to S3 Presigned REST API
+  // 1. Direct Cloudflare R2 Worker Binding Attempt (0.00초 직통 업로드 — S3 credentials 의존 제로)
+  const viaBinding = await withR2Binding(async (binding) => {
+    await binding.put(objectKey, body, {
+      httpMetadata: {
+        contentType: mimeType,
+        cacheControl: DEFAULT_CACHE_CONTROL } });
+  }, 'put');
+  if (viaBinding.used) {
+    return {
+      provider: 'r2',
+      bucket,
+      path: objectKey,
+      url: buildR2AccessUrl(bucket, objectKey) };
   }
 
   const config = getR2Config();
@@ -420,16 +395,10 @@ export async function uploadToR2(
  */
 export async function deleteFromR2(bucket: string, objectKey: string): Promise<void> {
   // 1. Direct Cloudflare R2 Worker Binding Attempt
-  try {
-    const cfCtx = await getCloudflareContext();
-    const r2Binding = (cfCtx?.env as any)?.R2;
-    if (r2Binding && typeof r2Binding.delete === 'function') {
-      await r2Binding.delete(objectKey);
-      return;
-    }
-  } catch {
-    // Fallback to S3 API
-  }
+  const viaBinding = await withR2Binding(async (binding) => {
+    await binding.delete(objectKey);
+  }, 'delete');
+  if (viaBinding.used) return;
 
   const config = getR2Config();
   if (!config) {

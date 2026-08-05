@@ -43,14 +43,26 @@ export default function ModWithholding() {
   const [companyName, setCompanyName] = useState<string>(data.selectedCo);
   const [businessNo, setBusinessNo] = useState<string>('');
 
-  const [, mStr] = yearMonth.split('-');
-  const filingDate = `${parseInt(mStr || '0', 10)}/10`;
+  // 원천세는 '귀속월 다음 달 10일'까지 신고한다. 과거에는 귀속월 당월 10일을
+  // 그대로 찍어(`${귀속월}/10`) 바로 아래 "매월 10일까지" 안내와 겹치며
+  // 이미 지난 날짜를 예정일로 보여줬다(8차 D04-013).
+  const filingDate = useMemo(() => {
+    const [yStr, mStr] = yearMonth.split('-');
+    const y = parseInt(yStr || '0', 10);
+    const m = parseInt(mStr || '0', 10);
+    if (!Number.isFinite(y) || !Number.isFinite(m) || m < 1) return '-';
+    const next = new Date(y, m, 1); // m 은 1-base 이므로 Date 의 0-base 로는 '다음 달'
+    return `${next.getMonth() + 1}/10`;
+  }, [yearMonth]);
 
   const handleDownload = () => {
-    const header = ['직원명', '주민번호', '과세대상', '소득세', '지방세'];
+    // 주민번호 열은 값이 항상 상수 '-' 였다 — 이 간이 다운로드는 staffs 스냅샷만 보고
+    // 주민번호를 아예 갖고 있지 않다. 있는 척하는 빈 열은 홈택스 제출본으로 오인시키므로
+    // 제거한다. 실제 주민번호가 필요한 제출 파일은 아래 '원천징수파일생성' 이 만든다(8차 D04-013).
+    const header = ['직원명', '과세대상', '소득세', '지방세'];
     const lines = data.records.map((r) => {
       const s = data.staffs.find((st) => String(st.id) === r.staff_id);
-      return [s?.name ?? r.staff_id, '-', r.total_taxable, r.income_tax, r.local_tax].join(',');
+      return [s?.name ?? r.staff_id, r.total_taxable, r.income_tax, r.local_tax].join(',');
     });
     const blob = new Blob(['﻿' + [header.join(','), ...lines].join('\n')], {
       type: 'text/plain;charset=utf-8;' });

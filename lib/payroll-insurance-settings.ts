@@ -1,4 +1,5 @@
 import type { StaffMember } from '@/types';
+import { parseBirthDateFromResidentNo } from '@/lib/resident-number';
 
 export const NATIONAL_PENSION_MIN_AGE = 18;
 export const NATIONAL_PENSION_MAX_EXCLUSIVE_AGE = 60;
@@ -68,36 +69,8 @@ export function resolvePayrollAsOfDate(value?: unknown): Date {
   return parsePayrollDate(value) || parseYearMonthEnd(value) || new Date();
 }
 
-function parseBirthDateFromResidentNo(value: unknown): Date | null {
-  const digits = String(value ?? '').replace(/[^0-9]/g, '');
-  if (digits.length < 7) return null;
-
-  const yearPrefix = Number(digits.slice(0, 2));
-  const month = Number(digits.slice(2, 4));
-  const day = Number(digits.slice(4, 6));
-  const genderDigit = digits.slice(6, 7);
-  const century =
-    genderDigit === '1' || genderDigit === '2' || genderDigit === '5' || genderDigit === '6'
-      ? 1900
-      : genderDigit === '3' || genderDigit === '4' || genderDigit === '7' || genderDigit === '8'
-      ? 2000
-      : genderDigit === '9' || genderDigit === '0'
-      ? 1800
-      : null;
-  if (century === null) return null;
-
-  const year = century + yearPrefix;
-  const date = new Date(year, month - 1, day);
-  if (
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
-  ) {
-    return null;
-  }
-
-  return date;
-}
+// 세기 판정 본체는 `lib/resident-number.ts` 로 이관했다(8차 D04-011).
+// 이 파일의 구현이 3사본 중 유일하게 9/0→1800 과 '판정 불가=null' 을 지켜 정본이 됐다.
 
 function getStaffBirthDate(staff?: StaffLike | null): Date | null {
   if (!staff) return null;

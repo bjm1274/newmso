@@ -18,12 +18,11 @@ import { useCallback, useMemo, useState } from 'react';
 import { toast } from '@/lib/toast';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 import type { ErpUser } from '@/types';
-import MAvatar from '../공통/MAvatar';
-import MCard from '../공통/MCard';
 import { MFormHeader, MField, MInput, useFieldIdPrefix } from '../인사관리/form-helpers';
 import SApprovalApproverPicker from './결재선피커';
 import SApprovalCcPicker, { type CcPick } from './참조피커';
 import AttachmentPicker from './AttachmentPicker';
+import { ApproverLinePreviewSection, CcSection } from './ApproverLineCcSections';
 import { useApprovalFormBase } from './useApprovalFormBase';
 import {
   getFormSchema,
@@ -219,139 +218,19 @@ export default function SApprovalGenericForm({
           )}
         </div>
 
-        {/* 결재선 미리보기 */}
-        <div className="m-section" style={{ background: 'transparent' }}>
-          <div className="m-section-h" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', padding: '8px 16px 4px' }}>
-            <div className="lbl" style={{ flex: 1, fontSize: 13, fontWeight: 900, color: 'var(--z-700)' }}>
-              결재선 ({approverManual ? '직접 지정' : '자동 매핑'})
-            </div>
-            <button
-              type="button"
-              className="transition-all active:scale-95"
-              onClick={() => setPickerOpen(true)}
-              aria-label="결재선 변경"
-              style={{ fontSize: 12, fontWeight: 900, color: 'var(--m-accent)', padding: '4px 8px', background: 'transparent', border: 'none', cursor: 'pointer' }}
-            >
-              변경
-            </button>
-          </div>
-          <MCard
-            className="macos-glass macos-squircle"
-            style={{
-              overflow: 'hidden',
-              margin: '0 16px',
-              padding: 0 }}
-          >
-            {approverLoading ? (
-              <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--z-500)', fontWeight: 800 }}>
-                결재선을 불러오는 중...
-              </div>
-            ) : approverLine.length === 0 ? (
-              <div
-                style={{
-                  padding: '14px 16px',
-                  background: 'var(--m-warning-soft)',
-                  fontSize: 12,
-                  fontWeight: 800,
-                  color: 'var(--m-warning)',
-                  lineHeight: 1.55 }}
-              >
-                회사 내 결재자(팀장·실장·원장 등)가 없어 자동 매핑할 수 없습니다. 우측 상단 &quot;변경&quot;으로 결재자를
-                직접 지정해 주세요.
-              </div>
-            ) : (
-              <ol style={{ listStyle: 'none' }} aria-label="결재 진행 순서">
-                {approverLine.map((a, i) => {
-                  const dept = [a.department, a.position].filter(Boolean).join(' / ');
-                  const stepLabel =
-                    i === approverLine.length - 1 ? '최종 결재' : i === 0 ? '1차 검토' : `${i + 1}차 검토`;
-                  return (
-                    <li
-                      key={String(a.id)}
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: '40px 1fr auto',
-                        gap: 12,
-                        padding: '12px 16px',
-                        borderBottom: i < approverLine.length - 1 ? '1px solid rgba(0, 0, 0, 0.04)' : 'none',
-                        alignItems: 'center' }}
-                    >
-                      <MAvatar tone="violet" size="sm">
-                        {(a.name || '?').charAt(0)}
-                      </MAvatar>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 800 }}>{stepLabel}</div>
-                        <div style={{ fontSize: 14, fontWeight: 900, marginTop: 1, color: 'var(--z-900)' }}>{a.name}</div>
-                        {dept && (
-                          <div style={{ fontSize: 11, color: 'var(--z-500)', marginTop: 1, fontWeight: 700 }}>{dept}</div>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 800 }}>대기</div>
-                    </li>
-                  );
-                })}
-              </ol>
-            )}
-          </MCard>
-          <div style={{ padding: '6px 20px 0', fontSize: 11, color: 'var(--z-500)', fontWeight: 800 }}>
-            {approverManual
-              ? '결재선을 직접 지정했습니다. "기본값으로" 버튼으로 되돌릴 수 있어요.'
-              : '직급 위계에 따라 자동 매핑되었습니다. "변경"으로 수정할 수 있어요.'}
-          </div>
-        </div>
+        {/* 결재선 미리보기 · 참조 — 8차 D12-015: 3개 폼에 verbatim 이던 JSX 를 공용 컴포넌트로 */}
+        <ApproverLinePreviewSection
+          approverLine={approverLine}
+          approverLoading={approverLoading}
+          approverManual={approverManual}
+          onOpenPicker={() => setPickerOpen(true)}
+        />
 
-        {/* 참조(CC) — 선택 사항 */}
-        <div className="m-section" style={{ background: 'transparent' }}>
-          <div className="m-section-h" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', padding: '8px 16px 4px' }}>
-            <div className="lbl" style={{ flex: 1, fontSize: 13, fontWeight: 900, color: 'var(--z-700)' }}>참조 ({ccUsers.length})</div>
-            <button
-              type="button"
-              className="transition-all active:scale-95"
-              onClick={() => setCcPickerOpen(true)}
-              aria-label="참조자 추가 또는 변경"
-              style={{ fontSize: 12, fontWeight: 900, color: 'var(--m-accent)', padding: '4px 8px', background: 'transparent', border: 'none', cursor: 'pointer' }}
-            >
-              {ccUsers.length > 0 ? '변경' : '추가'}
-            </button>
-          </div>
-          <MCard
-            className="macos-glass macos-squircle"
-            style={{
-              overflow: 'hidden',
-              margin: '0 16px',
-              padding: 0 }}
-          >
-            {ccUsers.length === 0 ? (
-              <div style={{ padding: '14px 16px', fontSize: 12, color: 'var(--z-500)', fontWeight: 800, lineHeight: 1.55 }}>
-                참조자는 선택 사항입니다. 지정하면 해당 직원에게 문서가 참조로 공유됩니다.
-              </div>
-            ) : (
-              <ul style={{ listStyle: 'none', display: 'flex', flexWrap: 'wrap', gap: 8, padding: '12px 16px' }} aria-label="참조자 목록">
-                {ccUsers.map((c) => {
-                  const dept = [c.department, c.position].filter(Boolean).join(' / ');
-                  return (
-                    <li
-                      key={c.id}
-                      className="macos-glass"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        padding: '6px 12px 6px 6px',
-                        borderRadius: 999 }}
-                    >
-                      <MAvatar tone="cyan" size="sm">{(c.name || '?').charAt(0)}</MAvatar>
-                      <span style={{ minWidth: 0 }}>
-                        <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--z-900)' }}>{c.name}</span>
-                        {dept && <span style={{ fontSize: 11, color: 'var(--z-500)', marginLeft: 6, fontWeight: 800 }}>{dept}</span>}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </MCard>
-        </div>
+        <CcSection
+          ccUsers={ccUsers}
+          emptyText="참조자는 선택 사항입니다. 지정하면 해당 직원에게 문서가 참조로 공유됩니다."
+          onOpenPicker={() => setCcPickerOpen(true)}
+        />
 
         {/* 첨부 파일 */}
         <div className="m-section" style={{ background: 'transparent', padding: '0 16px' }}>

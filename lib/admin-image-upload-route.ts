@@ -1,0 +1,98 @@
+import { NextResponse } from 'next/server';
+import { isAdminSession, readSessionFromRequest } from '@/lib/server-session';
+import { buildR2AccessUrl, isR2ChatStorageEnabled, uploadToR2 } from '@/lib/object-storage';
+
+/**
+ * 관리자 회사 이미지(로고·직인) 업로드 라우트 팩토리.
+ *
+ * 8차 D07-022(=D12-009): `/api/admin/logo/upload` 와 `/api/admin/seal/upload` 는
+ * diff 실측 결과 파일의 ~90%(71줄)가 바이트 단위로 같았고, 차이는
+ *   (1) R2 키 접두어 'logos/' ↔ 'seals/'
+ *   (2) 에러 문구의 '로고' ↔ '직인' 3곳
+ *   (3) logo 쪽 JSDoc 한 개("직인과 동일한 인증·R2 패턴" — 복붙을 자인한다)
+ *   (4) trailing comma
+ * 뿐이었다. 즉 **현재 동작 차이는 없고** 위험은 장래에 있다 — MAX_BYTES 나 허용
+ * 타입을 바꿀 때 한쪽만 고치면 조용히 갈라진다. 그래서 예방적으로 합친다.
+ */
+
+const R2_BUCKET = 'pchos-files';
+const ALLOWED_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+const MAX_BYTES = 5 * 1024 * 1024;
+
+function getExtension(fileName: string, mimeType: string): string {
+  const raw = fileName.split('.').pop()?.toLowerCase();
+  if (raw && /^[a-z0-9]+$/.test(raw)) return raw;
+  if (mimeType === 'image/png') return 'png';
+  if (mimeType === 'image/webp') return 'webp';
+  return 'jpg';
+}
+
+function buildObjectKey(prefix: string, company: string, fileName: string, mimeType: string): string {
+  const safeFolder = company.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase() || 'company';
+  // 누끼 처리 결과는 투명 PNG 고정
+  const ext = mimeType === 'image/png' ? 'png' : getExtension(fileName, mimeType);
+  return `${prefix}/${safeFolder}_${Date.now()}_${crypto.randomUUID()}.${ext}`;
+}
+
+export type AdminImageUploadOptions = {
+  /** R2 오브젝트 키 접두어(슬래시 제외). 예: 'logos' */
+  prefix: string;
+  /** 에러 문구에 쓰는 한국어 라벨. 예: '로고' */
+  label: string;
+};
+
+export function createAdminImageUploadHandler({ prefix, label }: AdminImageUploadOptions) {
+  return async function POST(request: Request): Promise<NextResponse> {
+    try {
+      const session = await readSessionFromRequest(request);
+      if (!session || !isAdminSession(session.user)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      if (!isR2ChatStorageEnabled()) {
+        return NextResponse.json(
+          { error: 'Cloudflare R2 스토리지가 설정되지 않았습니다.' },
+          { status: 503 },
+        );
+      }
+
+      const contentLength = Number(request.headers.get('content-length') || '0');
+      if (contentLength > MAX_BYTES) {
+        return NextResponse.json({ error: `${label} 이미지는 5MB 이하여야 합니다.` }, { status: 413 });
+      }
+
+      const formData = await request.formData();
+      const file = formData.get('file');
+      const company = String(formData.get('company') || '').trim();
+
+      if (!(file instanceof File)) {
+        return NextResponse.json({ error: '업로드할 파일이 없습니다.' }, { status: 400 });
+      }
+      if (!company) {
+        return NextResponse.json({ error: '회사 정보가 누락되었습니다.' }, { status: 400 });
+      }
+      if (!ALLOWED_TYPES.has(file.type)) {
+        return NextResponse.json(
+          { error: 'PNG, JPG, WEBP 이미지만 업로드할 수 있습니다.' },
+          { status: 400 },
+        );
+      }
+      if (file.size > MAX_BYTES) {
+        return NextResponse.json({ error: `${label} 이미지는 5MB 이하여야 합니다.` }, { status: 413 });
+      }
+
+      const objectKey = buildObjectKey(prefix, company, file.name, file.type);
+      const arrayBuffer = await file.arrayBuffer();
+
+      const uploaded = await uploadToR2(R2_BUCKET, objectKey, Buffer.from(arrayBuffer), file.type);
+
+      return NextResponse.json({
+        success: true,
+        path: uploaded.path,
+        url: buildR2AccessUrl(R2_BUCKET, objectKey) });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : `${label} 업로드 중 오류가 발생했습니다.`;
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+  };
+}

@@ -30,7 +30,7 @@ import { upsertPayrollRecordsWithFallback } from '@/lib/payroll-record-upsert';
 import { NP_INCOME_CEILING, NP_INCOME_FLOOR, NIGHT_DUTY_TAX_FREE_LIMIT } from '@/lib/tax-free-limits';
 import { calcStatutoryDeductions, type StatutoryDeductionOptions } from '@/lib/payroll-deductions';
 import { verifyPayrollBeforeSave } from '@/lib/payroll-shadow-verify';
-import { getPayrollInsuranceSettings, resolvePayrollAsOfDate, hasAnyEmployeePayrollInsurance } from '@/lib/payroll-insurance-settings';
+import { getPayrollInsuranceSettings, resolvePayrollAsOfDate, hasAnyEmployeePayrollInsurance, isDuruNuriActiveForYearMonth } from '@/lib/payroll-insurance-settings';
 import RiskActionDialog from '../RiskActionDialog';
 import type {
   SettlementEntry,
@@ -1073,18 +1073,18 @@ export default function SalarySettlement({
     const insSettings = (staff?.permissions?.insurance as Record<string, unknown>) || {};
     const isMedicalBenefit = Boolean(staff?.permissions?.is_medical_benefit) || false;
 
-    // 두루누리 적용 여부 판단 (기간 체크)
-    let isDuruNuriActive = Boolean(insSettings.duru_nuri) || false;
-    if (isDuruNuriActive && insSettings.duru_nuri_start && insSettings.duru_nuri_end) {
-      const current = yearMonth; // "YYYY-MM"
-      isDuruNuriActive = (current >= String(insSettings.duru_nuri_start) && current <= String(insSettings.duru_nuri_end));
-    }
-
     const dependentCount = Math.max(0, Number(data.dependent_count) || 0);
     const qualifyingChildCount = Math.min(dependentCount, Math.max(0, Number(data.child_count_8_20) || 0));
     const withholdingRatePercent = normalizeWithholdingRatePercent(data.withholding_rate_percent);
 
     const resolvedIns = getPayrollInsuranceSettings(staff, resolvePayrollAsOfDate(yearMonth));
+
+    // 8차 D04-014: 두루누리 판정 인라인 사본을 정본으로 교체.
+    // 사본과의 실측 차이 — (1) 시작·종료월이 **둘 다** 있어야만 기간을 봐서 종료월이 비면
+    // 무기한 적용, (2) 36개월 지원 상한 미집행, (3) 월 보수 270만원 초과 자격 상실 미집행.
+    // 정본(lib/payroll-insurance-settings)을 택한 이유는 세 조건이 모두 제도의 법정 요건이고,
+    // 정본은 호출처 0건의 데드코드였던 탓에 이 상한들이 전역 미집행 상태였기 때문이다.
+    const isDuruNuriActive = isDuruNuriActiveForYearMonth(resolvedIns, yearMonth, total_taxable);
 
     // 서버가 같은 입력으로 재계산할 수 있도록 옵션을 한 번만 만들어 공유한다.
     // (예전에는 이 옵션이 이 함수 안에만 있어서 서버가 재현할 방법이 없었다 — D04-008)

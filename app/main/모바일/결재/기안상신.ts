@@ -20,7 +20,14 @@ export type SubmitApprovalArgs = {
   staffId: string;
   company: string;
   formSlug: string;
+  /** 양식 표시명. doc_number 생성과 meta.form_display_name 에 쓰인다. */
   formName: string;
+  /**
+   * approvals.type. 대부분 formName 과 같지만 출결정정처럼
+   * 표시명('출결정정 신청')과 문서 타입('출결정정')이 다른 양식이 있어 분리해 둔다.
+   * 미지정 시 formName.
+   */
+  typeName?: string;
   title: string;
   content: string;
   approverLine: ApproverPick[];
@@ -28,6 +35,15 @@ export type SubmitApprovalArgs = {
   attachments?: AttachmentEntry[];
   /** 양식별 추가 메타 (예: overtime_records, plan_dates) */
   extraMeta?: Record<string, unknown>;
+  /**
+   * 참조 부서. 8차 D12-006: 예전에는 여기서 `[]` 로 고정돼 있었고 훅
+   * (useApprovalFormBase.submitApproval)만 파라미터를 지원했다. 두 파이프라인의
+   * 소비자가 3:3 으로 갈려 있어서, 연차 인사탭(이 함수 사용)의 행정팀 참조가
+   * 통째로 빠지는 D12-005 가 실제로 발생했다.
+   */
+  ccDepartments?: string[];
+  /** 참조 사용자. 미지정 시 `extraMeta.cc_users` 를 읽는 기존 경로를 유지한다. */
+  ccUsers?: Array<{ id: string; name: string }>;
 };
 
 export type SubmitApprovalResult = {
@@ -42,12 +58,15 @@ export async function submitApprovalDraft(args: SubmitApprovalArgs): Promise<Sub
     company,
     formSlug,
     formName,
+    typeName,
     title,
     content,
     approverLine,
     approverManual,
     attachments = [],
-    extraMeta = {} } = args;
+    extraMeta = {},
+    ccDepartments = [],
+    ccUsers: ccUsersArg } = args;
 
   const senderName = String(user.name || '').trim() || '이름 없음';
   const senderDepartment = String(user.department || '').trim();
@@ -62,10 +81,12 @@ export async function submitApprovalDraft(args: SubmitApprovalArgs): Promise<Sub
     userPermissions:
       (user as unknown as { permissions?: Record<string, unknown> }).permissions ?? null });
 
-  // PC 패리티: 전사 자동 CC 금지 (필요 시 호출 측 extraMeta.cc_users 로 전달)
-  const ccUsers: Array<{ id: string; name: string }> = Array.isArray(extraMeta.cc_users)
-    ? (extraMeta.cc_users as Array<{ id: string; name: string }>)
-    : [];
+  // PC 패리티: 전사 자동 CC 금지 (인자 우선, 없으면 기존 extraMeta.cc_users 경로)
+  const ccUsers: Array<{ id: string; name: string }> =
+    ccUsersArg ??
+    (Array.isArray(extraMeta.cc_users)
+      ? (extraMeta.cc_users as Array<{ id: string; name: string }>)
+      : []);
 
   const uploadedAttachments = attachments
     .filter((a) => a.state === 'done' && a.fileUrl)
@@ -82,7 +103,7 @@ export async function submitApprovalDraft(args: SubmitApprovalArgs): Promise<Sub
     senderCompany,
     senderDepartment: senderDepartment || null,
     companyId: user.company_id ?? null,
-    typeName: formName,
+    typeName: typeName || formName,
     title: title.trim(),
     content,
     formSlug,
@@ -90,7 +111,7 @@ export async function submitApprovalDraft(args: SubmitApprovalArgs): Promise<Sub
     approverLine,
     approverLineSource: approverManual ? 'mobile_manual' : 'mobile_auto',
     docNumber,
-    ccDepartments: [],
+    ccDepartments,
     ccUsers,
     extraMeta: {
       content,

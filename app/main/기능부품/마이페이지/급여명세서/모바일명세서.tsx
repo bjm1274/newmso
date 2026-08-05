@@ -17,6 +17,10 @@
 import { useMemo } from 'react';
 import { Share2, Printer } from 'lucide-react';
 import { calculateHourlyRateFromMonthlySalary, resolveWeeklyWorkingHours } from '@/lib/payroll-working-hours';
+import {
+  buildPayrollDeductionRows,
+  resolvePayrollDeductionAmounts,
+  sumPayrollDeductionRows } from '@/lib/payroll-slip-rows';
 
 type StaffInfo = {
   company?: string;
@@ -85,38 +89,15 @@ function formatYearMonthLabel(yearMonth: string): string {
 type AmountRow = { label: string; value: number; isTaxFree?: boolean };
 
 /**
- * 저장된 total_deduction 은 (법정공제 6종 + custom_deduction) 뿐이다(급여정산.tsx 의 deduction 정의).
- * 근태공제는 total_taxable 에서 이미 차감돼 있고 선지급은 net_pay 에서만 따로 빠지므로,
- * 이 둘이 total_deduction 에 없어 "지급총액 − 공제총액 = 실지급액" 이 성립하지 않았다.
- * 그래서 표시용 공제 합계는 저장된 total_deduction 이 아니라 아래 행들의 합으로 계산한다.
- * (A4 명세서 급여상세.tsx 의 deductionRows 와 항목·라벨을 일치시킨다.)
+ * 8차 D12-007: 공제 행 구성이 PC(급여상세.tsx)와 여기 두 벌이었다.
+ * 항목·라벨·순서·합계 규칙과 금액 해석을 lib/payroll-slip-rows 정본으로 옮겼다.
+ * 이 사본에는 deduction_detail 우선순위가 없어 detail 만 갱신된 레코드에서
+ * PC 와 다른 금액이 나올 수 있었다 — 정본은 detail → record 컬럼 순으로 본다.
+ * (PC 전용 '4대보험 계산 폴백' 은 넘기지 않는다. 직원 본인이 보는 명세서에
+ *  저장값이 없을 때 추정치를 실제 공제액처럼 보여주면 안 된다.)
  */
 function buildDeductionRows(record: SalaryRecord, deductionDetail: Record<string, unknown>): AmountRow[] {
-  const statutoryRows = [
-    { label: '국민연금', value: Number(record.national_pension || 0) },
-    { label: '건강보험', value: Number(record.health_insurance || 0) },
-    { label: '장기요양보험', value: Number(record.long_term_care || 0) },
-    { label: '고용보험', value: Number(record.employment_insurance || 0) },
-    { label: '소득세', value: Number(record.income_tax || 0) },
-    { label: '지방소득세', value: Number(record.local_tax || 0) },
-  ];
-  const statutoryTotal = statutoryRows.reduce((acc, row) => acc + row.value, 0);
-
-  // deduction_detail 이 비어 있는 레코드도 기타공제가 증발하지 않도록
-  // 저장된 total_deduction 에서 법정공제를 뺀 잔액으로 보정한다.
-  const customDeduction =
-    deductionDetail?.custom_deduction != null
-      ? Number(deductionDetail.custom_deduction) || 0
-      : Math.max(0, Number(record.total_deduction || 0) - statutoryTotal);
-
-  return [
-    ...statutoryRows,
-    { label: '근태공제', value: Number(record.attendance_deduction || 0) },
-    { label: '기타 공제', value: customDeduction },
-    // 라벨을 '가불금'에서 '선지급 차감'으로 바꾼다. advance_pay 는 지급액이 아니라
-    // net_pay 에서 빼는 차감액이다(급여정산.tsx 의 getAdvanceAdjustedNet).
-    { label: '선지급 차감', value: Number(record.advance_pay || 0) },
-  ].filter((row) => row.value > 0);
+  return buildPayrollDeductionRows(resolvePayrollDeductionAmounts(record, deductionDetail));
 }
 
 export default function MobileSalarySlip({
@@ -227,10 +208,7 @@ export default function MobileSalarySlip({
     // total_taxable 이 비어 있는 옛 레코드는 지급행 합계로 폴백한다.
     return gross > 0 ? gross : paymentRows.reduce((acc, row) => acc + row.value, 0);
   }, [record, paymentRows]);
-  const totalDeduction = useMemo(
-    () => deductionRows.reduce((acc, row) => acc + row.value, 0),
-    [deductionRows],
-  );
+  const totalDeduction = useMemo(() => sumPayrollDeductionRows(deductionRows), [deductionRows]);
   const netPay = Number(record?.net_pay ?? totalPayment - totalDeduction) || 0;
 
   const hourlyRate = useMemo(() => {

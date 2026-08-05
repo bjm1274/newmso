@@ -23,6 +23,20 @@ type FetchChatUnreadCountsParams = {
   userId: string | null | undefined;
   activeRoomId?: string | null;
   chunkSize?: number;
+  /**
+   * 커서가 없는 방의 implicit 기준선 보관소(호출자가 ref 등으로 세션 동안 유지).
+   *
+   * 8차 D06-010: PC(`메신저방데이터훅.ts:124-146`)만 이 보정을 갖고 있었고 모바일이 쓰는
+   * 이 함수에는 없었다. 커서가 없으면 필터가 `room_id.eq.X`(그 방 전체)가 되므로
+   * 한 번도 열지 않은 방 — 특히 항상 목록에 포함되는 공지방 — 의 **전 히스토리**가
+   * 안읽음으로 잡혔고, 폴링마다 그 방 메시지를 1000행 단위로 전부 내려받았다.
+   *
+   * 기준선은 '처음 본 시점의 last_message_at' 로 **한 번만** 고정해야 한다.
+   * 매번 last_message_at 으로 다시 잡으면 그 방은 영원히 안읽음 0 이 된다.
+   * 그래서 값을 함수 안에 두지 않고 호출자가 들고 있는 객체에 기록한다.
+   * 미전달 시 동작은 예전 그대로(보정 없음)라 기존 호출자는 영향받지 않는다.
+   */
+  implicitBaselineStore?: Record<string, string | null>;
 };
 
 type FetchUnreadCountsForRoomIdsParams = {
@@ -155,6 +169,32 @@ export async function fetchChatUnreadCountsByRoom(
     cursorMap[String(cursor.room_id || '')] = (cursor.last_read_at as string | null) || null;
   });
 
+  // 8차 D06-010: PC 에만 있던 implicit baseline 보정을 여기로 내려 PC/모바일이 같은 규칙을 쓴다.
+  const baselineStore = params.implicitBaselineStore;
+  const unreadCursorMap: Record<string, string | null | undefined> = { ...cursorMap };
+  if (baselineStore) {
+    const roomIdSet = new Set(roomIds);
+    myRooms.forEach((room) => {
+      const roomId = String(room.id || '').trim();
+      if (!roomId) return;
+      if (cursorMap[roomId]) {
+        // 실제 커서가 생긴 방은 기준선을 버린다 — 이후로는 커서가 진실이다.
+        delete baselineStore[roomId];
+        return;
+      }
+      if (baselineStore[roomId] === undefined) {
+        baselineStore[roomId] =
+          String(room.last_message_at || room.created_at || '').trim() || null;
+      }
+    });
+    Object.keys(baselineStore).forEach((roomId) => {
+      if (!roomIdSet.has(roomId)) delete baselineStore[roomId];
+    });
+    Object.entries(baselineStore).forEach(([roomId, baseline]) => {
+      if (!unreadCursorMap[roomId] && baseline) unreadCursorMap[roomId] = baseline;
+    });
+  }
+
   const activeRoomId = String(params.activeRoomId || '').trim();
   const openConversationRoomIds = getConversationRoomIdSet(activeRoomId, myRooms);
   const queryRoomIds = roomIds.filter(
@@ -165,7 +205,7 @@ export async function fetchChatUnreadCountsByRoom(
   const queriedCounts = await fetchUnreadCountsForRoomIds(client, {
     roomIds: queryRoomIds,
     userId: normalizedUserId,
-    cursorMap });
+    cursorMap: unreadCursorMap });
   const queriedEntries = Object.entries(queriedCounts);
 
   const activeEntries: Array<[string, number]> = roomIds

@@ -325,7 +325,9 @@ export function buildContractBodyPrintHTML(templateText: string): string {
 
             // 급여 항목(기본급/식대/직책수당/기타수당/비과세) → 라벨-금액 행
             if (/^(기본급|식대|직책수당|기타수당|비과세)\s+/.test(t)) {
-                const parts = t.split(/\s{2 }/);
+                // `{2,}` → `{2 }` 일괄 치환 사고(8차 D04-002). 손상판은 split 이 항상 1개를
+                // 돌려줘 금액 span 이 비고 라벨 span 에 전문이 들어갔다(값 소실은 아니고 레이아웃 붕괴).
+                const parts = t.split(/\s{2,}/);
                 const label = esc(parts[0] ?? '');
                 const amount = esc(parts[1] ?? '');
                 return `<div style="

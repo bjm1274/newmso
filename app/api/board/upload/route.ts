@@ -7,6 +7,12 @@ import {
   normalizeSessionUser,
   readSessionFromRequest,
   resolveLatestSessionUser } from '@/lib/server-session';
+import {
+  DEFAULT_CONTENT_TYPE,
+  guessUploadFileExtension,
+  normalizeUploadFileName,
+  normalizeUploadMimeType,
+  toSafeObjectKeyExtension } from '@/lib/upload-mime';
 
 
 export const dynamic = 'force-dynamic';
@@ -17,25 +23,9 @@ const MAX_VIDEO_SIZE_BYTES = 200 * 1024 * 1024;
 // 같은 상한을 적용해 "무제한" 만 닫는다 — 지금 통과하는 파일은 그대로 통과한다.
 const MAX_IMAGE_SIZE_BYTES = 200 * 1024 * 1024;
 const R2_BUCKET = 'pchos-files';
-const DEFAULT_CONTENT_TYPE = 'application/octet-stream';
-const MIME_BY_EXTENSION: Record<string, string> = {
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  png: 'image/png',
-  gif: 'image/gif',
-  webp: 'image/webp',
-  bmp: 'image/bmp',
-  heic: 'image/heic',
-  heif: 'image/heif',
-  avif: 'image/avif',
-  mp4: 'video/mp4',
-  mov: 'video/quicktime',
-  m4v: 'video/mp4',
-  webm: 'video/webm',
-  pdf: 'application/pdf',
-  txt: 'text/plain',
-  csv: 'text/csv',
-  zip: 'application/zip' };
+// DEFAULT_CONTENT_TYPE·MIME_BY_EXTENSION·normalizeUploadMimeType 로컬 사본을 제거하고
+// lib/upload-mime 정본을 쓴다(8차 D12-011). 사본은 정본과 17개 항목이 순서까지 같아
+// 현재 동작 차이가 0 이었지만, 확장자를 추가할 때 게시판만 누락되는 구조였다.
 
 type UploadPlanRequest = {
   boardType?: string;
@@ -55,61 +45,15 @@ type UploadPlanResponse = {
   headers: Record<string, string>;
 };
 
-function guessFileExtension(fileName: string, mimeType: string): string {
-  const rawName = String(fileName || '').trim();
-  const lastDotIndex = rawName.lastIndexOf('.');
-  if (lastDotIndex > -1 && lastDotIndex < rawName.length - 1) {
-    return rawName.slice(lastDotIndex + 1).toLowerCase();
-  }
-
-  if (mimeType.includes('/')) {
-    const guessed = mimeType.split('/')[1]?.toLowerCase();
-    if (guessed) return guessed;
-  }
-
-  return 'bin';
-}
-
-function normalizeUploadMimeType(fileName: string, mimeType: string): string {
-  const rawMimeType = String(mimeType || '').trim().toLowerCase();
-  if (rawMimeType === 'image/jpg' || rawMimeType === 'image/pjpeg') return 'image/jpeg';
-  if (rawMimeType === 'image/x-png') return 'image/png';
-  if (rawMimeType && rawMimeType !== DEFAULT_CONTENT_TYPE) return rawMimeType;
-
-  const ext = guessFileExtension(fileName, '');
-  return MIME_BY_EXTENSION[ext] || rawMimeType || DEFAULT_CONTENT_TYPE;
-}
-
-function buildFallbackFileName(mimeType: string, ext: string): string {
-  if (mimeType.startsWith('image/')) return `image.${ext}`;
-  if (mimeType.startsWith('video/')) return `video.${ext}`;
-  if (mimeType === 'application/pdf') return `document.${ext}`;
-  return `attachment.${ext}`;
-}
-
-function normalizeUploadFileName(fileName: string, mimeType: string): string {
-  const ext = guessFileExtension(fileName, mimeType);
-  const rawName = String(fileName || '').trim() || buildFallbackFileName(mimeType, ext);
-  const withoutPath = rawName.split(/[/\\]/).pop() || rawName;
-  const sanitized = withoutPath
-    .replace(/[\x00-\x1f<>:"/\\|?*]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  return sanitized || buildFallbackFileName(mimeType, ext);
-}
-
 function buildSafeFilePath(fileName: string, mimeType: string): string {
-  const ext = guessFileExtension(fileName, mimeType);
-  const safeExt = /^[a-z0-9]+$/i.test(ext) ? ext.toLowerCase() : 'bin';
-  return `board/${Date.now()}_${crypto.randomUUID()}.${safeExt}`;
+  return `board/${Date.now()}_${crypto.randomUUID()}.${toSafeObjectKeyExtension(fileName, mimeType)}`;
 }
 
 function detectAttachmentType(fileName: string, mimeType: string): string {
   if (mimeType.startsWith('image/')) return 'image';
   if (mimeType.startsWith('video/')) return 'video';
 
-  const ext = guessFileExtension(fileName, mimeType);
+  const ext = guessUploadFileExtension(fileName, mimeType);
   if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic', 'heif'].includes(ext)) return 'image';
   if (['mp4', 'mov', 'avi', 'wmv', 'webm', 'mkv', 'm4v'].includes(ext)) return 'video';
   return 'file';

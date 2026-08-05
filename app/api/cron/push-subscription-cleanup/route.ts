@@ -9,15 +9,13 @@ import {
 import {
   getD1Binding,
   getD1Drizzle,
-  push_subscriptions as pushSubscriptionsTable,
-  staff_members as staffMembersTable,
   notifications as notificationsTable,
   chat_push_jobs as chatPushJobsTable,
-  inArray,
   isNotNull,
   lt,
   and } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
+import { runPushSubscriptionCleanup } from '@/lib/push-subscription-cleanup';
 
 async function requireD1ForCleanup(label: string) {
   const d1 = await getD1Binding();
@@ -31,33 +29,6 @@ async function requireD1ForCleanup(label: string) {
 const CRON_SECRET = process.env.CRON_SECRET;
 
 export const dynamic = 'force-dynamic';
-
-type PushSubscriptionRow = {
-  id: string;
-  staff_id: string | null;
-  endpoint: string | null;
-};
-
-async function deleteSubscriptionsByIds(ids: string[]) {
-  if (ids.length === 0) return;
-
-  // Phase 8-G — D1 직접 delete. inArray bind 한도(100)에 맞춰 청크 분할.
-  const db = await requireD1ForCleanup('push_subscriptions:delete');
-  const chunkSize = 100;
-  for (let index = 0; index < ids.length; index += chunkSize) {
-    const chunk = ids.slice(index, index + chunkSize);
-    await db.delete(pushSubscriptionsTable).where(inArray(pushSubscriptionsTable.id, chunk));
-  }
-}
-
-function pickPreferredSubscription(rows: PushSubscriptionRow[]) {
-  return [...rows].sort((left, right) => {
-    const leftHasStaff = left.staff_id ? 1 : 0;
-    const rightHasStaff = right.staff_id ? 1 : 0;
-    if (leftHasStaff !== rightHasStaff) return rightHasStaff - leftHasStaff;
-    return String(right.id).localeCompare(String(left.id));
-  })[0];
-}
 
 async function cleanupRetentionLogs() {
   const result = { notificationsDeleted: 0, chatPushJobsDeleted: 0 } as {
@@ -111,103 +82,11 @@ async function cleanupRetentionLogs() {
   return result;
 }
 
+// 정리 본체는 lib/push-subscription-cleanup 정본으로 이관했다(8차 D12-008).
+// 관리도구(system-master) 사본은 staff.status 를 보지 않아 퇴사자 구독을 남겼고 이 cron 판은 지웠다 —
+// 같은 지표가 실행 주체에 따라 달라졌다. 퇴사자를 지우는 cron 판을 정본으로 삼았다.
 async function cleanupPushSubscriptions() {
-  // Phase 8-G — D1 직접 select.
-  const db = await requireD1ForCleanup('cleanup:select');
-  const [subscriptionRows, staffRows] = await Promise.all([
-    db
-      .select({
-        id: pushSubscriptionsTable.id,
-        staff_id: pushSubscriptionsTable.staff_id,
-        endpoint: pushSubscriptionsTable.endpoint })
-      .from(pushSubscriptionsTable),
-    db
-      .select({ id: staffMembersTable.id, status: staffMembersTable.status })
-      .from(staffMembersTable),
-  ]);
-
-  // 재직 중인 staff_id 집합 — '퇴사' / '퇴직' 상태는 제외한다.
-  // 퇴사자 행이 DB에 남아 있더라도 구독은 정리 대상으로 처리한다.
-  const RESIGNED_STATUSES = new Set(['퇴사', '퇴직']);
-  const validStaffIds = new Set(
-    staffRows
-      .filter((row) => !RESIGNED_STATUSES.has(String(row.status ?? '').trim()))
-      .map((row) => String(row.id || '')),
-  );
-
-  const rows = subscriptionRows as PushSubscriptionRow[];
-  const deleteIds = new Set<string>();
-  const validRows: PushSubscriptionRow[] = [];
-
-  let emptyEndpoint = 0;
-  let nullStaff = 0;
-  let orphanStaff = 0;
-
-  for (const row of rows) {
-    const endpoint = String(row.endpoint || '').trim();
-    const staffId = String(row.staff_id || '').trim();
-
-    if (!endpoint) {
-      emptyEndpoint += 1;
-      deleteIds.add(row.id);
-      continue;
-    }
-
-    if (!staffId) {
-      nullStaff += 1;
-      deleteIds.add(row.id);
-      continue;
-    }
-
-    if (!validStaffIds.has(staffId)) {
-      orphanStaff += 1;
-      deleteIds.add(row.id);
-      continue;
-    }
-
-    validRows.push({
-      ...row,
-      endpoint,
-      staff_id: staffId });
-  }
-
-  const endpointGroups = new Map<string, PushSubscriptionRow[]>();
-  for (const row of validRows) {
-    const key = String(row.endpoint || '');
-    const bucket = endpointGroups.get(key);
-    if (bucket) {
-      bucket.push(row);
-    } else {
-      endpointGroups.set(key, [row]);
-    }
-  }
-
-  let duplicateGroups = 0;
-  let duplicateRowsDeleted = 0;
-
-  for (const group of endpointGroups.values()) {
-    if (group.length <= 1) continue;
-    duplicateGroups += 1;
-
-    const keep = pickPreferredSubscription(group);
-    for (const row of group) {
-      if (row.id === keep.id) continue;
-      duplicateRowsDeleted += 1;
-      deleteIds.add(row.id);
-    }
-  }
-
-  await deleteSubscriptionsByIds(Array.from(deleteIds));
-
-  return {
-    totalBefore: rows.length,
-    deleted: deleteIds.size,
-    emptyEndpoint,
-    nullStaff,
-    orphanStaff,
-    duplicateGroups,
-    duplicateRowsDeleted,
-    totalAfter: rows.length - deleteIds.size };
+  return runPushSubscriptionCleanup('cron');
 }
 
 export async function GET(req: Request) {

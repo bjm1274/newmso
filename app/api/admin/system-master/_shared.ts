@@ -3,13 +3,12 @@
 import {
   getD1Binding,
   getD1Drizzle,
-  staff_members as staffMembersTable,
   push_subscriptions as pushSubscriptionsTable,
   backup_restore_runs as backupRestoreRunsTable,
   chat_push_jobs as chatPushJobsTable,
   desc,
-  isNotNull,
-  inArray } from '@/lib/db';
+  isNotNull } from '@/lib/db';
+import { runPushSubscriptionCleanup } from '@/lib/push-subscription-cleanup';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
 
@@ -418,98 +417,16 @@ export function buildPushFailureSummary(rows: PushFailureRow[]) {
     .sort((left, right) => right.count - left.count);
 }
 
-export function pickPreferredSubscription(rows: PushSubscriptionRow[]) {
-  return [...rows].sort((left, right) => {
-    const leftHasStaff = left.staff_id ? 1 : 0;
-    const rightHasStaff = right.staff_id ? 1 : 0;
-    if (leftHasStaff !== rightHasStaff) return rightHasStaff - leftHasStaff;
-    return String(right.id).localeCompare(String(left.id));
-  })[0];
-}
+/**
+ * 푸시 구독 정리는 lib/push-subscription-cleanup 정본으로 이관했다(8차 D12-008).
+ * 여기 있던 사본은 staff.status 를 조회하지 않아 **퇴사자 구독을 유지**했고,
+ * 같은 로직의 cron 판은 퇴사자를 삭제했다 — 관리도구로 정리한 직후 리포트 수치와
+ * 다음 날 03시 cron 이 돌고 난 뒤의 수치가 어긋나는 원인이었다.
+ */
+export { pickPreferredSubscription } from '@/lib/push-subscription-cleanup';
 
 export async function cleanupPushSubscriptionsInternal() {
-  const d1 = await getD1Binding();
-  if (!d1) throw new Error('[system-master] D1 binding not available (cleanupPushSubscriptionsInternal)');
-  const db = getD1Drizzle(d1);
-  const [subRows, staffRows] = await Promise.all([
-    db.select({
-      id: pushSubscriptionsTable.id,
-      staff_id: pushSubscriptionsTable.staff_id,
-      endpoint: pushSubscriptionsTable.endpoint }).from(pushSubscriptionsTable),
-    db.select({ id: staffMembersTable.id }).from(staffMembersTable),
-  ]);
-  const rows = subRows as PushSubscriptionRow[];
-  const validStaffIds = new Set(staffRows.map((row) => String(row.id || '')));
-
-  // 이하 공통 로직 — rows와 validStaffIds를 사용
-  const deleteIds = new Set<string>();
-  const validRows: PushSubscriptionRow[] = [];
-
-  let emptyEndpoint = 0;
-  let nullStaff = 0;
-  let orphanStaff = 0;
-
-  for (const row of rows) {
-    const endpoint = String(row.endpoint || '').trim();
-    const staffId = String(row.staff_id || '').trim();
-    if (!endpoint) {
-      emptyEndpoint += 1;
-      deleteIds.add(row.id);
-      continue;
-    }
-    if (!staffId) {
-      nullStaff += 1;
-      deleteIds.add(row.id);
-      continue;
-    }
-    if (!validStaffIds.has(staffId)) {
-      orphanStaff += 1;
-      deleteIds.add(row.id);
-      continue;
-    }
-    validRows.push({ ...row, endpoint, staff_id: staffId });
-  }
-
-  const endpointGroups = new Map<string, PushSubscriptionRow[]>();
-  for (const row of validRows) {
-    const key = String(row.endpoint || '');
-    const bucket = endpointGroups.get(key);
-    if (bucket) {
-      bucket.push(row);
-    } else {
-      endpointGroups.set(key, [row]);
-    }
-  }
-
-  let duplicateGroups = 0;
-  let duplicateRowsDeleted = 0;
-  for (const group of endpointGroups.values()) {
-    if (group.length <= 1) continue;
-    duplicateGroups += 1;
-    const keep = pickPreferredSubscription(group);
-    for (const row of group) {
-      if (row.id === keep.id) continue;
-      duplicateRowsDeleted += 1;
-      deleteIds.add(row.id);
-    }
-  }
-
-  const ids = Array.from(deleteIds);
-  const chunkSize = 200;
-  for (let index = 0; index < ids.length; index += chunkSize) {
-    const chunk = ids.slice(index, index + chunkSize);
-    await db.delete(pushSubscriptionsTable).where(inArray(pushSubscriptionsTable.id, chunk));
-  }
-
-  return {
-    totalBefore: rows.length,
-    deleted: ids.length,
-    emptyEndpoint,
-    nullStaff,
-    orphanStaff,
-    duplicateGroups,
-    duplicateRowsDeleted,
-    totalAfter: rows.length - ids.length };
+  return runPushSubscriptionCleanup('system-master');
 }
 
 export function buildPermissionChangeSummary(details: LooseRecord) {

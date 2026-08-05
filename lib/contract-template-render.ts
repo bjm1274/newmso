@@ -4,6 +4,7 @@ import {
   resolveWeeklyWorkingHours,
   resolveWorkingDaysPerWeek } from '@/lib/payroll-working-hours';
 import { buildShiftContractVariables } from '@/lib/contract-shift-rotation';
+import { resolveResidentBirthCentury } from '@/lib/resident-number';
 import {
   cleanOptionalText,
   getStaffContractEndDate,
@@ -104,13 +105,14 @@ function parseBirthFromResident(value?: unknown) {
   const yy = raw.slice(0, 2);
   const mm = raw.slice(2, 4);
   const dd = raw.slice(4, 6);
-  const genderCode = raw[6];
-  const century =
-    genderCode === '1' || genderCode === '2' || genderCode === '5' || genderCode === '6'
-      ? '19'
-      : '20';
+  // 8차 D04-011: 여기 사본은 1/2/5/6 만 1900 으로 보고 **나머지 전부** 2000 으로 단정했다.
+  // 실측: '990101-9######' → 이 사본 '2099년', 정본 '1899년'.
+  // 세기 판정만 SSOT 로 넘기고 표기 형식(월·일 원문 그대로)은 그대로 둔다 —
+  // 계약서는 주민번호 문자열을 사람이 읽는 형태로 옮겨 적는 자리라 날짜 유효성 보정이 목적이 아니다.
+  const century = resolveResidentBirthCentury(raw[6]);
+  if (century === null) return '';
 
-  return `${century}${yy}년 ${mm}월 ${dd}일`;
+  return `${String(century).slice(0, 2)}${yy}년 ${mm}월 ${dd}일`;
 }
 
 function formatResidentNo(value?: unknown) {
@@ -568,7 +570,9 @@ export function fillEmploymentContractTemplate(
 
   Object.entries(companyLineValues).forEach(([label, value]) => {
     if (!value) return;
-    const re = new RegExp(`(${label}\\s*:\\s*)(?:_{2 }|\\s{2 })(?=\\s|$)`, 'g');
+    // `{2,}` → `{2 }` 일괄 치환 사고(8차 D04-002)로 이 치환은 한 번도 동작한 적이 없다.
+    // 복원 실측: '회사명: ____ ' → 손상판 무변화 / 복원판 '회사명: (실제값) '.
+    const re = new RegExp(`(${label}\\s*:\\s*)(?:_{2,}|\\s{2,})(?=\\s|$)`, 'g');
     result = result.replace(re, `$1${value}`);
   });
 

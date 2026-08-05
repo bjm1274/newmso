@@ -21,7 +21,14 @@ import { useMemo, useState } from 'react';
 import type { ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
 import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
-import { leaveTypeLabel, normalizeLeaveType } from '@/lib/leave-type';
+import { normalizeLeaveType } from '@/lib/leave-type';
+import { getKoreanTodayString } from '@/lib/seoul-time';
+// 8차 D12-005: 이 화면만 행정팀 참조가 빠지고 meta.days 도 없었다 — 정본으로 통일.
+import {
+  LEAVE_APPROVAL_CC_DEPARTMENTS,
+  buildLeaveApprovalMeta,
+  buildLeaveApprovalTitle,
+  calcLeaveDays } from '@/lib/leave-submit';
 import MIcon from '../공통/MIcon';
 import {
   MFormHeader,
@@ -60,16 +67,17 @@ export default function 연차신청({
   const fieldId = useFieldIdPrefix('form-leave');
   const company = typeof user.company === 'string' ? user.company.trim() : '';
 
-  const today = useMemo(() => new Date(), []);
+  // 8차 D12-005: 기본 날짜가 디바이스 TZ(toLocaleDateString) 기준이라 결재탭(KST)과 달랐다.
+  const today = useMemo(() => getKoreanTodayString(), []);
   const [kind, setKind] = useState<LeaveKind>('연차');
-  const [start, setStart] = useState(today.toLocaleDateString('en-CA'));
-  const [end, setEnd] = useState(today.toLocaleDateString('en-CA'));
+  const [start, setStart] = useState(today);
+  const [end, setEnd] = useState(today);
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const approver = useApproverLine(staffId, company);
 
-  const days = useMemo(() => calcDays(start, end, kind), [start, end, kind]);
+  const days = useMemo(() => calcLeaveDays(start, end, normalizeLeaveType(kind)), [start, end, kind]);
   const remainingAfter = Math.max(0, data.remaining - days);
 
   const canSubmit =
@@ -126,8 +134,7 @@ export default function 연차신청({
     // 2) approvals 상신 — 선택된 결재선이 실제 효력을 갖도록 (연차신청폼.tsx와 동일)
     try {
       const senderName = String(user.name || '').trim() || staffName || '이름 없음';
-      const range = start === end ? start : `${start} ~ ${end}`;
-      const title = `${senderName} ${leaveTypeLabel(leaveTypeKey)} 신청 (${range})`;
+      const title = buildLeaveApprovalTitle(senderName, leaveTypeKey, start, end);
 
       const { queued: apprQueued } = await submitApprovalDraft({
         user,
@@ -139,13 +146,16 @@ export default function 연차신청({
         content: reason || '',
         approverLine: approver.approverLine,
         approverManual: approver.approverManual,
-        extraMeta: {
-          vType: leaveTypeKey,
-          leaveType: leaveTypeKey,
-          startDate: start,
-          endDate: end,
-          reason: reason || '',
-          leave_request_synced: leaveRequestInserted } });
+        // 예전에는 ccDepartments 가 아예 없어(기안상신 기본값 []) 행정팀 참조함에
+        // 이 경로로 낸 연차가 영원히 뜨지 않았다.
+        ccDepartments: [...LEAVE_APPROVAL_CC_DEPARTMENTS],
+        extraMeta: buildLeaveApprovalMeta({
+          leaveTypeKey,
+          start,
+          end,
+          days,
+          reason,
+          leaveRequestSynced: leaveRequestInserted }) });
 
       if (leaveQueued || apprQueued) {
         toast('오프라인 — 연차 신청이 동기화 대기 중입니다. 온라인 복귀 시 자동 전송됩니다.', 'warning');
@@ -309,14 +319,5 @@ export default function 연차신청({
   );
 }
 
-// 휴가 일수 계산 — 반차는 0.5, 그 외 inclusive 일수
-function calcDays(start: string, end: string, kind: LeaveKind): number {
-  if (kind === '반차') return 0.5;
-  if (!start || !end) return 0;
-  const s = new Date(start);
-  const e = new Date(end);
-  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return 0;
-  if (e < s) return 0;
-  const diff = Math.floor((e.getTime() - s.getTime()) / (24 * 3600 * 1000)) + 1;
-  return diff;
-}
+// 휴가 일수 계산은 lib/leave-submit.calcLeaveDays 정본으로 이관(8차 D12-005).
+// 여기 사본은 결재탭 연차신청폼.tsx 의 것과 글자 단위로 같았다.

@@ -14,12 +14,10 @@
  */
 
 import { useCallback, useState } from 'react';
-import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
 import type { ErpUser } from '@/types';
-import { buildApprovalSubmitPayload } from '@/lib/approval-submit-payload';
 import type { ApproverPick } from './결재선피커';
 import type { AttachmentEntry } from './AttachmentPicker';
-import { generateMobileDocNumber } from './data-hooks';
+import { submitApprovalDraft } from './기안상신';
 import { useApproverLine } from './useApproverLine';
 
 // ─────────────────────────────────────────────
@@ -54,6 +52,8 @@ export type SubmitApprovalParams = {
 export type SubmitApprovalResult = {
   /** 오프라인 큐 대기 여부 */
   queued: boolean;
+  /** 온라인 복귀 후 업로드될 첨부 수 */
+  queuedAttachments: number;
 };
 
 /** 업로드 완료된 첨부 shape — meta_data.attachments에 저장 */
@@ -82,17 +82,8 @@ export function useApprovalFormBase({ user, staffId, company }: ApprovalFormBase
     applyPick,
   } = useApproverLine(staffId, company);
 
-  // ── 첨부 파일 업로드 완료 항목 추출 ──
-  const buildUploadedAttachments = useCallback((): UploadedAttachment[] => {
-    return attachments
-      .filter((a) => a.state === 'done' && a.fileUrl)
-      .map((a) => ({
-        name: a.file.name,
-        url: a.fileUrl as string,
-        mimeType: a.file.type || null,
-        size: Number.isFinite(a.file.size) ? a.file.size : null,
-        uploadedAt: new Date().toISOString() }));
-  }, [attachments]);
+  // 첨부 완료 항목 추출은 submitApprovalDraft 안으로 들어갔다(8차 D12-006).
+  // 훅 밖 소비자가 없어 그대로 제거한다.
 
   // ── 결재선 피커 onApply 핸들러 ──
   const handleApproverApply = useCallback(
@@ -102,64 +93,42 @@ export function useApprovalFormBase({ user, staffId, company }: ApprovalFormBase
     [applyPick],
   );
 
-  // ── approvals insert (공통 패턴) ──
+  // ── approvals insert ──
+  // 8차 D12-006: doc_number 생성 → buildApprovalSubmitPayload → enqueueD1Mutation 파이프라인이
+  // 이 훅과 `기안상신.submitApprovalDraft` 에 병렬로 구현돼 있었고, 모바일 결재 6개 폼이
+  // 3:3 으로 갈려 두 경로를 타고 있었다. 그래서 상신 정책을 바꿀 때 한쪽 누락이
+  // 구조적으로 보장됐고 실제로 D12-005(행정팀 참조 누락)가 그 산물이었다.
+  //
+  // 두 판의 실측 차이는 네 가지였다.
+  //   ccDepartments   훅=파라미터 지원 / 함수=`[]` 고정        → 함수에 파라미터 추가(정본)
+  //   ccUsers         훅=파라미터    / 함수=extraMeta.cc_users → 함수가 둘 다 받도록
+  //   extraMeta.content 훅=미주입    / 함수=자동 주입          → 자동 주입으로 통일
+  //   첨부            훅=상태 기반   / 함수=인자               → 훅이 상태를 인자로 넘김
+  // 함수를 정본으로 승격한 이유: 소비자가 6개 폼 중 3개로 같지만, 함수는 훅이 아니어서
+  // React 컴포넌트 밖(인사탭 등)에서도 쓸 수 있어 커버 범위가 넓다.
   const submitApproval = useCallback(
     async (params: SubmitApprovalParams): Promise<SubmitApprovalResult> => {
       if (!staffId) {
         throw new Error('계정 정보를 확인할 수 없습니다.');
       }
 
-      const senderName = String(user.name || '').trim() || '이름 없음';
-      const senderDepartment = String(user.department || '').trim();
-      const senderCompany = company;
-
-      // doc_number — 회사·일자 시퀀스 생성 (실패 시 silent fallback)
-      const docNumber = await generateMobileDocNumber({
-        formSlug: params.formSlug,
-        typeName: params.formDisplayName,
-        companyName: senderCompany || null,
-        companyId: user.company_id != null ? String(user.company_id) : null,
-        departmentName: senderDepartment || null,
-        userPermissions:
-          (user as unknown as { permissions?: Record<string, unknown> }).permissions ?? null });
-
-      // 첨부 — PC와 동일하게 meta_data.attachments(정본 shape: name/url/mimeType/size)에 기록.
-      // 업로드 완료(done)된 항목만 저장. 오프라인 대기(queued)는 URL 미정이라 제외.
-      const uploadedAttachments = buildUploadedAttachments();
-
-      const { row } = buildApprovalSubmitPayload({
+      return submitApprovalDraft({
+        user,
         staffId,
-        senderName,
-        senderCompany,
-        senderDepartment: senderDepartment || null,
-        companyId: user.company_id ?? null,
+        company,
+        formSlug: params.formSlug,
+        formName: params.formDisplayName,
         typeName: params.typeName,
         title: params.title,
         content: params.content,
-        formSlug: params.formSlug,
-        formDisplayName: params.formDisplayName,
         approverLine,
-        approverLineSource: approverManual ? 'mobile_manual' : 'mobile_auto',
-        docNumber,
+        approverManual,
+        attachments,
         ccDepartments: params.ccDepartments ?? [],
         ccUsers: params.ccUsers ?? [],
-        extraMeta: {
-          client_origin: 'mobile',
-          ...params.extraMeta,
-        },
-        attachments: uploadedAttachments,
-        historyNote: '모바일 최초 상신',
-      });
-
-      const { queued, error } = await enqueueD1Mutation({
-        kind: 'insert',
-        table: 'approvals',
-        payload: row });
-      if (error) throw new Error(error);
-
-      return { queued };
+        extraMeta: params.extraMeta ?? {} });
     },
-    [staffId, approverLine, approverManual, user, company, buildUploadedAttachments],
+    [staffId, approverLine, approverManual, user, company, attachments],
   );
 
   return {
@@ -176,7 +145,6 @@ export function useApprovalFormBase({ user, staffId, company }: ApprovalFormBase
     setPickerOpen,
 
     // ── 파생/헬퍼 ──
-    buildUploadedAttachments,
     handleApproverApply,
     submitApproval,
 

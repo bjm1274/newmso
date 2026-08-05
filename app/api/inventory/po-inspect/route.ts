@@ -27,6 +27,7 @@ import {
   poLineName as lineName,
   poLineOrderedQty as lineOrderedQty,
   poLineReceivedQty as lineReceivedQty,
+  buildPurchaseOrderReceivedItems,
 } from '@/lib/inventory-po-items';
 
 export const dynamic = 'force-dynamic';
@@ -211,14 +212,9 @@ export async function POST(request: Request) {
     const prevRejected = Math.max(0, Math.trunc(Number(po.rejected_qty ?? 0) || 0));
     const totalReceivedQty = poItems.reduce((sum, it) => sum + lineReceivedQty(it), 0);
 
-    const received_items = poItems.map((it) => ({
-      name: lineName(it),
-      ordered: lineOrderedQty(it),
-      received: lineReceivedQty(it),
-      remaining: Math.max(0, lineOrderedQty(it) - lineReceivedQty(it)),
-      rejected: Math.max(0, Math.trunc(Number(it.rejected_qty ?? 0) || 0)),
-      item_id: it.item_id || it.inventory_id || null,
-    }));
+    // 8차 D12-003: 스냅샷 빌더를 lib 로 통합 — po-receive 사본이 rejected 를 빠뜨려
+    // 검수 뒤 추가 입고가 들어오면 반품 이력이 지워졌다.
+    const received_items = buildPurchaseOrderReceivedItems(poItems);
 
     // 전량 반품이면 상태를 배송/승인 계열로 되돌리지 않고 검수 불합격만 기록
     // received_qty 는 실입고 잔여

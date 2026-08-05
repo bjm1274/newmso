@@ -39,7 +39,9 @@ const CLOSING_LINE_PATTERNS: RegExp[] = [
   // 서명/날인
   /^서\s*명\s*또는\s*날인\s*[:：]?/,
   /^서\s*명\s*\/\s*날인\s*[:：]?/,
-  /^서\s*명\s*[:：]?\s*_{3 }/,
+  // 수량자 `{3,}` 의 콤마가 공백으로 바뀐 일괄 치환 사고(8차 D04-002)로 `{3 }` 는
+  // 수량자가 아니라 리터럴 "{3 }" 로 해석돼 밑줄 서명란을 한 번도 매칭하지 못했다.
+  /^서\s*명\s*[:：]?\s*_{3,}/,
   /^날\s*인\s*[:：]?/,
   /^서명\s*\(인\)/,
   // 교부 확인 / 안내
@@ -64,7 +66,7 @@ const CLOSING_LINE_PATTERNS: RegExp[] = [
 function isClosingLine(line: string): boolean {
   const t = line.trim();
   if (!t) return false;
-  if (/^_{3 }$/.test(t)) return true;
+  if (/^_{3,}$/.test(t)) return true;
   return CLOSING_LINE_PATTERNS.some((re) => re.test(t));
 }
 
@@ -146,7 +148,7 @@ export function stripContractClosingLines(text: string): StripClosingResult {
     let cutoff = Math.min(...cutoffCandidates);
     while (cutoff > 0 && !lines[cutoff - 1].trim()) cutoff--;
     return {
-      mainText: lines.slice(0, cutoff).join('\n').replace(/\n{3 }/g, '\n\n').trimEnd(),
+      mainText: lines.slice(0, cutoff).join('\n').replace(/\n{3,}/g, '\n\n').trimEnd(),
       hasClosing: true };
   }
 
@@ -166,7 +168,7 @@ export function stripContractClosingLines(text: string): StripClosingResult {
   }
 
   return {
-    mainText: lines.slice(0, cutoff).join('\n').replace(/\n{3 }/g, '\n\n').trimEnd(),
+    mainText: lines.slice(0, cutoff).join('\n').replace(/\n{3,}/g, '\n\n').trimEnd(),
     hasClosing: cutoff < lines.length };
 }
 

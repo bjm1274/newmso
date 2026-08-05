@@ -16,6 +16,15 @@ import {
   type ChatRoomRow,
   type StaffRow } from '../_shared';
 
+/**
+ * SQLite LIKE 패턴 이스케이프. `ESCAPE '\'` 절과 반드시 함께 써야 한다.
+ * 백슬래시 자신을 먼저 이스케이프하지 않으면 `\` 가 든 검색어가 뒤이어 붙는
+ * 이스케이프를 삼켜 버린다.
+ */
+function escapeLikePattern(raw: string): string {
+  return String(raw ?? '').replace(/[\\%_]/g, '\\$&');
+}
+
 export async function handleChats(
   request: NextRequest,
   staffMap: Map<string, StaffRow>,
@@ -53,7 +62,14 @@ export async function handleChats(
   const msgConditions: ReturnType<typeof and>[] = [];
   if (roomId) msgConditions.push(eq(messagesTable.room_id, roomId));
   // D1은 ilike 미지원 — like로 대체 (대소문자 무관 SQLite LIKE)
-  if (keyword) msgConditions.push(sql`lower(${messagesTable.content}) like lower(${'%' + keyword + '%'})`);
+  // 8차 D06-014: keyword 는 이스케이프가 아예 없어서 사용자가 넣은 `%`/`_` 가 와일드카드로
+  // 동작했고, bannedWords 는 `\` 를 붙이면서도 ESCAPE 절이 없어 백슬래시가 리터럴로 남아
+  // 오히려 매칭을 깨뜨렸다. 두 경로 모두 같은 이스케이프 + ESCAPE 절을 쓴다.
+  if (keyword) {
+    msgConditions.push(
+      sql`lower(${messagesTable.content}) like lower(${'%' + escapeLikePattern(keyword) + '%'}) escape '\\'`,
+    );
+  }
   if (msgConditions.length > 0) msgQuery = msgQuery.where(and(...msgConditions));
   msgQuery = msgQuery.orderBy(desc(messagesTable.created_at)).limit(chatLimit);
 
@@ -62,7 +78,8 @@ export async function handleChats(
   if (bannedWords.length > 0) {
     // SQLite LIKE OR 조건을 sql 태그로 조합
     const likeConditions = bannedWords.map(
-      (word) => sql`lower(${messagesTable.content}) like lower(${'%' + word.replace(/[%_]/g, '\\$&') + '%'})`
+      (word) =>
+        sql`lower(${messagesTable.content}) like lower(${'%' + escapeLikePattern(word) + '%'}) escape '\\'`,
     );
     const orExpr = likeConditions.length === 1
       ? likeConditions[0]

@@ -96,7 +96,12 @@ export function stripHiddenMetaBlocks(value: unknown) {
     .replace(/\[\[BOARD_META\]\][\s\S]*?\[\[\/BOARD_META\]\]/g, '')
     .replace(/\[\[WARD_MESSAGE_META\]\][\s\S]*?\[\[\/WARD_MESSAGE_META\]\]/g, '')
     .replace(/\[\[(?:SCHEDULE_META|BOARD_META|WARD_MESSAGE_META)\]\][\s\S]*$/g, '')
-    .replace(/\s{2 }/g, ' ')
+    // `{2,}` → `{2 }` 일괄 치환 사고(8차 D04-002)로 이 압축은 무동작이었다.
+    // 다만 원형 `\s{2,}` 를 그대로 복원하면 개행까지 공백 하나로 뭉개진다 —
+    // 소비처 중 buildWardMessageContent(patient-check-helpers.ts:57) 가 사용자가
+    // 여러 줄로 입력한 병동 요청 메시지를 넘기므로 줄바꿈이 사라진다.
+    // 그래서 수량자만 되살리고 대상은 '가로 공백'으로 좁힌다(줄 구조 보존).
+    .replace(/[^\S\r\n]{2,}/g, ' ')
     .trim();
 }
 

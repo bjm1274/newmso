@@ -15,6 +15,7 @@ import {
   resolveWeeklyWorkingHours } from '@/lib/payroll-working-hours';
 import {
   calculateEmployeeInsuranceDeductions } from '@/lib/payroll-insurance-rates';
+import { buildPayrollDeductionRows } from '@/lib/payroll-slip-rows';
 
 function toNumber(value: unknown) {
   const numeric = Number(value);
@@ -493,17 +494,18 @@ export default function SalaryDetail({
 
   // 근태공제·기타공제·선지급 차감은 어느 화면에도 안 나와 좌우 합계가 맞지 않았다.
   // 아래 행들의 합이 곧 calc.totalDeduction 이고, 지급총액 − 이 합 = 실지급액 이 된다.
-  const deductionRows = [
-    { label: '국민연금', value: calc.pension },
-    { label: '건강보험', value: calc.health },
-    { label: '장기요양보험', value: calc.longTerm },
-    { label: '고용보험', value: calc.employment },
-    { label: '소득세', value: calc.incomeTax },
-    { label: '지방소득세', value: calc.localTax },
-    { label: '근태공제', value: calc.attendanceDeduction },
-    { label: '기타 공제', value: calc.customDeduction },
-    { label: '선지급 차감', value: calc.advancePay },
-  ].filter((row) => row.value > 0);
+  // 8차 D12-007: 항목·라벨·순서·필터 규칙은 lib/payroll-slip-rows 정본에 있다 —
+  // 모바일 명세서(모바일명세서.tsx)와 같은 표를 보여줘야 하기 때문이다.
+  const deductionRows = buildPayrollDeductionRows({
+    pension: calc.pension,
+    health: calc.health,
+    longTerm: calc.longTerm,
+    employment: calc.employment,
+    incomeTax: calc.incomeTax,
+    localTax: calc.localTax,
+    attendanceDeduction: calc.attendanceDeduction,
+    customDeduction: calc.customDeduction,
+    advancePay: calc.advancePay });
 
   const paymentSlipRows = [
     ...paymentRows.map((row) => ({ ...row, isTaxFree: false })),

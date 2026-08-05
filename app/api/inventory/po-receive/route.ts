@@ -24,6 +24,7 @@ import {
   poLineName as lineName,
   poLineOrderedQty as lineOrderedQty,
   poLineReceivedQty as lineReceivedQty,
+  buildPurchaseOrderReceivedItems,
 } from '@/lib/inventory-po-items';
 
 export const dynamic = 'force-dynamic';
@@ -279,13 +280,9 @@ export async function POST(request: Request) {
         return o <= 0 || lineReceivedQty(it) >= o;
       });
 
-    const received_items = poItems.map((it) => ({
-      name: lineName(it),
-      ordered: lineOrderedQty(it),
-      received: lineReceivedQty(it),
-      remaining: Math.max(0, lineOrderedQty(it) - lineReceivedQty(it)),
-      item_id: it.item_id || it.inventory_id || null,
-    }));
+    // 8차 D12-003: 여기 사본만 `rejected` 필드가 없어서, 검수(po-inspect)가 기록해 둔
+    // 반품 수량이 이후 추가 입고 한 번으로 스냅샷에서 사라졌다. 빌더를 lib 로 통합한다.
+    const received_items = buildPurchaseOrderReceivedItems(poItems);
 
     let nextStatus = status;
     if (allComplete) {

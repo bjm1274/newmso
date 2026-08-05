@@ -24,7 +24,7 @@ import {
   calculateHourlyRateFromMonthlySalary,
   resolveWeeklyWorkingHours } from '@/lib/payroll-working-hours';
 import { calcStatutoryDeductions } from '@/lib/payroll-deductions';
-import { getPayrollInsuranceSettings, resolvePayrollAsOfDate, hasAnyEmployeePayrollInsurance } from '@/lib/payroll-insurance-settings';
+import { getPayrollInsuranceSettings, resolvePayrollAsOfDate, hasAnyEmployeePayrollInsurance, isDuruNuriActiveForYearMonth } from '@/lib/payroll-insurance-settings';
 import { NIGHT_DUTY_TAX_FREE_LIMIT } from '@/lib/tax-free-limits';
 import { NP_INCOME_CEILING, NP_INCOME_FLOOR } from '@/lib/tax-free-limits';
 import SmartDatePicker from '../../공통/SmartDatePicker';
@@ -541,13 +541,18 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
     const applyTax = resolvedIns.incomeTax;
     const isMedicalBenefit = Boolean(staff.permissions?.is_medical_benefit) || false;
 
-    let isDuruNuriActive = Boolean(insuranceSettings.duru_nuri) || false;
-    if (isDuruNuriActive && insuranceSettings.duru_nuri_start && insuranceSettings.duru_nuri_end) {
-      const current = settlementDate.slice(0, 7);
-      isDuruNuriActive =
-        current >= String(insuranceSettings.duru_nuri_start) &&
-        current <= String(insuranceSettings.duru_nuri_end);
-    }
+    // 8차 D04-014: 두루누리 판정이 이 화면과 급여정산에 인라인 사본으로 있었고
+    // 정본 isDuruNuriActiveForYearMonth 는 호출처 0건의 데드코드였다.
+    // 인라인 사본과의 실측 차이 — (1) 시작·종료월이 **둘 다** 있어야 기간을 봤으므로
+    // 종료월을 비워 두면 무기한 적용, (2) 36개월 지원 상한 미집행,
+    // (3) 월 보수 270만원 초과 시 자격 상실 미집행.
+    // 정본을 택한다: 세 조건 모두 두루누리 제도의 법정 요건이고, 인라인 사본은
+    // 그중 어느 것도 집행하지 않아 지원금이 과다 계상돼 왔다.
+    const isDuruNuriActive = isDuruNuriActiveForYearMonth(
+      resolvedIns,
+      settlementDate.slice(0, 7),
+      totalTaxable,
+    );
 
     const hasExactWithholdingTable = hasExactIncomeTaxBracket(taxInsuranceRates);
     const deductions = calcStatutoryDeductions(totalTaxable, taxInsuranceRates, {

@@ -20,6 +20,7 @@
 import { sql, eq, desc } from 'drizzle-orm';
 import type { D1Client } from '../client-d1';
 import { chat_rooms, messages } from '../schema';
+import { buildChatRoomPreview } from '@/lib/chat-room-preview';
 
 /**
  * update_chat_room_last_message 트리거 대체.
@@ -40,8 +41,9 @@ export async function updateChatRoomLastMessage(
 ): Promise<void> {
   const contentText = (args.content && args.content.trim() !== '') ? args.content : null;
   const fileNameText = (args.file_name && args.file_name.trim() !== '') ? args.file_name : null;
-  const previewSrc = contentText || fileNameText || '(파일)';
-  const preview = String(previewSrc).slice(0, 80);
+  // 8차 D06-015: 미리보기 문구가 여기('(파일)')·refresh 판('(file)')·클라이언트 판('파일')
+  // 세 갈래였다. 같은 목록 셀에 보이는 값이라 정본 하나로 모은다.
+  const preview = buildChatRoomPreview({ content: contentText, file_name: fileNameText });
   await db
     .update(chat_rooms)
     .set({
@@ -71,6 +73,7 @@ export async function refreshChatRoomLastMessage(
       created_at: messages.created_at,
       content: messages.content,
       file_name: messages.file_name,
+      file_url: messages.file_url,
       is_deleted: messages.is_deleted })
     .from(messages)
     .where(eq(messages.room_id, roomId))
@@ -90,25 +93,11 @@ export async function refreshChatRoomLastMessage(
     return;
   }
 
-  const deleted =
-    Number(latest.is_deleted ?? 0) === 1 ||
-    (typeof latest.content === 'string' &&
-      (latest.content.trim() === '삭제된 메시지입니다.' ||
-        latest.content.trim().startsWith('삭제된 메시지')));
-
-  let preview: string;
-  if (deleted) {
-    preview = '삭제된 메시지입니다.';
-  } else {
-    let previewSrc =
-      (latest.content && latest.content.trim() !== '' && latest.content) ||
-      (latest.file_name && latest.file_name.trim() !== '' && latest.file_name) ||
-      '(file)';
-    if (String(previewSrc).startsWith('file://') || String(previewSrc).startsWith('blob:')) {
-      previewSrc = latest.file_name || '파일';
-    }
-    preview = String(previewSrc).slice(0, 80);
-  }
+  // 8차 D06-015: 미리보기 규칙을 lib/chat-room-preview 정본으로 통합.
+  // 여기 있던 판은 파일만 있는 메시지를 '(file)' 이라는 영어 자리표시자로 남겼는데,
+  // 같은 컬럼을 나중에 덮어쓰던 클라이언트 사본은 '파일'/'메시지' 로 썼다.
+  // 삭제 경로에서 실제 저장값이 클라이언트 규칙이었으므로 그쪽을 정본으로 채택했다.
+  const preview = buildChatRoomPreview(latest);
 
   await db
     .update(chat_rooms)

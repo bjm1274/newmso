@@ -136,6 +136,10 @@ export function useChatRoomsForMobile(
   // refresh identity가 바뀌어 목록 전체 재조회·재정렬이 일어난다.
   const activeRoomIdRef = useRef(activeRoomId ?? null);
   activeRoomIdRef.current = activeRoomId ?? null;
+  // 8차 D06-010: 커서가 없는 방의 implicit 기준선. PC(메신저방데이터훅)는 갖고 있었고
+  // 모바일에는 없어서, 한 번도 열지 않은 방(특히 공지방)의 전 히스토리가 안읽음으로 잡혔다.
+  // 기준선은 '처음 본 시점' 값으로 고정돼야 하므로 폴링 간에 살아남는 ref 에 둔다.
+  const implicitUnreadBaselineRef = useRef<Record<string, string | null>>({});
 
   const refresh = useCallback(async (options?: { force?: boolean }) => {
     const currentUserId = userIdRef.current;
@@ -179,7 +183,8 @@ export function useChatRoomsForMobile(
         counts = await fetchChatUnreadCountsByRoom(db, {
           rooms: visible,
           userId: currentUserId,
-          activeRoomId: activeRoomIdRef.current });
+          activeRoomId: activeRoomIdRef.current,
+          implicitBaselineStore: implicitUnreadBaselineRef.current });
       } catch {
         counts = {};
       }

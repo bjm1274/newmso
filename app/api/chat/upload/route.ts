@@ -11,7 +11,10 @@ import {
   CHAT_MAX_IMAGE_SIZE_BYTES as MAX_IMAGE_SIZE_BYTES,
   CHAT_MAX_FILE_SIZE_LABEL as MAX_FILE_SIZE_LABEL,
 } from '@/lib/chat-upload-constants';
-import { DEFAULT_CONTENT_TYPE, normalizeUploadMimeType } from '@/lib/upload-mime';
+import {
+  DEFAULT_CONTENT_TYPE,
+  normalizeUploadFileName,
+  normalizeUploadMimeType } from '@/lib/upload-mime';
 import { getD1Binding, getD1Drizzle } from '@/lib/db';
 import { assertChatRoomMember } from '@/lib/chat-room-membership';
 
@@ -44,38 +47,9 @@ type UploadPlanResponse = {
   headers: Record<string, string>;
 };
 
-function guessFileExtension(fileName: string, mimeType: string): string {
-  const rawName = String(fileName || '').trim();
-  const lastDotIndex = rawName.lastIndexOf('.');
-  if (lastDotIndex > -1 && lastDotIndex < rawName.length - 1) {
-    return rawName.slice(lastDotIndex + 1).toLowerCase();
-  }
-
-  if (mimeType.startsWith('image/')) return mimeType.split('/')[1] || 'png';
-  if (mimeType.startsWith('video/')) return mimeType.split('/')[1] || 'mp4';
-  if (mimeType === 'application/pdf') return 'pdf';
-  if (mimeType === 'text/plain') return 'txt';
-  return 'bin';
-}
-
-function buildFallbackFileName(mimeType: string, ext: string): string {
-  if (mimeType.startsWith('image/')) return `image.${ext}`;
-  if (mimeType.startsWith('video/')) return `video.${ext}`;
-  if (mimeType === 'application/pdf') return `document.${ext}`;
-  return `attachment.${ext}`;
-}
-
-function normalizeUploadFileName(fileName: string, mimeType: string): string {
-  const ext = guessFileExtension(fileName, mimeType);
-  const rawName = String(fileName || '').trim() || buildFallbackFileName(mimeType, ext);
-  const withoutPath = rawName.split(/[/\\]/).pop() || rawName;
-  const sanitized = withoutPath
-    .replace(/[ -<>:"/\\|?*]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  return sanitized || buildFallbackFileName(mimeType, ext);
-}
+// 파일명 정규화·확장자 추정은 lib/upload-mime 정본으로 이관했다(8차 D07-013·D12-011).
+// 여기 있던 사본은 문자클래스가 `[ -<>…]`(0x20~0x3C 범위)라 숫자·점·하이픈을 지우고
+// 제어문자는 통과시켰다 — '결산 2026-07.pdf' 가 '결산 pdf' 가 됐다.
 
 function buildSafeFilePath(fileName: string, mimeType: string): string {
   return buildChatAttachmentObjectKey(normalizeUploadFileName(fileName, mimeType), mimeType);
