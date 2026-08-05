@@ -33,6 +33,14 @@ const PAD = (v: string | number, len: number) => String(v).padStart(len, '0');
 const COMMA_NUM = (v: number) => Math.round(v).toLocaleString('ko-KR');
 
 /**
+ * CSV 셀 이스케이프.
+ * 금액은 ko-KR 천단위 구분 쉼표를 그대로 쓰기 때문에 따옴표로 감싸지 않으면
+ * "3,100,000" 이 3개 열로 쪼개져 열이 통째로 밀린다(성명·부서에 쉼표가 있어도 동일).
+ * 열 수를 헤더와 맞추려면 모든 셀을 이 함수로 내보내야 한다.
+ */
+const CSV_CELL = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+
+/**
  * 국세청 홈택스 원천세 전자신고 TXT 생성
  * C레코드 포맷: 간이세액 신고용
  */
@@ -148,10 +156,15 @@ export function generateExcelCsv(
   const [year, month] = yearMonth.split('-');
   const lines: string[] = [];
 
-  lines.push(`${company.companyName} ${year}년 ${month}월 급여대장`);
+  lines.push(CSV_CELL(`${company.companyName} ${year}년 ${month}월 급여대장`));
   lines.push('');
   lines.push(
-    '번호,성명,부서,직위,기본급,과세총액,비과세,소득세,지방세,국민연금,건강보험,장기요양,고용보험,공제합계,차인지급액',
+    [
+      '번호', '성명', '부서', '직위', '기본급', '과세총액', '비과세', '소득세', '지방세',
+      '국민연금', '건강보험', '장기요양', '고용보험', '공제합계', '차인지급액',
+    ]
+      .map(CSV_CELL)
+      .join(','),
   );
 
   rows.forEach((row, i) => {
@@ -172,15 +185,39 @@ export function generateExcelCsv(
         COMMA_NUM(row.employmentInsurance),
         COMMA_NUM(row.totalDeduction),
         COMMA_NUM(row.netPay),
-      ].join(','),
+      ]
+        .map(CSV_CELL)
+        .join(','),
     );
   });
 
   // 합계행
+  // 헤더/데이터행과 동일한 15열이어야 한다. 과거에는 `,합계,` 뒤에 값을 붙여
+  // 앞 공백이 3칸(번호·성명·부서)뿐이라 '직위' 열이 빠진 14열이 되었고,
+  // 기본급 합계가 직위 칸에 들어가는 식으로 합계가 전부 한 칸씩 왼쪽으로 밀렸다.
+  // 실수를 반복하지 않도록 데이터행과 같은 배열 join 방식으로 맞춘다.
   const sum = (key: keyof PayrollExportRow) =>
     COMMA_NUM(rows.reduce((s, r) => s + (Number(r[key]) || 0), 0));
   lines.push(
-    `,합계,,${sum('baseSalary')},${sum('totalTaxable')},${sum('totalTaxfree')},${sum('incomeTax')},${sum('localTax')},${sum('nationalPension')},${sum('healthInsurance')},${sum('longTermCare')},${sum('employmentInsurance')},${sum('totalDeduction')},${sum('netPay')}`,
+    [
+      '', // 번호
+      '합계', // 성명
+      '', // 부서
+      '', // 직위
+      sum('baseSalary'),
+      sum('totalTaxable'),
+      sum('totalTaxfree'),
+      sum('incomeTax'),
+      sum('localTax'),
+      sum('nationalPension'),
+      sum('healthInsurance'),
+      sum('longTermCare'),
+      sum('employmentInsurance'),
+      sum('totalDeduction'),
+      sum('netPay'),
+    ]
+      .map(CSV_CELL)
+      .join(','),
   );
 
   return '\uFEFF' + lines.join('\r\n'); // BOM for Excel

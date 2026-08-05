@@ -60,6 +60,7 @@ type SalaryRecord = {
   local_tax?: number;
   net_pay?: number;
   advance_pay?: number;
+  attendance_deduction?: number;
   deduction_detail?: Record<string, unknown> | string;
 };
 
@@ -83,15 +84,38 @@ function formatYearMonthLabel(yearMonth: string): string {
 
 type AmountRow = { label: string; value: number; isTaxFree?: boolean };
 
-function buildDeductionRows(record: SalaryRecord): AmountRow[] {
-  return [
+/**
+ * 저장된 total_deduction 은 (법정공제 6종 + custom_deduction) 뿐이다(급여정산.tsx 의 deduction 정의).
+ * 근태공제는 total_taxable 에서 이미 차감돼 있고 선지급은 net_pay 에서만 따로 빠지므로,
+ * 이 둘이 total_deduction 에 없어 "지급총액 − 공제총액 = 실지급액" 이 성립하지 않았다.
+ * 그래서 표시용 공제 합계는 저장된 total_deduction 이 아니라 아래 행들의 합으로 계산한다.
+ * (A4 명세서 급여상세.tsx 의 deductionRows 와 항목·라벨을 일치시킨다.)
+ */
+function buildDeductionRows(record: SalaryRecord, deductionDetail: Record<string, unknown>): AmountRow[] {
+  const statutoryRows = [
     { label: '국민연금', value: Number(record.national_pension || 0) },
     { label: '건강보험', value: Number(record.health_insurance || 0) },
     { label: '장기요양보험', value: Number(record.long_term_care || 0) },
     { label: '고용보험', value: Number(record.employment_insurance || 0) },
     { label: '소득세', value: Number(record.income_tax || 0) },
     { label: '지방소득세', value: Number(record.local_tax || 0) },
-    { label: '가불금', value: Number(record.advance_pay || 0) },
+  ];
+  const statutoryTotal = statutoryRows.reduce((acc, row) => acc + row.value, 0);
+
+  // deduction_detail 이 비어 있는 레코드도 기타공제가 증발하지 않도록
+  // 저장된 total_deduction 에서 법정공제를 뺀 잔액으로 보정한다.
+  const customDeduction =
+    deductionDetail?.custom_deduction != null
+      ? Number(deductionDetail.custom_deduction) || 0
+      : Math.max(0, Number(record.total_deduction || 0) - statutoryTotal);
+
+  return [
+    ...statutoryRows,
+    { label: '근태공제', value: Number(record.attendance_deduction || 0) },
+    { label: '기타 공제', value: customDeduction },
+    // 라벨을 '가불금'에서 '선지급 차감'으로 바꾼다. advance_pay 는 지급액이 아니라
+    // net_pay 에서 빼는 차감액이다(급여정산.tsx 의 getAdvanceAdjustedNet).
+    { label: '선지급 차감', value: Number(record.advance_pay || 0) },
   ].filter((row) => row.value > 0);
 }
 
@@ -188,11 +212,21 @@ export default function MobileSalarySlip({
     return rows.filter((row) => row.isTaxFree || row.value > 0);
   }, [record, taxableAllowanceBreakdown, resolvedAgreedOvertime, resolvedAgreedNight]);
 
-  const deductionRows = useMemo(() => (record ? buildDeductionRows(record) : []), [record]);
+  const deductionRows = useMemo(
+    () => (record ? buildDeductionRows(record, deductionDetail) : []),
+    [record, deductionDetail],
+  );
   const totalPayment = useMemo(() => {
-    // Sum only taxable and non-taxable values that are > 0
-    return paymentRows.reduce((acc, row) => acc + row.value, 0);
-  }, [paymentRows]);
+    if (!record) return 0;
+    // 지급행은 기본급 '원액'을 보여주는데 저장된 total_taxable 은 근태공제가 이미 빠진 값이라
+    // 둘이 어긋났다. 근태공제를 지급총액에 되살리고, 공제 항목으로 따로 표시해서 맞춘다.
+    const gross =
+      Number(record.total_taxable || 0) +
+      Number(record.total_taxfree || 0) +
+      Number(record.attendance_deduction || 0);
+    // total_taxable 이 비어 있는 옛 레코드는 지급행 합계로 폴백한다.
+    return gross > 0 ? gross : paymentRows.reduce((acc, row) => acc + row.value, 0);
+  }, [record, paymentRows]);
   const totalDeduction = useMemo(
     () => deductionRows.reduce((acc, row) => acc + row.value, 0),
     [deductionRows],

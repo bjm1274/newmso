@@ -139,6 +139,7 @@ interface SalaryRecord {
   local_tax?: number;
   net_pay?: number;
   advance_pay?: number;
+  attendance_deduction?: number;
 }
 
 interface StaffInfo {
@@ -253,24 +254,49 @@ export default function SalaryDetail({
       const incomeTax = toNumber(detail.income_tax ?? record.income_tax);
       const insuranceFallback = calculateEmployeeInsuranceDeductions(totalTaxable, 30, targetYearMonth, nationalAmount, joinedAt);
 
+      const pension = toNumber(
+        detail.national_pension ?? record.national_pension ?? insuranceFallback.nationalPension,
+      );
+      const health = toNumber(
+        detail.health_insurance ?? record.health_insurance ?? insuranceFallback.healthInsurance,
+      );
+      const longTerm = toNumber(detail.long_term_care ?? record.long_term_care ?? insuranceFallback.longTermCare);
+      const employment = toNumber(
+        detail.employment_insurance ??
+          record.employment_insurance ??
+          insuranceFallback.employmentInsurance,
+      );
+      const localTax = toNumber(detail.local_tax ?? record.local_tax);
+      const statutoryTotal = pension + health + longTerm + employment + incomeTax + localTax;
+
+      // 저장된 total_deduction 은 (법정공제 6종 + custom_deduction) 뿐이다(급여정산.tsx 의 deduction 정의).
+      // 근태공제는 total_taxable 에서 이미 차감돼 있고, 선지급은 net_pay 에서만 따로 빠지기 때문에
+      // 둘 다 total_deduction 에 없고, 그래서 "지급총액 − 공제총액 = 실지급액" 이 깨져 있었다.
+      // 표시 계층에서만 아래처럼 맞춘다(저장 값 net_pay/total_deduction 은 그대로 둔다).
+      //   지급총액 = total_taxable + total_taxfree + 근태공제  ← 지급행이 기본급 '원액'을 보여주므로 되살린다
+      //   공제총액 = 법정공제 + 기타공제 + 근태공제 + 선지급차감
+      const attendanceDeduction = toNumber(record.attendance_deduction);
+      const advancePay = toNumber(record.advance_pay);
+
+      // 워크센터 급여대장처럼 deduction_detail 을 조회하지 않는 경로에서도 기타공제가 증발하지 않도록,
+      // detail 이 없으면 저장된 total_deduction 에서 법정공제를 뺀 잔액으로 보정한다.
+      const customDeduction =
+        detail.custom_deduction != null
+          ? toNumber(detail.custom_deduction)
+          : Math.max(0, toNumber(record.total_deduction) - statutoryTotal);
+
       return {
-        totalPayment: totalTaxable + totalTaxfree,
-        totalDeduction: toNumber(record.total_deduction),
-        pension: toNumber(
-          detail.national_pension ?? record.national_pension ?? insuranceFallback.nationalPension,
-        ),
-        health: toNumber(
-          detail.health_insurance ?? record.health_insurance ?? insuranceFallback.healthInsurance,
-        ),
-        longTerm: toNumber(detail.long_term_care ?? record.long_term_care ?? insuranceFallback.longTermCare),
-        employment: toNumber(
-          detail.employment_insurance ??
-            record.employment_insurance ??
-            insuranceFallback.employmentInsurance,
-        ),
+        totalPayment: totalTaxable + totalTaxfree + attendanceDeduction,
+        totalDeduction: statutoryTotal + customDeduction + attendanceDeduction + advancePay,
+        pension,
+        health,
+        longTerm,
+        employment,
         incomeTax,
-        localTax: toNumber(detail.local_tax ?? record.local_tax),
-        customDeduction: toNumber(detail.custom_deduction),
+        localTax,
+        customDeduction,
+        attendanceDeduction,
+        advancePay,
         net: toNumber(record.net_pay) };
     }
 
@@ -305,6 +331,9 @@ export default function SalaryDetail({
       incomeTax,
       localTax,
       customDeduction: 0,
+      // 확정 대장이 없는 미리보기에는 근태공제·선지급 개념 자체가 없다.
+      attendanceDeduction: 0,
+      advancePay: 0,
       net: taxable + taxfree - totalDeduction };
   }, [data, deductionDetail, record]);
 
@@ -315,8 +344,11 @@ export default function SalaryDetail({
   const yearMonth = String(data.year_month || getKoreanMonthString());
   const [year, month] = yearMonth.split('-');
   const monthLabel = `${year}년 ${Number(month || '1')}월`;
-  const advancePayAmount = toNumber(record?.advance_pay);
-  const isAdvancePay = advancePayAmount > 0;
+  // advance_pay 는 '가불 전용 명세서' 표식이 아니라 선지급 차감액이다
+  // (급여정산.tsx 의 getAdvanceAdjustedNet: net = net - advance).
+  // 예전에는 advance_pay > 0 이면 지급총액·실지급액을 통째로 선지급액으로 갈아끼워
+  // 기본급 300만/공제 30만/선지급 50만 인 사람의 실지급액이 220만이 아니라 50만으로 찍혔다.
+  // 이제는 분기 없이 항상 실제 값을 쓰고, 선지급은 공제 항목의 하나로만 표시한다.
   const isAlternateDayShift = !!(staff?.isAlternateDayShift || staff?.shift_type === '1일근무1일휴무');
   const weeklyHours = resolveWeeklyWorkingHours(staff, 40);
   const monthlyWorkingHours = getMonthlyWorkingHours(weeklyHours, isAlternateDayShift);
@@ -373,7 +405,7 @@ export default function SalaryDetail({
     resolvedAgreedNight;
 
   const hourlyRate = calculateHourlyRateFromMonthlySalary(toNumber(data.base_salary), weeklyHours, 'ceil', isAlternateDayShift);
-  const settlementAmount = isAdvancePay ? advancePayAmount : calc.net;
+  const settlementAmount = calc.net;
 
   const fixedTaxableAllowanceTotal =
     taxableAllowanceBreakdown.position_allowance +
@@ -458,6 +490,8 @@ export default function SalaryDetail({
       note: '기타 비과세 수당' },
   ];
 
+  // 근태공제·기타공제·선지급 차감은 어느 화면에도 안 나와 좌우 합계가 맞지 않았다.
+  // 아래 행들의 합이 곧 calc.totalDeduction 이고, 지급총액 − 이 합 = 실지급액 이 된다.
   const deductionRows = [
     { label: '국민연금', value: calc.pension },
     { label: '건강보험', value: calc.health },
@@ -465,7 +499,9 @@ export default function SalaryDetail({
     { label: '고용보험', value: calc.employment },
     { label: '소득세', value: calc.incomeTax },
     { label: '지방소득세', value: calc.localTax },
+    { label: '근태공제', value: calc.attendanceDeduction },
     { label: '기타 공제', value: calc.customDeduction },
+    { label: '선지급 차감', value: calc.advancePay },
   ].filter((row) => row.value > 0);
 
   const paymentSlipRows = [
@@ -482,8 +518,8 @@ export default function SalaryDetail({
   const rowDensity: RowDensity =
     rowCount > 28 ? 'ultra' : rowCount > 18 ? 'dense' : rowCount > 12 ? 'compact' : 'regular';
   const issueDate = new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
-  const summaryPaymentTotal = isAdvancePay ? advancePayAmount : calc.totalPayment;
-  const summaryDeductionTotal = isAdvancePay ? 0 : calc.totalDeduction;
+  const summaryPaymentTotal = calc.totalPayment;
+  const summaryDeductionTotal = calc.totalDeduction;
 
   return (
     <div
@@ -565,83 +601,66 @@ export default function SalaryDetail({
           </div>
         </div>
 
-        {isAdvancePay ? (
-          <div
-            className="salary-print-avoid border px-5 py-4 print:px-3 print:py-2"
-            style={{
-              borderColor: alphaColor('#d97706', 0.28),
-              backgroundColor: alphaColor('#d97706', 0.06) }}
+        {/* 선지급이 있어도 별도의 '가불 명세서' 레이아웃으로 갈아타지 않는다.
+            선지급은 지급/공제 내역 안의 한 줄(선지급 차감)로만 나타난다. */}
+        <div className="grid flex-1 grid-cols-2 gap-4 print:gap-2">
+          <section
+            className="salary-print-avoid flex min-w-0 flex-col overflow-hidden border bg-white"
+            style={{ borderColor: alphaColor(primaryColor, 0.18) }}
           >
-            <p className="text-sm font-bold text-amber-800 print:text-[10px]">
-              이 문서는 가불 지급 내역입니다. 기본 급여와 공제 항목은 제외하고 지급 금액만 표시합니다.
-            </p>
-            <div className="mt-4 flex items-center justify-between gap-4">
-              <span className="text-sm font-semibold text-slate-600 print:text-[10px]">가불 지급액</span>
-              <span className="text-xl font-black text-amber-700 print:text-[13px]">
-                {advancePayAmount.toLocaleString('ko-KR')}원
+            <div className="flex items-center justify-between gap-3 px-4 py-2 text-white print:px-2 print:py-1.5" style={{ backgroundColor: primaryColor }}>
+              <h3 className="text-sm font-black print:text-[10px]">지급내역</h3>
+              <span className="text-[11px] font-bold print:text-[8px]">Earnings</span>
+            </div>
+            <div className="flex-1">
+              {renderedPaymentRows.map((row) => (
+                <SalaryRow
+                  key={row.label}
+                  label={row.label}
+                  value={row.value}
+                  note={row.note}
+                  toneColor={primaryColor}
+                  isTaxFree={row.isTaxFree}
+                  density={rowDensity}
+                />
+              ))}
+            </div>
+            <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-2 print:px-2 print:py-1">
+              <span className="text-[11px] font-bold text-slate-600 print:text-[8px]">지급 합계</span>
+              <span className="text-sm font-black print:text-[9.5px]" style={{ color: primaryColor }}>
+                {summaryPaymentTotal.toLocaleString('ko-KR')}원
               </span>
             </div>
-          </div>
-        ) : (
-          <div className="grid flex-1 grid-cols-2 gap-4 print:gap-2">
-            <section
-              className="salary-print-avoid flex min-w-0 flex-col overflow-hidden border bg-white"
-              style={{ borderColor: alphaColor(primaryColor, 0.18) }}
-            >
-              <div className="flex items-center justify-between gap-3 px-4 py-2 text-white print:px-2 print:py-1.5" style={{ backgroundColor: primaryColor }}>
-                <h3 className="text-sm font-black print:text-[10px]">지급내역</h3>
-                <span className="text-[11px] font-bold print:text-[8px]">Earnings</span>
-              </div>
-              <div className="flex-1">
-                {renderedPaymentRows.map((row) => (
-                  <SalaryRow
-                    key={row.label}
-                    label={row.label}
-                    value={row.value}
-                    note={row.note}
-                    toneColor={primaryColor}
-                    isTaxFree={row.isTaxFree}
-                    density={rowDensity}
-                  />
-                ))}
-              </div>
-              <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-2 print:px-2 print:py-1">
-                <span className="text-[11px] font-bold text-slate-600 print:text-[8px]">지급 합계</span>
-                <span className="text-sm font-black print:text-[9.5px]" style={{ color: primaryColor }}>
-                  {calc.totalPayment.toLocaleString('ko-KR')}원
-                </span>
-              </div>
-            </section>
+          </section>
 
-            <section
-              className="salary-print-avoid flex min-w-0 flex-col overflow-hidden border bg-white"
-              style={{ borderColor: alphaColor('#991b1b', 0.18) }}
-            >
-              <div className="flex items-center justify-between gap-3 bg-red-800 px-4 py-2 text-white print:px-2 print:py-1.5">
-                <h3 className="text-sm font-black print:text-[10px]">공제내역</h3>
-                <span className="text-[11px] font-bold print:text-[8px]">Deductions</span>
-              </div>
-              <div className="flex-1">
-                {renderedDeductionRows.map((row) => (
-                  <SalaryRow
-                    key={row.label}
-                    label={row.label}
-                    value={row.value}
-                    toneColor={primaryColor}
-                    isDeduction
-                    density={rowDensity}
-                  />
-                ))}
-              </div>
-              <div className="flex items-center justify-between border-t border-slate-200 bg-red-50 px-4 py-2 print:px-2 print:py-1">
-                <span className="text-[11px] font-bold text-slate-600 print:text-[8px]">공제 합계</span>
-                <span className="text-sm font-black text-red-700 print:text-[9.5px]">
-                  {calc.totalDeduction.toLocaleString('ko-KR')}원
-                </span>
-              </div>
-            </section>
-          </div>
-        )}
+          <section
+            className="salary-print-avoid flex min-w-0 flex-col overflow-hidden border bg-white"
+            style={{ borderColor: alphaColor('#991b1b', 0.18) }}
+          >
+            <div className="flex items-center justify-between gap-3 bg-red-800 px-4 py-2 text-white print:px-2 print:py-1.5">
+              <h3 className="text-sm font-black print:text-[10px]">공제내역</h3>
+              <span className="text-[11px] font-bold print:text-[8px]">Deductions</span>
+            </div>
+            <div className="flex-1">
+              {renderedDeductionRows.map((row) => (
+                <SalaryRow
+                  key={row.label}
+                  label={row.label}
+                  value={row.value}
+                  toneColor={primaryColor}
+                  isDeduction
+                  density={rowDensity}
+                />
+              ))}
+            </div>
+            <div className="flex items-center justify-between border-t border-slate-200 bg-red-50 px-4 py-2 print:px-2 print:py-1">
+              <span className="text-[11px] font-bold text-slate-600 print:text-[8px]">공제 합계</span>
+              <span className="text-sm font-black text-red-700 print:text-[9.5px]">
+                {summaryDeductionTotal.toLocaleString('ko-KR')}원
+              </span>
+            </div>
+          </section>
+        </div>
 
         {!record && (
           <div className="salary-print-avoid my-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-800 border border-amber-200">

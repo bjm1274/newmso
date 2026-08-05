@@ -690,15 +690,28 @@ export default function InterimSettlement({ staffs = [], selectedCo, onRefresh }
         bonus: calc.bonus,
         total_taxable: calc.totalTaxable,
         total_taxfree: calc.totalTaxfree,
-        gross_pay: calc.totalTaxable + calc.totalTaxfree,
+        // 지급총액 기준을 net_pay 와 일치시킨다.
+        // net_pay(calc.net) = calc.total - calc.deduction 이고 calc.total 에는 퇴직금(severance)이
+        // 포함돼 있는데, gross_pay 만 퇴직금을 뺀 값(taxable+taxfree)으로 저장해 온 탓에
+        // 같은 레코드에서 gross_pay < net_pay 가 되는 역전이 생겼다.
+        // 정규 급여 저장 경로(급여정산.tsx:1233)도 gross_pay 에 calc.total 을 넣으므로 기준을 맞춘다.
+        // (퇴직금 자체는 severance_pay 컬럼에 계속 별도 저장한다.)
+        gross_pay: calc.total,
         total_deduction: calc.deduction,
         // R-2: 공제 항목을 top-level 컬럼에도 저장 (모바일 명세서·EDI가 deduction_detail 대신 읽음)
         national_pension: calc.deductionDetail.national_pension,
         health_insurance: calc.deductionDetail.health_insurance,
         long_term_care: calc.deductionDetail.long_term_care,
         employment_insurance: calc.deductionDetail.employment_insurance,
-        income_tax: calc.deductionDetail.income_tax + (calc.deductionDetail.retirement_income_tax || 0),
-        local_tax: calc.deductionDetail.local_tax + (calc.deductionDetail.retirement_local_tax || 0),
+        // 근로소득세/지방소득세만 top-level 에 저장한다.
+        // 퇴직소득은 분류과세(소득세법 §22)라 total_taxable 에 합산하지 않았는데(위 계산부 참조)
+        // 세액만 근로소득 컬럼에 더해 두면, 홈택스 C13(소득구분 1004=근로소득)이
+        // total_taxable 과 income_tax 를 나란히 쓰기 때문에 과세표준 없는 세액이
+        // 근로소득 원천세 신고서에 실린다.
+        // 퇴직소득세는 deduction_detail.retirement_income_tax / retirement_local_tax 로만 보관하고,
+        // total_deduction 에는 계속 포함되어 실지급액 계산은 그대로 유지된다.
+        income_tax: calc.deductionDetail.income_tax,
+        local_tax: calc.deductionDetail.local_tax,
         deduction_detail: calc.deductionDetail,
         net_pay: calc.net,
         attendance_deduction: calc.allowanceDeduction + calc.attendanceDeduction,

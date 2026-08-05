@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { db } from '@/lib/db-client';
+import { filterNonInterimPayrollRecords } from '@/lib/payroll-records';
 import {
   buildExportRows,
   generateEdiTxt,
@@ -40,13 +41,21 @@ export default function TaxFileGenerator({ staffs, selectedCo }: Props) {
         setRecordCount(0);
         return;
       }
-      const { count } = await db
+      // payroll_records 유니크 인덱스가 (staff_id, year_month, record_type)라
+      // 같은 직원·같은 달에 regular 행과 interim(중간정산) 행이 함께 존재할 수 있다.
+      // 신고 대상은 정규 급여분이므로 여기서 세는 건수도 interim 을 빼야
+      // 아래 다운로드 결과와 미리보기 건수가 어긋나지 않는다.
+      // head:true(count) 로는 record_type 을 볼 수 없어 실제 행을 받아 공용 헬퍼로 거른다.
+      const { data: countRows } = await db
         .from('payroll_records')
-        .select('id', { count: 'exact', head: true })
+        .select('id, record_type')
         .eq('year_month', yearMonth)
         .in('staff_id', targetStaffIds)
         .in('status', ['확정', 'finalized']);
-      if (!cancelled) setRecordCount(count ?? 0);
+      const regularRows = filterNonInterimPayrollRecords(
+        (countRows ?? []) as Record<string, unknown>[],
+      );
+      if (!cancelled) setRecordCount(regularRows.length);
     })();
     return () => { cancelled = true; };
   }, [yearMonth, selectedCo, staffs.length]);
@@ -90,7 +99,14 @@ export default function TaxFileGenerator({ staffs, selectedCo }: Props) {
         .in('staff_id', targetStaffIds)
         .in('status', ['확정', 'finalized']);
 
-      if (!payrollData || payrollData.length === 0) {
+      // 중간정산(record_type='interim') 행은 정규 급여 행과 같은 (staff_id, year_month) 에
+      // 공존한다. 걸러내지 않으면 홈택스 C13·EDI·급여대장에 같은 직원이 2줄로 실리고
+      // T레코드 합계가 두 배가 된다. 명세서 발송/마이페이지와 동일한 공용 헬퍼를 쓴다.
+      const regularPayrollData = filterNonInterimPayrollRecords(
+        (payrollData ?? []) as Record<string, unknown>[],
+      );
+
+      if (regularPayrollData.length === 0) {
         await openConfirm({
           title: '확정 급여 데이터 없음',
           description: '해당 월에 확정된 급여 데이터가 없습니다.',
@@ -106,10 +122,7 @@ export default function TaxFileGenerator({ staffs, selectedCo }: Props) {
         if (s.id) staffMap.set(String(s.id), s);
       }
 
-      const rows: PayrollExportRow[] = buildExportRows(
-        payrollData as Record<string, unknown>[],
-        staffMap,
-      );
+      const rows: PayrollExportRow[] = buildExportRows(regularPayrollData, staffMap);
 
       let content: string;
       let fileName: string;
