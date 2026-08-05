@@ -54,8 +54,14 @@ export type SBoardDetailProps = {
   onPatchPost: (patch: Partial<BoardListPost>) => void;
   currentUserId?: string | null;
   currentUserName?: string | null;
-  /** 관리자/시스템 마스터 — 수정·삭제·읽음현황 게이트 */
-  canAdmin?: boolean;
+  /**
+   * 남의 글 수정 관리자 — 부서장 또는 시스템 마스터.
+   * 예전에는 수정·삭제가 `canAdmin` 하나(=isAdminUser||isPrivilegedUser)를 공유해서
+   * PC 와 결과가 갈라졌다(D09-016). 판정 기준이 서로 다르므로 prop 도 분리해 둔다.
+   */
+  canAdminEdit?: boolean;
+  /** 남의 글·댓글 삭제 관리자 — 시스템 마스터만. 삭제는 되돌릴 수 없어 수정보다 좁다. */
+  canAdminDelete?: boolean;
   /** 해당 보드 board_*_write 권한 (PC canAccessBoard write 패리티) */
   canWriteBoard?: boolean;
   /** 내 좋아요 상태 */
@@ -82,7 +88,8 @@ export default function SBoardDetail({
   onPatchPost,
   currentUserId,
   currentUserName,
-  canAdmin = false,
+  canAdminEdit = false,
+  canAdminDelete = false,
   canWriteBoard = false,
   isLiked,
   onLikedChange,
@@ -303,8 +310,11 @@ export default function SBoardDetail({
   const bodyForRender = extractAttachmentMetaFromContent(String(post.content ?? '')).displayContent;
 
   // 권한 / 투표 / 읽음 — board write 게이트 + 작성자/관리자 (PC 패리티)
-  const canEdit = canWriteBoard && canEditMobilePost(post, currentUserId, canAdmin);
-  const canDelete = (canWriteBoard || canAdmin) && canDeleteMobilePost(post, currentUserId, canAdmin);
+  // 게이트 순서·조합을 PC(canEditPost/canDeletePost)와 정확히 맞춘다.
+  // 삭제에 있던 `|| canAdmin` 우회는 없앴다 — PC 는 board write 게이트를 우회시키지 않고,
+  // 시스템 마스터는 canAccessBoard 가 어차피 항상 true 라 우회가 필요 없었다.
+  const canEdit = canWriteBoard && canEditMobilePost(post, currentUserId, canAdminEdit);
+  const canDelete = canWriteBoard && canDeleteMobilePost(post, currentUserId, canAdminDelete);
   const canSeeReadStatus = !isAnonymousReadStatusPost(post);
   const poll = extractPoll((post as { poll?: unknown }).poll);
   const pollVotes = parsePollVotes((post as { poll_votes?: unknown }).poll_votes);
@@ -473,7 +483,7 @@ export default function SBoardDetail({
             onReply={handleReplyStart}
             onDelete={(c) => void handleDeleteComment(c)}
             currentUserId={currentUserId}
-            canAdmin={canAdmin}
+            canAdmin={canAdminDelete}
           />
 
           <div style={{ height: 20 }} />

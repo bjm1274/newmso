@@ -9,17 +9,11 @@ import { formatKoreanDateKey, formatKoreanTimeLabel } from '@/lib/seoul-time';
 import { parseDbTimestamp } from '@/lib/date-formatter';
 import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 import { applyAttendanceCorrectionStatus } from '@/lib/attendance-sync';
-
-type ProblemReason = '미체크' | '지각' | '조퇴' | '결근' | '미출근';
-
-type ProblemDateItem = {
-  date: string;
-  reason: ProblemReason;
-  label: string;
-  checkIn?: string | null;
-  checkOut?: string | null;
-  scheduledStart?: string | null;
-};
+import {
+  collectShiftIds,
+  detectAttendanceProblems,
+  getCorrectionDate,
+  type AttendanceProblemItem as ProblemDateItem } from '@/lib/attendance-correction-detect';
 
 type AttendanceCorrectionFormProps = {
   user: any;
@@ -55,10 +49,6 @@ async function withAttendanceCorrectionsFallback<T>(
     return fallback();
   }
   return result;
-}
-
-function getCorrectionDate(correction: any) {
-  return String(correction?.attendance_date || correction?.original_date || '').slice(0, 10);
 }
 
 function getCorrectionStatus(correction: any) {
@@ -147,174 +137,32 @@ export default function AttendanceCorrectionForm({
         getPrimaryShift(String(staffId)),
       ]);
 
-      /* ── 날짜별 배정 Map ── */
-      const assignmentByDate = new Map<string, string | null>(
-        (assignmentRows || []).map((a: any) => [String(a.work_date).slice(0, 10), a.shift_id ?? null])
-      );
-
       /* ── 관련된 shift_id 목록 수집 → work_shifts 조회 ── */
       const defaultShiftId: string | null = primaryShiftId;
-      const shiftIdSet = new Set<string>(
-        [...(assignmentRows || []).map((a: any) => a.shift_id).filter(Boolean), defaultShiftId].filter(Boolean) as string[]
-      );
-      const shiftsMap = new Map<string, any>();
-      if (shiftIdSet.size > 0) {
-        const { data: shiftRows } = await db
+      const shiftIds = collectShiftIds(assignmentRows, defaultShiftId);
+      let shiftRows: any[] = [];
+      if (shiftIds.length > 0) {
+        const { data } = await db
           .from('work_shifts')
           .select('id, name, shift_type, start_time, weekly_work_days, is_weekend_work')
-          .in('id', Array.from(shiftIdSet));
-        (shiftRows || []).forEach((s: any) => shiftsMap.set(s.id, s));
+          .in('id', shiftIds);
+        shiftRows = data || [];
       }
 
-      /* ── OFF shift 판단 ── */
-      const OFF_KEYWORDS = ['휴무', 'off', '비번', '오프'];
-      const isOffShift = (shiftId: string | null | undefined): boolean => {
-        if (!shiftId) return true; // shift_id가 null이면 OFF
-        const shift = shiftsMap.get(shiftId);
-        if (!shift) return false;
-        const name = String(shift.name || '').toLowerCase();
-        return OFF_KEYWORDS.some((kw) => name.includes(kw));
-      };
-
-      /* ── 근무유형 → 근무일 모드 ── */
-      const resolveWorkDayMode = (shiftId: string | null | undefined): 'all_days' | 'weekdays' => {
-        if (!shiftId) return 'weekdays';
-        const shift = shiftsMap.get(shiftId);
-        if (!shift) return 'weekdays';
-        if (String(shift.shift_type || '').includes('3교대')) return 'all_days';
-        if (shift.is_weekend_work === true || Number(shift.weekly_work_days) >= 7) return 'all_days';
-        return 'weekdays';
-      };
-
-      /* ── 해당 날짜가 근무일인지 판단 ── */
-      const isWorkDay = (dateStr: string): boolean => {
-        const dayOfWeek = new Date(`${dateStr}T00:00:00`).getDay(); // 0=일, 6=토
-        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-
-        if (assignmentByDate.has(dateStr)) {
-          // 근무표에 배정된 날짜
-          const assignedShiftId = assignmentByDate.get(dateStr);
-          if (isOffShift(assignedShiftId)) return false; // OFF 배정 → 근무 없음
-          return true; // 실제 근무 배정됨
-        } else {
-          // 근무표 배정 없음 → 기본 근무유형으로 판단
-          const mode = resolveWorkDayMode(defaultShiftId);
-          if (mode === 'all_days') return true;
-          return !isWeekend; // weekdays: 토/일 제외
-        }
-      };
-
-      /* ── 이미 신청한 날짜 Set ── */
-      const alreadyRequested = new Set(
-        (myCorrections || [])
-          .map((item: any) => getCorrectionDate(item))
-          .filter(Boolean)
+      // 탐지 판정은 lib/attendance-correction-detect 정본. 예전에는 이 ~150줄이
+      // 모바일 `출결정정폼.tsx` 에도 사본으로 있었다(8차 D12-004). 두 사본은 아직
+      // 갈라지지 않은 상태였고(측정 결과 전 케이스 동일), 갈라지기 전에 합쳤다.
+      setProblemDates(
+        detectAttendanceProblems({
+          start,
+          end,
+          attendanceRows,
+          attendancesRows,
+          correctionRows: myCorrections,
+          assignmentRows,
+          shiftRows,
+          defaultShiftId }),
       );
-
-      const attendanceByDate = new Map<string, any>((attendanceRows || []).map((item: any) => [item.date, item]));
-      const attendancesByDate = new Map<string, any>((attendancesRows || []).map((item: any) => [item.work_date, item]));
-      const nextProblemDates = new Map<string, ProblemDateItem>();
-
-      const toMinutes = (hhmm: string): number => {
-        const [h, m] = String(hhmm || '').slice(0, 5).split(':').map(Number);
-        return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
-      };
-
-      const resolveScheduledStartTime = (dateStr: string): string | null => {
-        const shiftId = assignmentByDate.has(dateStr) ? assignmentByDate.get(dateStr) : defaultShiftId;
-        if (!shiftId || isOffShift(shiftId)) return null;
-        return String(shiftsMap.get(shiftId)?.start_time || '').trim() || null;
-      };
-
-      // 해당 날짜의 예정 근무 시작(분). OFF/미해석이면 null.
-      const resolveScheduledStartMin = (dateStr: string): number | null => {
-        const shiftId = assignmentByDate.has(dateStr) ? assignmentByDate.get(dateStr) : defaultShiftId;
-        if (!shiftId || isOffShift(shiftId)) return null;
-        const startTime = String(shiftsMap.get(shiftId)?.start_time || '').trim();
-        return startTime ? toMinutes(startTime) : null;
-      };
-      // 저장된 status에만 의존하지 않고, 실제 체크인(KST)이 예정 시작시각을 지났으면 지각으로 판정.
-      // (체크인 시 근무유형 미해석으로 status가 'present'로 저장된 지각을 보강 — 출결정정 누락 방지)
-      const isCheckInLate = (dateStr: string, checkInIso: string | null): boolean => {
-        if (!checkInIso) return false;
-        const startMin = resolveScheduledStartMin(dateStr);
-        if (startMin === null) return false;
-        const checkInDate = new Date(checkInIso);
-        if (Number.isNaN(checkInDate.getTime())) return false;
-        return toMinutes(formatKoreanTimeLabel(checkInDate)) > startMin;
-      };
-
-      for (let offset = 0; offset <= 60; offset += 1) {
-        const current = new Date(start);
-        current.setDate(current.getDate() + offset);
-        if (current > end) break;
-
-        const dateStr = formatKoreanDateKey(current);
-        if (alreadyRequested.has(dateStr)) continue;
-
-        // 근무 없는 날(휴무/주말 등)은 건너뜀
-        if (!isWorkDay(dateStr)) continue;
-
-        const attendance = attendanceByDate.get(dateStr);
-        const attendances = attendancesByDate.get(dateStr);
-        const status = attendances?.status;
-        const checkInIso = attendances?.check_in_time || attendance?.check_in || null;
-        const checkOutIso = attendances?.check_out_time || attendance?.check_out || null;
-        const scheduledStart = resolveScheduledStartTime(dateStr);
-
-        // 결근이 아닌데 실제 체크인이 예정 시작시각을 지났으면 지각으로 우선 표시.
-        if (status !== 'absent' && attendance?.status !== '결근' && isCheckInLate(dateStr, checkInIso)) {
-          nextProblemDates.set(dateStr, { date: dateStr, reason: '지각', label: '지각', checkIn: checkInIso, checkOut: checkOutIso, scheduledStart });
-          continue;
-        }
-
-        // 정상 출근: "present" 상태만으로 확정하지 않고 실제 출근 기록도 함께 본다.
-        if (status === 'present') {
-          if (checkInIso) continue;
-          if (!attendance) {
-            nextProblemDates.set(dateStr, {
-              date: dateStr,
-              reason: '미체크',
-              label: '출퇴근 미체크',
-              checkIn: null,
-              checkOut: null,
-              scheduledStart });
-            continue;
-          }
-        }
-        if (
-          !status &&
-          attendance &&
-          (attendance.status === '정상' || attendance.status === 'present') &&
-          attendance.check_in
-        ) continue;
-
-        if (status === 'absent') {
-          nextProblemDates.set(dateStr, { date: dateStr, reason: '결근', label: '결근', checkIn: checkInIso, checkOut: checkOutIso, scheduledStart });
-          continue;
-        }
-
-        if (status === 'late' || attendance?.status === '지각') {
-          nextProblemDates.set(dateStr, { date: dateStr, reason: '지각', label: '지각', checkIn: checkInIso, checkOut: checkOutIso, scheduledStart });
-          continue;
-        }
-
-        if (status === 'early_leave' || attendance?.status === '조퇴') {
-          nextProblemDates.set(dateStr, { date: dateStr, reason: '조퇴', label: '조퇴', checkIn: checkInIso, checkOut: checkOutIso, scheduledStart });
-          continue;
-        }
-
-        if (!attendance && !attendances) {
-          nextProblemDates.set(dateStr, { date: dateStr, reason: '미체크', label: '출퇴근 미체크', checkIn: null, checkOut: null, scheduledStart });
-          continue;
-        }
-
-        if (!checkInIso) {
-          nextProblemDates.set(dateStr, { date: dateStr, reason: '미출근', label: '출근 미기록', checkIn: null, checkOut: checkOutIso, scheduledStart });
-        }
-      }
-
-      setProblemDates(Array.from(nextProblemDates.values()).sort((a, b) => b.date.localeCompare(a.date)));
       setHasQueried(true);
     } finally {
       setProblemDatesLoading(false);

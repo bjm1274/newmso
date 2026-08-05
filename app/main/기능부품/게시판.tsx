@@ -6,6 +6,12 @@ import { EmptyState, PermissionState } from '@/app/components/StatePanel';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { useDeferredValue, useState, useEffect, useMemo, useRef, useCallback, type MouseEvent as ReactMouseEvent } from 'react';
 import { canAccessBoard, isAdminUser, isMsoUser, isPrivilegedUser } from '@/lib/access-control';
+import {
+  canDeleteBoardPost,
+  canEditBoardPost,
+  isBoardDeleteAdmin,
+  isBoardDepartmentHead,
+  type BoardPostLike } from '@/lib/board-permissions';
 import { getStaffLikeId, resolveStaffLike } from '@/lib/staff-identity';
 import { db } from '@/lib/db-client';
 import { subscribeRealtimeBatched } from '@/lib/realtime-bus';
@@ -842,7 +848,9 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
     const list = comments[postId] || [];
     const comment = list.find((c) => c.id === commentId);
     if (!comment) return;
-    const isSysAdmin = isPrivilegedUser(user);
+    // 댓글 삭제 관리자도 게시글 삭제와 같은 기준(시스템 마스터)이다. 모바일 댓글트리가
+    // 여기와 다른 bool(`isAdminUser || isPrivilegedUser`)을 쓰고 있어 정본 함수로 묶는다.
+    const isSysAdmin = isBoardDeleteAdmin(user);
     if (String(comment.author_id) !== effectiveBoardUserId && !isSysAdmin) {
       toast('본인이 작성한 댓글만 삭제할 수 있습니다.', 'error');
       return;
@@ -1000,22 +1008,21 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
     })();
   }, [selectedPostId]);
 
-  const isDepartmentHead = ['팀장', '과장', '실장', '부장', '이사', '원장', '병원장'].some(p => user?.position?.includes(p)) || user?.permissions?.mso || user?.role === 'admin';
+  // 부서장 판정 — 일정게시판 상신 분기(아래 isScheduleBoard)에서도 쓴다.
+  // 직위 목록을 여기서 다시 쓰지 않고 정본을 부른다. 예전에 배열이 여기 하드코딩돼 있어
+  // 모바일 사본과 갈라졌다(D09-016).
+  const isDepartmentHead = isBoardDepartmentHead(user);
 
-  const canEditPost = (post: BoardPost) => {
-    if (!user) return false;
-    if (!canAccessBoard(user, (post?.board_type as string) || activeBoard, 'write')) return false;
-    // 일반 직원도 자신이 올린 수술/MRI일정에 대해 '요청'을 할 수 있도록 조건 완화 (작성자 본인 포함)
-    return (post.author_id && String(post.author_id) === effectiveBoardUserId) || isDepartmentHead;
-  };
+  // 수정/삭제 판정은 lib/board-permissions 정본에 위임한다.
+  // - 수정: 작성자 본인 또는 부서장/시스템 마스터.
+  //   (일반 직원도 자신이 올린 수술/MRI일정은 '요청'할 수 있어야 해서 작성자 본인을 포함한다.)
+  //   시스템 마스터가 추가된 이유는 정본 헤더 (나) 참고 — 삭제는 되는데 수정은 못 하던 비대칭을 없앴다.
+  // - 삭제: 작성자 본인 또는 시스템 마스터만. 종전과 동일하다.
+  const canEditPost = (post: BoardPost) =>
+    canEditBoardPost(user, post as BoardPostLike, effectiveBoardUserId, activeBoard);
 
-  const canDeletePost = (post: BoardPost) => {
-    if (!user) return false;
-    if (!canAccessBoard(user, (post?.board_type as string) || activeBoard, 'write')) return false;
-    const isAuthor = Boolean(post.author_id && String(post.author_id) === effectiveBoardUserId);
-    // 작성자 본인 또는 시스템관리자만 삭제 가능
-    return isAuthor || isPrivilegedUser(user);
-  };
+  const canDeletePost = (post: BoardPost) =>
+    canDeleteBoardPost(user, post as BoardPostLike, effectiveBoardUserId, activeBoard);
 
   const sendScheduleApprovalRequest = async (post: BoardPost, actionType: '삭제' | '수정', updatedData?: Record<string, unknown>) => {
     if (!user) return;

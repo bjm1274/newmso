@@ -17,11 +17,51 @@
  *
  * 판정 자체는 PC 를 정본으로 삼는다(원본이고 운영 기준이다).
  *
+ * ── 2차 정리(D09-016 잔여) ──────────────────────────────────────────────
+ * 위 ①③ 은 판정 함수를 합쳐도 사라지지 않았다. **호출부가 넘기는 `isAdmin` 값 자체가
+ * 갈라져 있었기 때문**이다. 모바일은 `isAdminUser(user) || isPrivilegedUser(user)` 하나를
+ * 수정·삭제·댓글삭제에 전부 돌려썼고, PC 는 수정에 `isDepartmentHead`, 삭제에
+ * `isPrivilegedUser` 를 따로 썼다. 합치기 전에 권한 조합별로 실제 결과를 재 봤다
+ * (게시판 write 권한 보유 + 타인 글 기준. O=가능, .=불가):
+ *
+ *   사용자                     | PC수정 PC삭제 | 모바일수정 모바일삭제
+ *   일반직원                    |   .     .    |    .        .
+ *   부서장(팀장/과장…)           |   O     .    |    .        .     ← 수정 불일치
+ *   role='admin'               |   O     .    |    O        O     ← 삭제 불일치
+ *   permissions.admin=true     |   .     .    |    O        O     ← 수정·삭제 불일치
+ *   permissions.mso=true       |   O     .    |    .        .     ← 수정 불일치
+ *   시스템마스터(9999)           |   .     O    |    O        O     ← 수정 불일치
+ *   (본인 글은 전 조합에서 양쪽 O O 로 동일했다)
+ *
+ * 여기서 두 가지를 정했다.
+ *
+ *  (가) **삭제 관리자 = `isPrivilegedUser` (시스템 마스터)만.** PC 그대로다.
+ *       모바일이 `role='admin'`·`permissions.admin` 까지 삭제를 열어 두고 있었는데,
+ *       삭제는 댓글·읽음까지 함께 날아가고 되돌릴 수 없다. **좁히는 방향**이라 안전하다.
+ *       댓글 삭제도 PC(`게시판.tsx` handleDeleteComment)가 `isPrivilegedUser` 만
+ *       허용하므로 같은 기준으로 맞춘다.
+ *
+ *  (나) **수정 관리자 = 부서장(`isBoardDepartmentHead`) 또는 시스템 마스터.**
+ *       - 부서장을 넣은 건 PC 운영 기준 복원이다. 표의 2·5행처럼 부서장이 PC 에서는
+ *         팀원 글을 고칠 수 있는데 모바일에서만 못 했다. 모바일 기준으로는 **넓히는**
+ *         변경이지만, 새 권한을 만든 게 아니라 이미 PC 에서 매일 쓰던 권한을 같은
+ *         사람에게 기기와 무관하게 준 것이다.
+ *       - 시스템 마스터를 넣은 건 PC 쪽 비대칭을 고친 것이라 **PC 기준으로도 넓힌다**.
+ *         표 6행을 보면 시스템 마스터는 남의 글을 **삭제는 되는데 수정은 못 했다**.
+ *         더 파괴적인 권한이 이미 열려 있는데 덜 파괴적인 권한만 막혀 있는 건 보호가
+ *         아니라 사고 유발이다(고칠 수 없으니 지우게 된다). 새로 노출되는 대상은
+ *         전권 계정 하나뿐이라 확대 위험도 없다.
+ *       - 반대로 `permissions.admin=true` 만 가진 사용자(표 4행)는 **제외**했다.
+ *         모바일 기준으로는 좁히는 변경이다. `admin` 은 게시판과 무관한 범용 관리자
+ *         플래그이고, PC 는 이 사용자에게 남의 글 수정을 허용한 적이 없다.
+ *         (`role='admin'` 은 부서장 판정에 이미 포함되어 그대로 통과한다.)
+ *
  * 두 계열을 내보낸다.
  *  - `canEditBoardPost` / `canDeleteBoardPost` : user 객체로 직접 판정하는 **정본**.
  *    PC·모바일 모두 최종적으로 이쪽을 써야 한다.
  *  - `...ByAdminFlag` : 관리자 여부를 이미 bool 로 들고 있는 기존 호출부용 어댑터.
- *    모바일 게시판이 현재 이 형태라 판정만 먼저 합류시키기 위한 것이다.
+ *    이 bool 은 반드시 `isBoardEditAdmin` / `isBoardDeleteAdmin` 으로 만들어야 한다.
+ *    아무 관리자 bool 이나 넣을 수 있게 열어 둔 것이 이번 재발의 원인이었다.
  */
 import { canAccessBoard, isPrivilegedUser } from '@/lib/access-control';
 
@@ -52,6 +92,22 @@ export function isBoardDepartmentHead(user: UserLike): boolean {
     Boolean(u.permissions?.mso) ||
     u.role === 'admin'
   );
+}
+
+/**
+ * 게시글 **수정** 판정에 넣을 관리자 bool (정본).
+ * 부서장 또는 시스템 마스터. 호출부는 이 함수 결과만 `...ByAdminFlag` 에 넘겨야 한다.
+ */
+export function isBoardEditAdmin(user: UserLike): boolean {
+  return isBoardDepartmentHead(user) || isPrivilegedUser(user);
+}
+
+/**
+ * 게시글·댓글 **삭제** 판정에 넣을 관리자 bool (정본).
+ * 시스템 마스터만 — 삭제는 댓글·읽음까지 함께 사라지고 되돌릴 수 없어 수정보다 좁게 둔다.
+ */
+export function isBoardDeleteAdmin(user: UserLike): boolean {
+  return isPrivilegedUser(user);
 }
 
 /**
@@ -111,7 +167,7 @@ export function canEditBoardPost(
   if (!user || !post) return false;
   const board = String(post?.board_type ?? '') || String(boardType ?? '');
   if (!canAccessBoard(user, board, 'write')) return false;
-  return canEditBoardPostByAdminFlag(post, userId, isBoardDepartmentHead(user));
+  return canEditBoardPostByAdminFlag(post, userId, isBoardEditAdmin(user));
 }
 
 /** 게시글 삭제 가능 여부 (정본). 삭제 관리자는 시스템 마스터로 좁다. */
@@ -124,5 +180,5 @@ export function canDeleteBoardPost(
   if (!user || !post) return false;
   const board = String(post?.board_type ?? '') || String(boardType ?? '');
   if (!canAccessBoard(user, board, 'write')) return false;
-  return canDeleteBoardPostByAdminFlag(post, userId, isPrivilegedUser(user));
+  return canDeleteBoardPostByAdminFlag(post, userId, isBoardDeleteAdmin(user));
 }

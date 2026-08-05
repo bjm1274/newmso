@@ -20,6 +20,11 @@ export type BoardCommentTreeProps = {
   /** 댓글 삭제 — 작성자/관리자만 노출 (없으면 삭제 버튼 미표시) */
   onDelete?: (comment: BoardComment) => void;
   currentUserId?: string | null;
+  /**
+   * 댓글 삭제 관리자 — 반드시 `isBoardDeleteAdmin(user)`(시스템 마스터)를 넘겨야 한다.
+   * 예전에 `isAdminUser || isPrivilegedUser` 를 넘겨서 PC handleDeleteComment 보다
+   * 넓게 열려 있었다(D09-016).
+   */
   canAdmin?: boolean;
 };
 
