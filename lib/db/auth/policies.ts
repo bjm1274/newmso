@@ -620,20 +620,23 @@ export const POLICY_REGISTRY: Registry = {
       insert: chatRoomsInsertGuard,
       update: chatRoomsUpdateGuard } },
 
+  // 읽음 커서·리액션은 "누가" 가 곧 데이터다. 쓰기가 AUTHENTICATED 라
+  // user_id 만 바꿔 보내면 타인의 읽음 상태를 조작하거나 타인 이름으로 리액션을
+  // 달고 지울 수 있었다. 본인 행만 쓰도록 좁힌다(열람은 방 UI 표시용이라 유지).
   room_read_cursors: {
     table: 'room_read_cursors',
     select: 'PUBLIC',
-    insert: 'AUTHENTICATED',
-    update: 'AUTHENTICATED',
-    delete: 'AUTHENTICATED',
+    insert: 'SELF_ONLY',
+    update: 'SELF_ONLY',
+    delete: 'SELF_ONLY',
     staffIdField: 'user_id',
   },
   message_reactions: {
     table: 'message_reactions',
     select: 'PUBLIC',
-    insert: 'AUTHENTICATED',
-    update: 'AUTHENTICATED',
-    delete: 'AUTHENTICATED',
+    insert: 'SELF_ONLY',
+    update: 'SELF_ONLY',
+    delete: 'SELF_ONLY',
     staffIdField: 'user_id',
   },
   message_bookmarks: {
@@ -904,8 +907,16 @@ export const POLICY_REGISTRY: Registry = {
 // 회귀를 방지하기 위해 필요. 향후 도메인별로 적절한 패턴(SELF_OR_SAME_COMPANY
 // 등)으로 재분류 가능. 보안 강화는 별도 phase.
 // ─────────────────────────────────────────────────────────────
-/** 로그인 사용자 공용(민감도 낮음) — 게시·채팅 부가·문서 등 */
-const ADDITIONAL_PUBLIC_TABLES: string[] = [
+/**
+ * 아직 도메인별로 재분류하지 못한 테이블 목록.
+ *
+ * ⚠ 이름에 속지 말 것. 예전 이름은 ADDITIONAL_PUBLIC_TABLES 였는데
+ * 아래 루프는 PUBLIC 이 아니라 **ADMIN_ONLY** 를 부여한다 — 이름과 동작이 정반대라
+ * "여기 넣으면 공개된다"고 읽고 민감 테이블을 넣으면 반대로 잠기고,
+ * 반대로 잠긴 줄 알고 뺐다가 열리는 오해가 생긴다.
+ * 실제 의미는 "미분류 → 관리자 전용으로 잠가 둔 테이블"이다.
+ */
+const UNCLASSIFIED_ADMIN_ONLY_TABLES: string[] = [
   // chat / messaging (rooms/messages 는 위 명시 정책 사용)
   'chat_messages',
   'chat_room_favorites',
@@ -990,7 +1001,7 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
 
   // ── 2026-05-20 컷오버 회귀 수정 — 누락 발견분 (7개)
   //    클라이언트 코드가 db.from()으로 호출하나 POLICY_REGISTRY·
-  //    ADDITIONAL_PUBLIC_TABLES 어디에도 없어 403이 발생하던 테이블.
+  //    UNCLASSIFIED_ADMIN_ONLY_TABLES 어디에도 없어 403이 발생하던 테이블.
   'annual_leave_promotion_logs', // 연차 이월/프로모션 로그
   'attendance_corrections',      // 출퇴근 정정 요청
 
@@ -1051,9 +1062,9 @@ const ADDITIONAL_PUBLIC_TABLES: string[] = [
 ];
 
 // ─────────────────────────────────────────────────────────────
-// 7차 전수조사 후속 — ADDITIONAL_PUBLIC_TABLES 일괄 ADMIN_ONLY 강등 해소
+// 7차 전수조사 후속 — 미분류 테이블 일괄 ADMIN_ONLY 강등 해소
 //
-// 아래 루프(`ADDITIONAL_PUBLIC_TABLES` → ADMIN_ONLY_ALL)는 목록 이름과 정반대로
+// 아래 루프(`UNCLASSIFIED_ADMIN_ONLY_TABLES` → ADMIN_ONLY_ALL)는 예전 이름과 정반대로
 // 85개 테이블을 관리자 전용으로 만들었고, 그중 54개를 살아있는 코드가 호출하고 있었다.
 // 비관리자에게 SELECT 는 조용히 빈 배열, 쓰기는 403 이라 **기능이 에러 없이 죽어 있었다**
 // (전자서명·할일·결재 양식 목록·증명서 발급·출결정정 등).
@@ -1427,7 +1438,7 @@ POLICY_REGISTRY['virtual_account_deposits'] = {
   companyIdField: 'company_id' };
 
 
-for (const tableName of ADDITIONAL_PUBLIC_TABLES) {
+for (const tableName of UNCLASSIFIED_ADMIN_ONLY_TABLES) {
   if (!POLICY_REGISTRY[tableName]) {
     // 자동 PUBLIC_ALL 부여 제거 — 미등록 테이블은 Default Deny (ADMIN_ONLY 또는 403)
     POLICY_REGISTRY[tableName] = ADMIN_ONLY_ALL(tableName);
@@ -1438,6 +1449,11 @@ for (const tableName of ADDITIONAL_PUBLIC_TABLES) {
 const SENSITIVE_STAFF_SCOPED: string[] = [
   'leave_balances',
   'leave_accruals',
+  // leave_ledger 가 빠져 있어 레지스트리 미등록 상태였다. /api/d1/query 는 미등록
+  // 테이블을 화이트리스트에서 거부하므로 admin 을 포함한 전원이 403 이었고,
+  // 연차원장 계열 화면은 오류 대신 "잔여 0일" 로 보였다 — 조회 실패가 데이터로 둔갑했다.
+  // 잔액·발생과 같은 성격(본인+회사 범위 열람, 인사 쓰기)이라 같은 패턴을 준다.
+  'leave_ledger',
 ];
 for (const tableName of SENSITIVE_STAFF_SCOPED) {
   POLICY_REGISTRY[tableName] = {
@@ -1487,10 +1503,26 @@ for (const tableName of SENSITIVE_ADMIN_WRITE) {
 const ADMIN_ONLY_TABLES: string[] = [
   'payroll',
   'salary_change_history',
-  'audit_logs',
   'op_consultations',
   'password_reset_tokens',
 ];
+
+// 감사로그: 열람은 관리자만, **기록은 행위자 누구나**.
+//
+// ADMIN_ONLY 로 묶여 있던 탓에 비관리자 인사 권한자가 수행한 작업은 감사 기록이
+// 403 으로 전부 버려졌다. 정작 남겨야 할 사람의 흔적이 남지 않은 것이다.
+// 감사로그는 append-only 가 원칙이므로 수정·삭제는 관리자로 유지한다.
+//
+// 남은 문제: 행위자(user_id/user_name)를 클라이언트가 보낼 수 있다(8차 D08-006).
+// 서버 세션에서 강제 주입하는 것이 옳고, 그 작업은 FB10(서버 권위 이전) 소관이다.
+// 지금은 "기록이 아예 없는 상태" 보다 "기록은 남되 행위자 위조 여지가 있는 상태" 가 낫다.
+POLICY_REGISTRY.audit_logs = {
+  table: 'audit_logs',
+  select: 'ADMIN_ONLY',
+  insert: 'AUTHENTICATED',
+  update: 'ADMIN_ONLY',
+  delete: 'ADMIN_ONLY',
+};
 
 for (const tableName of ADMIN_ONLY_TABLES) {
   if (!POLICY_REGISTRY[tableName]) {
