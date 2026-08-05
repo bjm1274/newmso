@@ -6,6 +6,7 @@ import { MAX_FILE_SIZE_BYTES, MAX_VIDEO_SIZE_BYTES } from '@/lib/upload-constant
 import {
   ALLOWED_APPLICATION_MIME_TYPES,
   hasBlockedUploadExtension,
+  normalizeUploadFileName,
   normalizeUploadMimeType } from '@/lib/upload-mime';
 
 export const dynamic = 'force-dynamic';
@@ -38,26 +39,6 @@ function guessFileExtension(fileName: string, mimeType: string): string {
   if (mimeType === 'application/pdf') return 'pdf';
   if (mimeType === 'text/plain') return 'txt';
   return 'bin';
-}
-
-function normalizeUploadFileName(fileName: string, mimeType: string): string {
-  const ext = guessFileExtension(fileName, mimeType);
-  const fallback =
-    mimeType.startsWith('image/')
-      ? `image.${ext}`
-      : mimeType.startsWith('video/')
-        ? `video.${ext}`
-        : mimeType === 'application/pdf'
-          ? `document.${ext}`
-          : `attachment.${ext}`;
-  const rawName = String(fileName || '').trim() || fallback;
-  const withoutPath = rawName.split(/[/\\]/).pop() || rawName;
-  const sanitized = withoutPath
-    .replace(/[ -<>:"/\\|?*]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  return sanitized || fallback;
 }
 
 function buildSafeFilePath(fileName: string, mimeType: string): string {
