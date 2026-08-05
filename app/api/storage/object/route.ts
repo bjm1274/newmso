@@ -164,12 +164,28 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    /**
+     * 어느 단계에서 실패했는지 남긴다.
+     *
+     * 예전에는 바인딩·서명 URL 두 경로가 모두 실패해도 응답이
+     * "Failed to fetch from storage" 한 줄이라, 원인이
+     *   (a) 바인딩이 아예 없음  (b) 바인딩에 그 객체가 없음
+     *   (c) 서명 URL 자격증명이 틀림  (d) 객체 자체가 없음
+     * 중 무엇인지 구분할 수 없었다. 계정 이전처럼 "예전 파일만 안 열리는"
+     * 상황에서 이 구분이 진단의 전부인데 그게 없었다.
+     */
+    const stages: string[] = [];
+
     // 1. Direct Cloudflare R2 Worker Binding Attempt (Zero-latency direct stream)
     try {
       const cfCtx = await getCloudflareContext();
       const r2Binding = (cfCtx?.env as any)?.R2;
+      if (!r2Binding || typeof r2Binding.get !== 'function') {
+        stages.push('binding:unavailable');
+      }
       if (r2Binding && typeof r2Binding.get === 'function') {
         const r2Object = await r2Binding.get(objectKey);
+        if (!r2Object) stages.push('binding:object-missing');
         if (r2Object && r2Object.body) {
           const contentType = r2Object.httpMetadata?.contentType || 'application/octet-stream';
           const headers: Record<string, string> = {
@@ -188,14 +204,19 @@ export async function GET(request: NextRequest) {
           return new NextResponse(r2Object.body as ReadableStream, { status: 200, headers });
         }
       }
-    } catch {
+    } catch (bindingErr) {
       // Fallback to S3 Presigned URL / REST API
+      stages.push('binding:error');
+      console.error('[storage/object] R2 바인딩 조회 실패:', bindingErr);
     }
 
     // 2. Fallback to S3 Presigned URL
     const signedUrl = await createR2DownloadUrl(bucket, objectKey);
     if (!signedUrl) {
-      return NextResponse.json({ error: 'Cloudflare R2 is not configured' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Cloudflare R2 is not configured', stages: [...stages, 'signed-url:not-configured'] },
+        { status: 500 },
+      );
     }
 
     if (!download && !proxy) {
@@ -210,7 +231,17 @@ export async function GET(request: NextRequest) {
     // 스트리밍 프록시
     const upstream = await fetch(signedUrl);
     if (!upstream.ok) {
-      return NextResponse.json({ error: 'Failed to fetch from storage' }, { status: upstream.status });
+      stages.push(`signed-url:${upstream.status}`);
+      // 403·401 은 대개 자격증명이 다른 계정을 가리킬 때 난다. 서버 로그에
+      // 계정 id 를 남겨 두면 계정 이전 후의 오설정을 바로 알아볼 수 있다.
+      console.error(
+        `[storage/object] 스토리지 조회 실패 (key=${objectKey}, status=${upstream.status}, `
+        + `account=${String(process.env.R2_ACCOUNT_ID || '(미설정)')}, stages=${stages.join(' → ')})`,
+      );
+      return NextResponse.json(
+        { error: 'Failed to fetch from storage', stages },
+        { status: upstream.status },
+      );
     }
 
     const contentType = upstream.headers.get('content-type') || 'application/octet-stream';
