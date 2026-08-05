@@ -823,13 +823,19 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
    * audit_logs 에 남긴다. **차단이 아니라 서버 판정·기록이다** — 위치 권한이 꺼진 단말이
    * 출근을 못 하게 되면 안 되기 때문이다(라우트 상단 주석 참고).
    *
-   * 오프라인·라우트 장애 시 null 을 돌려 기존 동작(단말 시계)으로 폴백한다.
+   * 오프라인·라우트 장애 시에는 막지 않고 기존 동작(단말 시계)으로 폴백한다.
+   * 검증에 실패한 것은 위반이 아니기 때문이다.
    */
+  // 차단 여부는 여기서 다시 계산하지 않고 서버 판정(blocked)을 그대로 따른다 —
+  // 화면마다 정책을 새로 쓰면 PC 와 모바일이 또 갈라진다.
+  type CommuteVerifyOutcome = { serverTime: string | null; blocked: boolean; blockReason: string | null };
+  const COMMUTE_VERIFY_FALLBACK: CommuteVerifyOutcome = { serverTime: null, blocked: false, blockReason: null };
+
   const verifyCommuteOnServer = async (
     action: 'check_in' | 'check_out',
     dateKey: string,
-  ): Promise<string | null> => {
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) return null;
+  ): Promise<CommuteVerifyOutcome> => {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return COMMUTE_VERIFY_FALLBACK;
     const loc = lastResolvedLocationRef.current;
     const isBypassed = bypassedRef.current;
     // 우회로 통과한 건은 좌표를 새로 잰 적이 없다 — 낡은 캐시를 진짜 측정값인 양 보내지 않는다.
@@ -847,11 +853,18 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
           clientTime: new Date().toISOString(),
           clientBypass: isBypassed }),
       });
-      if (!res.ok) return null;
-      const json = (await res.json()) as { serverTime?: string };
-      return typeof json.serverTime === 'string' ? json.serverTime : null;
+      if (!res.ok) return COMMUTE_VERIFY_FALLBACK;
+      const json = (await res.json()) as {
+        serverTime?: string;
+        blocked?: boolean;
+        blockReason?: string | null;
+      };
+      return {
+        serverTime: typeof json.serverTime === 'string' ? json.serverTime : null,
+        blocked: json.blocked === true,
+        blockReason: json.blockReason ?? null };
     } catch {
-      return null; // 검증 실패가 출퇴근을 막지는 않는다.
+      return COMMUTE_VERIFY_FALLBACK; // 검증 실패는 위반이 아니다.
     }
   };
 
@@ -868,10 +881,16 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
     }
 
     // 2. 서버 검증 — 좌표를 서버가 다시 재고, 기록에 쓸 권위 시각을 받는다.
-    const serverTime = await verifyCommuteOnServer(
+    const verified = await verifyCommuteOnServer(
       type === 'in' ? 'check_in' : 'check_out',
       formatLocalDateKey(new Date()),
     );
+    if (verified.blocked) {
+      toast(verified.blockReason || '사업장 반경 밖에서는 출퇴근을 기록할 수 없습니다.', 'error');
+      setIsProcessing(false);
+      return;
+    }
+    const serverTime = verified.serverTime;
 
     // 3. 위치 인증 성공 시 DB 기록 시작
     //    지각 판정까지 서버 시각 기준으로 한다 — 단말 시계를 되돌려 지각을 정상으로
