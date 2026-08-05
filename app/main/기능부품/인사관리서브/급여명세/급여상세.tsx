@@ -1,6 +1,7 @@
 'use client';
 import { logger } from '@/lib/logger';
 import { getKoreanMonthString } from '@/lib/seoul-time';
+import { formatDateLabel as formatKstDateLabel } from '@/lib/date-formatter';
 
 import { useEffect, useMemo, useState } from 'react';
 import { db } from '@/lib/db-client';
@@ -20,11 +21,11 @@ function toNumber(value: unknown) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+// 정본(lib/date-formatter.formatDateLabel)에 위임 — 사본 복제로 생기던
+// timeZone drift 를 없앤다(8차 D12-012).
 function formatDateLabel(value?: string | null) {
   if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
+  return formatKstDateLabel(value);
 }
 
 function InfoItem({

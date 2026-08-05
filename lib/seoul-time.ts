@@ -5,6 +5,13 @@
  * 사용하면 KST 자정 직전에 다음날로 잘못 인식한다 (예: KST 23:00 = UTC 14:00 다음날 00:00).
  *
  * 모든 DB insert·cron·통계 키는 이 헬퍼를 사용해 KST 기준으로 통일.
+ *
+ * ── 날짜/시각 모듈 역할 분담 (8차 D10-011 정리) ──
+ * - `lib/seoul-time`   : **KST 기준 '지금'** 을 만든다. 서버(UTC 런타임)·크론·통계 키는 여기만 쓴다.
+ * - `lib/date-formatter`: 저장된 값을 **읽고 표시**한다. 공백형 DB 타임스탬프 해석은
+ *                         `parseDbTimestamp`(=UTC 고정) 하나로 통일한다.
+ * - `lib/date-utils`   : 달력 UI 용 **로컬 TZ 날짜 키**(`toDateKey`)와 월 경계 계산.
+ *   → 서버 코드에서 `toDateKey`/`new Date().toISOString().slice(0,10)` 를 쓰면 UTC 로 새므로 금지.
  */
 
 export const SEOUL_TIME_ZONE = 'Asia/Seoul';

@@ -8,6 +8,7 @@ import {
 import { logD1MirrorFailure, logD1BindingMissing } from './db/mirror-metrics';
 import { sql, eq } from 'drizzle-orm';
 import { emitRealtimeSignal } from './realtime/server-signal';
+import { parseDbTimestampMs } from './date-formatter';
 
 const recentAdminAlertDispatches = new Map<string, number>();
 
@@ -112,16 +113,13 @@ export function getInitials(name: string, fallback = '?'): string {
   return trimmed.slice(0, 2).toUpperCase();
 }
 
-/** D1 UTC timestamp 문자열(timezone 표기 없음)을 안전하게 파싱. */
+/**
+ * D1 UTC timestamp 문자열(timezone 표기 없음)을 안전하게 파싱.
+ * 규약 정본은 lib/date-formatter.parseDbTimestampMs — 같은 규칙을 세 파일에
+ * 복제해 두었다가 서로 갈라진 전례가 있어 위임만 한다(8차 D10-009).
+ */
 function parseTimestampMs(value: number | string): number {
-  if (typeof value === 'number') return value;
-  const raw = String(value).trim();
-  if (!raw) return NaN;
-  // 이미 Z 또는 오프셋이 있으면 그대로 파싱
-  if (/[zZ]$/.test(raw) || /[+-]\d{2}:?\d{2}$/.test(raw)) return new Date(raw).getTime();
-  // D1 UTC 문자열("YYYY-MM-DD HH:MM:SS") → +00:00 오프셋 부여
-  if (/\d{2}:\d{2}/.test(raw)) return new Date(`${raw.replace(' ', 'T')}+00:00`).getTime();
-  return new Date(raw).getTime();
+  return parseDbTimestampMs(value);
 }
 
 export function timeAgo(value: number | string): string {

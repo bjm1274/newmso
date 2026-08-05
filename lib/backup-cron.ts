@@ -156,7 +156,18 @@ export async function runBackup(type: BackupType): Promise<BackupResult> {
   let totalRows = 0;
   let totalBytes = 0;
   const now = new Date();
-  const iso = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  // 폴더키의 날짜와 시각은 **둘 다 KST** 다.
+  //
+  // 예전에는 dateOnly 만 KST(formatKoreanDateKey)이고 뒤에 붙는 타임스탬프는
+  // UTC(toISOString)였다. 24h 백업 크론이 KST 00:00(=UTC 전날 15:00)에 도는 탓에
+  // 두 날짜가 상시 하루씩 어긋나(`mso-full-2026-03-01-2026-02-28T15-00-00`)
+  // 운영자가 폴더만 보고는 어느 날 백업인지 판단할 수 없었다(8차 D10-013).
+  // 문자열 모양(YYYY-MM-DDTHH-MM-SS)과 사전순 단조성은 그대로 유지한다.
+  const kstStamp = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+    .toISOString()
+    .replace(/[:.]/g, '-')
+    .slice(0, 19);
+  const iso = kstStamp;
   const dateOnly = formatKoreanDateKey(now);
 
   // **테이블별로 따로 올린다. 전부 모아서 한 파일로 만들면 워커가 죽는다.**

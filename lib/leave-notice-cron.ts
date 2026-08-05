@@ -17,6 +17,7 @@ import {
   inArray,
   desc } from '@/lib/db';
 import { enqueueChatPushJob } from '@/lib/chat-push-enqueue';
+import { toUtcSqlTimestamp } from '@/lib/chat-read-cursors';
 
 type D1Db = ReturnType<typeof getD1Drizzle>;
 
@@ -209,7 +210,15 @@ export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNo
   let skipped = 0;
   let failed = 0;
   const errors: string[] = [];
-  // 항상 KST 오전 09:00 (UTC 00:00)을 메시지 발송 시간으로 고정하여 지연 시에도 09:00으로 표시되게 함
+  // 항상 KST 오전 09:00 (UTC 00:00)을 메시지 발송 시간으로 고정하여 지연 시에도 09:00으로 표시되게 함.
+  //
+  // 형식이 공백형(UTC)인 이유 — messages.created_at / chat_rooms.last_message_at 은
+  // 전 행이 SQLite CURRENT_TIMESTAMP 의 공백형이고, /api/realtime/tail 은 TEXT 를
+  // 사전순 `ORDER BY DESC LIMIT 1` 로 읽는다. 예전처럼 ISO 를 넣으면
+  // ' '(0x20) < 'T'(0x54) 라 그 UTC 날짜 내내 이 행이 max 로 고정돼 변경감지가
+  // 멈추고 공지방 정렬도 뒤집혔다(8차 D10-001). 절대시각은 그대로, 표기만 맞춘다.
+  const nowSqlUtc = `${targetDate} 00:00:00`;
+  // meta_data(JSON)는 사전순 비교 대상이 아니라 ISO 를 유지한다 — 같은 절대시각.
   const nowIso = `${targetDate}T00:00:00.000Z`;
 
   for (const approval of dueApprovals) {
@@ -242,7 +251,7 @@ export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNo
       sender_id: null,
       sender_name: '공지봇',
       content,
-      created_at: nowIso };
+      created_at: nowSqlUtc };
 
     // 메시지 INSERT — id가 결정적(deterministic)이라 중복은 onConflictDoNothing.
     // returning 결과가 비어 있으면 이미 발송된 공지(중복).
@@ -265,7 +274,7 @@ export async function dispatchDueLeaveNotices(now = new Date()): Promise<LeaveNo
       try {
         await updateChatRoomLastMessage(db, {
           room_id: LEAVE_NOTICE_ROOM_ID,
-          created_at: nowIso,
+          created_at: nowSqlUtc,
           content });
         await enqueueChatPushJob({
           messageId,
@@ -363,13 +372,15 @@ export async function announceLeaveApprovalIfNeeded(
     delegateName: leaveMeta.delegateName });
 
   const nowIso = now.toISOString();
+  // messages/chat_rooms 는 공백형(UTC)이 컬럼 규약이다 — 위 크론과 같은 이유(8차 D10-001).
+  const nowSqlUtc = toUtcSqlTimestamp(nowIso);
   const messageRow = {
     id: messageId,
     room_id: LEAVE_NOTICE_ROOM_ID,
     sender_id: null,
     sender_name: '공지봇',
     content,
-    created_at: nowIso };
+    created_at: nowSqlUtc };
 
   let duplicateMessage = false;
   try {
@@ -388,7 +399,7 @@ export async function announceLeaveApprovalIfNeeded(
     try {
       await updateChatRoomLastMessage(db, {
         room_id: LEAVE_NOTICE_ROOM_ID,
-        created_at: nowIso,
+        created_at: nowSqlUtc,
         content });
       await enqueueChatPushJob({
         messageId,

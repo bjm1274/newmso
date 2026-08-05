@@ -5,13 +5,14 @@
 
 import { formatDateLabel } from './schedule-helpers';
 import type { PatientCheckState } from './patient-check-helpers';
+import { parseDbTimestamp } from '@/lib/date-formatter';
 
-/** D1 KST timestamp(timezone 표기 없음)을 KST 기준 Date로 파싱. */
+/**
+ * D1 타임스탬프 → Date. 공백형은 **UTC**(= `DEFAULT CURRENT_TIMESTAMP` 가 넣는 값)로 읽는다.
+ * 예전에는 `+09:00` 으로 읽어 공백형 행이 9시간 이르게 인쇄될 수 있었다(8차 D10-009).
+ */
 function parseD1KstDate(value: string): Date {
-  const raw = value.trim();
-  if (/[zZ]$/.test(raw) || /[+-]\d{2}:?\d{2}$/.test(raw)) return new Date(raw);
-  if (/\d{2}:\d{2}/.test(raw)) return new Date(`${raw.replace(' ', 'T')}+09:00`);
-  return new Date(raw);
+  return parseDbTimestamp(value);
 }
 
 type OpCheckPrintModalProps = {

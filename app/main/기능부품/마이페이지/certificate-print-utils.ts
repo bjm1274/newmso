@@ -14,6 +14,7 @@
 
 import { toast } from '@/lib/toast';
 import { escapeHtml } from '@/lib/escape-html';
+import { formatDateLabel as formatKstDateLabel } from '@/lib/date-formatter';
 import { buildApprovalPrintHtml, openApprovalPrintView } from '../전자결재서브/approval-print-utils';
 import { DEFAULT_APPROVAL_TEMPLATE_DESIGN } from '../전자결재서브/approval-constants';
 import { BUILTIN_TEMPLATE_DEFAULTS } from '../관리자전용서브/전자결재양식관리/design-utils';
@@ -29,11 +30,12 @@ export function sanitizeFilename(value: string) {
     .slice(0, 80);
 }
 
+// 정본(lib/date-formatter.formatDateLabel)에 위임한다. 예전에는 같은 로직을
+// 여기·증명서발급·급여상세에 각각 복제해 두었고, 정본만 timeZone 이 없어
+// 네 곳의 결과가 갈렸다(8차 D12-012). 빈 값 폴백만 화면별로 다르게 남긴다.
 function formatDateLabel(value?: string | null) {
-  if (!value) return new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
+  if (!value) return formatKstDateLabel(new Date().toISOString());
+  return formatKstDateLabel(value);
 }
 
 // ─────────────────────────────────────────────

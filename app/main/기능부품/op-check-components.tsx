@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { EmptyState } from '@/app/components/StatePanel';
 import { ANESTHESIA_OPTIONS } from './OP체크/constants';
+import { parseDbTimestamp } from '@/lib/date-formatter';
 
 type StatusTabOption = {
   value: string;
@@ -250,16 +251,13 @@ export function OpCheckScheduleList<T extends ScheduleListItem>({
   );
 }
 
-function parseD1KstDate(value: string): Date {
-  const raw = value.trim();
-  if (/[zZ]$/.test(raw) || /[+-]\d{2}:?\d{2}$/.test(raw)) return new Date(raw);
-  if (/\d{2}:\d{2}/.test(raw)) return new Date(`${raw.replace(' ', 'T')}+09:00`);
-  return new Date(raw);
-}
-
 function formatEventTime(value?: string | null) {
   if (!value) return '';
-  return parseD1KstDate(value).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' });
+  // 예전에는 공백형 타임스탬프를 `+09:00`(KST)으로 읽었다. 그러나 이 컬럼들에
+  // 공백형이 들어오는 유일한 경로는 `DEFAULT CURRENT_TIMESTAMP`(=UTC)라
+  // 값이 실제보다 9시간 이르게 표시될 수 있었다(8차 D10-009).
+  // 해석은 UTC 고정 정본 파서로, 표시만 KST 로 한다.
+  return parseDbTimestamp(value).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' });
 }
 
 function getDurationMinutes(start?: string | null, end?: string | null) {

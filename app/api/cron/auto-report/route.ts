@@ -10,6 +10,7 @@ import {
   getD1Drizzle,
   eq } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
+import { getKoreanMonthString } from '@/lib/seoul-time';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,8 +24,10 @@ export async function GET(request: Request) {
   }
 
   try {
-    const now = new Date();
-    const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    // 보고서 대상 월은 KST 기준이어야 한다. 예전에는 런타임 로컬(=워커 UTC) 달력을 썼고,
+    // KST 1일 00:00~08:59 에 실행되면 UTC 로는 아직 전월이라 전월 period 로 보고서를
+    // 만들었다(8차 D10-008).
+    const period = getKoreanMonthString();
 
     // 활성 스케줄 조회
     type ScheduleRow = { id: string; report_type: string; company_id: string | null; recipients: string[] | string | null; enabled: number | boolean };
@@ -107,7 +110,7 @@ export async function GET(request: Request) {
             const db = getD1Drizzle(d1);
             await db
               .update(reportSchedulesTable)
-              .set({ last_generated_at: now.toISOString() })
+              .set({ last_generated_at: new Date().toISOString() })
               .where(eq(reportSchedulesTable.id, schedule.id));
           }
         }

@@ -24,6 +24,7 @@ import {
 import type { ChatMessage, ChatRoom, ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
 import { db } from '@/lib/db-client';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 import { pokeChannel, subscribeRealtime, type TableFilter } from '@/lib/realtime-bus';
 import { logger } from '@/lib/logger';
 import { buildStorageInlineUrl, buildStorageDownloadUrl } from '@/lib/object-storage-url';
@@ -722,7 +723,10 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
           user_id: userId,
           content: `[채팅] ${content}`,
           is_complete: false,
-          task_date: new Date().toISOString().slice(0, 10),
+          // todos.task_date 는 KST 날짜키다(PC 는 getKoreanTodayString 사용).
+          // 예전에는 toISOString().slice(0,10) 로 UTC 날짜를 넣어, KST 00:00~08:59 에
+          // 등록한 할 일이 '어제' 목록으로 들어가 오늘 화면에 보이지 않았다(8차 D10-006).
+          task_date: getKoreanTodayString(),
           source_message_id: message.id,
           source_room_id: message.room_id }]);
       if (error) throw error;

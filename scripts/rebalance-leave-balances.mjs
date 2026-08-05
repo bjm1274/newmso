@@ -8,6 +8,8 @@
  * Usage: node scripts/rebalance-leave-balances.mjs [--year=2026] [--dry-run]
  */
 import { execSync } from 'node:child_process';
+// 전역 crypto 에 기대지 않고 명시 임포트 — Node 19 미만에서는 노출되지 않는다.
+import { randomUUID } from 'node:crypto';
 import { writeFileSync, unlinkSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -248,14 +250,18 @@ for (const s of staffs) {
       prev: { total: prevTotal, used: prevUsed, remaining: prevRem },
       next: { total: totalDays, used: usedDays, remaining, expired, source: granted.source },
     });
+    // 시각은 datetime('now') — leave_balances.created_at/updated_at 은 앱 쪽에서
+    // 아무도 값을 넣지 않아 전 행이 DEFAULT (CURRENT_TIMESTAMP) 의 공백형(UTC)이다.
+    // 예전에는 이 스크립트만 toISOString() 의 ISO 를 넣어 같은 컬럼에 두 형식이
+    // 섞였고, TEXT 사전순 비교에서 ' '(0x20) < 'T'(0x54) 라 정렬이 어긋났다(8차 D11-017).
     if (bal?.id) {
       updates.push(
-        `UPDATE leave_balances SET total_days=${totalDays}, used_days=${usedDays}, remaining_days=${remaining}, expired_days=${expired}, compensated_days=${compensated}, updated_at='${new Date().toISOString()}' WHERE id='${esc(bal.id)}';`,
+        `UPDATE leave_balances SET total_days=${totalDays}, used_days=${usedDays}, remaining_days=${remaining}, expired_days=${expired}, compensated_days=${compensated}, updated_at=datetime('now') WHERE id='${esc(bal.id)}';`,
       );
     } else {
-      const id = crypto.randomUUID();
+      const id = randomUUID();
       inserts.push(
-        `INSERT INTO leave_balances (id, staff_id, year, total_days, used_days, remaining_days, expired_days, compensated_days, created_at, updated_at) VALUES ('${id}', '${esc(sid)}', ${YEAR}, ${totalDays}, ${usedDays}, ${remaining}, ${expired}, ${compensated}, '${new Date().toISOString()}', '${new Date().toISOString()}');`,
+        `INSERT INTO leave_balances (id, staff_id, year, total_days, used_days, remaining_days, expired_days, compensated_days, created_at, updated_at) VALUES ('${id}', '${esc(sid)}', ${YEAR}, ${totalDays}, ${usedDays}, ${remaining}, ${expired}, ${compensated}, datetime('now'), datetime('now'));`,
       );
     }
   }

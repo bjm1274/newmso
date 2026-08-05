@@ -7,6 +7,7 @@
  * 26시간(1560분). 중복은 loadExistingDedupeKeys(7일) 로 차단.
  */
 import 'server-only';
+import { toUtcSqlTimestamp } from '@/lib/chat-read-cursors';
 import {
   type CheckJobResult,
   type NotificationInsertRow,
@@ -66,7 +67,14 @@ function resolveAttendanceEvent(row: AttendanceRow): {
 }
 
 export async function checkAttendanceEvents(): Promise<CheckJobResult> {
-  const cutoff = new Date(Date.now() - ATTENDANCE_LOOKBACK_MIN * 60 * 1000).toISOString();
+  // cutoff 는 공백형(UTC) — attendance.created_at 의 지배적 형식과 맞춘다.
+  // 예전에는 toISOString() 을 그대로 썼는데, TEXT 사전순 비교에서 ' '(0x20) < 'T'(0x54)
+  // 라 같은 날짜의 공백형 행이 전부 cutoff 미만으로 떨어졌다. 그 결과 26시간 lookback 이
+  // 실제로는 UTC 00:00~실행시각(=KST 09:00~12:00) 3시간만 훑었다(8차 D02-001).
+  // 공백형 기준으로 낮추면 ISO 행은 같은 날짜까지 약간 과포함되지만 dedupe(7일)가 막는다.
+  const cutoff = toUtcSqlTimestamp(
+    new Date(Date.now() - ATTENDANCE_LOOKBACK_MIN * 60 * 1000).toISOString(),
+  );
   const d1 = await getD1Binding();
   if (!d1) return { detected: 0, created: 0, errors: ['[check-attendance] D1 binding not available'] };
   const db = getD1Drizzle(d1);

@@ -3,6 +3,7 @@ import type { ChatRoom, StaffMember } from '@/types';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
 import { getKoreanTodayString as _getKoreanTodayStringFromSeoul } from '@/lib/seoul-time';
+import { parseDbTimestamp, parseDbTimestampMs } from '@/lib/date-formatter';
 export { NOTICE_ROOM_ID };
 export const NOTICE_ROOM_NAME = '공지사항';
 export const SELF_ROOM_NAME = '나와의 채팅';
@@ -28,16 +29,10 @@ const RESIGNED_STATUSES = new Set(['\uD1F4\uC0AC', '\uD1F4\uC9C1']);
  */
 export function toChatDate(value?: string | number | null): Date {
   if (value === null || value === undefined || value === '') return new Date(0);
-  if (typeof value === 'number') return new Date(value);
-  const raw = String(value).trim();
-  if (!raw) return new Date(0);
-  if (/^\d{10,13}$/.test(raw)) {
-    const num = Number(raw);
-    return new Date(raw.length === 10 ? num * 1000 : num);
-  }
-  if (/[zZ]$/.test(raw) || /[+-]\d{2}:?\d{2}$/.test(raw)) return new Date(raw);
-  if (/\d{2}:\d{2}/.test(raw)) return new Date(`${raw.replace(' ', 'T')}+00:00`);
-  return new Date(raw);
+  // 해석 규약은 lib/date-formatter.parseDbTimestamp 로 일원화(8차 D10-009).
+  // 예전에는 같은 규칙을 이 파일에도 한 벌 복제해 두었고, 그 사이 다른 화면의
+  // 사본이 +09:00/무접미로 갈라져 같은 행이 화면마다 다른 시각으로 보였다.
+  return parseDbTimestamp(value);
 }
 
 export type WardMessageMeta = {
@@ -131,10 +126,10 @@ export function extractWardMessageMeta(value: unknown): {
 export function sortChatRoomsWithNoticeFirst(rooms: ChatRoom[]): ChatRoom[] {
   const notice = rooms.find((room: ChatRoom) => room.id === NOTICE_ROOM_ID);
   const others = rooms.filter((room: ChatRoom) => room.id !== NOTICE_ROOM_ID).sort((a: ChatRoom, b: ChatRoom) => {
-    const atStr = String(a.last_message_at || a.created_at || 0).replace(' ', 'T');
-    const btStr = String(b.last_message_at || b.created_at || 0).replace(' ', 'T');
-    const at = new Date(atStr).getTime();
-    const bt = new Date(btStr).getTime();
+    // 예전에는 공백을 'T' 로만 바꿔 파싱해 디바이스 로컬 TZ 로 새어 나갔다.
+    // 공백형은 UTC 라는 규약을 파서 한 곳에서 지킨다(8차 D10-009).
+    const at = parseDbTimestampMs(a.last_message_at || a.created_at || 0);
+    const bt = parseDbTimestampMs(b.last_message_at || b.created_at || 0);
     const aMs = Number.isFinite(at) ? at : 0;
     const bMs = Number.isFinite(bt) ? bt : 0;
     if (bMs !== aMs) return bMs - aMs;

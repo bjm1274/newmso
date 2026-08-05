@@ -95,8 +95,15 @@ export async function processBirthdayAnnouncements(
   let addedToWelfare = 0;
   let postedToChat = 0;
   const errors: string[] = [];
-  // 항상 KST 오전 09:00 (UTC 00:00)을 메시지 발송 시간으로 고정하여 지연 시에도 09:00으로 표시되게 함
-  const nowIso = `${kstDateStr}T00:00:00.000Z`;
+  // 항상 KST 오전 09:00 (UTC 00:00)을 메시지 발송 시간으로 고정하여 지연 시에도 09:00으로 표시되게 함.
+  //
+  // 형식이 공백형(UTC)인 이유 — 예전에는 같은 절대시각을 ISO(`...T00:00:00.000Z`)로 넣었는데,
+  // messages.created_at / chat_rooms.last_message_at 은 전 행이 SQLite CURRENT_TIMESTAMP 의
+  // 공백형이고 /api/realtime/tail 이 TEXT 를 사전순 `ORDER BY DESC LIMIT 1` 로 읽는다.
+  // ' '(0x20) < 'T'(0x54) 이라 그 UTC 날짜 내내 이 ISO 행이 max 로 고정돼 변경감지가 멈추고,
+  // 공지방 정렬에서도 이후 메시지가 생일 메시지 앞(과거 위치)에 끼워졌다(8차 D10-001).
+  // 절대시각은 그대로 두고 표기만 컬럼 규약에 맞춘다.
+  const nowSqlUtc = `${kstDateStr} 00:00:00`;
 
   for (const staff of birthdayStaffs) {
     const welfareId = buildDeterministicId('welfare', staff.id, yearStr);
@@ -137,7 +144,7 @@ ${staff.name}님, 오늘 세상에서 가장 특별하고 행복한 하루 보�
       sender_id: null,
       sender_name: '공지봇',
       content,
-      created_at: nowIso };
+      created_at: nowSqlUtc };
 
     try {
       const inserted = await db
@@ -154,12 +161,12 @@ ${staff.name}님, 오늘 세상에서 가장 특별하고 행복한 하루 보�
           .update(chatRoomsTable)
           .set({
             last_message: content,
-            last_message_at: nowIso,
+            last_message_at: nowSqlUtc,
             last_message_preview: content.slice(0, 80) })
           .where(
             and(
               eq(chatRoomsTable.id, NOTICE_ROOM_ID),
-              or(isNull(chatRoomsTable.last_message_at), lte(chatRoomsTable.last_message_at, nowIso)),
+              or(isNull(chatRoomsTable.last_message_at), lte(chatRoomsTable.last_message_at, nowSqlUtc)),
             ),
           )
           .run();
@@ -217,7 +224,7 @@ ${staff.name}님, 오늘 세상에서 가장 특별하고 행복한 하루 보�
         sender_id: null,
         sender_name: '공지봇',
         content: eventContent,
-        created_at: nowIso };
+        created_at: nowSqlUtc };
 
       try {
         const inserted = await db
@@ -233,12 +240,12 @@ ${staff.name}님, 오늘 세상에서 가장 특별하고 행복한 하루 보�
             .update(chatRoomsTable)
             .set({
               last_message: eventContent,
-              last_message_at: nowIso,
+              last_message_at: nowSqlUtc,
               last_message_preview: eventContent.slice(0, 80) })
             .where(
               and(
                 eq(chatRoomsTable.id, NOTICE_ROOM_ID),
-                or(isNull(chatRoomsTable.last_message_at), lte(chatRoomsTable.last_message_at, nowIso)),
+                or(isNull(chatRoomsTable.last_message_at), lte(chatRoomsTable.last_message_at, nowSqlUtc)),
               ),
             )
             .run();

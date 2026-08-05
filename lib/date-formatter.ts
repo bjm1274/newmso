@@ -4,13 +4,55 @@
  * 날짜 포맷 함수들을 통합
  */
 
-/** ISO 날짜 문자열 → 한국 날짜 형식 (예: 2024. 1. 5.) */
+/**
+ * DB(TEXT) 타임스탬프 문자열 → epoch ms. **공백형은 UTC 로 고정 해석한다.**
+ *
+ * 왜 이 함수가 생겼는가 — D1 의 `DEFAULT CURRENT_TIMESTAMP` 는
+ * `'YYYY-MM-DD HH:MM:SS'`(UTC)를 넣는데, 저장소 안에 같은 문자열을
+ * ① `+00:00`(알림 유틸) ② `+09:00`(OP체크) ③ 접미사 없이 디바이스 로컬 TZ
+ * 세 가지로 읽는 파서가 따로 있었다. 그래서 같은 행이 화면마다 최대 18시간까지
+ * 어긋났다(8차 감사 D10-009). 해석 규약을 여기 한 곳으로 모은다.
+ *
+ * - 숫자 / 10·13자리 숫자문자열 → epoch(초·밀리초)
+ * - `Z` 또는 `±HH:MM` 접미사 → 그대로 신뢰
+ * - 공백형(`YYYY-MM-DD HH:MM:SS`) → **UTC**
+ * - 그 밖(날짜만 등) → 런타임 기본 파싱
+ */
+export function parseDbTimestampMs(value: unknown): number {
+  if (typeof value === 'number') return value;
+  const raw = String(value ?? '').trim();
+  if (!raw) return NaN;
+  if (/^\d{10}$/.test(raw)) return Number(raw) * 1000;
+  if (/^\d{13}$/.test(raw)) return Number(raw);
+  if (/[zZ]$/.test(raw) || /[+-]\d{2}:?\d{2}$/.test(raw)) return new Date(raw).getTime();
+  // 공백형 = UTC. 'T' 로 바꾸고 +00:00 을 명시해야 로컬 TZ 로 새지 않는다.
+  if (/\d{2}:\d{2}/.test(raw)) return new Date(`${raw.replace(' ', 'T')}+00:00`).getTime();
+  return new Date(raw).getTime();
+}
+
+/** `parseDbTimestampMs` 의 Date 판. 파싱 불가면 Invalid Date 를 그대로 돌려준다. */
+export function parseDbTimestamp(value: unknown): Date {
+  return new Date(parseDbTimestampMs(value));
+}
+
+/**
+ * 날짜 문자열 → 한국 날짜 형식 (예: 2024. 1. 5.).
+ *
+ * **날짜 전용 입력만 받는다** (`YYYY-MM-DD`). 타임스탬프를 넣지 말 것 —
+ * 시각이 붙은 값의 '날짜' 는 어느 시간대에서 보느냐에 따라 달라지므로
+ * 그 판단은 호출부가 `parseDbTimestamp` 로 명시해야 한다.
+ *
+ * 왜 `timeZone` 이 붙었는가 — 예전에는 timeZone 을 지정하지 않아
+ * `new Date('2026-05-02')`(=UTC 자정)를 렌더 환경의 로컬 TZ 로 포맷했다.
+ * KST·UTC 에서는 우연히 맞았지만 음수 오프셋 디바이스에서는 하루 전으로 밀렸고,
+ * 같은 함수의 사본 3곳은 이미 `Asia/Seoul` 을 박아 두어 정본만 달랐다(8차 D12-012).
+ */
 export function formatDateLabel(value: unknown): string {
   const raw = String(value ?? '').trim();
   if (!raw) return '';
   const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) return raw;
-  return parsed.toLocaleDateString('ko-KR');
+  return parsed.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
 }
 
 /** "YYYY-MM" 형식 → "YYYY년 M월" */

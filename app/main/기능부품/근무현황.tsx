@@ -5,6 +5,7 @@ import { db } from '@/lib/db-client';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import { isActiveStaff } from '@/lib/active-staff';
 import { toDateKey } from '@/lib/date-utils';
+import { parseDbTimestamp } from '@/lib/date-formatter';
 import { withMissingColumnFallback } from '@/lib/db-compat';
 import { buildShiftLookup, resolveAssignedShift } from '@/lib/shift-resolution';
 import { getStaffShiftsBatch, type StaffShiftEntry } from '@/lib/staff-shift-resolver';
@@ -109,7 +110,10 @@ function formatClockLabel(value?: string | null) {
   const raw = String(value).trim();
   const normalizedRaw = raw.includes(' ') && !raw.includes('T') ? raw.replace(' ', 'T') : raw;
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(normalizedRaw)) {
-    const parsed = new Date(normalizedRaw);
+    // 예전에는 정규화한 문자열을 그대로 new Date() 에 넘겼다 — 공백형(UTC)에는
+    // 오프셋이 없어 브라우저에서는 KST 로, 서버에서는 UTC 로 읽히며 9시간 갈렸다(8차 D10-009).
+    // 해석은 UTC 고정 정본 파서로, 표시만 KST 로 한다.
+    const parsed = parseDbTimestamp(value);
     if (!Number.isNaN(parsed.getTime())) {
       // Cloudflare Workers/SSR 환경의 시스템 timezone이 UTC라
       // timeZone: 'Asia/Seoul'을 명시하지 않으면 KST 변환이 누락된다.

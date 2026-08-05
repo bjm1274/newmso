@@ -6,6 +6,7 @@
  * lookback: 인앱 cron 일 1회 piggyback 누락 방지용 26시간. dedupe(7일)로 중복 차단.
  */
 import 'server-only';
+import { toUtcSqlTimestamp } from '@/lib/chat-read-cursors';
 import {
   type CheckJobResult,
   type NotificationInsertRow,
@@ -30,7 +31,11 @@ type PayrollRow = {
 const PAYROLL_LOOKBACK_MIN = 26 * 60;
 
 export async function checkPayrollSettled(): Promise<CheckJobResult> {
-  const cutoff = new Date(Date.now() - PAYROLL_LOOKBACK_MIN * 60 * 1000).toISOString();
+  // cutoff 를 ISO 로 만들면 공백형(UTC) created_at 행이 사전순 비교에서 전부 탈락해
+  // 26시간 lookback 이 3시간으로 줄어들었다(8차 D02-001). 공백형으로 통일한다.
+  const cutoff = toUtcSqlTimestamp(
+    new Date(Date.now() - PAYROLL_LOOKBACK_MIN * 60 * 1000).toISOString(),
+  );
   const d1 = await getD1Binding();
   if (!d1) return { detected: 0, created: 0, errors: ['[check-payroll] D1 binding not available'] };
   const db = getD1Drizzle(d1);

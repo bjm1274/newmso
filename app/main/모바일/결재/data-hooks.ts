@@ -31,6 +31,7 @@ import {
   defaultResolveStoredCurrentApproverId,
 } from '@/lib/approval-inbox';
 import { resolveStoredCurrentApproverId, resolveEffectiveApproverIdCore } from '@/lib/approval-shared';
+import { toUtcSqlTimestamp } from '@/lib/chat-read-cursors';
 
 // ─────────────────────────────────────────────
 // 타입
@@ -296,11 +297,19 @@ export async function generateMobileDocNumber(params: {
     const dayEnd = new Date(dayStart);
     dayEnd.setDate(dayEnd.getDate() + 1);
 
+    // 경계값을 공백형(UTC)으로 맞춘다. approvals.created_at 은 DEFAULT CURRENT_TIMESTAMP 의
+    // 공백형이고 d1 query 라우트는 값을 그대로 바인딩하므로 이 비교는 TEXT 사전순이다.
+    // 예전처럼 toISOString() 을 넘기면 ' '(0x20) < 'T'(0x54) 라 하루의 앞부분(KST 00:00~09:00)
+    // 기안분이 창에서 통째로 빠졌고, 문서번호 dateStamp 는 KST 기준이라 그 새벽 문서들이
+    // 모두 sequence 1 을 받아 **같은 문서번호가 중복 발급**될 수 있었다(8차 D10-005).
+    const windowStart = toUtcSqlTimestamp(dayStart.toISOString());
+    const windowEnd = toUtcSqlTimestamp(dayEnd.toISOString());
+
     let countQuery = db
       .from('approvals')
       .select('id', { count: 'exact', head: true })
-      .gte('created_at', dayStart.toISOString())
-      .lt('created_at', dayEnd.toISOString());
+      .gte('created_at', windowStart)
+      .lt('created_at', windowEnd);
 
     if (params.companyId) countQuery = countQuery.eq('company_id', params.companyId);
     else if (params.companyName) countQuery = countQuery.eq('sender_company', params.companyName);

@@ -3,6 +3,8 @@
  * 여러 컴포넌트에서 중복 사용되던 날짜 계산 로직을 통합
  */
 
+import { formatDateLabel } from '@/lib/date-formatter';
+
 /**
  * "YYYY-MM" 형식의 월 문자열에서 해당 월의 첫째 날과 마지막 날을 반환
  * @param yearMonth - "YYYY-MM" 형식 (예: "2026-05")
@@ -18,14 +20,14 @@ export function getMonthBoundaries(yearMonth: string): { startDate: string; endD
 /**
  * 날짜 값을 한국어 표시 포맷으로 변환 (예: "2026-05-02" → "2026. 5. 2.")
  * 값이 없으면 "현재" 반환, 파싱 불가 시 원본 반환.
- * 표시 포맷 SSOT 는 date-formatter.formatDateLabel 과 동일 엔진.
+ *
+ * 예전에는 "lazy import 회피" 를 이유로 date-formatter 와 같은 로직을 여기에
+ * 한 벌 더 두었는데, 정본에 `timeZone: 'Asia/Seoul'` 이 붙는 순간 이쪽만
+ * 로컬 TZ 로 남아 두 함수의 결과가 갈렸다(8차 D12-012). 이제 정본에 위임한다.
  */
 export function formatDateDisplay(value?: string | null): string {
   if (!value) return '현재';
-  // lazy import 회피 — 동일 로직 (date-formatter 와 일치)
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('ko-KR');
+  return formatDateLabel(value) || value;
 }
 
 /** 금액 표시 — date-formatter.formatWon 과 동일 SSOT 경로로 re-export */

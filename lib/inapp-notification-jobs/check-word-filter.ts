@@ -13,6 +13,7 @@
  *    별도 동기화 채널 필요 (현재 범위 밖. 후속 phase 에서 신규 테이블로 확장 가능).
  */
 import 'server-only';
+import { toUtcSqlTimestamp } from '@/lib/chat-read-cursors';
 import {
   type CheckJobResult,
   type NotificationInsertRow,
@@ -82,7 +83,11 @@ export async function checkWordFilter(): Promise<CheckJobResult> {
   const banned = parseBannedWordsEnv();
   if (banned.length === 0) return emptyResult();
 
-  const cutoff = new Date(Date.now() - MESSAGE_LOOKBACK_MIN * 60 * 1000).toISOString();
+  // messages.created_at 은 전 행이 공백형(UTC) 이라 ISO cutoff 로는 사전순 비교가
+  // 뒤집혀 하루 중 3시간분만 스캔됐다(8차 D02-001). cutoff 도 공백형으로 맞춘다.
+  const cutoff = toUtcSqlTimestamp(
+    new Date(Date.now() - MESSAGE_LOOKBACK_MIN * 60 * 1000).toISOString(),
+  );
   const d1 = await getD1Binding();
   if (!d1) return { detected: 0, created: 0, errors: ['[check-word-filter] D1 binding not available'] };
   const db = getD1Drizzle(d1);

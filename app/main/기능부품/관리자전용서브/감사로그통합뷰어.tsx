@@ -8,6 +8,7 @@ import { useIsMobile } from '@/app/components/useIsMobile';
 import { DesktopOnlyNotice } from '@/app/components/DesktopOnlyNotice';
 import { escapeLikePattern } from '@/lib/like-escape';
 import { getKoreanTodayString, formatKoreanDateKey } from '@/lib/seoul-time';
+import { parseDbTimestamp, parseDbTimestampMs } from '@/lib/date-formatter';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 
 // ==========================================
@@ -34,7 +35,7 @@ function AuditRow({ index, style, logs }: {
       className="flex items-center text-xs border-b border-[var(--border)] hover:bg-[var(--muted)]"
     >
       <div className="w-[30%] px-2 font-mono text-[11px] whitespace-nowrap truncate">
-        {new Date(l.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
+        {parseDbTimestamp(l.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
       </div>
       <div className="w-[20%] px-2 font-bold whitespace-nowrap truncate">
         {l.action}
@@ -209,8 +210,19 @@ interface AccessLog {
   created_at: string;
 }
 
+/**
+ * '새벽 접근'(KST 00:00~05:59) 판정.
+ *
+ * 예전에는 `new Date(created_at).getHours()` 였다. 두 가지가 동시에 틀렸다 —
+ * ① 공백형 타임스탬프에는 오프셋이 없어 브라우저 로컬 TZ 로 해석됐고,
+ * ② 시(hour)도 KST 가 아니라 브라우저 로컬 기준이었다. 서버 `_shared` 의 이상탐지는
+ * KST 로 판정하므로 같은 행이 목록에서만 다르게 표시될 수 있었다(8차 D08-019).
+ * 해석은 UTC 고정 정본 파서로, 시각은 KST 로 환산해 본다.
+ */
 function isSuspicious(log: AccessLog) {
-  const h = new Date(log.created_at).getHours();
+  const ms = parseDbTimestampMs(log.created_at);
+  if (Number.isNaN(ms)) return false;
+  const h = new Date(ms + 9 * 60 * 60 * 1000).getUTCHours();
   return h >= 0 && h < 6;
 }
 
@@ -223,7 +235,7 @@ const AUDIT_COLUMNS: Column<AccessLog>[] = [
       const suspicious = isSuspicious(log);
       return (
         <span className={`font-bold ${suspicious ? 'text-danger' : ''}`}>
-          {new Date(log.created_at).toLocaleString('ko-KR', {
+          {parseDbTimestamp(log.created_at).toLocaleString('ko-KR', {
             month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
           {suspicious && (
             <span className="ml-1 text-[9px] bg-danger text-white px-1 rounded-[var(--radius-md)]">새벽</span>
@@ -481,7 +493,7 @@ function AuditLogViewerMobile() {
             <div key={l.id} className="p-2.5 rounded-[var(--radius-md)] bg-[var(--muted)]/40 text-[11px] space-y-1.5">
               <div className="flex justify-between items-center">
                 <span className="font-bold text-[var(--foreground)] bg-[var(--toss-blue-light)] text-[var(--accent)] px-1.5 py-0.5 rounded-[var(--radius-md)] text-[9px]">{l.action}</span>
-                <span className="text-[10px] text-[var(--toss-gray-3)] font-mono">{new Date(l.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                <span className="text-[10px] text-[var(--toss-gray-3)] font-mono">{parseDbTimestamp(l.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
               </div>
               <div className="flex justify-between items-center text-[10.5px]">
                 <span className="text-[var(--foreground)] font-semibold">{l.target_type} {l.target_id ? `#${String(l.target_id).slice(0, 6)}` : ''}</span>
@@ -532,8 +544,9 @@ function AccessAuditLogMobile() {
       ) : (
         <div className="space-y-2 overflow-y-auto max-h-[300px]">
           {logs.map((l) => {
-            const h = new Date(l.created_at).getHours();
-            const suspicious = h >= 0 && h < 6;
+            // PC 목록과 같은 판정을 쓴다 — 예전에는 여기만 브라우저 로컬 시(hour)로
+            // 따로 계산해 같은 행의 '새벽' 배지가 화면마다 달랐다(8차 D08-019).
+            const suspicious = isSuspicious(l as unknown as AccessLog);
             return (
               <div key={l.id} className="p-2.5 rounded-[var(--radius-md)] bg-[var(--muted)]/40 text-[11px] space-y-1.5 border border-[var(--border)]/30">
                 <div className="flex justify-between items-center">
@@ -543,7 +556,7 @@ function AccessAuditLogMobile() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     {suspicious && <span className="bg-red-500 text-white px-1.5 py-0.2 rounded text-[8px] font-black">새벽</span>}
-                    <span className="text-[9.5px] text-[var(--toss-gray-3)] font-mono">{new Date(l.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                    <span className="text-[9.5px] text-[var(--toss-gray-3)] font-mono">{parseDbTimestamp(l.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
                 </div>
                 <div className="flex justify-between items-center text-[10.5px]">

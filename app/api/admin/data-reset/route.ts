@@ -179,6 +179,12 @@ export async function POST(req: Request) {
           action: 'data_reset',
           target_type: 'data_reset',
           target_id: type,
+          // created_at 을 빼면 SQLite DEFAULT (CURRENT_TIMESTAMP) 가 공백형(UTC)을 채운다.
+          // 다른 감사 경로는 전부 toISOString() 을 넣으므로 같은 TEXT 컬럼에 두 형식이 섞이고,
+          // 사전순에서 ' '(0x20) < 'T'(0x54) 라 같은 날짜의 이 행이 목록 뒤로 밀리며
+          // `gte(created_at, todayIso)` 필터에서도 항상 탈락했다 — 가장 파괴적인 작업의
+          // 기록이 오늘 집계에서 통째로 사라진 것이다(8차 D08-012).
+          created_at: new Date().toISOString(),
           details: JSON.stringify({ type, payload }) });
       } catch (auditErr) {
         console.error('[admin/data-reset] audit 기록 실패:', auditErr);

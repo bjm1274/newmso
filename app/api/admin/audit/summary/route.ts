@@ -30,16 +30,22 @@ import {
   desc,
   gte } from '@/lib/db';
 import { detectAnomalies, detectPayrollOutliers, guardAuditAdmin } from '../_shared';
+import { getKoreanTodayString } from '@/lib/seoul-time';
 
 export const dynamic = 'force-dynamic';
 
 type AuditLogLite = { action: string | null; created_at: string | null };
 type AccessLogLite = { action: string | null; created_at: string | null };
 
+/**
+ * '오늘'의 시작 = **KST 자정**의 ISO 표현.
+ *
+ * 예전에는 런타임 로컬 자정(`new Date(y, m, d)`)을 썼다. Cloudflare Worker 의 TZ 는
+ * UTC 라 이것이 UTC 자정 = KST 09:00 이 되고, KST 00:00~09:00 활동이 '오늘' 집계에서
+ * 통째로 빠지면서 창 전체가 9시간 밀렸다(8차 D08-013 / D10-007).
+ */
 function startOfTodayIso(): string {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-  return start.toISOString();
+  return new Date(`${getKoreanTodayString()}T00:00:00+09:00`).toISOString();
 }
 
 function isLoginAction(action: string): boolean {

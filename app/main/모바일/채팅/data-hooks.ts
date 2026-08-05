@@ -24,6 +24,7 @@ import {
   type TableFilter } from '@/lib/realtime-bus';
 import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
 import { toUtcSqlTimestamp } from '@/lib/chat-read-cursors';
+import { parseDbTimestampMs } from '@/lib/date-formatter';
 import { fetchAllChatRooms } from '@/app/main/기능부품/chatQueryService';
 import {
   fetchChatUnreadCountsByRoom,
@@ -117,8 +118,9 @@ function isRoomVisibleToUser(
 }
 
 function roomActivityMs(room: ChatRoom | null | undefined): number {
-  const raw = String(room?.last_message_at || room?.created_at || 0).replace(' ', 'T');
-  const ms = new Date(raw).getTime();
+  // 예전에는 공백을 'T' 로만 치환해 파싱했다 — 접미사가 없어 디바이스 로컬 TZ 로
+  // 해석되면서, 같은 값이 PC(+00:00 파서)와 9시간 어긋나 방 정렬이 갈렸다(8차 D10-009).
+  const ms = parseDbTimestampMs(room?.last_message_at || room?.created_at || 0);
   return Number.isFinite(ms) ? ms : 0;
 }
 
@@ -626,7 +628,11 @@ export function useChatMessagesForRoom(
             if (rid && roomSet.has(rid) && row?.id) ids.push(String(row.id));
           }
           if (ids.length > 0) {
-            await db.from('notifications').update({ read_at: lastReadAt }).in('id', ids.slice(0, 50));
+            // notifications.read_at 은 ISO 가 규약이다(알림인박스·게시판·전자결재 전부 toISOString).
+            // 예전에는 방 읽음커서용 공백형(lastReadAt)을 그대로 재사용해 이 컬럼만 두 형식이
+            // 다시 섞였고, 30일 보존 크론이 ISO 와 비교하면서 경계일에 하루 일찍 지워질 수
+            // 있었다(8차 D06-016). 커서(공백형)와 알림(ISO)은 규약이 다르므로 값을 분리한다.
+            await db.from('notifications').update({ read_at: new Date().toISOString() }).in('id', ids.slice(0, 50));
             if (typeof window !== 'undefined') {
               window.dispatchEvent(new CustomEvent('erp-notification-read'));
             }
