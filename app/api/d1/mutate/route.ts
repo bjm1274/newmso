@@ -241,21 +241,49 @@ const MAX_POLICY_ROWS_PER_MUTATION = 200;
  * (실제로 그렇게 만들었다가 런타임 검증에서 공격이 통과하는 것을 확인했다.)
  * 변경 후 상태를 봐야 하는 컬럼 가드에는 호출부가 `{...정본, ...set}` 을 guardRow 로 따로 넘긴다.
  *
- * 조회가 불가능한 상황(테이블 미허용 등)에서는 기존 방식의 합성 행으로 폴백한다.
+ * 조회가 불가능한 상황에서는 **거부한다(fail-closed)**.
+ *
+ * 예전에는 그런 경우 `{...where, ...set}` 합성 행으로 폴백해 판정을 계속했다.
+ * 그 합성 행은 전적으로 호출자가 보낸 값이라, 회사 스코프 정책이라면
+ * `set` 에 자기 회사 id 를 넣어 검사를 통과시키고 실제 SQL 은 다른 회사 행을
+ * 지우게 만들 수 있었다(판정 대상 ≠ 실행 대상). 폴백 경로는 넷이었고
+ * `loadedFromDb` 를 돌려주긴 했지만 호출부가 그것을 보지 않았다.
+ *
+ * 예외는 하나다 — 정책이 행 내용과 무관하고(PUBLIC/AUTHENTICATED) 컬럼 가드도 없으면
+ * 어떤 행으로 검사해도 결과가 같으므로 조회를 생략한다. 이 경우 합성 행은 판정에
+ * 영향을 주지 않는다.
  */
+type PolicyRowLoadResult = {
+  rows: Record<string, unknown>[];
+  tooMany: boolean;
+  loadedFromDb: boolean;
+  /** 판정 대상 행을 확정할 수 없어 거부해야 하는 경우의 사유 */
+  blocked?: string;
+};
+
 async function loadPolicyRowsForMutation(
   db: ReturnType<typeof getD1Drizzle>,
   table: string,
   op: 'update' | 'delete',
   where: { field: string; op: string; value: unknown }[],
   set?: Record<string, unknown>,
-): Promise<{ rows: Record<string, unknown>[]; tooMany: boolean; loadedFromDb: boolean }> {
+): Promise<PolicyRowLoadResult> {
   const whereProxy = whereToRowProxy(where);
   const setProxy = set ?? {};
-  const fallback = { rows: [{ ...whereProxy, ...setProxy }], tooMany: false, loadedFromDb: false };
+  const blocked = (reason: string): PolicyRowLoadResult => ({
+    rows: [],
+    tooMany: false,
+    loadedFromDb: false,
+    blocked: reason,
+  });
 
-  if (!ALLOWED_TABLES.has(table) || !COLUMN_RE.test(table)) return fallback;
-  if (!where || where.length === 0) return fallback;
+  if (!ALLOWED_TABLES.has(table) || !COLUMN_RE.test(table)) {
+    return blocked('허용되지 않은 테이블입니다.');
+  }
+  // WHERE 가 없으면 테이블 전체가 대상이다. 그런 요청을 합성 행 하나로 판정할 수는 없다.
+  if (!where || where.length === 0) {
+    return blocked('조건 없는 수정·삭제는 허용되지 않습니다. WHERE 를 지정하세요.');
+  }
 
   // 행 내용과 무관한 정책(PUBLIC/AUTHENTICATED)이고 컬럼 가드도 없으면 조회가 무의미하다.
   // 어떤 행을 잡든 판정이 같으므로 기존처럼 합성 행 1개로 검사해 왕복을 아낀다.
@@ -264,11 +292,21 @@ async function loadPolicyRowsForMutation(
   const pattern = cfg?.[op];
   const rowIndependent = pattern === 'PUBLIC' || pattern === 'AUTHENTICATED';
   const hasGuards = Boolean(cfg?.guards?.[op]) || Boolean(cfg?.asyncGuards?.[op]);
-  if (cfg && rowIndependent && !hasGuards) return fallback;
+  if (cfg && rowIndependent && !hasGuards) {
+    // 이 경우에만 합성 행을 쓴다 — 정책이 행 내용을 보지 않으므로 판정 결과가 같다.
+    return {
+      rows: [{ ...whereProxy, ...setProxy }],
+      tooMany: false,
+      loadedFromDb: false,
+    };
+  }
 
   try {
     const whereParts = buildWhereSql(where);
-    if (whereParts.length === 0) return fallback;
+    // WHERE 를 SQL 로 옮기지 못했다면 어떤 행이 대상인지 알 수 없다.
+    if (whereParts.length === 0) {
+      return blocked('WHERE 조건을 해석할 수 없어 요청을 거부했습니다.');
+    }
     const result = await db.run(
       sql`SELECT * FROM ${sql.identifier(table)} WHERE ${sql.join(whereParts, sql` AND `)} LIMIT ${
         MAX_POLICY_ROWS_PER_MUTATION + 1
@@ -285,8 +323,10 @@ async function loadPolicyRowsForMutation(
     // DB 정본 그대로 — set 을 병합하지 않는다(위 주석 참조).
     return { rows: existing, tooMany: false, loadedFromDb: true };
   } catch (err) {
+    // 조회 실패 시 합성 행으로 넘어가면, DB 를 일시적으로 흔들 수 있는 쪽이
+    // 정책 검사를 자기 값으로 통과시킬 수 있다. 판정 근거가 없으면 거부한다.
     console.error(`[d1/mutate] loadPolicyRowsForMutation failed for ${table}:`, err);
-    return fallback;
+    return blocked('대상 행을 확인할 수 없어 요청을 거부했습니다.');
   }
 }
 
@@ -682,6 +722,12 @@ export async function POST(request: Request) {
         payload.where,
         payload.set,
       );
+      if (updateTargets.blocked) {
+        return NextResponse.json(
+          { ok: false, error: updateTargets.blocked, code: 'POLICY_TARGET_UNRESOLVED' },
+          { status: 400 },
+        );
+      }
       if (updateTargets.tooMany) {
         return NextResponse.json(
           {
@@ -788,6 +834,12 @@ export async function POST(request: Request) {
     if (payload.op === 'delete') {
       // update 와 동일 — WHERE 가 실제로 잡는 행 전부에 정책을 적용한다.
       const deleteTargets = await loadPolicyRowsForMutation(db, payload.table, 'delete', payload.where);
+      if (deleteTargets.blocked) {
+        return NextResponse.json(
+          { ok: false, error: deleteTargets.blocked, code: 'POLICY_TARGET_UNRESOLVED' },
+          { status: 400 },
+        );
+      }
       if (deleteTargets.tooMany) {
         return NextResponse.json(
           {
