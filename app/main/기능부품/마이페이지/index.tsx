@@ -24,6 +24,7 @@ import HomeTabHeader, { type HomeKpiCard } from './홈탭헤더';
 import NotificationInbox from '../알림인박스';
 import ContractSignatureModal from '../인사관리서브/계약문서/전자서명모달';
 import { db } from '@/lib/db-client';
+import { completeContractSigning } from '@/lib/contract-sign-complete';
 import { useAnnualLeaveSummary } from '@/lib/annual-leave-summary';
 import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 import { isActiveStaff } from '@/lib/active-staff';
@@ -275,35 +276,17 @@ function MyPageMain({
     try {
       // 문서 보관함 선저장 → 실패 시 계약 상태 미변경
       const signedAt = new Date().toISOString();
-      const { encryptContract } = await import('@/lib/contract-crypto');
-      const encryptedContractText = await encryptContract(contractText);
-      const { error: insertDocError } = await db.from('document_repository').insert({
-        title: `${user?.name} 근로계약서 (${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })})`,
-        category: '근로계약서',
-        content: encryptedContractText,
-        company_name: (user?.company as string) || '전체',
-        created_by: currentUserId,
-        version: 1
-      });
-      if (insertDocError) {
-        throw new Error(`문서 보관함 저장 실패: ${insertDocError.message}`);
-      }
-
-      const { error: updateError } = await db
-        .from('employment_contracts')
-        .update({
-          status: '서명완료',
-          signed_at: signedAt,
-          signature_data: signatureDataUrl,
-          receipt_signature_data: receiptSignatureData || null,
-          privacy_consent: privacyConsent === true ? 1 : (privacyConsent === false ? 0 : null)
-        })
-        .eq('id', pendingContract.id)
-        .eq('staff_id', currentUserId);
-
-      if (updateError) {
-        throw new Error(`계약서 상태 업데이트 실패: ${updateError.message}`);
-      }
+      // 저장·상태변경은 모바일 셸과 공용 (lib/contract-sign-complete.ts)
+      await completeContractSigning({
+        contractId: pendingContract.id,
+        staffId: currentUserId,
+        staffName: String(user?.name ?? ''),
+        companyName: (user?.company as string) || '전체',
+        contractText,
+        signatureDataUrl,
+        receiptSignatureData,
+        privacyConsent,
+        signedAt });
 
       const { data: checklistRows } = await db
         .from('onboarding_checklists')

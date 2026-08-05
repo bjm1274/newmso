@@ -214,7 +214,12 @@ export async function fetchPayrollWorkcenterData({
     const { data, error } = await db
       .from('staff_members')
       .select(
-        'id, name, company, department, position, status, hire_date, resign_date, join_date, joined_at, resigned_at, birth_date, salary, employee_no, permissions, base_salary, meal_allowance, night_duty_allowance, vehicle_allowance, childcare_allowance, research_allowance, other_taxfree, overtime_allowance, night_work_allowance, holiday_work_allowance, annual_leave_pay, position_allowance, bank_name, bank_account, agreed_overtime_allowance, agreed_night_allowance, working_hours_per_week, working_days_per_week, shift_id',
+        // agreed_overtime_allowance · agreed_night_allowance 는 employment_contracts
+        // 에만 있는 컬럼이다(0022 마이그레이션의 ALTER 대상). staff_members 에는
+        // 어떤 마이그레이션도 추가한 적이 없어서, 셀렉트에 넣으면 쿼리가 통째로
+        // 실패하고 **급여 워크센터가 직원 0명으로 열렸다.** 아래 매핑이
+        // permissions 안의 값으로 폴백하므로 셀렉트에서 빼도 값은 그대로 나온다.
+        'id, name, company, department, position, status, hire_date, resign_date, join_date, joined_at, resigned_at, birth_date, salary, employee_no, permissions, base_salary, meal_allowance, night_duty_allowance, vehicle_allowance, childcare_allowance, research_allowance, other_taxfree, overtime_allowance, night_work_allowance, holiday_work_allowance, annual_leave_pay, position_allowance, bank_name, bank_account, working_hours_per_week, working_days_per_week, shift_id',
       );
     if (error) throw new Error(error.message);
     const rows = Array.isArray(data) ? data : [];

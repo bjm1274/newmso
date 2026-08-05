@@ -41,8 +41,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: '정보 수정 권한이 없습니다.' }, { status: 403 });
     }
 
+    // details 는 객체로 온다. 클라이언트(lib/profile-change-request.ts)가
+    // `{ requested_changes, original_data }` 객체를 그대로 실어 보내는데,
+    // 예전에는 문자열만 받아서 **모든 요청이 400 으로 떨어졌다** — 일반 직원의
+    // '내 정보 저장' 이 PC·모바일 양쪽에서 100% 실패했다.
+    // audit_logs.details 는 TEXT 이므로 저장 직전에 문자열로 만든다.
     const body = (await req.json().catch(() => null)) as { details?: unknown } | null;
-    const details = typeof body?.details === 'string' ? body.details : '';
+    const rawDetails = body?.details;
+    const details =
+      typeof rawDetails === 'string'
+        ? rawDetails
+        : rawDetails && typeof rawDetails === 'object'
+          ? JSON.stringify(rawDetails)
+          : '';
     if (!details) {
       return NextResponse.json({ ok: false, error: 'details 가 필요합니다.' }, { status: 400 });
     }
