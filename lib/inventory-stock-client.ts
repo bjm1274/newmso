@@ -46,6 +46,12 @@ export function formatStockApiError(error?: string | null, code?: string | null)
   if (c === 'EXPIRED_STOCK' || msg.includes('EXPIRED_STOCK')) {
     return '유통기한이 지난 재고는 출고/소모할 수 없습니다. 만료 품목을 확인하거나 관리자 강제 출고를 사용하세요.';
   }
+  if (c === 'PO_CONFLICT') {
+    return msg || '다른 요청이 같은 발주서를 처리했습니다. 목록을 새로고침한 뒤 다시 시도하세요.';
+  }
+  if (c === 'AMBIGUOUS_ITEM' || c === 'NO_COMPANY_SCOPE') {
+    return msg || '품목을 특정할 수 없습니다. 발주 라인에서 품목을 직접 지정하세요.';
+  }
   if (c === 'FORBIDDEN') {
     return '권한이 없습니다.';
   }
@@ -125,6 +131,7 @@ export async function postStockMovement(payload: {
   purchaseOrderId?: string | null;
   approvalId?: string | null;
   applyMovingAverage?: boolean;
+  /** 아래 3개는 관리자 강제 옵션 — 비관리자가 보내면 서버가 403 으로 거부한다 (D07-002) */
   skipClosingCheck?: boolean;
   skipExpiryCheck?: boolean;
   minAllowed?: number;
@@ -263,6 +270,8 @@ export async function inspectPurchaseOrder(payload: {
     alreadySet?: boolean;
     reversed?: Array<{ itemName: string; itemId: string; qty: number; nextQty: number }>;
     reverseErrors?: Array<{ itemName: string; error: string; code?: string }>;
+    /** 실패한 반품이 남아 재검수 재실행으로 잔여분을 반품할 수 있는 상태 */
+    retryable?: boolean;
     totalRejected?: number;
     totalReceivedQty?: number;
   }>

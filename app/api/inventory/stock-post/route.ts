@@ -14,8 +14,9 @@ import { NextResponse } from 'next/server';
 import { userId } from '@/lib/d1-api-helpers';
 import { z } from 'zod';
 import { readSessionFromRequest } from '@/lib/server-session';
-import { assertInventoryItemCompanyScope } from '@/lib/inventory-scope-guard';
-import { getD1Binding, getD1Drizzle, StockError } from '@/lib/db';
+import { assertInventoryItemCompanyScope, isInventoryAdmin } from '@/lib/inventory-scope-guard';
+import { getD1Binding, getD1Drizzle } from '@/lib/db';
+import { inventoryErrorResponse } from '@/lib/inventory-http-errors';
 import {
   postInventoryMovement,
   type StockMovementType,
@@ -90,6 +91,30 @@ export async function POST(request: Request) {
     }
 
     const p = parsed.data;
+
+    // 관리자 강제 옵션 게이트.
+    // 예전에는 skipClosingCheck / skipExpiryCheck / minAllowed 를 payload 그대로 서비스에 넘겼다.
+    // movement-service 주석은 이 둘을 '관리자 강제' 로 규정하는데 정작 라우트에 역할 검사가 없어서,
+    // permissions.inventory 만 가진 일반 재고 담당자도 월마감 잠금과 음수재고 방지를 함께 끌 수 있었다
+    // (8차 D07-002 실측: 잠긴 달에 skipClosingCheck:true 로 입고 200, minAllowed:-99999 로 수량 -97 생성).
+    const isAdmin = isInventoryAdmin(session.user);
+    if (!isAdmin) {
+      const overrides: string[] = [];
+      if (p.skipClosingCheck) overrides.push('skipClosingCheck');
+      if (p.skipExpiryCheck) overrides.push('skipExpiryCheck');
+      if ((p.minAllowed ?? 0) < 0) overrides.push('minAllowed<0');
+      if (overrides.length > 0) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `관리자 전용 강제 옵션입니다: ${overrides.join(', ')}`,
+            code: 'FORBIDDEN',
+          },
+          { status: 403 },
+        );
+      }
+    }
+
     if (p.mode === 'delta' && p.delta == null) {
       return NextResponse.json({ ok: false, error: 'delta required' }, { status: 400 });
     }
@@ -156,32 +181,8 @@ export async function POST(request: Request) {
       },
     });
   } catch (err) {
-    if (err instanceof StockError) {
-      const statusMap: Record<string, number> = {
-        INSUFFICIENT_STOCK: 409,
-        EXPIRED_STOCK: 409,
-        ITEM_NOT_FOUND: 404,
-        SOURCE_NOT_FOUND: 404,
-        DEST_NOT_FOUND: 404,
-      };
-      return NextResponse.json(
-        { ok: false, error: err.message, code: err.code },
-        { status: statusMap[err.code] ?? 500 },
-      );
-    }
-    const message = err instanceof Error ? err.message : 'Internal error';
-    if (message.startsWith('INVENTORY_PERIOD_LOCKED')) {
-      return NextResponse.json(
-        { ok: false, error: message, code: 'PERIOD_LOCKED' },
-        { status: 423 },
-      );
-    }
-    if (message.startsWith('STOCK_CONFLICT')) {
-      return NextResponse.json(
-        { ok: false, error: message, code: 'STOCK_CONFLICT' },
-        { status: 409 },
-      );
-    }
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    // 매핑은 lib/inventory-http-errors 로 통합 — 라우트마다 따로 갖던 catch 가 갈라져
+    // 같은 STOCK_CONFLICT 가 여기서는 409, po-receive 에서는 500 이었다 (D07-016).
+    return inventoryErrorResponse(err);
   }
 }

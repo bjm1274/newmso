@@ -10,12 +10,21 @@
 import { NextResponse } from 'next/server';
 import { userId } from '@/lib/d1-api-helpers';
 import { z } from 'zod';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { getD1Binding, getD1Drizzle, StockError } from '@/lib/db';
-import { purchase_orders, inventory } from '@/lib/db/schema';
+import { purchase_orders } from '@/lib/db/schema';
 import { postInventoryMovement } from '@/lib/inventory-movement-service';
 import { assertInventoryCompanyScope, assertInventoryItemCompanyScope } from '@/lib/inventory-scope-guard';
+import { resolveInventoryItemIdByName } from '@/lib/inventory-item-lookup';
+import { acquirePurchaseOrderLock } from '@/lib/inventory-po-lock';
+import { inventoryErrorResponse } from '@/lib/inventory-http-errors';
+import {
+  parsePurchaseOrderItems as parseItems,
+  poLineName as lineName,
+  poLineOrderedQty as lineOrderedQty,
+  poLineReceivedQty as lineReceivedQty,
+} from '@/lib/inventory-po-items';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,31 +41,6 @@ const PayloadSchema = z.object({
   purchaseOrderId: z.string().min(1),
   lines: z.array(LineSchema).min(1),
 });
-
-function parseItems(raw: unknown): Array<Record<string, unknown>> {
-  if (Array.isArray(raw)) return raw as Array<Record<string, unknown>>;
-  if (typeof raw === 'string' && raw.trim()) {
-    try {
-      const p = JSON.parse(raw);
-      return Array.isArray(p) ? p : [];
-    } catch {
-      return [];
-    }
-  }
-  return [];
-}
-
-function lineName(it: Record<string, unknown>): string {
-  return String(it.name || it.item_name || '').trim();
-}
-
-function lineOrderedQty(it: Record<string, unknown>): number {
-  return Math.max(0, Math.trunc(Number(it.qty ?? it.quantity ?? 0) || 0));
-}
-
-function lineReceivedQty(it: Record<string, unknown>): number {
-  return Math.max(0, Math.trunc(Number(it.received_qty ?? it.receivedQty ?? 0) || 0));
-}
 
 function matchLineIndex(
   items: Array<Record<string, unknown>>,
@@ -136,6 +120,34 @@ export async function POST(request: Request) {
     }));
     const matchedUsed = new Set<number>();
 
+    // ── 1차 패스: 쓰기 없이 라인 전부 검증·해석 ──
+    // 예전에는 검증과 전표 커밋이 한 루프 안에 섞여 있었다. 라인 매칭 실패·초과 입고·
+    // 품목 스코프 403 의 조기 return 이 전부 루프 안에 있어서, 뒤 라인이 걸리면
+    // 앞 라인의 재고 증가만 커밋된 채 PO 는 옛 상태(received_qty 미갱신)로 남았다.
+    // 사용자가 같은 요청을 재시도하면 잔여 검사가 옛 received_qty 를 보므로 앞 라인이 또 입고됐다
+    // (8차 D07-003 실측: 400 응답 두 번에 재고가 50→55→60, PO received_qty 는 계속 0).
+    // 이제 실패할 수 있는 검사는 전부 이 패스에서 끝내고, 그 뒤에야 첫 쓰기가 일어난다.
+    const poCompany = String(po.requester_company || '').trim();
+    const lookupScope = poCompany
+      ? { company: poCompany, companyId: null }
+      : {
+          company: (session?.user?.company as string | undefined) ?? null,
+          companyId: (session?.user?.company_id as string | undefined) ?? null,
+        };
+
+    type LinePlan = {
+      idx: number;
+      itemId: string;
+      itemName: string;
+      qty: number;
+      unitPrice?: number;
+      lotNumber?: string;
+      expiryDate?: string;
+    };
+    const plans: LinePlan[] = [];
+    /** 같은 PO 라인을 이 요청 안에서 여러 번 잡을 수 있으므로 요청 내 누적분도 잔여에서 뺀다 */
+    const pendingByIdx = new Map<number, number>();
+
     for (const line of parsed.data.lines) {
       const idx = matchLineIndex(poItems, line.itemName, matchedUsed);
       if (idx < 0) {
@@ -149,7 +161,8 @@ export async function POST(request: Request) {
       const poLine = poItems[idx];
       const ordered = lineOrderedQty(poLine);
       const already = lineReceivedQty(poLine);
-      const remaining = Math.max(0, ordered - already);
+      const pending = pendingByIdx.get(idx) ?? 0;
+      const remaining = Math.max(0, ordered - already - pending);
       if (line.qty > remaining) {
         return NextResponse.json(
           {
@@ -160,6 +173,7 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       }
+      pendingByIdx.set(idx, pending + line.qty);
 
       let itemId = line.inventoryItemId?.trim() || '';
       if (!itemId) {
@@ -167,66 +181,92 @@ export async function POST(request: Request) {
         if (invId) itemId = invId;
       }
       if (!itemId) {
-        const invRows = await db
-          .select({ id: inventory.id, item_name: inventory.item_name, name: inventory.name })
-          .from(inventory)
-          .limit(5000);
-        const hit = invRows.find((r) => {
-          const n = String(r.item_name || r.name || '').trim().toLowerCase();
-          return n === line.itemName.trim().toLowerCase();
-        });
-        if (!hit) {
+        const found = await resolveInventoryItemIdByName(db, line.itemName, lookupScope);
+        if (!found.ok) {
           return NextResponse.json(
-            {
-              ok: false,
-              error: `품목 미등록: ${line.itemName}. 기준정보에서 등록 후 입고하세요.`,
-            },
+            { ok: false, error: found.error, code: found.code },
             { status: 400 },
           );
         }
-        itemId = hit.id;
+        itemId = found.itemId;
       }
 
       const itemScope = await assertInventoryItemCompanyScope(d1, session.user, itemId);
       if (!itemScope.ok) return itemScope.response;
 
-      const unitPrice =
-        line.unitPrice ??
-        (Number(poLine.unit_price ?? poLine.price ?? 0) || undefined);
-
-      const mov = await postInventoryMovement(db, {
+      plans.push({
+        idx,
         itemId,
-        mode: 'delta',
-        delta: line.qty,
-        type: '발주입고',
-        changeType: '발주입고',
-        notes: `PO ${parsed.data.purchaseOrderId} · ${line.itemName} (+${line.qty})`,
-        actorId: uid,
-        actorName,
-        company: (session?.user?.company as string) || null,
-        department: (session?.user?.department as string) || null,
-        unitPrice: unitPrice ?? null,
-        supplierName: po.supplier_name ?? null,
-        purchaseOrderId: parsed.data.purchaseOrderId,
-        lotNumber: line.lotNumber ?? null,
-        expiryDate: line.expiryDate ?? null,
-        applyMovingAverage: true,
-      });
-
-      const lineReceived = already + line.qty;
-      poItems[idx] = {
-        ...poLine,
-        received_qty: lineReceived,
-        item_id: poLine.item_id || itemId,
-      };
-
-      results.push({
         itemName: line.itemName,
-        itemId,
-        nextQty: mov.nextQty,
-        lineReceived,
-        lineOrdered: ordered,
-        remaining: Math.max(0, ordered - lineReceived),
+        qty: line.qty,
+        unitPrice:
+          line.unitPrice ?? (Number(poLine.unit_price ?? poLine.price ?? 0) || undefined),
+        lotNumber: line.lotNumber,
+        expiryDate: line.expiryDate,
+      });
+    }
+
+    // ── PO 선점(낙관적 잠금) ──
+    // 재고를 건드리기 전에 잡는다. 여기서 밀리면 재고는 하나도 변하지 않은 상태로 409 가 나간다.
+    const lock = await acquirePurchaseOrderLock(db, parsed.data.purchaseOrderId, po.updated_at);
+    if (!lock.ok) {
+      return NextResponse.json({ ok: false, error: lock.error, code: lock.code }, { status: 409 });
+    }
+
+    // ── 2차 패스: 전표 커밋 ──
+    // 중간에 실패해도 아래에서 '성공한 라인까지의 received_qty' 를 반드시 PO 에 기록한다.
+    // 그래야 재시도가 잔여분만 입고하고, 이중 입고가 되지 않는다.
+    let failure: unknown = null;
+    for (const plan of plans) {
+      const poLine = poItems[plan.idx];
+      const ordered = lineOrderedQty(poLine);
+      const already = lineReceivedQty(poLine);
+      try {
+        const mov = await postInventoryMovement(db, {
+          itemId: plan.itemId,
+          mode: 'delta',
+          delta: plan.qty,
+          type: '발주입고',
+          changeType: '발주입고',
+          notes: `PO ${parsed.data.purchaseOrderId} · ${plan.itemName} (+${plan.qty})`,
+          actorId: uid,
+          actorName,
+          company: (session?.user?.company as string) || null,
+          department: (session?.user?.department as string) || null,
+          unitPrice: plan.unitPrice ?? null,
+          supplierName: po.supplier_name ?? null,
+          purchaseOrderId: parsed.data.purchaseOrderId,
+          lotNumber: plan.lotNumber ?? null,
+          expiryDate: plan.expiryDate ?? null,
+          applyMovingAverage: true,
+        });
+
+        const lineReceived = already + plan.qty;
+        poItems[plan.idx] = {
+          ...poLine,
+          received_qty: lineReceived,
+          item_id: poLine.item_id || plan.itemId,
+        };
+
+        results.push({
+          itemName: plan.itemName,
+          itemId: plan.itemId,
+          nextQty: mov.nextQty,
+          lineReceived,
+          lineOrdered: ordered,
+          remaining: Math.max(0, ordered - lineReceived),
+        });
+      } catch (err) {
+        failure = err;
+        break;
+      }
+    }
+
+    if (failure && results.length === 0) {
+      // 한 라인도 커밋되지 않았다 — PO 문서는 손대지 않는다.
+      // (예전 코드는 여기까지 오지도 못했지만, 상태를 '배송' 으로 바꾸는 부작용만 남기는 것을 막는다)
+      return inventoryErrorResponse(failure, {
+        data: { received: [], purchaseOrderId: parsed.data.purchaseOrderId },
       });
     }
 
@@ -256,15 +296,19 @@ export async function POST(request: Request) {
       nextStatus = '배송';
     }
 
-    await db
+    const committed = await db
       .update(purchase_orders)
       .set({
         items: JSON.stringify(poItems),
         received_items: JSON.stringify(received_items),
         received_qty: totalReceivedQty,
-        received_at: new Date().toISOString(),
-        received_by_id: uid,
-        received_by_name: actorName,
+        ...(results.length > 0
+          ? {
+              received_at: new Date().toISOString(),
+              received_by_id: uid,
+              received_by_name: actorName,
+            }
+          : {}),
         status: nextStatus,
         updated_at: new Date().toISOString(),
         ...(allComplete
@@ -276,34 +320,52 @@ export async function POST(request: Request) {
             }
           : {}),
       })
-      .where(eq(purchase_orders.id, parsed.data.purchaseOrderId));
+      // 선점 구간을 닫는다 — 우리가 찍은 stamp 가 그대로일 때만 확정한다.
+      .where(
+        sql`${purchase_orders.id} = ${parsed.data.purchaseOrderId} AND ${purchase_orders.updated_at} = ${lock.stamp}`,
+      )
+      .returning({ id: purchase_orders.id });
 
-    return NextResponse.json({
-      ok: true,
-      data: {
-        received: results,
-        purchaseOrderId: parsed.data.purchaseOrderId,
-        totalReceivedQty,
-        totalOrderedQty,
-        allComplete,
-        status: nextStatus,
-        received_items,
-      },
-    });
+    const partial = {
+      received: results,
+      purchaseOrderId: parsed.data.purchaseOrderId,
+      totalReceivedQty,
+      totalOrderedQty,
+      allComplete,
+      status: nextStatus,
+      received_items,
+    };
+
+    if (committed.length === 0) {
+      // 선점 이후 누군가 같은 PO 를 덮었다. 재고 전표는 이미 남았으므로 조용히 성공시키지 않는다.
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `발주서 갱신이 다른 요청과 충돌했습니다. 입고 전표 ${results.length}건은 이미 반영되었으니 발주서를 새로고침해 실입고 수량을 확인하세요.`,
+          code: 'PO_CONFLICT',
+          data: partial,
+        },
+        { status: 409 },
+      );
+    }
+
+    if (failure) {
+      // 부분 실패 — 커밋된 라인은 PO 에 기록됐으므로 재시도는 잔여분만 입고한다.
+      const note = `발주 라인 ${results.length}/${plans.length}건까지 입고 반영됨 · 남은 라인만 다시 시도하세요.`;
+      const wrapped =
+        failure instanceof StockError
+          ? new StockError(failure.code, `${failure.message} · ${note}`)
+          : new Error(
+              `${failure instanceof Error ? failure.message : String(failure)} · ${note}`,
+            );
+      return inventoryErrorResponse(wrapped, { data: partial });
+    }
+
+    return NextResponse.json({ ok: true, data: partial });
   } catch (err) {
-    if (err instanceof StockError) {
-      return NextResponse.json(
-        { ok: false, error: err.message, code: err.code },
-        { status: err.code === 'INSUFFICIENT_STOCK' ? 409 : 404 },
-      );
-    }
-    const message = err instanceof Error ? err.message : 'Internal error';
-    if (message.startsWith('INVENTORY_PERIOD_LOCKED')) {
-      return NextResponse.json(
-        { ok: false, error: message, code: 'PERIOD_LOCKED' },
-        { status: 423 },
-      );
-    }
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    // 매핑은 lib/inventory-http-errors 로 통합 (D07-016) — 예전에는 여기서
+    // INSUFFICIENT_STOCK 이 아닌 StockError 를 전부 404 로, STOCK_CONFLICT 를 500 으로 내보내
+    // stock-post(409)와 답이 달랐다.
+    return inventoryErrorResponse(err);
   }
 }

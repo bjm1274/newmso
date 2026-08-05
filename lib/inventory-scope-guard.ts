@@ -4,7 +4,7 @@ import type { SessionUser } from '@/lib/server-session';
 
 type ScopeResult = { ok: true } | { ok: false; response: NextResponse };
 
-function isInventoryAdmin(user: SessionUser): boolean {
+export function isInventoryAdmin(user: SessionUser): boolean {
   const role = String(user.role || '').toLowerCase();
   const perms = user.permissions || {};
   // is_master·is_admin 은 세션에 존재하지 않는 필드다(is_system_master 만 있다).

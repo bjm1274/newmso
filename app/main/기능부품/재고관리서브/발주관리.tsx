@@ -488,8 +488,10 @@ export default function PurchaseOrderManagement({
       const reversed = res.data?.reversed?.length ?? 0;
       const reverseErrors = res.data?.reverseErrors?.length ?? 0;
       if (result === '불합격' && reverseErrors > 0) {
+        // 예전에는 실패한 반품이 영구히 재시도 불가였다(서버가 검수 상태를 확정해 버려 재호출이
+        // '이미 처리됨' 으로 막혔다). 이제 잔여 입고분이 남아 있으면 재실행이 가능하므로 그걸 안내한다.
         toast(
-          `검수 불합격 처리됨. 반품 ${reversed}건 성공, ${reverseErrors}건 실패(재고 부족 등).`,
+          `검수 불합격 처리됨. 반품 ${reversed}건 성공, ${reverseErrors}건 실패(재고 부족 등). 재고 확보 후 '불합격'을 다시 눌러 잔여분을 반품하세요.`,
           'warning',
         );
       } else if (result === '불합격' && reversed > 0) {
