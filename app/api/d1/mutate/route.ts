@@ -157,7 +157,9 @@ import {
   assertAccess,
   PolicyDenied,
   PolicyMissing,
-  POLICY_REGISTRY } from '@/lib/db';
+  POLICY_REGISTRY,
+  STAFF_SECRET_ALWAYS_COLUMNS,
+  STAFF_PII_SENSITIVE_COLUMNS } from '@/lib/db';
 import { JSON_COLUMNS } from '@/lib/db/json-columns';
 import * as schema from '@/lib/db/schema';
 import { consumeRateLimit } from '@/lib/rate-limit';
@@ -217,6 +219,28 @@ function whereToRowProxy(where: { field: string; op: string; value: unknown }[])
     if (cond.op === 'eq') proxy[cond.field] = cond.value;
   }
   return proxy;
+}
+
+/**
+ * 마스킹 대상 staff_members 컬럼이 update/delete 의 WHERE 에 쓰였는지 검사.
+ *
+ * query 라우트의 findSensitiveFieldUsage 와 같은 목적이다 — 마스킹은 반환값만 가리므로,
+ * 조건절에 쓰면 "몇 건이 잡히는가"가 오라클이 되어 값을 접두 이분탐색으로 복원할 수 있다.
+ * mutate 는 결과 행을 돌려주지 않지만 200/403/변경건수로 같은 1비트가 새어 나간다.
+ *
+ * @returns 위반한 필드명, 없으면 null
+ */
+function findSensitiveMutationField(payload: Payload): string | null {
+  if (payload.table !== 'staff_members') return null;
+  if (payload.op !== 'update' && payload.op !== 'delete') return null;
+
+  const blocked = (field: string) =>
+    STAFF_SECRET_ALWAYS_COLUMNS.has(field) || STAFF_PII_SENSITIVE_COLUMNS.has(field);
+
+  for (const cond of payload.where ?? []) {
+    if (blocked(cond.field)) return cond.field;
+  }
+  return null;
 }
 
 /**
@@ -453,6 +477,21 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { ok: false, error: `Table not allowed: ${payload.table}` },
         { status: 403 },
+      );
+    }
+
+    // 마스킹 대상 컬럼을 WHERE 에 쓰지 못하게 한다.
+    //
+    // /api/d1/query 는 이 검사를 하는데 mutate 에는 없었다(7차 A12-02 가 query 만 닫았다).
+    // update/delete 는 WHERE 가 잡는 행 수에 따라 응답이 갈리므로 —
+    // 0건이면 no-op 200, 잡히면 정책 판정 결과 —
+    // `where: [{field:'password', op:'like', value:'$2a$10$a%'}]` 같은 요청으로
+    // 비밀번호 해시를 접두 이분탐색해 복원할 수 있는 1비트 오라클이 된다.
+    const sensitiveField = findSensitiveMutationField(payload);
+    if (sensitiveField) {
+      return NextResponse.json(
+        { ok: false, error: `Field not allowed in filter: ${sensitiveField}` },
+        { status: 400 },
       );
     }
     const d1 = await getD1Binding();
