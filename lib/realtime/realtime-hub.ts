@@ -15,6 +15,10 @@ type WsAttachment = {
   subscriptions: string[];
   connectedAt: number;
   lastSeenAt: number;
+  /** signal 발신 속도 제한 창의 시작 시각(ms) */
+  signalWindowStart?: number;
+  /** 현재 창에서 이 소켓이 보낸 signal 수 */
+  signalCount?: number;
 };
 
 /** Hibernation WebSocket (CF 확장 API) */
@@ -47,6 +51,14 @@ function getPairEnds(pair: any): { client: HibernatableWebSocket; server: Hibern
  * 여러 탭의 채널이 리더 탭으로 합쳐지는 경우를 감안해 여유를 둔다.
  */
 const MAX_SUBSCRIPTIONS_PER_SOCKET = 100;
+
+/**
+ * 클라이언트발 signal 중계 속도 제한.
+ * 정상 사용에서는 타이핑·읽음 갱신 정도라 초당 수 건을 넘지 않는다.
+ * 한 소켓이 중계를 독점해 다른 구독자에게 프레임을 쏟아붓지 못하게 상한을 둔다.
+ */
+const SIGNAL_WINDOW_MS = 1000;
+const MAX_SIGNALS_PER_WINDOW = 20;
 
 export class RealtimeHub {
   state: any;
@@ -261,9 +273,42 @@ export class RealtimeHub {
       }
 
       if (data.type === 'signal') {
-        const channels = Array.isArray(data.channels)
+        const requested = Array.isArray(data.channels)
           ? (data.channels as unknown[]).map((c) => String(c))
           : [];
+
+        // 발신자가 실제로 관여하는 채널로만 중계한다.
+        //
+        // 예전에는 클라이언트가 보낸 channels 를 그대로 믿고 그 채널을 구독한
+        // **모든** 소켓에 change 프레임을 뿌렸다. 즉 아무 로그인 사용자나
+        // 임의 채널에 가짜 변경 신호를 주입해 전 구독자를 재조회시킬 수 있었다.
+        //
+        // 단순 교집합으로 막으면 정상 동작이 깨진다. 클라이언트(polling-bus 의
+        // pokeChannel)는 `messages:room_id=eq.X` 를 구독한 상태에서 bare `messages`
+        // 채널로도 신호를 보낸다 — 다른 클라이언트의 전역 안읽음 목록을 깨우기 위해서다.
+        // 그래서 "구독 중이거나, 구독 중인 필터 채널의 테이블 접두어인 경우" 를 허용한다.
+        const mySubs = attachment.subscriptions || [];
+        const mySubSet = new Set(mySubs);
+        const channels = requested.filter(
+          (ch) => mySubSet.has(ch) || mySubs.some((sub) => sub.startsWith(`${ch}:`)),
+        );
+        if (channels.length === 0) {
+          ws.serializeAttachment(attachment);
+          return;
+        }
+
+        // 소켓당 신호 발신 속도 제한 — 한 클라이언트가 중계를 독점하지 못하게 한다.
+        const nowMs = Date.now();
+        if (nowMs - (attachment.signalWindowStart ?? 0) >= SIGNAL_WINDOW_MS) {
+          attachment.signalWindowStart = nowMs;
+          attachment.signalCount = 0;
+        }
+        attachment.signalCount = (attachment.signalCount ?? 0) + 1;
+        if (attachment.signalCount > MAX_SIGNALS_PER_WINDOW) {
+          ws.serializeAttachment(attachment);
+          return;
+        }
+
         const websockets = this.state.getWebSockets();
 
         for (const otherWs of websockets) {

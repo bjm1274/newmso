@@ -10,6 +10,7 @@ import {
   getD1Drizzle,
   updateChatRoomLastMessage } from '@/lib/db';
 import { assertChatRoomMember } from '@/lib/chat-room-membership';
+import { dispatchChatPushForMessage } from '@/lib/chat-push-dispatch';
 
 export async function POST(req: NextRequest) {
   try {
@@ -66,15 +67,22 @@ export async function POST(req: NextRequest) {
       console.warn('[quick-reply] chat_rooms last_message D1 update failed', err);
     }
 
-    // 채팅 push 트리거 (비동기, 실패해도 무방)
+    // 채팅 push 디스패치 — 같은 런타임에서 직접 호출한다.
+    //
+    // 예전에는 /api/notifications/chat-push 로 서버간 fetch 를 했는데, 그 라우트는
+    // readSessionFromRequest 로 세션을 요구한다. 서버에서 만든 요청에는 쿠키가 없으니
+    // 언제나 401 로 끝났고, 큐에 적재하는 것도 아니어서 5분 주기 크론 폴백도
+    // 회수할 것이 없었다. 결과적으로 quick-reply 로 보낸 메시지는 푸시가 아예 안 나갔다.
+    // dispatchChatPushForMessage 는 message_id 기준 멱등이라 중복 호출도 안전하다.
     try {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://erp.pchos.kr';
-      void fetch(`${appUrl}/api/notifications/chat-push`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomId: room_id, messageId }) });
-    } catch {
-      // push trigger 실패는 치명적 오류 아님
+      await dispatchChatPushForMessage({
+        roomId: room_id,
+        messageId,
+        expectedSenderId: senderId,
+      });
+    } catch (err) {
+      // 푸시 실패가 메시지 전송 자체를 되돌릴 이유는 없다 — 기록만 남긴다.
+      console.warn('[quick-reply] chat push dispatch failed', err);
     }
 
     return NextResponse.json({ ok: true, message_id: messageId });
