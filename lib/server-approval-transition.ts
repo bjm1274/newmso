@@ -503,11 +503,22 @@ async function transitionSingleApproval(params: {
       supplySummary: null } satisfies ApprovalTransitionResult;
   }
 
-  const isArbitraryDecision = Boolean(
-    (item.meta_data as Record<string, unknown> | null | undefined)?.is_arbitrary ||
-      approveComment?.includes('[전결]'),
-  );
-  const isFinalApproval = currentIndex === lineIds.length - 1 || isArbitraryDecision;
+  /**
+   * 최종 승인은 결재선의 마지막 차례일 때만 성립한다.
+   *
+   * 예전에는 승인 코멘트에 '[전결]' 이 들어 있거나 문서 meta_data 에
+   * is_arbitrary 가 심어져 있으면 남은 결재선을 통째로 건너뛰고 최종 승인으로
+   * 처리했다. 둘 다 검증 없는 입력이다 — 코멘트는 요청 본문의 자유 문자열이라
+   * 1차 결재자가 승인 사유에 그 네 글자를 적기만 하면 원장·대표 결재가
+   * 생략됐고, is_arbitrary 는 기안 메타가 화이트리스트 없이 병합돼 저장되므로
+   * **기안자가 자기 문서에 미리 심어 둘 수 있었다.** 그 경우 1차 결재자는
+   * 평범하게 승인만 눌러도 자신이 최종 승인을 했다는 사실을 알지 못한다.
+   *
+   * 전결 권한을 검증할 상수도 함수도 저장소에 없고, 이 두 값을 만들어 내는
+   * 코드도 앱 어디에도 없다(소비하는 이 자리뿐). 즉 기능이 아니라 우회로였다.
+   * 전결을 다시 도입한다면 권한 판정을 갖춘 별도 액션이어야 한다.
+   */
+  const isFinalApproval = currentIndex === lineIds.length - 1;
   const nextLineApproverId = !isFinalApproval ? lineIds[currentIndex + 1] : null;
   const nextApproverId = nextLineApproverId
     ? (resolveEffectiveApproverId(nextLineApproverId, staffMap) || nextLineApproverId)

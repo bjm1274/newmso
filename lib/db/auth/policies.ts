@@ -280,6 +280,38 @@ function staffPrivilegeGuard(
   return true;
 }
 
+/**
+ * approvals: 결재 상태 전이는 범용 mutate 로 할 수 없다.
+ *
+ * approvals 정책은 APPROVAL_SCOPE(기안자 또는 현재 결재자면 통과)만 걸려 있고
+ * 컬럼 가드가 없었다. 그래서 **기안자가 자기 문서에 status='승인' 을 직접 써서**
+ * 결재선을 통째로 건너뛸 수 있었다. 정본 행을 읽어 판정하므로 행 위조는
+ * 불가능하지만, 그 행의 sender_id 가 곧 자기 자신이라 범위 검사를 그냥 통과한다.
+ * 이후 /api/approvals/process-final 이 '승인' 을 최종 상태로 인정하므로
+ * 연차 차감·인사명령 반영·기본급 갱신까지 실제로 커밋된다.
+ *
+ * 상태 전이는 /api/approvals/transition 전용이다(그 경로는 정책 레지스트리를
+ * 거치지 않고 서버에서 직접 쓰므로 이 가드의 영향을 받지 않는다).
+ * 결재자 라우팅(current_approver_id·approver_line)과 meta_data 는 클라이언트
+ * 위임 동기화가 실제로 쓰고 있어 여기서 막지 않는다 — 별건이다.
+ */
+const APPROVAL_TRANSITION_COLUMNS = [
+  'status',
+  // 기안자·소속을 바꾸면 결재 범위 판정 자체가 바뀐다.
+  'sender_id',
+  'company_id',
+  // 문서번호는 발급 이력과 대조되는 값이라 임의로 덮어쓸 수 없어야 한다.
+  'doc_number',
+] as const;
+
+function approvalsUpdateGuard(
+  claims: ErpClaims,
+  row: Record<string, unknown>,
+  changedKeys?: ReadonlySet<string>,
+): boolean {
+  return !APPROVAL_TRANSITION_COLUMNS.some((col) => touchesColumn(row, changedKeys, col));
+}
+
 /** employment_contracts: 본인 서명 필드만 허용, 급여/본문 등은 관리자·매니저 */
 const CONTRACT_SELF_UPDATE_ALLOW = new Set([
   'status',
@@ -916,7 +948,8 @@ export const POLICY_REGISTRY: Registry = {
     update: 'APPROVAL_SCOPE',
     delete: 'SELF_ONLY',
     staffIdField: 'sender_id',
-    approvalFields: { sender: 'sender_id', approver: 'current_approver_id' } },
+    approvalFields: { sender: 'sender_id', approver: 'current_approver_id' },
+    guards: { update: approvalsUpdateGuard } },
 
   // ── INVENTORY_SCOPE
   inventory: {
