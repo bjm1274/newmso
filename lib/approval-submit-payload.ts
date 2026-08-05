@@ -71,9 +71,25 @@ export function buildApprovalSubmitPayload(
   const senderName = String(input.senderName || '').trim() || '이름 없음';
   const senderCompany = String(input.senderCompany || '').trim();
   const senderDepartment = String(input.senderDepartment || '').trim() || null;
-  const firstApproverId = String(input.approverLine[0]?.id || '');
+  const approverIds = (Array.isArray(input.approverLine) ? input.approverLine : [])
+    .map((a) => String(a?.id ?? '').trim())
+    .filter(Boolean);
+
+  /**
+   * 결재선이 비면 row 를 만들지 않는다.
+   *
+   * 예전에는 `String(input.approverLine[0]?.id || '')` 로 첫 결재자를 뽑아
+   * current_approver_id 에 **빈 문자열** 을 넣고도 그대로 상신했다. 그렇게 만들어진
+   * 문서는 결재자가 없어 승인·반려 어느 쪽도 진행할 수 없고, 서버 전이 검사에서
+   * 'Current approver is missing.' 로만 떨어지는 처리 불가 문서로 남았다.
+   * 상신 자체를 막는 편이 만들어 두고 못 고치는 것보다 낫다.
+   */
+  if (approverIds.length === 0) {
+    throw new Error('결재선이 비어 있어 상신할 수 없습니다. 결재자를 한 명 이상 지정해 주세요.');
+  }
+
+  const firstApproverId = approverIds[0];
   const revision = input.revision ?? 1;
-  const approverIds = input.approverLine.map((a) => String(a.id));
 
   const meta: Record<string, unknown> = {
     form_slug: input.formSlug,

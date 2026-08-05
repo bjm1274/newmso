@@ -19,21 +19,6 @@ function normalizeApprovalLineIds(line: unknown): string[] {
   return Array.from(new Set(ids));
 }
 
-function normalizeApprovalCcUserIds(ccUsers: unknown): string[] {
-  if (!Array.isArray(ccUsers)) return [];
-  return Array.from(
-    new Set(
-      ccUsers
-        .map((entry) => {
-          if (!entry || typeof entry !== 'object') return null;
-          const value = (entry as Record<string, unknown>).id;
-          return value != null ? String(value).trim() : null;
-        })
-        .filter(Boolean) as string[]
-    )
-  );
-}
-
 export async function POST(request: Request) {
   try {
     const session = await readSessionFromRequest(request);
@@ -48,6 +33,14 @@ export async function POST(request: Request) {
     }
 
     // approvals 조회 (D1)
+    /**
+     * 후속 처리에 필요한 컬럼을 모두 읽는다.
+     *
+     * 예전에는 권한 판정에 쓰는 몇 개만 골라 읽었는데, processFinalApprovalEffects
+     * 는 `item.type` 으로 어떤 후속 처리를 돌릴지 갈라진다. 즉 이 라우트로 들어온
+     * 요청은 **type 이 undefined 라 인사명령·연차·증명서 같은 집행이 통째로
+     * 건너뛰어졌고**, 문서보관함 본문도 반쪽짜리로 저장됐다.
+     */
     type ApprovalFetchRow = {
       id: string;
       status: string | null;
@@ -56,8 +49,15 @@ export async function POST(request: Request) {
       approver_line: unknown;
       doc_number: string | null;
       sender_id: string | null;
+      sender_name: string | null;
       sender_company: string | null;
+      sender_department: string | null;
+      company_id: string | null;
+      type: string | null;
       title: string;
+      content: string | null;
+      created_at: string | null;
+      updated_at: string | null;
     };
 
     let approval: ApprovalFetchRow | null = null;
@@ -76,8 +76,15 @@ export async function POST(request: Request) {
         approver_line: approvalsTable.approver_line,
         doc_number: approvalsTable.doc_number,
         sender_id: approvalsTable.sender_id,
+        sender_name: approvalsTable.sender_name,
         sender_company: approvalsTable.sender_company,
-        title: approvalsTable.title })
+        sender_department: approvalsTable.sender_department,
+        company_id: approvalsTable.company_id,
+        type: approvalsTable.type,
+        title: approvalsTable.title,
+        content: approvalsTable.content,
+        created_at: approvalsTable.created_at,
+        updated_at: approvalsTable.updated_at })
       .from(approvalsTable)
       .where(eq(approvalsTable.id, approvalId));
     const row = rows[0] ?? null;
@@ -111,13 +118,20 @@ export async function POST(request: Request) {
       approval.current_approver_id || metaData?.current_approver_id || ''
     ).trim();
     const approvalLineIds = normalizeApprovalLineIds(approval.approver_line ?? metaData?.approver_line);
-    const referenceUserIds = normalizeApprovalCcUserIds(metaData?.cc_users);
+    const lastApproverId = approvalLineIds.length > 0 ? approvalLineIds[approvalLineIds.length - 1] : '';
+
+    /**
+     * 후속 처리 실행 권한은 관리자와 최종 결재자에게만 준다.
+     *
+     * 예전에는 **기안자와 참조자, 결재선의 모든 구성원** 까지 이 엔드포인트를 호출할 수
+     * 있었다. 이 라우트는 연차 차감·인사명령 반영·기본급 갱신 같은 실제 집행을
+     * 돌리므로, 상태 위조 경로와 엮이면 기안자가 자기 문서의 급여 인상을 스스로
+     * 집행하는 체인이 된다. 조회가 필요한 사람은 결재 상세 화면을 쓰면 된다.
+     */
     const canAccess =
       isAdminSession(session.user) ||
-      sessionUserId === String(approval.sender_id || '').trim() ||
-      sessionUserId === currentApproverId ||
-      approvalLineIds.includes(sessionUserId) ||
-      referenceUserIds.includes(sessionUserId);
+      (Boolean(currentApproverId) && sessionUserId === currentApproverId) ||
+      (Boolean(lastApproverId) && sessionUserId === lastApproverId);
 
     if (!canAccess) {
       return NextResponse.json({ ok: false, error: 'Forbidden' }, { status: 403 });

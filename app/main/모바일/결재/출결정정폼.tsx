@@ -13,6 +13,7 @@ import { db } from '@/lib/db-client';
 import { isMissingColumnError } from '@/lib/db-compat';
 import { getPrimaryShift } from '@/lib/staff-shift-resolver';
 import { formatKoreanDateKey, formatKoreanTimeLabel } from '@/lib/seoul-time';
+import { parseDbTimestamp } from '@/lib/date-formatter';
 import type { ErpUser, StaffMember } from '@/types';
 import MAvatar from '../공통/MAvatar';
 import MCard from '../공통/MCard';
@@ -438,7 +439,20 @@ export default function SApprovalAttendanceFixForm({
         requested_at: requestedAt,
         status: '대기' }));
 
-      await withAttendanceCorrectionsFallback<null>(
+      /**
+       * insert 결과의 error 를 반드시 확인한다.
+       *
+       * 예전에는 반환값을 버리고 곧바로 성공 토스트를 띄웠다. db 클라이언트는
+       * 실패를 throw 하지 않고 `{ data, error }` 로 돌려주므로 바깥 catch 도 걸리지
+       * 않았고, 선삽입이 실패해도 사용자에게는 아무 경고가 없었다. 그러면 중복 신청
+       * 차단(alreadyRequested)이 동작하지 않아 같은 날짜로 반복 상신이 가능하고,
+       * 반려 시 '대기'→'반려' 로 되돌릴 대상 행이 없어 상태 추적이 어긋난다.
+       *
+       * 다만 이 시점엔 결재 문서(approvals)가 이미 상신된 뒤라 throw 하면 사용자가
+       * 실패로 알고 재상신해 문서가 두 벌 생긴다. 그래서 상신은 성공으로 알리되
+       * 정정 기록 실패는 따로 경고한다.
+       */
+      const { error: correctionError } = await withAttendanceCorrectionsFallback<null>(
         () => db.from('attendance_corrections').insert(rows),
         () => {
           const legacyRows = rows.map(({ attendance_date, requested_at, ...rest }) => rest);
@@ -446,7 +460,15 @@ export default function SApprovalAttendanceFixForm({
         },
       );
 
-      toast('출결 정정 기안이 상신되었습니다.', 'success');
+      if (correctionError) {
+        console.error('[mobile-approval] attendance_corrections insert failed', correctionError);
+        toast(
+          '기안은 상신됐지만 출결 정정 기록 저장에 실패했습니다. 같은 날짜로 다시 상신하지 마시고 관리자에게 알려 주세요.',
+          'error',
+        );
+      } else {
+        toast('출결 정정 기안이 상신되었습니다.', 'success');
+      }
       onSubmitted();
     } catch (err) {
       console.error(err);
@@ -469,21 +491,24 @@ export default function SApprovalAttendanceFixForm({
 
   const canSubmit = selectedDates.length > 0 && reason.trim() !== '' && approverLine.length > 0;
 
+  // dateStr 은 'YYYY-MM-DD' 날짜키다. 예전에는 `new Date(dateStr)`(=UTC 자정) 을
+  // getMonth/getDate 로 읽어 디바이스 로컬 TZ 로 되돌렸고, 음수 오프셋 TZ 에서는
+  // 하루 전 날짜·요일이 나왔다(8차 D12-020). 문자열을 그대로 쓰고 요일만 UTC 로 계산한다.
   const fmtDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
+    const [yy, mm, dd] = String(dateStr).slice(0, 10).split('-');
+    const d = new Date(`${yy}-${mm}-${dd}T00:00:00Z`);
     const days = ['일', '월', '화', '수', '목', '금', '토'];
-    return { short: `${mm}/${dd}`, day: days[d.getDay()] };
+    return { short: `${mm}/${dd}`, day: days[d.getUTCDay()] };
   };
 
+  // 지각/조퇴 판정은 KST(formatKoreanTimeLabel)로 하는데 표시만 디바이스 로컬 TZ
+  // (`toTimeString()`)여서, 비-KST 디바이스에서는 '지각' 배지와 화면의 시각이
+  // 서로 모순됐다(8차 D12-020). 표시도 KST 로 고정한다.
   const fmtTime = (iso: string | null | undefined) => {
     if (!iso) return null;
-    try {
-      return new Date(iso).toTimeString().slice(0, 5);
-    } catch {
-      return null;
-    }
+    const parsed = parseDbTimestamp(iso);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return formatKoreanTimeLabel(parsed);
   };
 
   return (

@@ -67,6 +67,14 @@ export function useApprovalDelegation({
       delegatedAt: String(metaData?.delegated_at || '') };
   }, [approvalStaffMap, resolveEffectiveApproverId, resolveStoredCurrentApproverId]);
 
+  /**
+   * 결재 지연 알림 — 이 구현이 유일한 정본이다.
+   *
+   * 예전에는 useApprovalRouting 에도 거의 같은 코드(syncApprovalDelayNotifications)가
+   * 한 벌 더 있었는데, 훅이 반환만 하고 호출부가 0건인 사장 코드였다. 두 벌이
+   * 미묘하게 달라(알림 metadata 의 dedupe_key 유무) 어느 쪽이 실제 동작인지
+   * 코드만 봐서는 알 수 없었으므로 죽은 쪽을 지웠다.
+   */
   const syncDelegatedApprovalDelayNotifications = useCallback(async (items: ApprovalRecord[]) => {
     const overdueItems = items.filter((item) => {
       const originalApproverId = resolveStoredCurrentApproverId(item);

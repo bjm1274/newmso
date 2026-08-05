@@ -26,8 +26,10 @@ import {
   getD1Drizzle } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 import {
+  getCompletedProcessingSteps,
   isFinalApprovalEffectsDone,
   normalizeLeaveAttendanceStatus,
+  PARTIAL_FAILURE_SERVER_PROCESSING_STATUS,
   resolveAttendanceCorrectionStatusPair } from '@/lib/server-approval-processing-helpers';
 
 // D1 binding 필수 — Workers env 가 없으면 throw. (서버 라우트 안에서만 호출)
@@ -236,38 +238,67 @@ export async function processFinalApprovalEffects(
     // d1 binding 없으면 silently skip — 마커 실패가 처리를 막지 않도록
   }
 
-  const steps: string[] = [];
+  /**
+   * 직전 시도에서 성공한 단계는 건너뛴다.
+   *
+   * 부분 실패를 완료로 굳히지 않고 재시도할 수 있게 바꾸면서(D05-004), 재시도가
+   * 이미 성공한 단계를 다시 돌려 증명서 이중 발급·인사이력 2행 같은 부작용을
+   * 내지 않도록 단계별 멱등을 둔다. 각 단계 자체는 조건 없는 INSERT 라
+   * 이 스킵이 유일한 방어선이다.
+   */
+  const completedSteps = getCompletedProcessingSteps(metaData);
+  const isStepDone = (step: string) => completedSteps.includes(step);
+  const steps: string[] = [...completedSteps];
   const warnings: string[] = [];
+  // 재시도로 회복 가능한 실패만 담는다 — '대상이 여러 명이라 미반영' 같은 안내성
+  // 경고까지 실패로 세면 문서가 영원히 failed_partial 로 남는다.
+  const failedSteps: string[] = [];
   let supplySummary: ReturnType<typeof summarizeSupplyRequestWorkflow> | null = null;
 
-  try {
-    await syncApprovalToDocumentRepository(item);
-    steps.push('document_repository');
-  } catch (error) {
-    warnings.push(`문서보관함 동기화 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);
+  if (!isStepDone('document_repository')) {
+    try {
+      await syncApprovalToDocumentRepository(item);
+      steps.push('document_repository');
+    } catch (error) {
+      failedSteps.push('document_repository');
+      warnings.push(`문서보관함 동기화 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);
+    }
   }
 
   const itemMetaData = item.meta_data as Record<string, unknown> | null | undefined;
 
-  if (item.type === '공문발송' || itemMetaData?.official_doc_request) {
+  /**
+   * 공문 발송대장 반영.
+   *
+   * 예전에는 이 블록과 별개로 함수 끝에서 조건 없이 한 번 더
+   * syncOfficialDocumentLogFromApproval 을 호출했다. 그 함수는 멱등 검사 없이
+   * 항상 INSERT 하므로 **공문발송 결재가 최종 승인될 때마다 발송대장에 2행**이
+   * 생겼고, doc_number 를 자동 채번하는 경우 두 행의 번호까지 달라져 어느 쪽이
+   * 정본인지 판별할 수 없었다. 조건 없는 두 번째 호출은 제거했다.
+   */
+  if ((item.type === '공문발송' || itemMetaData?.official_doc_request) && !isStepDone('official_document_log')) {
     try {
-      await syncOfficialDocumentLogFromApproval(item);
-      steps.push('official_document_log');
+      const officialDocResult = await syncOfficialDocumentLogFromApproval(item);
+      if (officialDocResult) {
+        steps.push('official_document_log');
+      }
     } catch (error) {
+      failedSteps.push('official_document_log');
       warnings.push(`공문대장 동기화 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);
     }
   }
 
-  if (item.type === '물품신청' && itemMetaData?.items) {
+  if (item.type === '물품신청' && itemMetaData?.items && !isStepDone('inventory_workflow')) {
     try {
       supplySummary = await prepareSupplyApprovalInventoryWorkflow(item);
       steps.push('inventory_workflow');
     } catch (error) {
+      failedSteps.push('inventory_workflow');
       warnings.push(`재고 워크플로우 준비 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);
     }
   }
 
-  if (item.type === '인사명령' && itemMetaData?.orderTargetId) {
+  if (item.type === '인사명령' && itemMetaData?.orderTargetId && !isStepDone('personnel_order')) {
     const { orderTargetId, newPosition, orderCategory, targetDept } = itemMetaData as {
       orderTargetId: string;
       newPosition?: string;
@@ -330,11 +361,12 @@ export async function processFinalApprovalEffects(
 
       steps.push('personnel_order');
     } catch (error) {
+      failedSteps.push('personnel_order');
       warnings.push(`인사명령 반영 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);
     }
   }
 
-  if (item.type === '연차/휴가' || item.type === '휴가신청') {
+  if ((item.type === '연차/휴가' || item.type === '휴가신청') && !isStepDone('leave_attendance')) {
     const senderId = String(item.sender_id || '');
     const leaveSummary = extractLeaveRequestMeta(itemMetaData);
     const startStr = leaveSummary?.startDate || '';
@@ -449,6 +481,7 @@ export async function processFinalApprovalEffects(
           console.error('[server-approval-processing] Failed to dispatch immediate leave notice:', annErr);
         }
       } catch (error) {
+        failedSteps.push('leave_attendance');
         warnings.push(`연차/휴가 반영 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);
       }
     }
@@ -457,7 +490,8 @@ export async function processFinalApprovalEffects(
   if (
     (String(item.type || '').trim() === '출결정정' || String(itemMetaData?.form_slug || '').trim() === 'attendance_fix') &&
     Array.isArray(itemMetaData?.correction_dates) &&
-    itemMetaData.correction_dates.length > 0
+    itemMetaData.correction_dates.length > 0 &&
+    !isStepDone('attendance_fix')
   ) {
     try {
       const approvedAt = new Date().toISOString();
@@ -519,11 +553,12 @@ export async function processFinalApprovalEffects(
 
       steps.push('attendance_fix');
     } catch (error) {
+      failedSteps.push('attendance_fix');
       warnings.push(`출결정정 반영 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);
     }
   }
 
-  if (item.type === '양식요청' && itemMetaData?.form_type && itemMetaData?.target_staff && itemMetaData?.auto_issue) {
+  if (item.type === '양식요청' && itemMetaData?.form_type && itemMetaData?.target_staff && itemMetaData?.auto_issue && !isStepDone('certificate_issue')) {
     try {
       // 증명서 일련번호의 연·월은 KST 기준 (서버 UTC면 월말/연말 자정 부근 어긋남)
       const certYearMonth = getKoreanTodayString().slice(0, 7).replace('-', '');
@@ -546,11 +581,12 @@ export async function processFinalApprovalEffects(
         issued_at: new Date().toISOString() });
       steps.push('certificate_issue');
     } catch (error) {
+      failedSteps.push('certificate_issue');
       warnings.push(`증명서 발급 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);
     }
   }
 
-  if (item.type === '근무표') {
+  if (item.type === '근무표' && !isStepDone('shift_assignments_sync')) {
     try {
       const assignments = Array.isArray(itemMetaData?.assignments) ? itemMetaData.assignments : [];
       if (assignments.length > 0) {
@@ -588,6 +624,7 @@ export async function processFinalApprovalEffects(
         steps.push('shift_assignments_sync');
       }
     } catch (error) {
+      failedSteps.push('shift_assignments_sync');
       warnings.push(`근무표 배정 반영 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);
     }
   }
@@ -600,7 +637,7 @@ export async function processFinalApprovalEffects(
     String(itemMetaData?.request_category || '').trim() === 'salary_increase_evaluation' ||
     itemMetaData?.evaluationType === 'salary_increase';
 
-  if (isSalaryIncreaseForm) {
+  if (isSalaryIncreaseForm && !isStepDone('salary_increase_applied')) {
     try {
       const targetStaffId = itemMetaData?.targetStaffId ? String(itemMetaData.targetStaffId).trim() : null;
       const targetStaffName = itemMetaData?.targetStaffName
@@ -704,22 +741,17 @@ export async function processFinalApprovalEffects(
         }
       }
     } catch (error) {
+      failedSteps.push('salary_increase_applied');
       warnings.push(`급여 인상 자동 반영 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);
     }
   }
 
-  try {
-    const officialDocResult = await syncOfficialDocumentLogFromApproval(item);
-    if (officialDocResult) {
-      steps.push('official_document_log');
-    }
-  } catch (error) {
-    warnings.push(`공문서 발송대장 반영 실패: ${String((error as { message?: string } | null)?.message || error || 'unknown')}`);
-  }
+  // (공문 발송대장 반영은 위 조건부 블록 한 곳에서만 한다 — 여기 있던 조건 없는
+  //  두 번째 호출이 같은 공문을 한 번 더 INSERT 하던 자리다.)
 
   // Fix B: 물품요청 외 타입에 대해 기안자에게 최종 승인 알림 전송
   // (물품요청은 prepareSupplyApprovalInventoryWorkflow 안에서 이미 처리됨)
-  if (item.type !== '물품요청') {
+  if (item.type !== '물품요청' && !isStepDone('sender_approval_notification')) {
     try {
       const senderId = String(item.sender_id || '').trim();
       if (senderId) {
@@ -773,12 +805,16 @@ export async function processFinalApprovalEffects(
   const nextMetaData = {
     ...latestMetaData,
     server_processing: {
-      status: warnings.length > 0 ? 'completed_with_warnings' : 'completed',
+      // 재시도로 회복 가능한 실패가 하나라도 있으면 완료로 굳히지 않는다.
+      // 예전에는 이 자리에서 'completed_with_warnings' 를 쓰고 그것을 완료로
+      // 취급해, 연차 차감·인사명령 미반영이 영구히 굳었다.
+      status: failedSteps.length > 0 ? PARTIAL_FAILURE_SERVER_PROCESSING_STATUS : 'completed',
       started_at: startedAt,
       started_by: actorId || null,
       processed_at: processedAt,
       errors: warnings,
-      steps } };
+      failed_steps: failedSteps,
+      steps: Array.from(new Set(steps)) } };
 
   {
     const d1 = await getD1Binding();

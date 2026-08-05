@@ -2,6 +2,7 @@ import {
   appendApprovalHistory,
   getApprovalRevision,
   lockApprovalMeta } from '@/lib/approval-workflow';
+import { hasPermission } from '@/lib/access-control';
 import { notificationMatchesApprovalId } from '@/lib/notification-metadata';
 import { processFinalApprovalEffects } from '@/lib/server-approval-processing';
 import {
@@ -170,6 +171,92 @@ function applyDelegationMeta(
   );
 }
 
+/**
+ * 다음 단계로 넘어갈 때 위임(대결) 메타를 "다음 결재자 기준" 으로 다시 쓴다.
+ *
+ * 예전에는 단계 진행 시 current_approver_id 에 대리자 id 를 그대로 저장하면서
+ * delegated_from_id / delegated_to_id 는 손대지 않았다. 그 탓에 두 가지가 깨졌다.
+ *  - 저장된 대리자 id 가 approver_line 에 없는 값이 되어, 다음 호출에서
+ *    'Current approver is not in approver line.' 로 문서가 영구 정지했다.
+ *    이 검사는 관리자 우회보다 앞이라 관리자도 손댈 수 없었다.
+ *  - 같은 사람이 연속된 두 결재자를 대행하면 직전 단계의 delegated_to_id 가
+ *    남아 있어 resolveStoredCurrentApproverId 가 **이전 결재자** 를 가리켰고,
+ *    결재 단계가 뒤로 되감겼다.
+ * 그래서 단계마다 이 세 값을 다음 결재자의 것으로 덮어쓰거나, 위임이 없으면 비운다.
+ */
+function applyNextStepDelegationMeta(
+  metaData: Record<string, unknown>,
+  nextLineApproverId: string | null,
+  nextEffectiveApproverId: string | null,
+): Record<string, unknown> {
+  const hasDelegation = Boolean(
+    nextLineApproverId &&
+      nextEffectiveApproverId &&
+      String(nextLineApproverId) !== String(nextEffectiveApproverId)
+  );
+
+  return {
+    ...metaData,
+    delegated_from_id: hasDelegation ? nextLineApproverId : null,
+    delegated_to_id: hasDelegation ? nextEffectiveApproverId : null,
+    delegated_at: hasDelegation ? new Date().toISOString() : null };
+}
+
+/**
+ * 반려·회수로 결재가 끝났을 때 남는 leave_requests '대기' 행을 정리한다.
+ *
+ * 모바일 연차신청 폼은 approvals 보다 **먼저** leave_requests 에 status='대기'
+ * 행을 넣는다(중복 신청 차단과 오프라인 큐 때문). 그런데 그 행을 '승인' 으로
+ * 승격시키는 코드는 최종 승인 경로(ensureApprovedAnnualLeaveRequest)에만 있고,
+ * 반려 경로는 attendance_corrections 만 되돌렸다. 그래서 반려된 연차가 인사
+ * 화면(휴가관리·LeaveWorkcenter·모바일 연차관리자)에는 계속 '대기' 로 떠 있는
+ * 유령 신청으로 남았다 — 그 화면들은 status 필터 없이 조회한다.
+ */
+async function cleanupPendingLeaveRequestOnTermination(
+  item: ApprovalRow,
+  metaData: Record<string, unknown> | null | undefined,
+  nextStatus: '반려' | '회수',
+) {
+  const itemType = String(item.type || '').trim();
+  if (itemType !== '연차/휴가' && itemType !== '휴가신청') return;
+
+  const senderId = String(item.sender_id || '').trim();
+  if (!senderId) return;
+
+  try {
+    const { extractLeaveRequestMeta } = await import('@/lib/leave-notice');
+    const leaveSummary = extractLeaveRequestMeta(metaData);
+    const startDate = leaveSummary?.startDate || '';
+    if (!startDate) return;
+    const endDate = leaveSummary?.endDate || startDate;
+
+    const { leaveTypeLookupAliases } = await import('@/lib/leave-type');
+    // 승격 경로와 같은 조건(직원 + 유형 별칭 + 기간)으로 찾아야 같은 행을 집는다.
+    const typeAliases = leaveTypeLookupAliases(leaveSummary?.leaveType);
+
+    const d1 = await getD1Binding();
+    if (!d1) return;
+    const db = getD1Drizzle(d1);
+    const { leave_requests } = await import('@/lib/db/schema');
+    const { and: drizzleAnd, eq: drizzleEq, inArray: drizzleInArray } = await import('drizzle-orm');
+    await db
+      .update(leave_requests)
+      .set({ status: nextStatus })
+      .where(
+        drizzleAnd(
+          drizzleEq(leave_requests.staff_id, senderId),
+          drizzleInArray(leave_requests.leave_type, typeAliases),
+          drizzleEq(leave_requests.start_date, startDate),
+          drizzleEq(leave_requests.end_date, endDate),
+          drizzleEq(leave_requests.status, '대기'),
+        ),
+      );
+  } catch (leaveErr) {
+    // 결재 상태 전이 자체는 이미 확정됐으므로 정리 실패로 되돌리지 않는다.
+    console.error('[server-approval-transition] leave_requests 대기 행 정리 실패:', leaveErr);
+  }
+}
+
 function serializeApprovalUpdateForD1(updateData: Record<string, unknown>): Record<string, unknown> {
   const d1UpdateData: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(updateData)) {
@@ -182,19 +269,47 @@ function serializeApprovalUpdateForD1(updateData: Record<string, unknown>): Reco
   return d1UpdateData;
 }
 
+/**
+ * 결재 행 갱신 — 읽은 스냅샷을 조건에 건 낙관적 잠금(CAS).
+ *
+ * 예전에는 SELECT 로 읽은 status 가 '대기' 인지만 확인하고 UPDATE 는
+ * `where id = ?` 하나로 나갔다. D1 은 문장 단위 자동커밋이고 라우트에도
+ * 문서 단위 직렬화가 없어서, 승인 버튼 더블클릭이나 PC/모바일 동시 조작이
+ * 같은 스냅샷을 읽으면 **둘 다 통과해 둘 다 UPDATE** 했다. 그 결과 최종 승인
+ * 후속 처리가 두 번 돌아 증명서·인사이력·알림이 2건씩 생겼다
+ * (실측: 동시 승인 2건 → certificate_issuances 2행).
+ *
+ * 이제 읽은 시점의 status/current_approver_id 를 WHERE 에 함께 걸고,
+ * 갱신된 행이 없으면(=그 사이 누가 먼저 처리) 호출측이 충돌로 처리한다.
+ */
 async function updateApprovalRecord(
   approvalId: string,
-  updateData: Record<string, unknown>
+  updateData: Record<string, unknown>,
+  expected?: { status: string; currentApproverId: unknown }
 ) {
   const d1 = await getD1Binding();
   if (!d1) throw new Error('[server-approval-transition] D1 binding not available (updateApprovalRecord)');
   const db = getD1Drizzle(d1);
   // JSON 컬럼(meta_data, approver_line, approval_line)은 TEXT로 직렬화
   const d1UpdateData = serializeApprovalUpdateForD1(updateData);
+  const { and: drizzleAnd, eq: drizzleEq, isNull: drizzleIsNull } = await import('drizzle-orm');
+  const expectedApproverId =
+    expected && expected.currentApproverId != null && String(expected.currentApproverId) !== ''
+      ? String(expected.currentApproverId)
+      : null;
+  const whereClause = expected
+    ? drizzleAnd(
+        drizzleEq(approvalsTable.id, approvalId),
+        drizzleEq(approvalsTable.status, expected.status),
+        expectedApproverId
+          ? drizzleEq(approvalsTable.current_approver_id, expectedApproverId)
+          : drizzleIsNull(approvalsTable.current_approver_id),
+      )
+    : eq(approvalsTable.id, approvalId);
   const rows = await db
     .update(approvalsTable)
     .set(d1UpdateData as Parameters<ReturnType<typeof db.update>['set']>[0])
-    .where(eq(approvalsTable.id, approvalId))
+    .where(whereClause)
     .returning();
   const row = rows[0] ?? null;
   if (!row) return null;
@@ -343,7 +458,31 @@ async function transitionSingleApproval(params: {
       ? (item.approver_line ?? (item.meta_data as Record<string, unknown> | null | undefined)?.approver_line)
       : [storedCurrentApproverId] });
 
-  const currentIndex = lineIds.findIndex((id) => String(id) === String(storedCurrentApproverId));
+  const staffMap = await fetchStaffMap(
+    [storedCurrentApproverId, ...lineIds, actor.id || ''].filter(Boolean)
+  );
+
+  /**
+   * 결재선에서 현재 결재자의 위치를 찾는다.
+   *
+   * 대결이 걸린 문서는 예전 저장 경로 탓에 current_approver_id 에 결재선에 없는
+   * **대리자 id** 가 그대로 들어가 있을 수 있고, 그러면 이 검사에서 걸려 승인도
+   * 반려도 되지 않았다(회수 외 복구 수단이 없었다). 저장 경로는
+   * applyNextStepDelegationMeta 로 고쳤지만 이미 그렇게 굳은 문서가 남아 있으므로,
+   * "결재선의 누군가가 위임한 대리자" 인 경우 그 위임자 자리로 되돌려 복구한다.
+   */
+  let currentApproverLineId = storedCurrentApproverId;
+  let currentIndex = lineIds.findIndex((id) => String(id) === String(storedCurrentApproverId));
+  if (currentIndex === -1) {
+    const delegatedIndex = lineIds.findIndex(
+      (id) => String(resolveEffectiveApproverId(id, staffMap) || id) === String(storedCurrentApproverId)
+    );
+    if (delegatedIndex >= 0) {
+      currentIndex = delegatedIndex;
+      currentApproverLineId = String(lineIds[delegatedIndex]);
+    }
+  }
+
   if (currentIndex === -1) {
     return {
       approvalId,
@@ -358,13 +497,10 @@ async function transitionSingleApproval(params: {
       error: 'Current approver is not in approver line.' } satisfies ApprovalTransitionResult;
   }
 
-  const staffMap = await fetchStaffMap(
-    [storedCurrentApproverId, ...lineIds].filter(Boolean)
-  );
   let effectiveCurrentApproverId =
-    resolveEffectiveApproverId(storedCurrentApproverId, staffMap) || storedCurrentApproverId;
+    resolveEffectiveApproverId(currentApproverLineId, staffMap) || currentApproverLineId;
 
-  const isDirectApprover = String(storedCurrentApproverId) === String(actor.id);
+  const isDirectApprover = String(currentApproverLineId) === String(actor.id);
   const isEffectiveApprover = String(effectiveCurrentApproverId) === String(actor.id);
 
   if (!actor.isAdmin && !isDirectApprover && !isEffectiveApprover) {
@@ -379,7 +515,7 @@ async function transitionSingleApproval(params: {
           .from(approval_delegation)
           .where(
             drizzleAnd(
-              drizzleEq(approval_delegation.delegator_id, storedCurrentApproverId),
+              drizzleEq(approval_delegation.delegator_id, currentApproverLineId),
               drizzleEq(approval_delegation.delegate_id, String(actor.id)),
               drizzleEq(approval_delegation.is_active, 1),
             ),
@@ -404,9 +540,30 @@ async function transitionSingleApproval(params: {
     }
   }
 
+  /**
+   * 강제 반려는 '현재 결재자' 검사를 면제한다 — 정체된 결재를 인사/관리 담당자가
+   * 끊어 줄 수 있어야 하기 때문. 승인에는 적용하지 않는다.
+   *
+   * PC 는 approval_반려권한('강제 반려/회수') 이 있으면 현재 결재자가 아니어도
+   * 반려를 진행시키는데, 서버는 이 권한을 **아예 참조하지 않고** 무조건 거부했다.
+   * 그래서 해당 권한자는 사유 입력까지 마친 뒤 항상 서버 오류 토스트만 봤고,
+   * 권한 설정 화면의 그 항목은 사실상 아무 효과가 없었다.
+   *
+   * 권한은 세션이 아니라 DB(staff_members.permissions)에서 읽는다 — 세션 토큰은
+   * 크기 때문에 일부 접두사(menu_/hr_/inventory_ …)만 담고 approval_ 계열은
+   * 버리므로, 세션에서 읽으면 영원히 false 다.
+   */
+  const isForcedReject =
+    action === 'reject' &&
+    hasPermission(
+      { permissions: staffMap.get(String(actor.id))?.permissions || {} } as Record<string, unknown>,
+      'approval_반려권한',
+    );
+
   if (
     !actor.isAdmin &&
-    String(storedCurrentApproverId) !== String(actor.id) &&
+    !isForcedReject &&
+    String(currentApproverLineId) !== String(actor.id) &&
     String(effectiveCurrentApproverId) !== String(actor.id)
   ) {
     return {
@@ -426,24 +583,50 @@ async function transitionSingleApproval(params: {
     item,
     actor,
     (item.meta_data as Record<string, unknown> | null | undefined) || {},
-    storedCurrentApproverId,
+    currentApproverLineId,
     effectiveCurrentApproverId,
   );
   const revision = getApprovalRevision(baseMetaData);
 
   if (action === 'reject') {
     const reason = String(rejectReason || '').trim();
+    // 현재 결재자가 아닌 사람이 권한으로 끊은 반려는 이력에서 구분되어야 한다.
+    const isForcedRejectByPermission =
+      isForcedReject &&
+      String(currentApproverLineId) !== String(actor.id) &&
+      String(effectiveCurrentApproverId) !== String(actor.id);
+    const rejectNote = isForcedRejectByPermission
+      ? `[강제 반려] ${reason || '반려'}`
+      : reason || '반려';
     const nextRejectedMetaData = buildNextApprovalMetaData(baseMetaData, actor, 'rejected', {
-      note: reason || '반려',
+      note: rejectNote,
       lock: true,
       currentApproverId: effectiveCurrentApproverId,
       revision });
 
-    await updateApprovalRecord(approvalId, {
-      status: '반려',
-      meta_data: {
-        ...nextRejectedMetaData,
-        reject_reason: reason || null } });
+    const rejectedRow = await updateApprovalRecord(
+      approvalId,
+      {
+        status: '반려',
+        meta_data: {
+          ...nextRejectedMetaData,
+          reject_reason: reason || null } },
+      { status: itemStatus, currentApproverId: item.current_approver_id },
+    );
+
+    if (!rejectedRow) {
+      return {
+        approvalId,
+        action,
+        ok: false,
+        status: itemStatus,
+        finalApproval: false,
+        nextApproverId: null,
+        alreadyProcessed: true,
+        warnings: [],
+        supplySummary: null,
+        error: 'Approval was already processed by another request.' } satisfies ApprovalTransitionResult;
+    }
 
     // Fix A: 기안자에게 반려 알림 전송
     try {
@@ -490,6 +673,8 @@ async function transitionSingleApproval(params: {
         console.error('[server-approval-transition] attendance_corrections 반려 상태 갱신 실패:', attErr);
       }
     }
+
+    await cleanupPendingLeaveRequestOnTermination(item, baseMetaData, '반려');
 
     return {
       approvalId,
@@ -545,13 +730,35 @@ async function transitionSingleApproval(params: {
     : {
         current_approver_id: nextApproverId,
         meta_data: {
-          ...buildNextApprovalMetaData(baseMetaData, actor, 'approved_step', {
-            note: stepApprovalNote,
-            currentApproverId: nextApproverId,
-            revision }),
+          ...applyNextStepDelegationMeta(
+            buildNextApprovalMetaData(baseMetaData, actor, 'approved_step', {
+              note: stepApprovalNote,
+              currentApproverId: nextApproverId,
+              revision }),
+            nextLineApproverId,
+            nextApproverId,
+          ),
           ...(trimmedApproveComment ? { approve_comment: trimmedApproveComment } : {}) } };
 
-  const updatedApproval = await updateApprovalRecord(approvalId, updateData);
+  const updatedApproval = await updateApprovalRecord(approvalId, updateData, {
+    status: itemStatus,
+    currentApproverId: item.current_approver_id });
+
+  if (!updatedApproval) {
+    // CAS 실패 = 같은 스냅샷을 읽은 다른 요청이 먼저 처리했다.
+    // 여기서 멈추지 않으면 최종 승인 후속 처리가 두 번 실행된다.
+    return {
+      approvalId,
+      action,
+      ok: false,
+      status: itemStatus,
+      finalApproval: false,
+      nextApproverId: null,
+      alreadyProcessed: true,
+      warnings: [],
+      supplySummary: null,
+      error: 'Approval was already processed by another request.' } satisfies ApprovalTransitionResult;
+  }
 
   if (!isFinalApproval) {
     // Fix D: 다음 결재자에게 결재 차례 알림 전송

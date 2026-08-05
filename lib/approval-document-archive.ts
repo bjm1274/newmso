@@ -197,11 +197,10 @@ function buildApprovalArchiveContent(item: ApprovalArchiveSource) {
   return `${headerLines.join('\n')}\n\n${body}`.trim();
 }
 
-function hasMatchingFallbackDocument(doc: Record<string, unknown>, item: ApprovalArchiveSource) {
-  const sameTitle = String(doc.title || '').trim() === String(item.title || '').trim();
-  const sameCreator = String(doc.created_by || '').trim() === String(item.sender_id || '').trim();
-  const sameCompany = String(doc.company_name || '').trim() === String(item.sender_company || '').trim();
-  return sameTitle && sameCreator && sameCompany;
+/** 결재 문서를 문서보관함에 담을 때 쓰는 결정적 키. */
+function buildApprovalArchiveId(approvalId: unknown) {
+  const normalized = String(approvalId || '').trim();
+  return normalized ? `approval-${normalized}` : '';
 }
 
 export type ParsedArchivedContent = {
@@ -295,7 +294,7 @@ export function extractApprovalDocNumberFromDocument(doc: Record<string, unknown
 
 export function mapApprovalToDocumentRepositoryEntry(item: ApprovalArchiveSource) {
   return {
-    id: `approval-${String(item.id || '')}`,
+    id: buildApprovalArchiveId(item.id) || `approval-${String(item.id || '')}`,
     title: String(item.title || '').trim() || '전자결재 문서',
     category: resolveApprovalCategory(item),
     content: buildApprovalArchiveContent(item),
@@ -336,25 +335,58 @@ export async function syncApprovalToDocumentRepository(
   if (!d1) throw new Error('[approval-document-archive] D1 binding not available (syncApprovalToDocumentRepository)');
   const db = getD1Drizzle(d1);
 
-  const baseQuery = db
-    .select()
-    .from(documentRepositoryTable)
-    .orderBy(desc(documentRepositoryTable.updated_at))
-    .limit(300);
-
-  const existingDocs = companyName && companyName !== '전체'
-    ? await baseQuery.where(eq(documentRepositoryTable.company_name, companyName))
-    : await baseQuery;
-
-  const matchedDoc = (existingDocs || []).find((doc) => {
-    const archivedDocNumber = extractApprovalDocNumberFromDocument(doc as Record<string, unknown>);
-    if (docNumber && archivedDocNumber) {
-      return archivedDocNumber === docNumber;
-    }
-    return hasMatchingFallbackDocument(doc as Record<string, unknown>, item);
-  }) as Record<string, unknown> | undefined;
-
+  /**
+   * 보관 대상 행은 결재 id 로 결정된다.
+   *
+   * 예전에는 document_repository 를 updated_at 내림차순 300건만 훑은 뒤,
+   * 문서번호가 없으면 **제목 + 기안자 + 회사** 가 같다는 이유로 기존 행의 content 를
+   * 통째로 덮어썼다. 그래서 같은 사람이 같은 제목으로 반복 기안하는 문서
+   * (주간업무보고 등)는 서로를 덮어써 과거 결재 본문이 사라졌고, 반대로 보관함이
+   * 300건을 넘어가면 같은 문서가 중복 저장됐다.
+   * 이제 `approval-<id>` 를 기본키로 단건 조회해 upsert 한다. 문서번호 매칭은
+   * 그 키가 없던 시절에 만들어진 옛 행을 흡수하기 위한 폴백으로만 남긴다.
+   */
+  const archiveId = buildApprovalArchiveId(item.id);
   const now = new Date().toISOString();
+
+  if (archiveId) {
+    const ownRows = await db
+      .select()
+      .from(documentRepositoryTable)
+      .where(eq(documentRepositoryTable.id, archiveId))
+      .limit(1);
+    const ownDoc = ownRows[0] as Record<string, unknown> | undefined;
+    if (ownDoc?.id) {
+      await db
+        .update(documentRepositoryTable)
+        .set({
+          ...nextRow,
+          updated_at: now,
+          version: Number(ownDoc.version) || 1,
+          file_url: (ownDoc.file_url as string | null) || null })
+        .where(eq(documentRepositoryTable.id, archiveId));
+      return archiveId;
+    }
+  }
+
+  let matchedDoc: Record<string, unknown> | undefined;
+  if (docNumber) {
+    const baseQuery = db
+      .select()
+      .from(documentRepositoryTable)
+      .orderBy(desc(documentRepositoryTable.updated_at))
+      .limit(300);
+
+    const existingDocs = companyName && companyName !== '전체'
+      ? await baseQuery.where(eq(documentRepositoryTable.company_name, companyName))
+      : await baseQuery;
+
+    matchedDoc = (existingDocs || []).find((doc) => {
+      const archivedDocNumber = extractApprovalDocNumberFromDocument(doc as Record<string, unknown>);
+      return Boolean(archivedDocNumber) && archivedDocNumber === docNumber;
+    }) as Record<string, unknown> | undefined;
+  }
+
   if (matchedDoc?.id) {
     const currentVersion = Number(matchedDoc.version) || 1;
     await db
@@ -368,7 +400,7 @@ export async function syncApprovalToDocumentRepository(
     return matchedDoc.id;
   }
 
-  const newId = crypto.randomUUID();
+  const newId = archiveId || crypto.randomUUID();
   await db.insert(documentRepositoryTable).values({
     id: newId,
     ...nextRow,

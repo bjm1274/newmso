@@ -35,6 +35,10 @@ import {
 import { pickAvatarTone } from './format-utils';
 import { buildApprovalPrintHtml } from '../../기능부품/전자결재서브/approval-print-utils';
 import { resolveEffectiveApproverIdCore } from '@/lib/approval-shared';
+import {
+  formatApprovalHistoryActionLabel,
+  getApprovalEditHistory,
+  type ApprovalHistoryAction } from '@/lib/approval-workflow';
 
 type DetailTab = 'form' | 'line' | 'comment';
 
@@ -71,11 +75,20 @@ function shortTs(iso?: string | null): string {
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+/**
+ * 결재 이력(승인/반려 사유) 읽기.
+ *
+ * 예전에는 `meta.history` 를 읽었는데, 서버(appendApprovalHistory)는 이력을
+ * **`edit_history`** 키에만 쌓는다. `history` 키에 쓰는 코드는 저장소 어디에도
+ * 없어서 모바일 '코멘트' 탭은 어떤 문서를 열어도 항상 비어 있었고 — 즉
+ * **모바일에서는 반려 사유를 확인할 방법이 없었다.** PC 인쇄 유틸도 `edit_history`
+ * 를 읽으므로 공용 getApprovalEditHistory 로 통일한다.
+ */
 function readHistory(row: ApprovalRow | null): CommentEntry[] {
   if (!row) return [];
   const meta = (row.meta_data ?? {}) as Record<string, unknown>;
-  const history = meta.history;
-  if (!Array.isArray(history)) return [];
+  const history = getApprovalEditHistory(meta);
+  if (history.length === 0) return [];
   return history
     .map((h, idx) => {
       if (h == null || typeof h !== 'object') return null;
@@ -786,8 +799,19 @@ function CommentTab({
                     {formatDateTime(c.at)}
                   </span>
                   {c.action && c.action !== 'commented' && (
-                    <MChip tone={c.action === 'approved' ? 'success' : c.action === 'rejected' ? 'danger' : ''}>
-                      {c.action === 'approved' ? '승인' : c.action === 'rejected' ? '반려' : c.action}
+                    <MChip
+                      tone={
+                        c.action === 'approved_step' || c.action === 'approved_final'
+                          ? 'success'
+                          : c.action === 'rejected'
+                            ? 'danger'
+                            : ''
+                      }
+                    >
+                      {/* 라벨은 PC 와 같은 정본(formatApprovalHistoryActionLabel)을 쓴다 —
+                          예전에는 'approved'/'rejected' 두 값만 한글로 바꾸고 나머지는
+                          영문 키를 그대로 노출했다. */}
+                      {formatApprovalHistoryActionLabel(c.action as ApprovalHistoryAction)}
                     </MChip>
                   )}
                 </div>
