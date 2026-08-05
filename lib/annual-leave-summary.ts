@@ -355,11 +355,16 @@ export function useAnnualLeaveSummary(staffId: string | null | undefined): Annua
       leaveSummaryCache.set(staffId, { data: nextState, timestamp: Date.now() });
       setState(nextState);    } catch (err) {
       console.error('[useAnnualLeaveSummary]', err);
+      // 실패를 error 에 남긴다.
+      //
+      // 예전에는 catch 에서 `error: null` 로 두고 전량 0 인 EMPTY 를 그대로 세팅했다.
+      // 화면은 "연차 0일"을 정상 값처럼 보여줬고, 직원은 자기 연차가 소멸된 줄 알고,
+      // 인사담당자는 조회가 실패한 사실 자체를 알 수 없었다. 오류는 오류로 보여야 한다.
       setState({
         ...EMPTY,
         loading: false,
         year,
-        error: null,
+        error: err instanceof Error ? err.message : '연차 정보를 불러오지 못했습니다.',
       });
     }
   }, [staffId]);

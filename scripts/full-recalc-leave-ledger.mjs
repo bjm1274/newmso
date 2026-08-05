@@ -18,6 +18,8 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
+// 사이클 포함 판정은 reset-leave-usage.mjs 와 **같은 규칙**을 써야 한다.
+import { isLedgerEntryInCycle } from './leave-ledger-cycle-rules.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -159,10 +161,6 @@ function getLeaveCycle(hireDate, asOfDate) {
     end,
     completedYears,
   };
-}
-
-function isWithinCycle(dateKey, cycle) {
-  return dateKey >= cycle.start && dateKey < cycle.end;
 }
 
 function isActiveStatus(status) {
@@ -575,17 +573,13 @@ for (const s of staffs) {
   let remainingRaw = 0;
 
   for (const entry of rows) {
-    const periodKey = String(entry.period_key || '');
-    if (periodKey.startsWith('auto-seed:')) continue;
-    const occurredOn = String(entry.occurred_on || '').slice(0, 10);
     const entryType = String(entry.entry_type || '');
-    const isManual =
-      entryType === 'manual_adjustment' ||
-      entryType === 'manual_used_adjustment' ||
-      entryType === 'manual_expire_adjustment' ||
-      entryType === 'manual_compensate_adjustment' ||
-      entryType === 'initial_grant';
-    if (!isManual && occurredOn && !isWithinCycle(occurredOn, cycle)) continue;
+
+    // 예전에는 여기에 자체 보존 목록(isManual)이 있었고 reset-leave-usage 의
+    // 목록과 서로 달랐다 — 그쪽은 `substitute` 를 무조건 보존하는데 여기서는
+    // 사이클 밖 대체휴무가 총계에서 떨어져 나갔다. 같은 원장인데 마지막에 돌린
+    // 스크립트에 따라 잔액이 달라졌다. 판정은 공용 규칙 한 곳으로 모은다.
+    if (!isLedgerEntryInCycle(entry, cycle)) continue;
 
     const days = Number(entry.days) || 0;
     remainingRaw += days;

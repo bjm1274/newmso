@@ -9,7 +9,6 @@ import {
   and,
   eq,
   or,
-  sql,
   getD1Binding,
   getD1Drizzle,
   leave_balances as leaveBalancesTable,
@@ -19,39 +18,33 @@ import {
 } from '@/lib/db';
 import { getLeaveUnit, isAnnualLeaveType } from '@/lib/leave-type';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
+// 주기 계산·원장 집계는 클라이언트도 같은 함수를 써야 해서 lib/leave-cycle.ts 로
+// 내렸다. 이 파일은 DB 접근이 필요한 부분만 담당하고, 순수 계산은 재수출한다.
+import {
+  LEAVE_LEDGER_ENTRY_TYPE,
+  aggregateLedgerEntries,
+  addYearsToDateKey,
+  completedLeaveYears,
+  getLeaveCycle,
+  toDateKey,
+  type LedgerCycleTotals,
+  type LeaveCycle,
+  type LeaveLedgerEntryType,
+  type UnifiedLeaveLedgerEntry,
+} from '@/lib/leave-cycle';
 
-export const LEAVE_LEDGER_ENTRY_TYPE = {
-  AUTO_MONTHLY: 'auto_monthly',
-  AUTO_ANNUAL: 'auto_annual',
-  MANUAL_ADJUSTMENT: 'manual_adjustment',
-  MANUAL_USED_ADJUSTMENT: 'manual_used_adjustment',
-  MANUAL_EXPIRE_ADJUSTMENT: 'manual_expire_adjustment',
-  MANUAL_COMPENSATE_ADJUSTMENT: 'manual_compensate_adjustment',
-  USE: 'use',
-  SUBSTITUTE: 'substitute',
-  EXPIRE: 'expire',
-  COMPENSATE: 'compensate',
-} as const;
-
-export type LeaveLedgerEntryType = (typeof LEAVE_LEDGER_ENTRY_TYPE)[keyof typeof LEAVE_LEDGER_ENTRY_TYPE];
-
-type Ymd = { year: number; month: number; day: number };
-
-export type LeaveCycle = {
-  key: string;
-  start: string;
-  end: string;
-  completedYears: number;
+export {
+  LEAVE_LEDGER_ENTRY_TYPE,
+  aggregateLedgerEntries,
+  addYearsToDateKey,
+  completedLeaveYears,
+  getLeaveCycle,
 };
-
-export type UnifiedLeaveLedgerEntry = {
-  id: string;
-  entryType: string;
-  days: number;
-  occurredOn: string;
-  periodKey: string;
-  sourceId: string | null;
-  note: string | null;
+export type {
+  LedgerCycleTotals,
+  LeaveCycle,
+  LeaveLedgerEntryType,
+  UnifiedLeaveLedgerEntry,
 };
 
 export type UnifiedLeaveSummary = {
@@ -78,72 +71,6 @@ function roundDays(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-function toDateKey(value: string | null | undefined): string | null {
-  const matched = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value ?? '').trim());
-  if (!matched) return null;
-  return `${matched[1]}-${matched[2]}-${matched[3]}`;
-}
-
-function parseDateKey(value: string): Ymd | null {
-  const key = toDateKey(value);
-  if (!key) return null;
-  const [year, month, day] = key.split('-').map(Number);
-  return { year, month, day };
-}
-
-function daysInMonth(year: number, month: number): number {
-  return new Date(year, month, 0).getDate();
-}
-
-export function addYearsToDateKey(value: string, years: number): string | null {
-  const parsed = parseDateKey(value);
-  if (!parsed) return null;
-  const targetYear = parsed.year + years;
-  const targetDay = Math.min(parsed.day, daysInMonth(targetYear, parsed.month));
-  return `${targetYear}-${String(parsed.month).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
-}
-
-export function completedLeaveYears(hireDate: string, asOfDate: string): number {
-  const hire = parseDateKey(hireDate);
-  const asOf = parseDateKey(asOfDate);
-  if (!hire || !asOf) return 0;
-  let years = asOf.year - hire.year;
-  if (asOf.month < hire.month || (asOf.month === hire.month && asOf.day < hire.day)) years -= 1;
-  return Math.max(0, years);
-}
-
-export function getLeaveCycle(hireDate: string, asOfDate: string): LeaveCycle | null {
-  const hire = toDateKey(hireDate);
-  const asOf = toDateKey(asOfDate);
-  if (!hire || !asOf) return null;
-
-  if (hire > asOf) {
-    const end = addYearsToDateKey(hire, 1) ?? `${asOf.slice(0, 4)}-12-31`;
-    return {
-      key: `first-year:${hire}`,
-      start: hire,
-      end,
-      completedYears: 0,
-    };
-  }
-
-  const completedYears = completedLeaveYears(hire, asOf);
-  const start = completedYears === 0 ? hire : addYearsToDateKey(hire, completedYears);
-  const end = addYearsToDateKey(hire, completedYears + 1);
-  if (!start || !end) return null;
-
-  return {
-    key: completedYears === 0 ? `first-year:${hire}` : `annual:${completedYears}:${start}`,
-    start,
-    end,
-    completedYears,
-  };
-}
-
-function isWithinCycle(dateKey: string, cycle: LeaveCycle): boolean {
-  return dateKey >= cycle.start && dateKey < cycle.end;
-}
-
 function approved(value: unknown): boolean {
   const normalized = String(value ?? '').trim().toLowerCase();
   return normalized === '승인' || normalized === 'approved';
@@ -166,6 +93,14 @@ async function getStaffLeaveContext(staffId: string) {
   if (!d1) throw new Error('[unified-leave-ledger] D1 binding not available');
   const db = getD1Drizzle(d1);
   const searchKey = String(staffId ?? '').trim();
+  // 식별자는 id / auth_user_id 만 받는다.
+  //
+  // 예전에는 employee_no 와 name 까지 OR 로 묶고 정렬 없이 .limit(1) 을 했다.
+  // 라우트의 IDOR 게이트는 "세션 사용자 id == 요청 staffId" 로 판정하는데,
+  // 여기서 이름·사번까지 받아주면 게이트가 검사한 값과 실제로 조회되는 직원이
+  // 달라질 수 있었다(동명이인·사번 충돌 시 어느 행이 나올지 정렬 미지정이라
+  // 보장도 없다). 이름/사번으로 직원을 찾는 일은 회사 스코프를 명시한
+  // 별도 조회 경로가 담당해야 한다.
   const rows = await db
     .select({
       id: staffMembersTable.id,
@@ -181,8 +116,6 @@ async function getStaffLeaveContext(staffId: string) {
       or(
         eq(staffMembersTable.id, searchKey),
         eq(staffMembersTable.auth_user_id, searchKey),
-        eq(staffMembersTable.employee_no, searchKey),
-        eq(staffMembersTable.name, searchKey),
       )
     )
     .limit(1);
@@ -272,99 +205,6 @@ export async function recordSubstituteLeaveGrant(input: {
     sourceId: input.workDate,
     note: input.note,
   });
-}
-
-type LedgerRow = {
-  id: unknown;
-  entry_type: unknown;
-  days: unknown;
-  occurred_on: string | null;
-  period_key: unknown;
-  source_id: string | null;
-  note: string | null;
-};
-
-export type LedgerCycleTotals = {
-  entries: UnifiedLeaveSummary['entries'];
-  total: number;
-  used: number;
-  expired: number;
-  compensated: number;
-  remaining: number;
-};
-
-/**
- * 원장 행을 한 주기 기준으로 집계한다.
- *
- * 요약 조회와 소멸 배치가 **같은 계산을 써야** 한다. 화면에 15일 남았다고
- * 보여주고 배치는 다른 수치로 소멸시키면 근거가 어긋나므로, 집계는 여기 한 곳에만 둔다.
- */
-export function aggregateLedgerEntries(rows: LedgerRow[], cycle: LeaveCycle): LedgerCycleTotals {
-  const entries = rows
-    .map((row) => ({
-      id: String(row.id),
-      entryType: String(row.entry_type),
-      days: Number(row.days) || 0,
-      occurredOn: toDateKey(row.occurred_on) ?? '',
-      periodKey: String(row.period_key),
-      sourceId: row.source_id ?? null,
-      note: row.note ?? null,
-    }))
-    .filter((row) => {
-      if (!row.occurredOn) return false;
-      // 법정 자동 발생은 processAnnualLeaveAccrual / 백필 스크립트만 기록한다.
-      // 조회 경로에서 1년 미만 11일 시드 등 write side-effect 를 두지 않는다.
-      // (과거 auto-seed 잔존분은 집계에서 제외)
-      if (row.periodKey.startsWith('auto-seed:')) return false;
-      // 수동 조정과 최초 부여는 주기와 무관하게 항상 반영한다.
-      if (
-        row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_ADJUSTMENT ||
-        row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_USED_ADJUSTMENT ||
-        row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_EXPIRE_ADJUSTMENT ||
-        row.entryType === LEAVE_LEDGER_ENTRY_TYPE.MANUAL_COMPENSATE_ADJUSTMENT ||
-        row.entryType === 'initial_grant'
-      ) {
-        return true;
-      }
-      return isWithinCycle(row.occurredOn, cycle);
-    });
-
-  let total = 0;
-  let used = 0;
-  let expired = 0;
-  let compensated = 0;
-  let remainingRaw = 0;
-
-  for (const entry of entries) {
-    const days = Number(entry.days) || 0;
-    remainingRaw += days;
-    switch (entry.entryType) {
-      case LEAVE_LEDGER_ENTRY_TYPE.USE:
-      case LEAVE_LEDGER_ENTRY_TYPE.MANUAL_USED_ADJUSTMENT:
-        used += -days;
-        break;
-      case LEAVE_LEDGER_ENTRY_TYPE.EXPIRE:
-      case LEAVE_LEDGER_ENTRY_TYPE.MANUAL_EXPIRE_ADJUSTMENT:
-        expired += -days;
-        break;
-      case LEAVE_LEDGER_ENTRY_TYPE.COMPENSATE:
-      case LEAVE_LEDGER_ENTRY_TYPE.MANUAL_COMPENSATE_ADJUSTMENT:
-        compensated += -days;
-        break;
-      default:
-        total += days;
-        break;
-    }
-  }
-
-  return {
-    entries,
-    total: roundDays(total),
-    used: roundDays(Math.max(0, used)),
-    expired: roundDays(Math.max(0, expired)),
-    compensated: roundDays(Math.max(0, compensated)),
-    remaining: roundDays(Math.max(0, remainingRaw)),
-  };
 }
 
 /**
@@ -542,7 +382,8 @@ export async function getUnifiedAnnualLeaveSummary(
   ]).catch((err) => console.error('[getUnifiedAnnualLeaveSummary] DB sync failed:', err));
 
   return {
-    staffId,
+    // 호출부가 auth_user_id 를 넘겼어도 resolve 된 id 를 돌려준다.
+    staffId: staff.id,
     hireDate,
     cycle,
     total: finalTotal,
@@ -584,6 +425,12 @@ export async function setManualAnnualLeaveTarget(
     throw new Error('사용/소멸/수당 합계가 총 연차를 초과할 수 없습니다.');
   }
 
+  // 원장 기록에는 **resolve 된 staff.id** 만 쓴다.
+  //
+  // 예전에는 인자로 받은 staffId 를 그대로 staff_id 컬럼에 적었다. 호출부가
+  // auth_user_id 를 넘기면 원장에는 그 값으로 행이 생기고, 조회는 staff.id 로
+  // 하므로 방금 넣은 수동조정이 요약에 잡히지 않았다(FK 가 걸려 있으면 조용한
+  // 오염 대신 명시적 실패가 된다). 조회 기준과 기록 기준을 하나로 맞춘다.
   const { db, staff, hireDate } = await getStaffLeaveContext(staffId);
   const cycle = getLeaveCycle(hireDate, asOfDate) ?? {
     key: `fallback:${asOfDate.slice(0, 4)}`,
@@ -591,7 +438,7 @@ export async function setManualAnnualLeaveTarget(
     end: `${asOfDate.slice(0, 4)}-12-31`,
     completedYears: 0,
   };
-  const before = await getUnifiedAnnualLeaveSummary(staffId, asOfDate);
+  const before = await getUnifiedAnnualLeaveSummary(staff.id, asOfDate);
   const prefix = `manual:${cycle.key}`;
   const occurredOn = asOfDate;
 
@@ -600,15 +447,15 @@ export async function setManualAnnualLeaveTarget(
   const expiredKey = `${prefix}:expired`;
   const compensatedKey = `${prefix}:compensated`;
   const [currentTotal, currentUsed, currentExpired, currentCompensated] = await Promise.all([
-    currentAdjustmentDays(db, staffId, LEAVE_LEDGER_ENTRY_TYPE.MANUAL_ADJUSTMENT, totalKey),
-    currentAdjustmentDays(db, staffId, LEAVE_LEDGER_ENTRY_TYPE.MANUAL_USED_ADJUSTMENT, usedKey),
-    currentAdjustmentDays(db, staffId, LEAVE_LEDGER_ENTRY_TYPE.MANUAL_EXPIRE_ADJUSTMENT, expiredKey),
-    currentAdjustmentDays(db, staffId, LEAVE_LEDGER_ENTRY_TYPE.MANUAL_COMPENSATE_ADJUSTMENT, compensatedKey),
+    currentAdjustmentDays(db, staff.id, LEAVE_LEDGER_ENTRY_TYPE.MANUAL_ADJUSTMENT, totalKey),
+    currentAdjustmentDays(db, staff.id, LEAVE_LEDGER_ENTRY_TYPE.MANUAL_USED_ADJUSTMENT, usedKey),
+    currentAdjustmentDays(db, staff.id, LEAVE_LEDGER_ENTRY_TYPE.MANUAL_EXPIRE_ADJUSTMENT, expiredKey),
+    currentAdjustmentDays(db, staff.id, LEAVE_LEDGER_ENTRY_TYPE.MANUAL_COMPENSATE_ADJUSTMENT, compensatedKey),
   ]);
 
   await Promise.all([
     upsertLedgerEntry(db, {
-      staffId,
+      staffId: staff.id,
       companyId: staff.company_id,
       entryType: LEAVE_LEDGER_ENTRY_TYPE.MANUAL_ADJUSTMENT,
       days: currentTotal + (target.total - before.total),
@@ -617,7 +464,7 @@ export async function setManualAnnualLeaveTarget(
       note: target.note ?? '관리자 수동 총 연차 변경',
     }),
     upsertLedgerEntry(db, {
-      staffId,
+      staffId: staff.id,
       companyId: staff.company_id,
       entryType: LEAVE_LEDGER_ENTRY_TYPE.MANUAL_USED_ADJUSTMENT,
       days: currentUsed - (target.used - before.used),
@@ -626,7 +473,7 @@ export async function setManualAnnualLeaveTarget(
       note: target.note ?? '관리자 수동 사용일수 변경',
     }),
     upsertLedgerEntry(db, {
-      staffId,
+      staffId: staff.id,
       companyId: staff.company_id,
       entryType: LEAVE_LEDGER_ENTRY_TYPE.MANUAL_EXPIRE_ADJUSTMENT,
       days: currentExpired - ((target.expired ?? 0) - before.expired),
@@ -635,7 +482,7 @@ export async function setManualAnnualLeaveTarget(
       note: target.note ?? '관리자 수동 소멸일수 변경',
     }),
     upsertLedgerEntry(db, {
-      staffId,
+      staffId: staff.id,
       companyId: staff.company_id,
       entryType: LEAVE_LEDGER_ENTRY_TYPE.MANUAL_COMPENSATE_ADJUSTMENT,
       days: currentCompensated - ((target.compensated ?? 0) - before.compensated),
@@ -645,7 +492,7 @@ export async function setManualAnnualLeaveTarget(
     }),
   ]);
 
-  return getUnifiedAnnualLeaveSummary(staffId, asOfDate);
+  return getUnifiedAnnualLeaveSummary(staff.id, asOfDate);
 }
 
 export async function syncApprovedLeaveRequestsToLedger(

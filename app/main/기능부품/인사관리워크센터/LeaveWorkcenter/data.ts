@@ -15,6 +15,13 @@ import { formatKoreanDateKey } from '@/lib/seoul-time';
 import { normalizeLeaveType } from '@/lib/leave-type';
 import { buildApprovalSubmitPayload } from '@/lib/approval-submit-payload';
 import { computeAnnualLeaveSummary } from '@/lib/annual-leave-summary';
+// PC 워크센터도 개인/모바일 화면과 **같은 주기 계산·같은 집계 함수**를 쓴다.
+import {
+  aggregateLedgerEntries,
+  getLeaveCycle,
+  resolveHireDateKey,
+  type LedgerRowLike,
+} from '@/lib/leave-cycle';
 
 // ─── 타입 ─────────────────────────────────────────────────────────
 export type LeaveStatus = '대기' | '승인' | '반려';
@@ -172,7 +179,8 @@ export async function fetchLeaveData({
   }
 
   const now = new Date();
-  const [balanceRes, requestRes, ledgerRes] = await Promise.all([
+  const todayKey = formatKoreanDateKey(now);
+  const [balanceRes, requestRes, ledgerRes, hireRes] = await Promise.all([
     db
       .from('leave_balances')
       .select('*')
@@ -186,6 +194,12 @@ export async function fetchLeaveData({
       .from('leave_ledger')
       .select('id, staff_id, entry_type, days, occurred_on, period_key, source_id, note')
       .in('staff_id', staffIds),
+    // 주기 계산에 입사일이 필요하다. staffs prop 에 입사일이 실려 오지 않는
+    // 호출부가 있어 원본에서 직접 읽는다.
+    db
+      .from('staff_members')
+      .select('id, hire_date, join_date, joined_at')
+      .in('id', staffIds),
   ]);
 
   if (signal?.aborted) {
@@ -204,33 +218,41 @@ export async function fetchLeaveData({
     }
   }
 
-  // leave_ledger 집계는 참고용. 화면 숫자는 leave_balances(당해 사이클 재계산분)를 우선한다.
-  // (ledger 전 이력 합산 시 과거 annual:N 이 중복 합산되어 30일 등으로 부풀려질 수 있음)
-  const ledgerByStaff = new Map<string, { total: number; used: number; expired: number; compensated: number; remaining: number }>();
+  // 원장(leave_ledger)을 **입사일 주기** 기준으로 집계한다.
+  //
+  // 예전에는 이 화면만 자체 합산 로직을 갖고 있었고, 주기 필터도 없이 전 이력을
+  // 더한 뒤 `leave_balances`(year = 역년) 값을 우선했다. 개인·모바일 화면은
+  // /api/annual-leave/summary 의 **입사일 주기** 값을 쓰므로, 입사기념일이 연중인
+  // 직원(대다수)은 인사담당자 화면과 본인 화면의 총/사용/잔여가 계속 어긋났다.
+  // 이제 서버와 같은 aggregateLedgerEntries 를 그대로 쓴다.
+  const rawHires = Array.isArray(hireRes.data) ? hireRes.data : [];
+  const hireDateByStaff = new Map<string, string>();
+  for (const raw of rawHires) {
+    if (!raw || typeof raw !== 'object') continue;
+    const row = raw as Record<string, unknown>;
+    const sId = String(row.id ?? '').trim();
+    const hireKey = resolveHireDateKey(row);
+    if (sId && hireKey) hireDateByStaff.set(sId, hireKey);
+  }
+
+  const ledgerRowsByStaff = new Map<string, LedgerRowLike[]>();
   for (const l of rawLedgers) {
     if (!l || typeof l !== 'object') continue;
-    const sId = String((l as Record<string, unknown>).staff_id || '').trim();
+    const row = l as Record<string, unknown>;
+    const sId = String(row.staff_id ?? '').trim();
     if (!sId) continue;
-    const entryType = String((l as Record<string, unknown>).entry_type || '');
-    const periodKey = String((l as Record<string, unknown>).period_key || '');
-    if (periodKey.startsWith('auto-seed:')) continue;
-    const days = Number((l as Record<string, unknown>).days) || 0;
-
-    if (!ledgerByStaff.has(sId)) {
-      ledgerByStaff.set(sId, { total: 0, used: 0, expired: 0, compensated: 0, remaining: 0 });
-    }
-    const current = ledgerByStaff.get(sId)!;
-    current.remaining += days;
-
-    if (entryType === 'use' || entryType === 'manual_used_adjustment') {
-      current.used += -days;
-    } else if (entryType === 'expire' || entryType === 'manual_expire_adjustment') {
-      current.expired += -days;
-    } else if (entryType === 'compensate' || entryType === 'manual_compensate_adjustment') {
-      current.compensated += -days;
-    } else {
-      current.total += days;
-    }
+    const entry: LedgerRowLike = {
+      id: row.id,
+      entry_type: row.entry_type,
+      days: row.days,
+      occurred_on: typeof row.occurred_on === 'string' ? row.occurred_on : null,
+      period_key: row.period_key,
+      source_id: typeof row.source_id === 'string' ? row.source_id : null,
+      note: typeof row.note === 'string' ? row.note : null,
+    };
+    const list = ledgerRowsByStaff.get(sId);
+    if (list) list.push(entry);
+    else ledgerRowsByStaff.set(sId, [entry]);
   }
 
   const requests: LeaveRequest[] = [];
@@ -261,8 +283,28 @@ export async function fetchLeaveData({
   const rows: LeaveStaffRow[] = targetStaff.map((staff) => {
     const sId = String(staff.id);
     const balance = balances.get(sId);
-    const ledger = ledgerByStaff.get(sId);
     const staffLeaveRows = requestsByStaff.get(sId) || [];
+    const hireKey = hireDateByStaff.get(sId) ?? resolveHireDateKey(staff as Record<string, unknown>);
+    const cycle = hireKey ? getLeaveCycle(hireKey, todayKey) : null;
+
+    if (cycle) {
+      const ledger = aggregateLedgerEntries(ledgerRowsByStaff.get(sId) ?? [], cycle);
+      // 만료일은 주기 종료일(다음 입사기념일)이다. leave_balances.expiry_date 는
+      // 갱신 시점에 따라 비어 있을 수 있어 주기 계산값을 우선한다.
+      const expiryDate = cycle.end;
+      const daysUntilExpiry = daysBetween(safeDate(expiryDate, now), now);
+      return {
+        staff,
+        total: ledger.total,
+        used: ledger.used,
+        remaining: ledger.remaining,
+        daysUntilExpiry,
+        expiryDate,
+        pending: pendingByStaff.get(sId) ?? 0,
+        updatedAt: balance?.updated_at ?? null };
+    }
+
+    // 입사일이 없어 주기를 못 잡는 직원만 기존 역년 폴백을 쓴다.
     const summary = computeAnnualLeaveSummary({
       staffTotal: pickNumber(staff.annual_leave_total ?? staff.annual_days ?? 0),
       staffUsed: pickNumber(staff.annual_leave_used ?? staff.annual_used ?? 0),
@@ -274,20 +316,13 @@ export async function fetchLeaveData({
       leaveRows: staffLeaveRows,
       year: now.getFullYear(),
     });
-
-    // leave_balances 가 있으면 SSOT (전체 재계산 후 사이클 기준). 없으면 summary/ledger 순.
-    const total = balance != null ? summary.total : (ledger ? ledger.total : summary.total);
-    const used = balance != null ? summary.used : (ledger ? ledger.used : summary.used);
-    const remaining = balance != null ? summary.remaining : (ledger ? Math.max(0, ledger.remaining) : summary.remaining);
-    const expiry = balance?.expiry_date ?? null;
-    const daysUntilExpiry = balance?.days_until_expiry ?? 365;
     return {
       staff,
-      total,
-      used,
-      remaining,
-      daysUntilExpiry,
-      expiryDate: expiry,
+      total: summary.total,
+      used: summary.used,
+      remaining: summary.remaining,
+      daysUntilExpiry: balance?.days_until_expiry ?? 365,
+      expiryDate: balance?.expiry_date ?? null,
       pending: pendingByStaff.get(sId) ?? 0,
       updatedAt: balance?.updated_at ?? null };
   });

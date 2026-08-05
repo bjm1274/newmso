@@ -235,6 +235,7 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
     try {
       // 1) 만 N년차 연차 부여 (멱등성 소급 적용 포함)
       const maxYears = tenureYears(hireKey, todayKey);
+      let annualGranted = false;
       if (maxYears >= 1) {
         // 이미 부여된 연차 목록 조회
         const existingAccruals = await db
@@ -248,7 +249,6 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
           );
         const existingAnnualKeys = new Set(existingAccruals.map((a) => a.period_key));
 
-        let hasGranted = false;
         for (let n = 1; n <= maxYears; n += 1) {
           const periodKey = `annual:${n}`;
           if (!existingAnnualKeys.has(periodKey)) {
@@ -269,24 +269,28 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
                 days,
                 periodKey,
                 note: `만 ${n}년차 ${days}일` });
-              hasGranted = true;
+              annualGranted = true;
             }
           }
-        }
-        if (hasGranted || maxYears >= 1) {
-          // 이미 1년이 지났으므로 월차 발생 로직(2번)은 건너뜁니다.
-          if (!hasGranted) {
-            result.skipped += 1;
-          }
-          continue;
         }
       }
 
       // 2) 1년 미만 월 만근 → +1일 (경과한 모든 월 구간을 소급 부여)
       // 기존에는 입사 응당일 당일에만 부여해서, cron 이 그 하루를 거르면(배포 공백/CRON_SECRET 미설정 등)
       // 해당 월 +1일이 영구 누락됐다. 이제 경과한 모든 월 구간 중 미부여분을 매 실행마다 메꾼다(멱등).
-      if (tenureYears(hireKey, todayKey) >= 1) {
-        result.skipped += 1;
+      //
+      // 예전에는 만 1년이 지나면 위에서 무조건 `continue` 해 이 블록에 아예 들어오지
+      // 못했다(아래 `tenureYears >= 1` 가드는 그래서 죽은 코드였다). 그 결과
+      // 입사 1년째 마지막 달에 크론이 멈춰 있었으면 그 달의 월차 +1일이
+      // **영구히 복구 불가**가 됐다. 이제 1년을 넘겨도 미부여분을 메꾼다.
+      //
+      // 다만 무제한은 아니다. 만근 판정은 "결근 기록이 없으면 만근"이라서,
+      // 시스템 도입 이전에 입사해 첫 해 근태 기록이 통째로 없는 직원까지 대상에
+      // 넣으면 없던 11일이 새로 생긴다. 크론 공백을 메우는 데 필요한 만큼만
+      // (만 2년 미만) 소급한다.
+      const MONTHLY_BACKFILL_TENURE_LIMIT = 2;
+      if (maxYears >= MONTHLY_BACKFILL_TENURE_LIMIT) {
+        if (!annualGranted) result.skipped += 1;
         continue;
       }
 
@@ -330,7 +334,7 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
           periodKey,
           note: `${k}개월차 만근` });
       }
-      if (monthlyGranted === 0) {
+      if (monthlyGranted === 0 && !annualGranted) {
         result.skipped += 1;
       }
     } catch (err) {

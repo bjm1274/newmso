@@ -12,11 +12,12 @@
 
 import {
   buildPromotionSentKey,
-  clampLeaveRemaining,
   getStaffPromotionSchedule,
   resolveDuePromotionStage,
   resolveHireDateFromStaff,
 } from '@/lib/annual-leave-promotion';
+// 촉진 대상 판정은 원장(SSOT)으로 한다 — staff_members 미러가 아니다.
+import { aggregateLedgerEntries, getLeaveCycle, type LedgerRowLike } from '@/lib/leave-cycle';
 import { mirrorNotificationsToD1, type NotificationRow } from '@/lib/notification-utils';
 // 통보일자는 KST 기준이어야 한다 — 이 코드는 크론(UTC 워커)에서 돌기 때문에
 // toLocaleDateString('ko-KR') 만 쓰면 KST 09:00 이후 날짜가 하루 밀린다.
@@ -29,6 +30,7 @@ import {
   annual_leave_promotion_logs as promotionLogsTable,
   approvals as approvalsTable,
   document_repository as documentRepositoryTable,
+  leave_ledger as leaveLedgerTable,
   eq,
   and,
   inArray,
@@ -53,8 +55,6 @@ type StaffRow = {
   department: string | null;
   position: string | null;
   status: string | null;
-  annual_leave_total: number | null;
-  annual_leave_used: number | null;
   join_date: string | null;
   joined_at: string | null;
   hire_date: string | null;
@@ -138,8 +138,6 @@ export async function dispatchAnnualLeavePromotions(
       department: staffMembersTable.department,
       position: staffMembersTable.position,
       status: staffMembersTable.status,
-      annual_leave_total: staffMembersTable.annual_leave_total,
-      annual_leave_used: staffMembersTable.annual_leave_used,
       join_date: staffMembersTable.join_date,
       joined_at: staffMembersTable.joined_at,
       hire_date: staffMembersTable.hire_date,
@@ -178,6 +176,7 @@ export async function dispatchAnnualLeavePromotions(
       sender_id: approvalsTable.sender_id,
       type: approvalsTable.type,
       status: approvalsTable.status,
+      created_at: approvalsTable.created_at,
     })
     .from(approvalsTable)
     .where(
@@ -189,11 +188,50 @@ export async function dispatchAnnualLeavePromotions(
         ne(approvalsTable.status, '반려'),
       ),
     );
-  const planSet = new Set(
-    planRows
-      .map((r) => String(r.sender_id || '').trim())
-      .filter(Boolean),
-  );
+  // 계획서 제출일을 직원별로 모아 둔다.
+  //
+  // 예전에는 sender_id 만 Set 에 담고 `planSet.has(id)` 로 skip 했다. 대상 연도도,
+  // 촉진 주기 필터도 없어서 **한 번이라도 계획서를 낸 직원은 그 뒤 모든 해의
+  // 1·2차 촉진에서 영구 제외**됐다. 촉진 미이행은 연차 자동소멸의 적법 요건을
+  // 무너뜨려 회사가 미사용 연차 수당 보상 의무를 계속 지게 된다.
+  // approvals 에는 연도 아카이브도, type 문자열의 연도 표기도 없으므로
+  // created_at 을 촉진 주기 창과 대조한다.
+  const planDatesByStaff = new Map<string, string[]>();
+  for (const r of planRows) {
+    const senderId = String(r.sender_id || '').trim();
+    if (!senderId) continue;
+    const submittedOn = String(r.created_at || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(submittedOn)) continue;
+    const list = planDatesByStaff.get(senderId);
+    if (list) list.push(submittedOn);
+    else planDatesByStaff.set(senderId, [submittedOn]);
+  }
+
+  // 촉진 대상 판정용 원장 전량 로드.
+  //
+  // 예전에는 staff_members.annual_leave_total/used 로 잔여를 계산했다. 그 두 컬럼은
+  // 개인 요약 화면을 열 때 fire-and-forget 으로만 갱신되는 파생 미러라,
+  // **화면을 한 번도 열지 않은 직원은 구값(대개 0)** 이 남아 촉진이 통째로
+  // 누락되거나 반대로 잔여 0인 직원에게 오발송됐다. 원장을 직접 집계한다.
+  // 직원 수만큼 쿼리를 날리지 않도록 한 번에 읽어 메모리에서 묶는다.
+  const ledgerRows = await db
+    .select({
+      id: leaveLedgerTable.id,
+      staff_id: leaveLedgerTable.staff_id,
+      entry_type: leaveLedgerTable.entry_type,
+      days: leaveLedgerTable.days,
+      occurred_on: leaveLedgerTable.occurred_on,
+      period_key: leaveLedgerTable.period_key,
+    })
+    .from(leaveLedgerTable);
+  const ledgerByStaff = new Map<string, LedgerRowLike[]>();
+  for (const row of ledgerRows) {
+    const sid = String(row.staff_id || '').trim();
+    if (!sid) continue;
+    const list = ledgerByStaff.get(sid);
+    if (list) list.push(row);
+    else ledgerByStaff.set(sid, [row]);
+  }
 
   for (const s of staffs) {
     result.scanned += 1;
@@ -217,15 +255,31 @@ export async function dispatchAnnualLeavePromotions(
       continue;
     }
 
-    const remaining = clampLeaveRemaining(s.annual_leave_total, s.annual_leave_used);
-    if (remaining <= 0 || planSet.has(String(s.id))) {
+    const expiryKey = formatKoreanDateKey(schedule.expiryDate);
+    const step1Key = formatKoreanDateKey(schedule.step1Date);
+    const step2Key = formatKoreanDateKey(schedule.step2Date);
+
+    // 잔여는 원장 기준 현재 주기 집계값이다 (미러 아님 — 위 주석 참고).
+    const cycle = getLeaveCycle(hireDate, todayKey);
+    if (!cycle) {
+      result.skipped += 1;
+      continue;
+    }
+    const remaining = aggregateLedgerEntries(ledgerByStaff.get(String(s.id)) ?? [], cycle).remaining;
+    if (remaining <= 0) {
       result.skipped += 1;
       continue;
     }
 
-    const expiryKey = formatKoreanDateKey(schedule.expiryDate);
-    const step1Key = formatKoreanDateKey(schedule.step1Date);
-    const step2Key = formatKoreanDateKey(schedule.step2Date);
+    // 계획서 면제는 **이번 촉진 주기에 낸 계획서**만 인정한다.
+    // 창은 1차 촉진일 ~ 만료일. 그 밖의 제출은 지난 주기 것이므로 면제되지 않는다.
+    const submittedInCycle = (planDatesByStaff.get(String(s.id)) ?? []).some(
+      (submittedOn) => submittedOn >= step1Key && submittedOn <= expiryKey,
+    );
+    if (submittedInCycle) {
+      result.skipped += 1;
+      continue;
+    }
 
     const hasStage1 =
       sentSet.has(buildPromotionSentKey(s.id, 1, expiryKey)) ||

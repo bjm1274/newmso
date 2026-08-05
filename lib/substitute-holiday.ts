@@ -3,14 +3,17 @@
  *
  * 공휴일(한국 법정공휴일 + company_holidays)에 실제 근무한 직원에게 대체휴무 1일을 자동 적립.
  * - 정책 게이트: system_settings(leave_policy_rules_v1).companies[회사].grantCompDayForHolidayWork === true 인 회사만.
- * - 멱등성: leave_accruals(kind='substitute', period_key=근무일 'YYYY-MM-DD').
- * - 적립 방식: staff_members.annual_leave_total += 1 후 recalculateLeaveBalance (연차 잔여에 합산).
+ * - 적립 방식: leave_ledger 에 entry_type='substitute' 원장 1행. 잔여 연차 집계가 이 원장을 읽는다.
+ * - 멱등성: leave_ledger (staff_id, entry_type, period_key='substitute:{근무일}') 유니크.
  *
- * 주의: 본 시스템은 대체휴무 전용 잔액 컬럼이 없어 연차 총량에 합산한다(운영상 통용). 별도 구분이
- *       필요하면 leave_accruals.kind='substitute' 원장으로 집계/표시 가능.
+ * 헤더 주석이 예전에는 "leave_accruals(kind='substitute')" 와
+ * "staff_members.annual_leave_total += 1 후 recalculateLeaveBalance" 를 설명했다.
+ * 둘 다 원장 일원화 때 없어진 동작이라, 주석만 보고 고치면 존재하지 않는 경로를
+ * 찾게 된다. 실제 동작으로 맞춘다.
  */
 
 import { isKoreanPublicHoliday } from '@/lib/korean-public-holidays';
+import { recordSubstituteLeaveGrant } from '@/lib/unified-leave-ledger';
 import {
   getD1Binding,
   getD1Drizzle,
@@ -154,30 +157,13 @@ export async function processSubstituteHolidayGrants(
     }
 
     try {
-      const inserted = await db
-        .insert(leaveLedgerTable)
-        .values({
-          id: crypto.randomUUID(),
-          staff_id: row.staff_id,
-          company_id: null,
-          entry_type: 'substitute',
-          period_key: `substitute:${workDate}`,
-          days: 1,
-          occurred_on: workDate,
-          source_id: workDate,
-          note: `${holidayName} 근무 대체휴무 +1일`,
-          created_at: new Date().toISOString() })
-        .onConflictDoNothing()
-        .returning({ id: leaveLedgerTable.id });
-
-      if (inserted.length === 0) {
-        result.skipped += 1;
-        continue;
-      }
-
-      // 직원 연차 총량 +1 후 잔액 재계산
+      // 회사를 원장에 남긴다.
+      //
+      // 예전에는 `company_id: null` 로 고정 INSERT 했다. 원장의 회사 컬럼이 비면
+      // 회사 단위 집계·정산에서 대체휴무만 어느 회사에도 속하지 않는 행으로
+      // 남는다. 근태 행의 직원에서 회사를 해석해 채운다.
       const staffRows = await db
-        .select({ name: staffMembersTable.name })
+        .select({ name: staffMembersTable.name, company_id: staffMembersTable.company_id })
         .from(staffMembersTable)
         .where(eq(staffMembersTable.id, row.staff_id))
         .limit(1);
@@ -186,6 +172,30 @@ export async function processSubstituteHolidayGrants(
         result.skipped += 1;
         continue;
       }
+
+      // 이미 부여된 근무일은 건너뛴다(멱등). 기록 자체는 원장 모듈의
+      // recordSubstituteLeaveGrant 한 곳으로 모아 upsert 규칙이 갈라지지 않게 한다.
+      const existing = await db
+        .select({ id: leaveLedgerTable.id })
+        .from(leaveLedgerTable)
+        .where(and(
+          eq(leaveLedgerTable.staff_id, row.staff_id),
+          eq(leaveLedgerTable.entry_type, 'substitute'),
+          eq(leaveLedgerTable.period_key, `substitute:${workDate}`),
+        ))
+        .limit(1);
+      if (existing.length > 0) {
+        result.skipped += 1;
+        continue;
+      }
+
+      await recordSubstituteLeaveGrant({
+        staffId: row.staff_id,
+        companyId: staff.company_id ?? null,
+        workDate,
+        days: 1,
+        note: `${holidayName} 근무 대체휴무 +1일`,
+      });
 
       result.granted.push({
         staffId: row.staff_id,

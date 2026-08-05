@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getD1Binding, getD1Drizzle, staff_members } from '@/lib/db';
 import { getUnifiedAnnualLeaveSummary } from '@/lib/unified-leave-ledger';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 import {
   isAdminSession,
   isSystemMasterSession,
@@ -25,7 +26,12 @@ export async function GET(req: NextRequest) {
     const db = getD1Drizzle(d1);
 
     const staffs = await db.select().from(staff_members);
-    const year = 2026;
+    // 라벨 연도는 KST 오늘 기준이다.
+    //
+    // 예전에는 `const year = 2026;` 으로 박혀 있었다. 아래 수치는
+    // getUnifiedAnnualLeaveSummary 가 **오늘 기준 주기**로 계산하는데 라벨만 2026 에
+    // 고정돼 있어서, 2027년부터는 계산 기준과 라벨이 어긋난 CSV 가 나간다.
+    const year = Number(formatKoreanDateKey(new Date()).slice(0, 4));
 
     const rows = await Promise.all(
       staffs.map(async (s) => {

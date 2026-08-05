@@ -1,3 +1,21 @@
+/**
+ * 한국 법정공휴일 하드코딩 표.
+ *
+ * 이 표는 수록된 연도까지만 진실이고, 미수록 연도는 `isKoreanPublicHoliday` 가
+ * 조용히 false 를 돌려준다. 예전에는 마지막 항목이 2026-12-25 였는데 갱신 장치도
+ * 외부 API 폴백도 없어서, **2027-01-01 부터 모든 날이 평일로 판정**될 예정이었다.
+ * 매일 도는 대체휴무 크론·급여 휴일수당·캘린더가 예외도 로그도 없이 일제히
+ * 어긋난다. 그래서 연도 데이터와 함께 커버리지 가드(아래 warnIfOutsideCoverage)를
+ * 둔다 — 데이터만 늘리면 몇 해 뒤 같은 일이 반복된다.
+ *
+ * 2027~2028 항목은 관공서의 공휴일에 관한 규정을 그대로 적용해 산출했다.
+ *  - 음력 공휴일(설날·부처님오신날·추석)은 음력력 변환으로 뽑았고, 2024~2026
+ *    기존 값이 전부 재현되는 것을 확인했다.
+ *  - 대체공휴일: 삼일절·어린이날·부처님오신날·광복절·개천절·한글날·성탄절은
+ *    토·일요일과 겹치면 대체, 설·추석 연휴는 **일요일**(토요일 제외) 또는 다른
+ *    공휴일과 겹치면 대체. 이 규칙으로 2024~2026 기존 대체일이 전부 재현된다.
+ *  - 임시공휴일은 예측 불가라 넣지 않는다. 관보로 확정되면 그때 보완한다.
+ */
 export const KOREAN_PUBLIC_HOLIDAY_DATES = [
   '2024-01-01',
   '2024-02-09',
@@ -55,9 +73,84 @@ export const KOREAN_PUBLIC_HOLIDAY_DATES = [
   '2026-10-05',
   '2026-10-09',
   '2026-12-25',
+  '2027-01-01',
+  '2027-02-06',
+  '2027-02-07',
+  '2027-02-08',
+  '2027-02-09',
+  '2027-03-01',
+  '2027-05-01',
+  '2027-05-05',
+  '2027-05-13',
+  '2027-06-06',
+  '2027-08-15',
+  '2027-08-16',
+  '2027-09-14',
+  '2027-09-15',
+  '2027-09-16',
+  '2027-10-03',
+  '2027-10-04',
+  '2027-10-09',
+  '2027-10-11',
+  '2027-12-25',
+  '2027-12-27',
+  '2028-01-01',
+  '2028-01-25',
+  '2028-01-26',
+  '2028-01-27',
+  '2028-03-01',
+  '2028-04-12',
+  '2028-05-01',
+  '2028-05-02',
+  '2028-05-05',
+  '2028-06-06',
+  '2028-08-15',
+  '2028-10-02',
+  '2028-10-03',
+  '2028-10-04',
+  '2028-10-05',
+  '2028-10-09',
+  '2028-12-25',
 ] as const;
 
 const holidayDateSet = new Set<string>(KOREAN_PUBLIC_HOLIDAY_DATES);
+
+/** 이 표가 실제로 커버하는 연도 범위. 배열에서 직접 도출한다(수기 갱신 누락 방지). */
+export const KOREAN_PUBLIC_HOLIDAY_COVERAGE = {
+  firstYear: Number(KOREAN_PUBLIC_HOLIDAY_DATES[0].slice(0, 4)),
+  lastYear: Number(KOREAN_PUBLIC_HOLIDAY_DATES[KOREAN_PUBLIC_HOLIDAY_DATES.length - 1].slice(0, 4)),
+} as const;
+
+const warnedYears = new Set<number>();
+
+/**
+ * 표에 없는 연도를 물어보면 경고를 남긴다.
+ *
+ * 미수록 연도는 "공휴일 0일"과 구분되지 않는다 — 조용한 false 가 문제의 본체였다.
+ * 연도당 한 번만 찍어 크론 로그를 뒤덮지 않게 한다.
+ */
+function warnIfOutsideCoverage(dateKey: string): void {
+  const year = Number(dateKey.slice(0, 4));
+  if (!Number.isFinite(year) || year === 0) return;
+  if (year >= KOREAN_PUBLIC_HOLIDAY_COVERAGE.firstYear && year <= KOREAN_PUBLIC_HOLIDAY_COVERAGE.lastYear) return;
+  if (warnedYears.has(year)) return;
+  warnedYears.add(year);
+  console.warn(
+    `[korean-public-holidays] ${year}년 공휴일 데이터가 없습니다 ` +
+      `(수록 범위 ${KOREAN_PUBLIC_HOLIDAY_COVERAGE.firstYear}~${KOREAN_PUBLIC_HOLIDAY_COVERAGE.lastYear}). ` +
+      '해당 연도는 모든 날이 평일로 판정되어 대체휴무·휴일수당·캘린더가 어긋납니다. ' +
+      'lib/korean-public-holidays.ts 의 KOREAN_PUBLIC_HOLIDAY_DATES 를 갱신하세요.',
+  );
+}
+
+/** 해당 연도 공휴일 데이터가 수록돼 있는지. 배치/헬스체크에서 사전 점검용. */
+export function hasKoreanPublicHolidayData(year: number): boolean {
+  return (
+    Number.isFinite(year) &&
+    year >= KOREAN_PUBLIC_HOLIDAY_COVERAGE.firstYear &&
+    year <= KOREAN_PUBLIC_HOLIDAY_COVERAGE.lastYear
+  );
+}
 
 /**
  * 날짜 → 공휴일 명칭 매핑.
@@ -120,19 +213,61 @@ const KOREAN_PUBLIC_HOLIDAY_LABELS: Record<string, string> = {
   '2026-10-03': '개천절',
   '2026-10-05': '개천절 대체',
   '2026-10-09': '한글날',
-  '2026-12-25': '성탄절' };
+  '2026-12-25': '성탄절',
+  '2027-01-01': '신정',
+  '2027-02-06': '설 연휴',
+  '2027-02-07': '설날',
+  '2027-02-08': '설 연휴',
+  '2027-02-09': '설 대체',
+  '2027-03-01': '삼일절',
+  '2027-05-01': '근로자의 날',
+  '2027-05-05': '어린이날',
+  '2027-05-13': '부처님오신날',
+  '2027-06-06': '현충일',
+  '2027-08-15': '광복절',
+  '2027-08-16': '광복절 대체',
+  '2027-09-14': '추석 연휴',
+  '2027-09-15': '추석',
+  '2027-09-16': '추석 연휴',
+  '2027-10-03': '개천절',
+  '2027-10-04': '개천절 대체',
+  '2027-10-09': '한글날',
+  '2027-10-11': '한글날 대체',
+  '2027-12-25': '성탄절',
+  '2027-12-27': '성탄절 대체',
+  '2028-01-01': '신정',
+  '2028-01-25': '설 연휴',
+  '2028-01-26': '설날',
+  '2028-01-27': '설 연휴',
+  '2028-03-01': '삼일절',
+  '2028-04-12': '국회의원선거',
+  '2028-05-01': '근로자의 날',
+  '2028-05-02': '부처님오신날',
+  '2028-05-05': '어린이날',
+  '2028-06-06': '현충일',
+  '2028-08-15': '광복절',
+  '2028-10-02': '추석 연휴',
+  '2028-10-03': '추석',
+  '2028-10-04': '추석 연휴',
+  '2028-10-05': '추석 대체',
+  '2028-10-09': '한글날',
+  '2028-12-25': '성탄절' };
 
 export function isKoreanPublicHoliday(dateKey: string) {
-  return holidayDateSet.has(String(dateKey || '').slice(0, 10));
+  const key = String(dateKey || '').slice(0, 10);
+  warnIfOutsideCoverage(key);
+  return holidayDateSet.has(key);
 }
 
 /** 공휴일 명칭. 비공휴일은 null. */
 export function getKoreanPublicHolidayName(dateKey: string): string | null {
   const key = String(dateKey || '').slice(0, 10);
+  warnIfOutsideCoverage(key);
   return KOREAN_PUBLIC_HOLIDAY_LABELS[key] ?? null;
 }
 
 export function getKoreanPublicHolidayDatesForMonth(month: string) {
   const prefix = `${String(month || '').slice(0, 7)}-`;
+  warnIfOutsideCoverage(prefix);
   return KOREAN_PUBLIC_HOLIDAY_DATES.filter((dateKey) => dateKey.startsWith(prefix));
 }

@@ -29,7 +29,10 @@ export async function POST(req: NextRequest) {
     await syncAnnualLeaveUsedForStaff(staffId, { year, writeStaffMembers: false });
     await recalculateLeaveBalance(staffId, year);
 
-    return NextResponse.json({ ok: true, year, staffMembersUntouched: true });
+    // `staffMembersUntouched: true` 를 돌려주던 자리다. 사실이 아니었다 —
+    // recalculateLeaveBalance 가 요약을 거치며 staff_members 미러를 원장 값으로
+    // 갱신한다. 읽는 쪽이 없어 오해만 남기던 필드라 실제 동작으로 바꾼다.
+    return NextResponse.json({ ok: true, year, mirrorsSyncedFromLedger: true });
   } catch (err: any) {
     console.error('[annual-leave/sync] 실패:', err);
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });

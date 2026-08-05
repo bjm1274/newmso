@@ -16,6 +16,8 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
+// 사이클 포함 판정은 full-recalc-leave-ledger.mjs 와 **같은 규칙**을 써야 한다.
+import { isLedgerEntryInCycle } from './leave-ledger-cycle-rules.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -124,6 +126,7 @@ function getLeaveCycle(hireDate, asOfDate) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(hire) || !/^\d{4}-\d{2}-\d{2}$/.test(asOf)) return null;
   if (hire > asOf) {
     return {
+      key: `first-year:${hire}`,
       start: hire,
       end: addYearsKey(hire, 1) ?? `${asOf.slice(0, 4)}-12-31`,
       completedYears: 0,
@@ -133,11 +136,14 @@ function getLeaveCycle(hireDate, asOfDate) {
   const start = completedYears === 0 ? hire : addYearsKey(hire, completedYears);
   const end = addYearsKey(hire, completedYears + 1);
   if (!start || !end) return null;
-  return { start, end, completedYears };
-}
-
-function isWithinCycle(dateKey, cycle) {
-  return dateKey >= cycle.start && dateKey < cycle.end;
+  // 주기 키(key)는 수동조정 period_key 대조에 쓰인다. 예전에는 이 스크립트만
+  // key 를 만들지 않아 앱·다른 스크립트와 판정 근거가 달랐다.
+  return {
+    key: completedYears === 0 ? `first-year:${hire}` : `annual:${completedYears}:${start}`,
+    start,
+    end,
+    completedYears,
+  };
 }
 
 function isActiveStatus(status) {
@@ -260,21 +266,16 @@ for (const s of staffs) {
 
   for (const entry of rows) {
     const periodKey = String(entry.period_key || '');
-    if (periodKey.startsWith('auto-seed:')) continue;
-    const occurredOn = String(entry.occurred_on || '').slice(0, 10);
     const entryType = String(entry.entry_type || '');
-    const isManualKeep =
-      entryType === 'manual_adjustment' ||
-      entryType === 'manual_expire_adjustment' ||
-      entryType === 'manual_compensate_adjustment' ||
-      entryType === 'initial_grant' ||
-      entryType === 'substitute';
 
     // 사용 가능 범위 = 현재 입사 응당일 사이클만
     // (예: 23.8 입사 → 24.8 부여분은 25.8 전까지만, 25.8 이후는 25.8 신규 부여분만)
-    if (!isManualKeep && occurredOn && !isWithinCycle(occurredOn, cycle)) {
-      continue;
-    }
+    //
+    // 예전에는 이 자리에 자체 보존 목록(isManualKeep)이 있었고 full-recalc 의
+    // 목록과 서로 달랐다 — 특히 `substitute` 가 여기서만 무조건 보존돼,
+    // 어느 스크립트를 마지막에 돌렸는지에 따라 같은 원장에서 다른 잔액이 나왔다.
+    // 판정은 공용 규칙 한 곳으로 모은다.
+    if (!isLedgerEntryInCycle(entry, cycle)) continue;
 
     const days = Number(entry.days) || 0;
     remainingRaw += days;

@@ -109,6 +109,42 @@ interface AttendanceRecord {
   hasCheckOut: boolean;
 }
 
+/** 소정근로 종료시각(KST). 조퇴 분수를 퇴근 기록에서 역산할 때의 기준. */
+const STANDARD_WORK_END_MINUTES = 18 * 60;
+
+/** 'HH:MM' / ISO 시각 문자열에서 자정 기준 분을 뽑는다. 못 읽으면 null. */
+function toMinutesOfDay(raw: string): number | null {
+  const matched = /(\d{1,2}):(\d{2})/.exec(raw);
+  if (!matched) return null;
+  const hour = Number(matched[1]);
+  const minute = Number(matched[2]);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+  return hour * 60 + minute;
+}
+
+/**
+ * 조퇴 분수.
+ *
+ * `early_leave_minutes` 는 attendances 셀렉트 목록에 없다(스키마에도 없다).
+ * 그래서 예전에는 이 값이 **항상 0** 이었고, 조퇴 감지(`> 0`)와 강한 조퇴 감지
+ * (`>= 30`) 두 가지가 영구히 빈 배열이었다. 화면은 멀쩡히 "이상 없음"을 보여줘서
+ * 반복 조퇴가 감지되지 않는다는 사실 자체가 드러나지 않았다. 지각이 status 폴백으로
+ * 살아난 것과 같은 방식으로, status 가 조퇴인 행만 대상으로 삼아
+ *  1) 퇴근 기록이 있으면 소정근로 종료시각과의 차이로 실제 분수를 역산하고
+ *  2) 없으면 최소값(10분)으로 잡는다.
+ * status 가 조퇴가 아닌 행은 건드리지 않으므로 정상 퇴근자가 오탐되지 않는다.
+ */
+function resolveEarlyLeaveMinutes(status: string, checkOut: string): number {
+  const isEarlyLeave = status.includes('early') || status.includes('조퇴');
+  if (!isEarlyLeave) return 0;
+  const checkOutMinutes = toMinutesOfDay(checkOut);
+  if (checkOutMinutes != null && checkOutMinutes < STANDARD_WORK_END_MINUTES) {
+    return STANDARD_WORK_END_MINUTES - checkOutMinutes;
+  }
+  return 10;
+}
+
 function normalizeRecord(row: Record<string, unknown>): AttendanceRecord | null {
   const staffId = pickString(row.staff_id);
   const workDate = pickString(row.work_date);
@@ -123,7 +159,8 @@ function normalizeRecord(row: Record<string, unknown>): AttendanceRecord | null 
     workDate,
     status,
     lateMinutes: lateMinutes > 0 ? lateMinutes : status.includes('late') || status.includes('지각') ? 5 : 0,
-    earlyLeaveMinutes,
+    earlyLeaveMinutes:
+      earlyLeaveMinutes > 0 ? earlyLeaveMinutes : resolveEarlyLeaveMinutes(status, checkOut),
     hasCheckIn: checkIn.length > 0,
     hasCheckOut: checkOut.length > 0 };
 }
