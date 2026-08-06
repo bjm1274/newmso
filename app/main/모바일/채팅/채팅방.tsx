@@ -145,15 +145,55 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
   const isPeerOnline = peer?.id ? Boolean(presenceMap[String(peer.id)]) : false;
   const readCounts = useMobileChatReadCounts(String(room.id), messages, memberIds);
 
-  const attachments = useMemo(() => {
-    return messages.filter(m => !!m.file_url).reverse();
-  }, [messages]);
+  /**
+   * 공유된 사진·파일 목록.
+   *
+   * 예전에는 `messages.filter(m => m.file_url)` 로 **현재 화면에 로드된 메시지**만
+   * 걸렀다. 모바일은 최근 20개(MESSAGES_LIMIT)만 먼저 불러오므로, 사진이 그 안에
+   * 없으면 상세 패널의 공유 파일 칸이 **비어 있는 것처럼 보였다.** 파일이 없는 게
+   * 아니라 아직 안 불러온 것이었는데, 화면은 "첨부된 항목이 없습니다" 라고 말했다.
+   *
+   * 이제 방 전체에서 첨부가 있는 메시지만 따로 조회한다. 패널을 열 때만 부르므로
+   * 방 진입 비용은 늘지 않는다.
+   */
+  const ROOM_ATTACHMENTS_LIMIT = 200;
+  const [roomAttachments, setRoomAttachments] = useState<ChatMessage[]>([]);
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
+
+  const loadedAttachments = useMemo(
+    () => messages.filter((m) => !!m.file_url).reverse(),
+    [messages],
+  );
+  // 조회 전이거나 실패했을 때는 최소한 로드된 창에서 걸러낸 것이라도 보여준다.
+  const attachments = roomAttachments.length > 0 ? roomAttachments : loadedAttachments;
 
   const memberProfiles = useMemo(() => {
     return memberIds
       .map((id) => staffs.find((s) => String(s.id) === String(id)))
       .filter(Boolean) as StaffDirectoryEntry[];
   }, [memberIds, staffs]);
+
+  const loadRoomAttachments = useCallback(async () => {
+    const roomId = String(room.id || '').trim();
+    if (!roomId) return;
+    setAttachmentsLoading(true);
+    try {
+      const { data, error } = await db
+        .from('messages')
+        .select('id, room_id, sender_id, sender_name, content, file_url, file_name, file_kind, created_at')
+        .eq('room_id', roomId)
+        .not('file_url', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(ROOM_ATTACHMENTS_LIMIT);
+      if (error) throw error;
+      setRoomAttachments(Array.isArray(data) ? (data as ChatMessage[]) : []);
+    } catch (err) {
+      // 실패해도 목록을 비우지 않는다 — 로드된 창 기준 폴백이 남는다.
+      logger.warn('[mobile-chat] 공유 파일 조회 실패:', err);
+    } finally {
+      setAttachmentsLoading(false);
+    }
+  }, [room.id]);
 
   const [hasText, setHasText] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -922,7 +962,11 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
           <button
             type="button"
             aria-label="상세메뉴"
-            onClick={() => setInfoOpen(true)}
+            onClick={() => {
+              setInfoOpen(true);
+              // 패널을 열 때 방 전체 첨부를 불러온다 (방 진입 비용은 늘리지 않는다).
+              void loadRoomAttachments();
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -1520,7 +1564,11 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
             <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--z-600)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>공유된 사진 및 파일 ({attachments.length})</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
               {attachments.length === 0 && (
-                <div style={{ gridColumn: '1 / -1', padding: '20px 0', textAlign: 'center', fontSize: 11, color: 'var(--z-400)', fontWeight: 600 }}>첨부된 항목이 없습니다.</div>
+                <div style={{ gridColumn: '1 / -1', padding: '20px 0', textAlign: 'center', fontSize: 11, color: 'var(--z-400)', fontWeight: 600 }}>
+                  {/* 아직 불러오는 중인데 "없다" 고 단정하지 않는다 — 예전에는 로드된
+                      메시지 20개만 보고 없다고 말해서 있는 파일도 없는 것처럼 보였다. */}
+                  {attachmentsLoading ? '불러오는 중…' : '첨부된 항목이 없습니다.'}
+                </div>
               )}
               {attachments.slice(0, 9).map((att) => (
                 <div key={att.id} className="macos-glass" style={{ aspectRatio: 1, borderRadius: 8, background: 'rgba(255, 255, 255, 0.65)', border: '1px solid rgba(0, 0, 0, 0.05)', overflow: 'hidden', position: 'relative' }}>
