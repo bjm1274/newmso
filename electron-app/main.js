@@ -48,6 +48,64 @@ function logNotification(msg) {
   }
 }
 
+/**
+ * 앱 버전이 바뀌었을 때 HTTP 캐시와 서비스워커를 한 번 비운다.
+ *
+ * 이 앱은 erp.pchos.kr 을 그대로 띄우는 껍데기라 화면 코드는 전부 서버에서 온다.
+ * 그런데 서비스워커와 Electron 캐시는 브라우저보다 오래 남고, 사용자가 새로고침을
+ * 할 방법도 마땅치 않다. 서버를 배포해도 설치형 앱만 **옛 화면 코드에 갇혀**
+ * 새 API 와 어긋나는 일이 생긴다. 한 번 갇히면 재설치를 해도 사용자 프로필이
+ * 남아 있어 풀리지 않는다.
+ *
+ * **쿠키와 localStorage 는 건드리지 않는다** — 지우면 로그인 상태가 매번 풀린다.
+ * 지우는 것은 코드·자산 캐시(serviceworkers, cachestorage, HTTP 캐시)뿐이다.
+ */
+const CACHE_STAMP_FILE = 'cache-version.txt';
+
+function getCacheStampPath() {
+  return path.join(app.getPath('userData'), CACHE_STAMP_FILE);
+}
+
+function readLastRunVersion() {
+  try {
+    return fs.readFileSync(getCacheStampPath(), 'utf8').trim();
+  } catch {
+    return '';
+  }
+}
+
+function writeLastRunVersion(version) {
+  try {
+    fs.mkdirSync(app.getPath('userData'), { recursive: true });
+    fs.writeFileSync(getCacheStampPath(), version, 'utf8');
+  } catch (err) {
+    logNotification(`캐시 버전 기록 실패: ${err && err.message}`);
+  }
+}
+
+async function clearWebCaches(reason) {
+  const { session } = require('electron');
+  try {
+    await session.defaultSession.clearCache();
+    await session.defaultSession.clearStorageData({
+      storages: ['serviceworkers', 'cachestorage', 'shadercache'],
+    });
+    logNotification(`웹 캐시·서비스워커 정리 완료 (${reason})`);
+    return true;
+  } catch (err) {
+    logNotification(`웹 캐시 정리 실패 (${reason}): ${err && err.message}`);
+    return false;
+  }
+}
+
+async function clearWebCachesIfUpgraded() {
+  const current = app.getVersion();
+  const last = readLastRunVersion();
+  if (last === current) return;
+  await clearWebCaches(last ? `${last} → ${current}` : `최초 실행 ${current}`);
+  writeLastRunVersion(current);
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -238,7 +296,7 @@ if (!gotTheLock) {
     }
   });
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     // AppUserModelId 는 파일 상단(ready 이전)에서 이미 설정. 이중 호출은 무해.
     if (process.platform === 'win32') {
       try {
@@ -357,6 +415,10 @@ if (!gotTheLock) {
       }
     );
 
+    // 버전이 올라갔으면 창을 만들기 전에 옛 화면 코드를 비운다.
+    // (창을 먼저 띄우면 옛 서비스워커가 이미 요청을 가로챈 뒤라 늦다.)
+    await clearWebCachesIfUpgraded();
+
     createWindow();
 
     // 트레이 아이콘 설정
@@ -366,6 +428,28 @@ if (!gotTheLock) {
         label: 'AllERP 열기',
         click: () => {
           showMainWindow();
+        },
+      },
+      { type: 'separator' },
+      {
+        // 사용자가 스스로 빠져나올 수단. 예전에는 옛 화면 코드에 갇히면
+        // 재설치를 해도(프로필이 남아서) 풀리지 않아 손쓸 방법이 없었다.
+        label: '새로고침 (캐시 정리)',
+        click: async () => {
+          const ok = await clearWebCaches('트레이 메뉴');
+          showMainWindow();
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            // 캐시를 비운 뒤 서버에서 다시 받아오도록 강제 새로고침한다.
+            mainWindow.webContents.reloadIgnoringCache();
+          }
+          if (tray && !tray.isDestroyed()) {
+            tray.displayBalloon?.({
+              title: 'AllERP',
+              content: ok
+                ? '캐시를 정리하고 새로 불러왔습니다.'
+                : '캐시 정리에 실패했습니다. 앱을 종료 후 다시 실행해 주세요.',
+            });
+          }
         },
       },
       { type: 'separator' },

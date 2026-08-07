@@ -1,6 +1,6 @@
 {
   "name": "allerp",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "AIIERP PC Client",
   "main": "main.js",
   "scripts": {
