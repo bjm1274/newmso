@@ -85,14 +85,23 @@ export function buildStorageDownloadUrl(url: string, fileName: string): string {
   const normalizedFileName = String(fileName || '').trim() || 'download';
   if (!normalizedUrl) return '';
 
+  // 공개 R2 도메인(https://r2.pchos.kr/...)도 내부 프록시로 바꿔서 내려받는다.
+  //
+  // 이 변환이 인라인(buildStorageInlineUrl)에만 있고 여기에는 없었다. 그래서
+  // 같은 첨부인데 **미리보기 이미지는 뜨는데 다운로드만 실패**했다 — 원인을
+  // 짐작하기 어려운 조합이었다. 다운로드는 /api/download 로 내려가 공개 URL 을
+  // 그대로 fetch 하는데, 버킷이 공개로 열려 있지 않아 401 이 오고 그것이
+  // "파일 다운로드에 실패했습니다" 로 표시됐다.
+  //
+  // messages.file_url 에 저장되는 값이 바로 이 공개 도메인 형태라 실운영의
+  // 첨부 대부분이 이 경로를 탄다.
+  const internalFromPublic = rewritePublicR2UrlToInternal(normalizedUrl);
+  if (internalFromPublic) {
+    return buildInternalStorageDownloadUrl(internalFromPublic, normalizedFileName);
+  }
+
   if (isInternalStorageObjectUrl(normalizedUrl)) {
     // 내부 프록시 URL 은 그대로 내부 프록시로 내려받는다.
-    //
-    // 예전에는 여기서 공개 R2 도메인(NEXT_PUBLIC_R2_PUBLIC_BASE_URL)으로 되돌린 뒤
-    // /api/download 가 그 URL 을 fetch 했다. 그런데 버킷이 공개로 열려 있지 않아
-    // https://r2.pchos.kr 이 401 을 반환했고, /api/download 는 upstream.ok 실패를
-    // 404 "파일을 찾을 수 없습니다" 로 바꿔 **모든 첨부 다운로드가 실패**했다.
-    //
     // 내부 프록시는 R2 바인딩으로 직접 읽으므로 버킷 공개 여부와 무관하고,
     // 세션·멤버십 검사도 거친다(의료·인사 파일이라 공개 버킷은 애초에 부적절).
     return buildInternalStorageDownloadUrl(normalizedUrl, normalizedFileName);
