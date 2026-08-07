@@ -22,6 +22,11 @@ import {
   MAX_SERVER_RELAY_SIZE_BYTES,
   MAX_SERVER_RELAY_SIZE_LABEL as SHARED_MAX_SERVER_RELAY_SIZE_LABEL,
   MAX_VIDEO_SIZE_LABEL as SHARED_MAX_VIDEO_SIZE_LABEL } from '@/lib/upload-constants';
+import {
+  isRawUploadRequest,
+  readRawUploadFileName,
+  readRawUploadMeta,
+  readRawUploadMimeType } from '@/lib/upload-raw-request';
 
 export const dynamic = 'force-dynamic';
 
@@ -95,6 +100,9 @@ function validateUploadTarget(fileName: string, mimeType: string, fileSize: numb
     throw new Error(`파일 크기는 ${SHARED_MAX_FILE_SIZE_LABEL} 이하여야 합니다.`);
   }
 }
+
+/** detectBoardUploadMimeType 이 보는 최대 바이트 수 (WebP 판정이 12바이트를 쓴다). */
+const MAGIC_BYTE_PREFIX_LENGTH = 12;
 
 const MAGIC_BYTE_VERIFIED_MIME_TYPES = new Set([
   'application/pdf',
@@ -214,6 +222,44 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    // 본문을 그대로 실어 보내는 경로(application/octet-stream).
+    // formData 파싱조차 파일 전체를 메모리에 올리므로, 큰 파일은 이쪽으로 받아
+    // request.body 스트림을 R2 에 그대로 흘려보낸다.
+    if (isRawUploadRequest(contentType)) {
+      const boardType = readRawUploadMeta(request.headers, 'boardType');
+      if (!boardType) {
+        return NextResponse.json({ error: 'boardType is required.' }, { status: 400 });
+      }
+      if (!canAccessBoard(latestUser, boardType, 'write')) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      if (!request.body) {
+        return NextResponse.json({ error: '업로드할 파일이 없습니다.' }, { status: 400 });
+      }
+
+      const rawName = readRawUploadFileName(request.headers);
+      const rawMime = normalizeUploadMimeType(
+        rawName,
+        readRawUploadMimeType(request.headers) || DEFAULT_CONTENT_TYPE,
+      );
+      const rawNormalizedName = normalizeUploadFileName(rawName, rawMime);
+      validateUploadTarget(rawNormalizedName, rawMime, contentLength);
+
+      // 이 경로는 본문을 흘려보내므로 매직바이트를 미리 볼 수 없다. 앞부분만
+      // 떼어내려면 스트림을 끊어야 하고 그러면 R2 로 보낼 본문이 망가진다.
+      // 대신 확장자·MIME 정규화(normalizeUploadMimeType)와 상한 검사는 그대로 탄다.
+      const rawPath = buildSafeFilePath(rawNormalizedName, rawMime);
+      const rawUploaded = await uploadToR2(R2_BUCKET, rawPath, request.body, rawMime);
+      return NextResponse.json({
+        success: true,
+        provider: rawUploaded.provider,
+        bucket: rawUploaded.bucket,
+        path: rawUploaded.path,
+        fileName: rawNormalizedName,
+        type: detectAttachmentType(rawNormalizedName, rawMime),
+        url: rawUploaded.url });
+    }
+
     const formData = await request.formData();
     const boardType = String(formData.get('boardType') || formData.get('boardId') || '').trim();
     const file = formData.get('file');
@@ -236,10 +282,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     validateUploadTarget(normalizedFileName, mimeType, file.size);
 
     const filePath = buildSafeFilePath(normalizedFileName, mimeType);
-    const arrayBuffer = await file.arrayBuffer();
-    validateKnownFileContentType(mimeType, arrayBuffer);
+    // 파일 전체를 메모리에 올리지 않는다.
+    //
+    // 예전에는 `Buffer.from(await file.arrayBuffer())` 였다. formData 파싱본까지
+    // 합쳐 파일 하나를 세 벌 들고 있었고, 77MB 짜리에서 워커 메모리 한도(128MB)를
+    // 넘겨 요청이 통째로 죽었다 — 라우트가 응답을 못 내니 Cloudflare 가 5xx 를
+    // 대신 돌려줬고, 화면에는 원인을 알 수 없는 HTTP 503 만 떴다.
+    // 매직바이트 검사는 앞 12바이트만 있으면 된다.
+    const headBuffer = await file.slice(0, MAGIC_BYTE_PREFIX_LENGTH).arrayBuffer();
+    validateKnownFileContentType(mimeType, headBuffer);
 
-    const uploaded = await uploadToR2(R2_BUCKET, filePath, Buffer.from(arrayBuffer), mimeType);
+    const uploaded = await uploadToR2(R2_BUCKET, filePath, file, mimeType);
     return NextResponse.json({
       success: true,
       provider: uploaded.provider,

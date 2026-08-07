@@ -331,12 +331,22 @@ async function withR2Binding<T>(
  */
 export async function uploadChatAttachmentToR2(
   objectKey: string,
-  body: Buffer,
+  body: R2UploadBody,
   mimeType: string,
 ): Promise<Pick<R2UploadPlan, 'bucket' | 'path' | 'provider' | 'url'>> {
   const config = getR2Config();
   return uploadToR2(config?.chatBucket || DEFAULT_R2_CHAT_BUCKET, objectKey, body, mimeType);
 }
+
+/**
+ * 업로드 본문으로 받을 수 있는 형태.
+ *
+ * 예전에는 `Buffer` 만 받았다. 그래서 호출부가 큰 파일을 넘기려면
+ * `Buffer.from(await file.arrayBuffer())` 로 전체를 메모리에 두 벌 더 만들어야
+ * 했고, 워커 메모리 한도(128MB)를 넘겨 요청이 통째로 죽었다. Blob·스트림을
+ * 그대로 받으면 R2 바인딩과 fetch 양쪽 모두 복사 없이 흘려보낼 수 있다.
+ */
+export type R2UploadBody = Buffer | Blob | ArrayBuffer | ReadableStream<Uint8Array>;
 
 /**
  * 범용 R2 업로드 — 버킷과 objectKey를 직접 지정.
@@ -345,7 +355,7 @@ export async function uploadChatAttachmentToR2(
 export async function uploadToR2(
   bucket: string,
   objectKey: string,
-  body: Buffer,
+  body: R2UploadBody,
   mimeType: string,
 ): Promise<Pick<R2UploadPlan, 'bucket' | 'path' | 'provider' | 'url'>> {
   // 1. Direct Cloudflare R2 Worker Binding Attempt (0.00초 직통 업로드 — S3 credentials 의존 제로)

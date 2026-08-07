@@ -8,6 +8,7 @@ import {
   MAX_FILE_SIZE_LABEL,
   MAX_SERVER_RELAY_SIZE_BYTES,
   MAX_SERVER_RELAY_SIZE_LABEL } from '@/lib/upload-constants';
+import { buildRawUploadHeaders } from '@/lib/upload-raw-request';
 
 const BOARD_UPLOAD_ENDPOINT = '/api/board/upload';
 const CACHE_CONTROL = '3600';
@@ -52,14 +53,15 @@ function normalizeUploadedAttachment(file: File, payload: UploadResponsePayload)
 }
 
 async function uploadViaAppServer(file: File, boardType: string) {
-  const formData = new FormData();
   const uploadFileName = getUploadFileName(file);
-  formData.append('file', file, uploadFileName);
-  formData.append('boardType', boardType);
 
+  // 파일을 FormData 로 감싸지 않고 본문에 그대로 싣는다.
+  // 서버의 formData() 파싱이 파일 전체를 메모리에 올려 큰 첨부에서 워커가
+  // 죽었다(원인을 알 수 없는 503). 메타데이터는 헤더로 보낸다.
   const response = await fetch(BOARD_UPLOAD_ENDPOINT, {
     method: 'POST',
-    body: formData });
+    headers: buildRawUploadHeaders(uploadFileName, getUploadContentType(file), { boardType }),
+    body: file });
   const payload = (await response.json().catch(() => null)) as UploadResponsePayload | null;
 
   if (!response.ok || !payload?.url) {

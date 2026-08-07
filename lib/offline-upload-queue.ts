@@ -25,6 +25,7 @@ import { storeBlob, getBlob, deleteBlob, cleanupOldBlobs } from './offline-blob-
 import { enqueueD1Mutation } from './offline-queue-d1';
 import { isNetworkError } from './offline-network-error';
 import { MAX_SERVER_RELAY_SIZE_BYTES, MAX_SERVER_RELAY_SIZE_LABEL } from './upload-constants';
+import { buildRawUploadHeaders } from './upload-raw-request';
 
 // ─────────────────────────────────────────────────────────────
 // 상수
@@ -222,17 +223,20 @@ async function uploadViaServerRelay(
     return { ok: false, error: `앱 서버 경로의 한도(${MAX_SERVER_RELAY_SIZE_LABEL})를 초과했습니다.` };
   }
   try {
-    const formData = new FormData();
-    formData.append('file', blob, filename);
-    for (const [key, value] of Object.entries(params)) {
-      if (value === undefined || value === null) continue;
-      // planParams 는 requester 마다 키가 다르다(chat: roomId, board: boardType).
-      // 서버는 snake_case 를 읽으므로 둘 다 실어 어느 쪽이든 받게 한다.
-      formData.append(key, String(value));
-      formData.append(key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`), String(value));
-    }
+    // planParams 는 requester 마다 키가 다르다(chat: roomId, board: boardType).
+    const meta = Object.fromEntries(
+      Object.entries(params)
+        .filter(([, value]) => value !== undefined && value !== null && value !== '')
+        .map(([key, value]) => [key, String(value)]),
+    );
+    // 파일을 FormData 로 감싸지 않는다 — 서버의 formData() 파싱이 파일 전체를
+    // 메모리에 올려 큰 첨부에서 워커가 죽는다.
     const endpoint = UPLOAD_ENDPOINT_BY_REQUESTER[requester];
-    const res = await fetch(endpoint, { method: 'POST', credentials: 'same-origin', body: formData });
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: buildRawUploadHeaders(filename, blob.type || 'application/octet-stream', meta),
+      body: blob });
     const payload = (await res.json().catch(() => null)) as PlanResponse | null;
     if (!res.ok || !payload?.url) {
       return { ok: false, error: payload?.error ?? `서버 업로드 실패 (HTTP ${res.status})` };

@@ -13,6 +13,11 @@ import {
 } from '@/lib/chat-upload-constants';
 import { MAX_SERVER_RELAY_SIZE_BYTES, MAX_SERVER_RELAY_SIZE_LABEL } from '@/lib/upload-constants';
 import {
+  isRawUploadRequest,
+  readRawUploadFileName,
+  readRawUploadMeta,
+  readRawUploadMimeType } from '@/lib/upload-raw-request';
+import {
   DEFAULT_CONTENT_TYPE,
   normalizeUploadFileName,
   normalizeUploadMimeType } from '@/lib/upload-mime';
@@ -187,6 +192,37 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    // 본문을 그대로 실어 보내는 경로 — formData 파싱조차 파일 전체를 메모리에
+    // 올리므로, 큰 파일은 request.body 스트림을 R2 로 그대로 흘려보낸다.
+    if (isRawUploadRequest(contentType)) {
+      const rawRoomDenied = await assertRoomMembership(
+        userId,
+        readRawUploadMeta(request.headers, 'roomId'),
+      );
+      if (rawRoomDenied) return rawRoomDenied;
+      if (!request.body) {
+        return NextResponse.json({ error: '업로드할 파일이 없습니다.' }, { status: 400 });
+      }
+
+      const rawName = readRawUploadFileName(request.headers);
+      const rawMime = normalizeUploadMimeType(
+        rawName,
+        readRawUploadMimeType(request.headers) || DEFAULT_CONTENT_TYPE,
+      );
+      const rawNormalizedName = normalizeUploadFileName(rawName, rawMime);
+      validateUploadTarget(rawNormalizedName, rawMime, contentLength);
+
+      const rawPath = buildSafeFilePath(rawNormalizedName, rawMime);
+      const rawUploaded = await uploadToR2(R2_BUCKET, rawPath, request.body, rawMime);
+      return NextResponse.json({
+        success: true,
+        provider: rawUploaded.provider,
+        bucket: rawUploaded.bucket,
+        path: rawUploaded.path,
+        fileName: rawNormalizedName,
+        url: rawUploaded.url });
+    }
+
     const formData = await request.formData();
     const file = formData.get('file');
 
@@ -206,9 +242,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     validateUploadTarget(normalizedFileName, mimeType, file.size);
 
     const filePath = buildSafeFilePath(normalizedFileName, mimeType);
-    const arrayBuffer = await file.arrayBuffer();
-
-    const uploaded = await uploadToR2(R2_BUCKET, filePath, Buffer.from(arrayBuffer), mimeType);
+    // 파일 전체를 메모리에 복사하지 않는다 — 큰 첨부에서 워커 메모리 한도를
+    // 넘겨 요청이 통째로 죽고, 원인을 알 수 없는 5xx 로 보였다.
+    const uploaded = await uploadToR2(R2_BUCKET, filePath, file, mimeType);
     return NextResponse.json({
       success: true,
       provider: uploaded.provider,

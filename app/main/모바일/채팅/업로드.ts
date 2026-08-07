@@ -23,6 +23,7 @@ import {
   CHAT_MAX_VIDEO_SIZE_BYTES } from '@/lib/chat-upload-constants';
 import type { ChatMessage } from '@/types';
 import { enqueueUpload } from '@/lib/offline-upload-queue';
+import { buildRawUploadHeaders } from '@/lib/upload-raw-request';
 
 export type FileKind = 'image' | 'video' | 'file';
 
@@ -135,13 +136,13 @@ async function uploadViaServerFallback(
   roomId: string,
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   try {
-    const formData = new FormData();
-    formData.append('file', file, file.name);
-    formData.append('room_id', roomId);
+    // 파일을 FormData 로 감싸지 않고 본문에 그대로 싣는다 — 서버의 formData()
+    // 파싱이 파일 전체를 메모리에 올려 큰 첨부에서 워커가 죽었다.
     const res = await fetch('/api/chat/upload', {
       method: 'POST',
       credentials: 'same-origin',
-      body: formData });
+      headers: buildRawUploadHeaders(file.name, normalizeMimeType(file), { roomId }),
+      body: file });
     const payload = (await res.json().catch(() => null)) as FallbackUploadResponse | null;
     if (!res.ok || !payload?.url) {
       return { ok: false, error: payload?.error || `업로드 실패 (HTTP ${res.status})` };

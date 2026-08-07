@@ -25,6 +25,7 @@ import {
 import { CHAT_MAX_FILE_SIZE_BYTES as MAX_FILE_SIZE_BYTES, CHAT_MAX_VIDEO_SIZE_BYTES as MAX_VIDEO_SIZE_BYTES } from '@/lib/chat-upload-constants';
 import { getUploadContentType } from '@/lib/upload-mime';
 import { MAX_SERVER_RELAY_SIZE_BYTES, MAX_SERVER_RELAY_SIZE_LABEL } from '@/lib/upload-constants';
+import { buildRawUploadHeaders } from '@/lib/upload-raw-request';
 
 type ShareTarget = {
   id: string;
@@ -213,13 +214,12 @@ export function useChatUploads({
         }
 
         const uploadViaAppServer = async () => {
-          const formData = new FormData();
-          formData.append('file', file, uploadFileName);
-          formData.append('room_id', uploadRoomId);
-
+          // 파일을 FormData 로 감싸지 않고 본문에 그대로 싣는다 — 서버의 formData()
+          // 파싱이 파일 전체를 메모리에 올려 큰 첨부에서 워커가 죽었다.
           const fallbackResponse = await fetch('/api/chat/upload', {
             method: 'POST',
-            body: formData });
+            headers: buildRawUploadHeaders(uploadFileName, uploadContentType, { roomId: uploadRoomId }),
+            body: file });
           const fallbackPayload = (await fallbackResponse.json().catch(() => null)) as {
             provider?: 'supabase' | 'r2';
             bucket?: string;
