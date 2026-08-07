@@ -4,6 +4,10 @@ import { logger } from '@/lib/logger';
 import { inferAttachmentType } from './게시판공통';
 
 import { getUploadContentType } from '@/lib/upload-mime';
+import {
+  MAX_FILE_SIZE_LABEL,
+  MAX_SERVER_RELAY_SIZE_BYTES,
+  MAX_SERVER_RELAY_SIZE_LABEL } from '@/lib/upload-constants';
 
 const BOARD_UPLOAD_ENDPOINT = '/api/board/upload';
 const CACHE_CONTROL = '3600';
@@ -123,8 +127,19 @@ export async function uploadBoardAttachmentFile(
     }
   } catch (directUploadError) {
     logger.warn('직접 업로드 실패, 서버 업로드로 다시 시도합니다.', directUploadError);
-    if (file.size > 50 * 1024 * 1024) {
-      throw new Error('파일 서버에 직접 업로드할 수 없으며, 서버 우회 한도(50MB)를 초과하여 업로드가 취소되었습니다.');
+    // 직접 업로드가 안 되면 앱 서버를 거쳐 올린다. 다만 본문이 Worker 를 통과하는
+    // 경로라 Cloudflare 요청 본문 한도(요금제가 정한다)를 넘을 수 없다.
+    //
+    // 실패 사유를 함께 알려준다. 예전에는 "한도를 초과해 취소되었습니다" 만 떠서,
+    // 파일이 큰 것이 문제인지 스토리지 설정이 문제인지 구분할 수 없었다.
+    // 실제로는 직접 업로드가 막혀 있어 우회 경로로 밀린 것이 근본 원인이다.
+    if (file.size > MAX_SERVER_RELAY_SIZE_BYTES) {
+      const sizeMb = Math.round(file.size / (1024 * 1024));
+      throw new Error(
+        `R2 직접 업로드가 되지 않아 앱 서버를 거쳐 올리려 했으나, `
+        + `이 경로의 한도(${MAX_SERVER_RELAY_SIZE_LABEL})보다 파일이 큽니다(${sizeMb}MB). `
+        + `${MAX_FILE_SIZE_LABEL} 까지 올리려면 R2 직접 업로드가 동작해야 합니다.`,
+      );
     }
     return await uploadViaAppServer(file, boardType);
   }

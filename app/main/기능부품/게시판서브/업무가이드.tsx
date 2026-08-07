@@ -10,6 +10,7 @@ import {
   shouldUseManagedBrowserDownload,
   triggerManagedBrowserDownload } from '@/lib/object-storage-url';
 import { db } from '@/lib/db-client';
+import { MAX_FILE_SIZE_LABEL } from '@/lib/upload-constants';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import { withMissingColumnsFallback } from '@/lib/db-compat';
 import { toast } from '@/lib/toast';
@@ -1569,7 +1570,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                 >
                   <Upload size={20} className="text-[var(--toss-gray-4)]" />
                   <span className="text-[12px] font-bold text-[var(--toss-gray-4)]">클릭하여 파일 선택 또는 드래그 앤 드롭</span>
-                  <span className="text-[10px] text-[var(--toss-gray-3)]">PDF · 이미지 · 문서 (개당 200MB 이하, 최대 10개)</span>
+                  <span className="text-[10px] text-[var(--toss-gray-3)]">{`PDF · 이미지 · 문서 (개당 ${MAX_FILE_SIZE_LABEL} 이하, 최대 10개)`}</span>
                 </div>
                 <input
                   data-testid="guide-file-input"

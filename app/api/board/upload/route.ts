@@ -15,13 +15,21 @@ import {
   toSafeObjectKeyExtension } from '@/lib/upload-mime';
 
 
+import {
+  MAX_FILE_SIZE_BYTES as SHARED_MAX_FILE_SIZE_BYTES,
+  MAX_VIDEO_SIZE_BYTES as SHARED_MAX_VIDEO_SIZE_BYTES,
+  MAX_FILE_SIZE_LABEL as SHARED_MAX_FILE_SIZE_LABEL,
+  MAX_VIDEO_SIZE_LABEL as SHARED_MAX_VIDEO_SIZE_LABEL } from '@/lib/upload-constants';
+
 export const dynamic = 'force-dynamic';
 
-const MAX_FILE_SIZE_BYTES = 200 * 1024 * 1024;
-const MAX_VIDEO_SIZE_BYTES = 200 * 1024 * 1024;
+// 상한은 lib/upload-constants.ts 를 따른다. 예전에는 이 파일에 사본이 있어
+// 클라이언트 안내 문구와 서버 검사가 따로 놀 수 있었다.
+const MAX_FILE_SIZE_BYTES = SHARED_MAX_FILE_SIZE_BYTES;
+const MAX_VIDEO_SIZE_BYTES = SHARED_MAX_VIDEO_SIZE_BYTES;
 // 이미지에는 상한이 아예 없었다(아래 validateUploadTarget 주석 참고). 다른 종류와
 // 같은 상한을 적용해 "무제한" 만 닫는다 — 지금 통과하는 파일은 그대로 통과한다.
-const MAX_IMAGE_SIZE_BYTES = 200 * 1024 * 1024;
+const MAX_IMAGE_SIZE_BYTES = SHARED_MAX_FILE_SIZE_BYTES;
 const R2_BUCKET = 'pchos-files';
 // DEFAULT_CONTENT_TYPE·MIME_BY_EXTENSION·normalizeUploadMimeType 로컬 사본을 제거하고
 // lib/upload-mime 정본을 쓴다(8차 D12-011). 사본은 정본과 17개 항목이 순서까지 같아
@@ -69,20 +77,20 @@ function validateUploadTarget(fileName: string, mimeType: string, fileSize: numb
   // 않으므로 그 신고값이 유일한 방어였다 — 즉 이미지는 상한이 없었다.
   if (mimeType.startsWith('image/')) {
     if (fileSize > MAX_IMAGE_SIZE_BYTES) {
-      throw new Error('이미지 크기는 200MB 이하여야 합니다.');
+      throw new Error(`이미지 크기는 ${SHARED_MAX_FILE_SIZE_LABEL} 이하여야 합니다.`);
     }
     return;
   }
 
   if (mimeType.startsWith('video/')) {
     if (fileSize > MAX_VIDEO_SIZE_BYTES) {
-      throw new Error('동영상 크기는 200MB 이하여야 합니다.');
+      throw new Error(`동영상 크기는 ${SHARED_MAX_VIDEO_SIZE_LABEL} 이하여야 합니다.`);
     }
     return;
   }
 
   if (fileSize > MAX_FILE_SIZE_BYTES) {
-    throw new Error('파일 크기는 200MB 이하여야 합니다.');
+    throw new Error(`파일 크기는 ${SHARED_MAX_FILE_SIZE_LABEL} 이하여야 합니다.`);
   }
 }
 
@@ -195,7 +203,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const contentLength = Number(request.headers.get('content-length') || '0');
     if (contentLength > 209_715_200) {
-      return NextResponse.json({ error: '파일 크기가 200MB를 초과합니다.' }, { status: 413 });
+      return NextResponse.json({ error: `파일 크기가 ${SHARED_MAX_FILE_SIZE_LABEL} 를 초과합니다.` }, { status: 413 });
     }
 
     const formData = await request.formData();
