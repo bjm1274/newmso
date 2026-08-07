@@ -307,7 +307,10 @@ async function withR2Binding<T>(
   requiredMethod: 'put' | 'delete',
 ): Promise<{ used: true; value: T } | { used: false }> {
   try {
-    const cfCtx = await getCloudflareContext();
+    // `{ async: true }` 가 필요하다. 인자 없이 부르는 동기 형태는 요청 처리 중
+    // env 를 내주지 못하고 던지며, 그러면 아래 catch 로 빠져 바인딩이 멀쩡한데도
+    // 없는 것처럼 취급된다. 동작하는 D1 헬퍼(lib/db/get-binding.ts)와 같은 형태다.
+    const cfCtx = await getCloudflareContext({ async: true });
     const r2Binding = (cfCtx?.env as any)?.R2;
     if (r2Binding && typeof r2Binding[requiredMethod] === 'function') {
       return { used: true, value: await op(r2Binding) };

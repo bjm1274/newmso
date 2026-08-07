@@ -178,7 +178,14 @@ export async function GET(request: NextRequest) {
 
     // 1. Direct Cloudflare R2 Worker Binding Attempt (Zero-latency direct stream)
     try {
-      const cfCtx = await getCloudflareContext();
+      // `{ async: true }` 가 필요하다. 인자 없는 동기 형태는 요청 처리 중 env 를
+      // 내주지 못하고 던진다. 그러면 아래 catch 로 빠져 바인딩이 멀쩡한데도 없는
+      // 것으로 취급되고, 서명 URL 폴백으로 내려간다. 그런데 운영 워커에는
+      // R2_ACCOUNT_ID·R2_ACCESS_KEY_ID 시크릿이 설정돼 있지 않아 그 폴백도
+      // 만들어지지 않는다 — 결국 500 "Cloudflare R2 is not configured" 가 나가고
+      // 사용자에게는 "파일 다운로드에 실패했습니다" 로만 보였다.
+      // 동작하는 D1 헬퍼(lib/db/get-binding.ts)와 같은 형태로 맞춘다.
+      const cfCtx = await getCloudflareContext({ async: true });
       const r2Binding = (cfCtx?.env as any)?.R2;
       if (!r2Binding || typeof r2Binding.get !== 'function') {
         stages.push('binding:unavailable');
