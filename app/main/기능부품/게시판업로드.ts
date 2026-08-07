@@ -85,8 +85,24 @@ export async function uploadBoardAttachmentFile(
       fileSize: file.size }) });
   const payload = (await response.json().catch(() => null)) as UploadResponsePayload | null;
 
-  if (!response.ok || !payload?.path || !payload?.signedUrl || !payload?.provider) {
-    throw new Error(payload?.error || `파일 업로드 준비에 실패했습니다. (HTTP ${response.status})`);
+  // 직접 업로드 플랜을 못 받았다고 해서 곧장 포기하지 않는다.
+  //
+  // 서명 URL 은 R2 S3 자격증명이 있어야 만들어진다. 운영 워커에 그 시크릿이
+  // 없으면 이 요청이 503 으로 떨어지는데, 예전에는 여기서 그대로 던져버려
+  // **동작하는 서버 우회 경로에 닿지도 못한 채** 업로드가 실패했다.
+  // 앱 서버 경로는 R2 바인딩으로 직접 쓰므로 자격증명 없이도 동작한다.
+  const hasDirectUploadPlan = response.ok && payload?.path && payload?.signedUrl && payload?.provider;
+  if (!hasDirectUploadPlan) {
+    if (file.size > MAX_SERVER_RELAY_SIZE_BYTES) {
+      const sizeMb = Math.round(file.size / (1024 * 1024));
+      throw new Error(
+        `R2 직접 업로드를 준비하지 못했고(HTTP ${response.status}), `
+        + `앱 서버 경로의 한도(${MAX_SERVER_RELAY_SIZE_LABEL})보다 파일이 큽니다(${sizeMb}MB). `
+        + `${MAX_FILE_SIZE_LABEL} 까지 올리려면 R2 직접 업로드가 동작해야 합니다.`,
+      );
+    }
+    logger.warn('직접 업로드 플랜을 받지 못해 서버 업로드로 진행합니다.', payload?.error || response.status);
+    return await uploadViaAppServer(file, boardType);
   }
 
   const publicUrl = payload.url || '';

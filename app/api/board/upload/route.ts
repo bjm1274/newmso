@@ -19,6 +19,8 @@ import {
   MAX_FILE_SIZE_BYTES as SHARED_MAX_FILE_SIZE_BYTES,
   MAX_VIDEO_SIZE_BYTES as SHARED_MAX_VIDEO_SIZE_BYTES,
   MAX_FILE_SIZE_LABEL as SHARED_MAX_FILE_SIZE_LABEL,
+  MAX_SERVER_RELAY_SIZE_BYTES,
+  MAX_SERVER_RELAY_SIZE_LABEL as SHARED_MAX_SERVER_RELAY_SIZE_LABEL,
   MAX_VIDEO_SIZE_LABEL as SHARED_MAX_VIDEO_SIZE_LABEL } from '@/lib/upload-constants';
 
 export const dynamic = 'force-dynamic';
@@ -201,9 +203,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return await createSignedUploadPlan(payload);
     }
 
+    // 본문이 이 워커를 통과하는 경로다. 상한은 첨부 상한(500MB)이 아니라
+    // 우회 경로 상한을 따른다 — 예전에는 200MB 상수가 박혀 있으면서 오류 문구는
+    // 첨부 상한을 말해, 거절 크기와 안내 문구가 서로 달랐다.
     const contentLength = Number(request.headers.get('content-length') || '0');
-    if (contentLength > 209_715_200) {
-      return NextResponse.json({ error: `파일 크기가 ${SHARED_MAX_FILE_SIZE_LABEL} 를 초과합니다.` }, { status: 413 });
+    if (contentLength > MAX_SERVER_RELAY_SIZE_BYTES) {
+      return NextResponse.json(
+        { error: `앱 서버를 거쳐 올릴 수 있는 크기는 ${SHARED_MAX_SERVER_RELAY_SIZE_LABEL} 까지입니다.` },
+        { status: 413 },
+      );
     }
 
     const formData = await request.formData();

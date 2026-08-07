@@ -24,6 +24,7 @@
 import { storeBlob, getBlob, deleteBlob, cleanupOldBlobs } from './offline-blob-storage';
 import { enqueueD1Mutation } from './offline-queue-d1';
 import { isNetworkError } from './offline-network-error';
+import { MAX_SERVER_RELAY_SIZE_BYTES, MAX_SERVER_RELAY_SIZE_LABEL } from './upload-constants';
 
 // ─────────────────────────────────────────────────────────────
 // 상수
@@ -82,6 +83,12 @@ type PlanResponse = {
   headers?: Record<string, string>;
   error?: string;
 };
+
+const UPLOAD_ENDPOINT_BY_REQUESTER: Record<UploadPlanRequester, string> = {
+  chat: '/api/chat/upload',
+  board: '/api/board/upload',
+  approval: '/api/approval/upload',
+  submission: '/api/submission/upload' };
 
 // ─────────────────────────────────────────────────────────────
 // in-memory 큐 (localStorage 동기 직렬화)
@@ -156,12 +163,7 @@ async function requestPlan(
   mimeType: string,
   sizeBytes: number,
 ): Promise<{ ok: true; signedUrl: string; publicUrl: string; headers: Record<string, string> } | { ok: false; error: string }> {
-  const endpointMap: Record<UploadPlanRequester, string> = {
-    chat: '/api/chat/upload',
-    board: '/api/board/upload',
-    approval: '/api/approval/upload',
-    submission: '/api/submission/upload' };
-  const endpoint = endpointMap[requester];
+  const endpoint = UPLOAD_ENDPOINT_BY_REQUESTER[requester];
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
@@ -197,6 +199,47 @@ async function putToR2(
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'R2 PUT 오류' };
+  }
+}
+
+/**
+ * 앱 서버를 거쳐 올리는 우회 경로.
+ *
+ * presigned URL 은 R2 S3 자격증명이 있어야 발급된다. 운영 워커에 그 시크릿이
+ * 없으면 requestPlan 이 항상 503 이고, 이 큐는 presign 만 쓰고 있어서
+ * **큐에 들어간 파일이 3회 재시도 후 전부 failed 로 죽었다**. 서버 경로는
+ * R2 바인딩으로 직접 쓰므로 자격증명 없이도 올라간다.
+ *
+ * 다만 본문이 워커를 통과하므로 Cloudflare 요청 본문 한도를 넘을 수 없다.
+ */
+async function uploadViaServerRelay(
+  requester: UploadPlanRequester,
+  params: Record<string, unknown>,
+  blob: Blob,
+  filename: string,
+): Promise<{ ok: true; publicUrl: string } | { ok: false; error: string }> {
+  if (blob.size > MAX_SERVER_RELAY_SIZE_BYTES) {
+    return { ok: false, error: `앱 서버 경로의 한도(${MAX_SERVER_RELAY_SIZE_LABEL})를 초과했습니다.` };
+  }
+  try {
+    const formData = new FormData();
+    formData.append('file', blob, filename);
+    for (const [key, value] of Object.entries(params)) {
+      if (value === undefined || value === null) continue;
+      // planParams 는 requester 마다 키가 다르다(chat: roomId, board: boardType).
+      // 서버는 snake_case 를 읽으므로 둘 다 실어 어느 쪽이든 받게 한다.
+      formData.append(key, String(value));
+      formData.append(key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`), String(value));
+    }
+    const endpoint = UPLOAD_ENDPOINT_BY_REQUESTER[requester];
+    const res = await fetch(endpoint, { method: 'POST', credentials: 'same-origin', body: formData });
+    const payload = (await res.json().catch(() => null)) as PlanResponse | null;
+    if (!res.ok || !payload?.url) {
+      return { ok: false, error: payload?.error ?? `서버 업로드 실패 (HTTP ${res.status})` };
+    }
+    return { ok: true, publicUrl: payload.url };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : '서버 업로드 오류' };
   }
 }
 
@@ -237,20 +280,27 @@ async function flushOne(item: UploadQueueItem): Promise<void> {
     item.mimeType,
     item.sizeBytes,
   );
-  if (!plan.ok) {
-    item.retryCount += 1;
-    item.status = item.retryCount > MAX_RETRY ? 'failed' : 'pending';
-    lsSaveQueue();
-    return;
-  }
 
-  // R2 PUT
-  const put = await putToR2(plan.signedUrl, stored.blob, plan.headers);
-  if (!put.ok) {
-    item.retryCount += 1;
-    item.status = item.retryCount > MAX_RETRY ? 'failed' : 'pending';
-    lsSaveQueue();
-    return;
+  // 직접 업로드가 되면 그 URL 을, 안 되면 서버 우회 경로의 URL 을 쓴다.
+  let publicUrl = '';
+  if (plan.ok) {
+    const put = await putToR2(plan.signedUrl, stored.blob, plan.headers);
+    if (put.ok) publicUrl = plan.publicUrl;
+  }
+  if (!publicUrl) {
+    const relayed = await uploadViaServerRelay(
+      item.planRequester,
+      item.planParams,
+      stored.blob,
+      item.filename,
+    );
+    if (!relayed.ok) {
+      item.retryCount += 1;
+      item.status = item.retryCount > MAX_RETRY ? 'failed' : 'pending';
+      lsSaveQueue();
+      return;
+    }
+    publicUrl = relayed.publicUrl;
   }
 
   // onSuccessAction 체이닝 — 메시지 insert 성공 후에만 큐/blob 제거 (유실 방지)
@@ -259,7 +309,7 @@ async function flushOne(item: UploadQueueItem): Promise<void> {
     const payload = Object.fromEntries(
       Object.entries(payloadTemplate).map(([k, v]) => [
         k,
-        v === '{fileUrl}' ? plan.publicUrl : v,
+        v === '{fileUrl}' ? publicUrl : v,
       ]),
     );
     const result = await enqueueD1Mutation({ kind, table, payload, match });
@@ -337,31 +387,38 @@ export async function enqueueUpload(opts: EnqueueUploadOpts): Promise<EnqueueUpl
     // 온라인 — 직접 업로드 시도
     try {
       const plan = await requestPlan(planRequester, planParams, filename, mimeType, file.size);
+
+      const finish = async (fileUrl: string): Promise<EnqueueUploadResult> => {
+        // 성공 후 onSuccessAction 즉시 실행
+        if (onSuccessAction) {
+          const payload = Object.fromEntries(
+            Object.entries(onSuccessAction.payloadTemplate).map(([k, v]) => [
+              k,
+              v === '{fileUrl}' ? fileUrl : v,
+            ]),
+          );
+          await enqueueD1Mutation({
+            kind: onSuccessAction.kind,
+            table: onSuccessAction.table,
+            payload,
+            match: onSuccessAction.match });
+        }
+        return { uploaded: true, queued: false, fileUrl, error: null };
+      };
+
       if (plan.ok) {
         const put = await putToR2(plan.signedUrl, file, plan.headers);
-        if (put.ok) {
-          // 성공 후 onSuccessAction 즉시 실행
-          if (onSuccessAction) {
-            const payload = Object.fromEntries(
-              Object.entries(onSuccessAction.payloadTemplate).map(([k, v]) => [
-                k,
-                v === '{fileUrl}' ? plan.publicUrl : v,
-              ]),
-            );
-            await enqueueD1Mutation({
-              kind: onSuccessAction.kind,
-              table: onSuccessAction.table,
-              payload,
-              match: onSuccessAction.match });
-          }
-          return { uploaded: true, queued: false, fileUrl: plan.publicUrl, error: null };
-        }
+        if (put.ok) return await finish(plan.publicUrl);
         // R2 PUT 실패가 네트워크 에러인지 확인
         if (!isNetworkError(new Error(put.error))) {
           return { uploaded: false, queued: false, fileUrl: null, error: put.error };
         }
       } else if (!isNetworkError(new Error(plan.error))) {
-        return { uploaded: false, queued: false, fileUrl: null, error: plan.error };
+        // 플랜 발급이 네트워크 문제가 아닌 이유로 실패했다(자격증명 미설정이면 503).
+        // 큐에 넣어봐야 같은 이유로 계속 실패하므로, 여기서 서버 우회 경로를 시도한다.
+        const relayed = await uploadViaServerRelay(planRequester, planParams, file, filename);
+        if (relayed.ok) return await finish(relayed.publicUrl);
+        return { uploaded: false, queued: false, fileUrl: null, error: relayed.error };
       }
     } catch (err) {
       if (!isNetworkError(err)) {

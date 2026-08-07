@@ -24,6 +24,7 @@ import {
 
 import { CHAT_MAX_FILE_SIZE_BYTES as MAX_FILE_SIZE_BYTES, CHAT_MAX_VIDEO_SIZE_BYTES as MAX_VIDEO_SIZE_BYTES } from '@/lib/chat-upload-constants';
 import { getUploadContentType } from '@/lib/upload-mime';
+import { MAX_SERVER_RELAY_SIZE_BYTES, MAX_SERVER_RELAY_SIZE_LABEL } from '@/lib/upload-constants';
 
 type ShareTarget = {
   id: string;
@@ -266,25 +267,41 @@ export function useChatUploads({
           }
         }
 
-        if (!response.ok || !payload?.path || !payload?.signedUrl || !payload?.provider) {
-          throw new Error(payload?.error || `파일 업로드 준비에 실패했습니다. (HTTP ${response.status})`);
+        // 플랜을 못 받아도 곧장 포기하지 않는다. 서명 URL 은 R2 S3 자격증명이
+        // 있어야 만들어지고, 운영 워커에 그 시크릿이 없으면 여기가 503 이 된다.
+        // 예전에는 그대로 던져서 **동작하는 서버 경로에 닿지도 못했다**.
+        // 앱 서버 경로는 R2 바인딩으로 직접 쓰므로 자격증명 없이도 올라간다.
+        const hasDirectUploadPlan = Boolean(
+          response.ok && payload?.path && payload?.signedUrl && payload?.provider,
+        );
+        if (!hasDirectUploadPlan && file.size > MAX_SERVER_RELAY_SIZE_BYTES) {
+          throw new Error(
+            `R2 직접 업로드를 준비하지 못했고(HTTP ${response.status}), `
+            + `앱 서버 경로의 한도(${MAX_SERVER_RELAY_SIZE_LABEL})보다 파일이 큽니다.`,
+          );
         }
 
-        let publicUrl = payload.url || '';
+        let publicUrl = payload?.url || '';
 
-        try {
-          const directUploadResponse = await fetch(payload.signedUrl, {
-            method: 'PUT',
-            headers: payload.headers || { 'content-type': uploadContentType },
-            body: file });
-
-          if (!directUploadResponse.ok) {
-            throw new Error(`Storage 직접 업로드에 실패했습니다. (HTTP ${directUploadResponse.status})`);
-          }
-        } catch (directUploadError) {
-          logger.warn('직접 업로드 실패, 서버 업로드로 다시 시도합니다.', directUploadError);
+        if (!hasDirectUploadPlan) {
+          logger.warn('직접 업로드 플랜을 받지 못해 서버 업로드로 진행합니다.', payload?.error || response.status);
           const fallbackPayload = await uploadViaAppServer();
           publicUrl = fallbackPayload.url || '';
+        } else {
+          try {
+            const directUploadResponse = await fetch(payload!.signedUrl!, {
+              method: 'PUT',
+              headers: payload!.headers || { 'content-type': uploadContentType },
+              body: file });
+
+            if (!directUploadResponse.ok) {
+              throw new Error(`Storage 직접 업로드에 실패했습니다. (HTTP ${directUploadResponse.status})`);
+            }
+          } catch (directUploadError) {
+            logger.warn('직접 업로드 실패, 서버 업로드로 다시 시도합니다.', directUploadError);
+            const fallbackPayload = await uploadViaAppServer();
+            publicUrl = fallbackPayload.url || '';
+          }
         }
 
         if (!publicUrl) {

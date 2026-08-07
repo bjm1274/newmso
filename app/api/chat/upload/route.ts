@@ -11,6 +11,7 @@ import {
   CHAT_MAX_IMAGE_SIZE_BYTES as MAX_IMAGE_SIZE_BYTES,
   CHAT_MAX_FILE_SIZE_LABEL as MAX_FILE_SIZE_LABEL,
 } from '@/lib/chat-upload-constants';
+import { MAX_SERVER_RELAY_SIZE_BYTES, MAX_SERVER_RELAY_SIZE_LABEL } from '@/lib/upload-constants';
 import {
   DEFAULT_CONTENT_TYPE,
   normalizeUploadFileName,
@@ -177,9 +178,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return await createSignedUploadPlan(payload, userId);
     }
 
+    // 본문이 이 워커를 통과하는 경로라 상한은 우회 경로 상한을 따른다.
     const contentLength = Number(request.headers.get('content-length') || '0');
-    if (contentLength > 209_715_200) {
-      return NextResponse.json({ error: '파일 크기가 200MB를 초과합니다.' }, { status: 413 });
+    if (contentLength > MAX_SERVER_RELAY_SIZE_BYTES) {
+      return NextResponse.json(
+        { error: `앱 서버를 거쳐 올릴 수 있는 크기는 ${MAX_SERVER_RELAY_SIZE_LABEL} 까지입니다.` },
+        { status: 413 },
+      );
     }
 
     const formData = await request.formData();
