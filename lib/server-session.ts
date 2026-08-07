@@ -396,17 +396,64 @@ function createSessionUserSnapshot(input: any): SerializedSessionUser {
     ...compactSessionPermissions(normalizedUser.permissions || {}) };
 }
 
+/**
+ * 쿠키 하나가 담을 수 있는 최대 크기(이름+값). 브라우저 공통 한도가 4096 이다.
+ * 쿠키 이름·속성이 함께 세므로 여유를 두고 토큰 자체를 이 값으로 제한한다.
+ */
+const MAX_SESSION_TOKEN_BYTES = 3600;
+
+/**
+ * 세션 토큰을 만든다. **쿠키 한도를 넘기지 않는 것이 최우선이다.**
+ *
+ * 권한을 세션에 담기 시작한 뒤(FB3), 권한이 많은 계정은 pt/pf 로 압축해도
+ * 4096 바이트를 넘었다. 그러면 브라우저가 Set-Cookie 를 **조용히 버린다** —
+ * 서버는 200 을 주고 실패 기록도 남지 않는데 사용자에게는 "로그인을 눌러도
+ * 아무 반응이 없는" 것으로 보인다. 원인을 짐작할 단서가 화면에 하나도 없다.
+ *
+ * 그래서 한도를 넘으면 권한 payload 를 떼고 다시 만든다. 권한이 빠진 세션도
+ * 로그인 자체는 성립하고, 권한이 필요한 경로는 resolveLatestSessionUser 가
+ * DB 에서 최신 권한을 읽어 채운다. 화면이 잠깐 좁게 보일 수는 있어도
+ * **아무도 로그인하지 못하는 것보다는 낫다.**
+ */
 export async function createSessionToken(user: any, maxAgeSeconds = SESSION_MAX_AGE_SECONDS) {
   const now = Math.floor(Date.now() / 1000);
-  const payload: SerializedSessionPayload = {
-    ver: 1,
-    iat: now,
-    exp: now + maxAgeSeconds,
-    user: createSessionUserSnapshot(user) };
+  const snapshot = createSessionUserSnapshot(user);
 
-  const body = stringToBase64Url(JSON.stringify(payload));
-  const signature = await signValue(body);
-  return `${body}.${signature}`;
+  const build = async (userPayload: SerializedSessionUser) => {
+    const payload: SerializedSessionPayload = {
+      ver: 1,
+      iat: now,
+      exp: now + maxAgeSeconds,
+      user: userPayload };
+    const body = stringToBase64Url(JSON.stringify(payload));
+    const signature = await signValue(body);
+    return `${body}.${signature}`;
+  };
+
+  const token = await build(snapshot);
+  if (token.length <= MAX_SESSION_TOKEN_BYTES) return token;
+
+  // 1차 축소: 값이 false 인 권한 목록(pf)은 없어도 판정이 달라지지 않는다.
+  // (읽는 쪽은 pt 에 없는 키를 미부여로 취급한다.)
+  const withoutFalse: SerializedSessionUser = { ...snapshot, pf: undefined };
+  const trimmed = await build(withoutFalse);
+  if (trimmed.length <= MAX_SESSION_TOKEN_BYTES) {
+    console.warn(
+      `[server-session] 세션 토큰이 커서 미부여 권한 목록을 뺐습니다 `
+      + `(${token.length} → ${trimmed.length}바이트, id=${snapshot.id ?? '?'})`,
+    );
+    return trimmed;
+  }
+
+  // 2차 축소: 권한을 통째로 뺀다. 권한은 DB 에서 다시 읽힌다.
+  const withoutPermissions: SerializedSessionUser = { ...snapshot, pt: undefined, pf: undefined };
+  const minimal = await build(withoutPermissions);
+  console.warn(
+    `[server-session] 세션 토큰이 쿠키 한도를 넘어 권한을 제외했습니다 `
+    + `(${token.length} → ${minimal.length}바이트, id=${snapshot.id ?? '?'}). `
+    + '권한은 요청 시 DB 에서 조회됩니다.',
+  );
+  return minimal;
 }
 
 export async function verifySessionTokenWithSecret(token: string | null | undefined, secret: string) {
