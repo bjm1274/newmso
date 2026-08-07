@@ -212,8 +212,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const rawNormalizedName = normalizeUploadFileName(rawName, rawMime);
       validateUploadTarget(rawNormalizedName, rawMime, contentLength);
 
+      // 본문을 한 번만 메모리에 올린다 — request.body 를 R2 바인딩에 그대로
+      // 넘기면 put 이 던진다(OpenNext 를 거친 본문은 네이티브 스트림이 아니다).
+      const rawBody = await request.arrayBuffer();
       const rawPath = buildSafeFilePath(rawNormalizedName, rawMime);
-      const rawUploaded = await uploadToR2(R2_BUCKET, rawPath, request.body, rawMime);
+      const rawUploaded = await uploadToR2(R2_BUCKET, rawPath, rawBody, rawMime);
       return NextResponse.json({
         success: true,
         provider: rawUploaded.provider,

@@ -245,11 +245,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const rawNormalizedName = normalizeUploadFileName(rawName, rawMime);
       validateUploadTarget(rawNormalizedName, rawMime, contentLength);
 
-      // 이 경로는 본문을 흘려보내므로 매직바이트를 미리 볼 수 없다. 앞부분만
-      // 떼어내려면 스트림을 끊어야 하고 그러면 R2 로 보낼 본문이 망가진다.
-      // 대신 확장자·MIME 정규화(normalizeUploadMimeType)와 상한 검사는 그대로 탄다.
+      // 본문을 한 번만 메모리에 올린다.
+      //
+      // request.body(ReadableStream)를 R2 바인딩에 그대로 넘기면 put 이 던진다 —
+      // OpenNext 를 거친 본문은 R2 가 받는 네이티브 스트림이 아니다. 예전에는 그
+      // 실패를 바인딩 헬퍼가 삼키고 presign 폴백으로 넘겨, 화면에는 자격증명
+      // 문제인 403 만 떴다. 복사는 한 벌이면 충분하다(예전 문제는 세 벌이었다).
+      const rawBody = await request.arrayBuffer();
+      validateKnownFileContentType(rawMime, rawBody);
+
       const rawPath = buildSafeFilePath(rawNormalizedName, rawMime);
-      const rawUploaded = await uploadToR2(R2_BUCKET, rawPath, request.body, rawMime);
+      const rawUploaded = await uploadToR2(R2_BUCKET, rawPath, rawBody, rawMime);
       return NextResponse.json({
         success: true,
         provider: rawUploaded.provider,

@@ -306,19 +306,27 @@ async function withR2Binding<T>(
   op: (binding: { put: (...args: unknown[]) => Promise<unknown>; delete: (key: string) => Promise<unknown> }) => Promise<T>,
   requiredMethod: 'put' | 'delete',
 ): Promise<{ used: true; value: T } | { used: false }> {
+  let r2Binding: { put: (...args: unknown[]) => Promise<unknown>; delete: (key: string) => Promise<unknown> } | undefined;
   try {
     // `{ async: true }` 가 필요하다. 인자 없이 부르는 동기 형태는 요청 처리 중
-    // env 를 내주지 못하고 던지며, 그러면 아래 catch 로 빠져 바인딩이 멀쩡한데도
-    // 없는 것처럼 취급된다. 동작하는 D1 헬퍼(lib/db/get-binding.ts)와 같은 형태다.
+    // env 를 내주지 못하고 던지며, 그러면 바인딩이 멀쩡한데도 없는 것처럼 취급된다.
+    // 동작하는 D1 헬퍼(lib/db/get-binding.ts)와 같은 형태다.
     const cfCtx = await getCloudflareContext({ async: true });
-    const r2Binding = (cfCtx?.env as any)?.R2;
-    if (r2Binding && typeof r2Binding[requiredMethod] === 'function') {
-      return { used: true, value: await op(r2Binding) };
-    }
+    r2Binding = (cfCtx?.env as any)?.R2;
   } catch {
-    // binding 자체가 없거나 put/delete 가 실패했다 — 아래 S3 presign 경로로 폴백한다.
+    // 컨텍스트를 못 얻었다 = 바인딩 없음. presign 폴백으로 넘긴다.
+    return { used: false };
   }
-  return { used: false };
+
+  if (!r2Binding || typeof r2Binding[requiredMethod] !== 'function') {
+    return { used: false };
+  }
+
+  // 바인딩이 있는데 op 가 실패한 것은 "바인딩이 없다"와 전혀 다른 상황이다.
+  // 예전에는 둘을 같은 catch 로 삼켰다. 그래서 실제 R2 오류가 조용히 presign
+  // 폴백으로 넘어갔고, 화면에는 자격증명 문제인 403 만 떠서 진짜 원인이 가려졌다.
+  // 여기서는 던져서 호출부가 사유를 그대로 보게 한다.
+  return { used: true, value: await op(r2Binding) };
 }
 
 /**
