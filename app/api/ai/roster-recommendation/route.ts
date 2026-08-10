@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isKoreanPublicHoliday } from '@/lib/korean-public-holidays';
 import { expandCoverageRoleTags, normalizeCoverageRoleTags } from '@/lib/roster-role-tags';
 import { readSessionFromRequest } from '@/lib/server-session';
+import { buildShiftBandText, hasWorkingHours } from '@/lib/shift-resolution';
 import { withTimeout } from '@/lib/promise-timeout';
 
 // 유저별 AI 근무표 생성 요청 횟수 제한 (인스턴스 내 메모리 기반)
@@ -240,12 +241,9 @@ function normalizeShiftName(name: string) {
   return String(name || '').replace(/\s+/g, '').toLowerCase();
 }
 
-function buildShiftSearchText(shift: RequestWorkShift) {
-  return [shift.name, shift.shift_type, shift.description]
-    .map((value) => String(value || '').trim().toLowerCase())
-    .filter(Boolean)
-    .join(' ');
-}
+// description 은 밴드 판정에서 제외한다 — 이유는 buildShiftBandText 주석 참고.
+// (여기도 같은 이유로 거의 모든 시프트를 night 으로 분류하고 있었다.)
+const buildShiftSearchText = buildShiftBandText;
 
 function hasBandPrefix(rawText: string, compactText: string, prefix: 'd' | 'e' | 'n' | 'o') {
   if (compactText === prefix) return true;
@@ -267,11 +265,15 @@ function resolveShiftBand(shift: RequestWorkShift) {
   const endHour = Number(String(shift.end_time || '').slice(0, 2) || '0');
   const overnight = Boolean(hasStartTime && hasEndTime && startHour > endHour);
 
+  // 근무 시각이 있으면 OFF 일 수 없다 — shift_type 의 `2일근무 1일휴무` 같은
+  // 근무 패턴 표기가 휴무로 오인되는 것을 막는다(hasWorkingHours 주석 참고).
+  const working = hasWorkingHours(shift);
   if (
-    normalized.includes('off') ||
-    normalized.includes('휴무') ||
-    normalized.includes('비번') ||
-    normalized.includes('오프') ||
+    (!working &&
+      (normalized.includes('off') ||
+        normalized.includes('휴무') ||
+        normalized.includes('비번') ||
+        normalized.includes('오프'))) ||
     hasBandPrefix(rawText, normalized, 'o')
   ) {
     return 'off';

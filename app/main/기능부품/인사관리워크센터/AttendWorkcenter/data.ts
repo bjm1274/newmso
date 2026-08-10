@@ -9,6 +9,7 @@
 import type { StaffMember } from '@/types';
 import type { WorkcenterKpi } from '../workcenter-common';
 import { isActive } from '../MemberWorkcenter/data';
+import { buildShiftBandText, hasWorkingHours } from '@/lib/shift-resolution';
 
 // ─── 근태 상태 ─────────────────────────────────────────────────
 export type AttendanceStatus =
@@ -243,23 +244,26 @@ export interface ShiftAssignmentRow {
   shift_id: string | null;
 }
 
-function normalizeText(...values: Array<string | null | undefined>): string {
-  return values
-    .map((v) => String(v ?? '').trim().toLowerCase())
-    .filter(Boolean)
-    .join(' ');
-}
-
 /** WorkShift → 밴드 (D/E/N/OFF) 로 분류 */
 export function resolveShiftBand(shift: WorkShiftRow | null | undefined): ShiftBand {
   if (!shift) return 'off';
-  const raw = normalizeText(shift.name, shift.shift_type, shift.description);
+  // description 은 보지 않는다 — 이유는 buildShiftBandText 주석 참고.
+  const raw = buildShiftBandText(shift);
   const compact = raw.replace(/\s+/g, '');
   const startHour = Number(String(shift.start_time ?? '').slice(0, 2) || '0');
   const endHour = Number(String(shift.end_time ?? '').slice(0, 2) || '0');
   const overnight = startHour > endHour && Number.isFinite(startHour) && Number.isFinite(endHour);
 
-  if (raw.includes('off') || raw.includes('휴무') || raw.includes('비번') || raw.includes('오프') || compact.startsWith('o/')) {
+  // 근무 시각이 실제로 있으면 OFF 일 수 없다.
+  //
+  // shift_type 에는 근무 패턴이 들어간다 — `2일근무 1일휴무` 처럼. 키워드만 보면
+  // 05:30~13:30 로 일하는 `식당/오전` 이 휴무로 잡힌다. 진짜 휴무 코드는
+  // 00:00:00~00:00:00 처럼 근무 시각이 없다.
+  if (!hasWorkingHours(shift)) {
+    if (raw.includes('off') || raw.includes('휴무') || raw.includes('비번') || raw.includes('오프') || compact.startsWith('o/')) {
+      return 'off';
+    }
+  } else if (compact.startsWith('o/') || raw === 'off' || raw === '휴무') {
     return 'off';
   }
   if (raw.includes('night') || raw.includes('야간') || raw.includes('나이트') || startHour >= 20 || overnight) {

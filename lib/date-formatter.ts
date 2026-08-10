@@ -36,6 +36,52 @@ export function parseDbTimestamp(value: unknown): Date {
 }
 
 /**
+ * 저장된 타임스탬프 → **KST 기준 `HH:mm`**. 프로그램 전체 시각 표시의 정본.
+ *
+ * 화면마다 제각각이었다. `getHours()`(브라우저 TZ), `slice(11,16)`(UTC 그대로),
+ * `toLocaleTimeString()`(timeZone 누락) 세 가지가 섞여 있었는데 셋 다 KST 를
+ * 보장하지 못한다 — 특히 slice 는 항상 9시간 이르게, getHours 와 timeZone 없는
+ * toLocaleTimeString 은 서버 렌더(Workers=UTC)에서 9시간 이르게 나온다.
+ * 출근 05:09 가 20:09 로 보이던 것이 이것이다.
+ *
+ * 이미 `HH:mm` 만 들어온 값은 KST 로 간주해 그대로 돌려준다(근무 시프트의
+ * start_time 처럼 시각만 저장하는 컬럼이 있다).
+ */
+export function formatKoreanClock(value: unknown): string {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(raw)) {
+    const [hour, minute] = raw.split(':');
+    return `${hour.padStart(2, '0')}:${minute}`;
+  }
+
+  const parsed = parseDbTimestamp(raw);
+  if (Number.isNaN(parsed.getTime())) return raw;
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Seoul',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23' }).format(parsed);
+}
+
+/** 저장된 타임스탬프 → KST `YYYY-MM-DD HH:mm`. 날짜까지 같이 보여야 할 때. */
+export function formatKoreanDateTime(value: unknown): string {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  const parsed = parseDbTimestamp(raw);
+  if (Number.isNaN(parsed.getTime())) return raw;
+  const parts = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23' }).format(parsed);
+  return parts.replace(',', '');
+}
+
+/**
  * 날짜 문자열 → 한국 날짜 형식 (예: 2024. 1. 5.).
  *
  * **날짜 전용 입력만 받는다** (`YYYY-MM-DD`). 타임스탬프를 넣지 말 것 —

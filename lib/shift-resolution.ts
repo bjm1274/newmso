@@ -22,6 +22,44 @@ function normalizeShiftLookupText(value: unknown) {
 const SHIFT_META_MARKER = '[SHIFT_META]';
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
 
+/**
+ * 시프트를 D/E/N/OFF 밴드로 분류할 때 볼 텍스트.
+ *
+ * **description 은 쓰지 않는다.** 자유 서술 필드라 밴드와 무관한 단어가 섞인다:
+ *   - `[SHIFT_META]{"monthly_night_days":6,...}` → 'night' 이 항상 걸린다
+ *   - `휴게시간 총2h 오후12:30~14:00` → '오후' 가 걸려 주간 근무가 이브닝이 된다
+ *
+ * 실제로 운영 활성 시프트 40개 중 35개가 이 이유로 N 으로 판정됐고,
+ * 근무표를 편성하면 모든 칸이 N 으로 찍혔다. 밴드는 이름·근무유형·시각만으로
+ * 판정한다(`병동3교대/D`, `데이전담/D` 처럼 이름이 밴드를 담고 있다).
+ */
+export function buildShiftBandText(shift: {
+  name?: string | null;
+  shift_type?: string | null;
+}): string {
+  return [shift.name, shift.shift_type]
+    .map((value) => String(value ?? '').trim().toLowerCase())
+    .filter(Boolean)
+    .join(' ');
+}
+
+/**
+ * 이 시프트에 실제 근무 시각이 있는가.
+ *
+ * 휴무 코드는 `00:00:00~00:00:00` 처럼 시작·종료가 같다. 반대로 근무 시각이
+ * 있는 시프트는 이름·유형에 '휴무' 가 들어가도 휴무일 수 없다 — shift_type 에는
+ * `2일근무 1일휴무` 같은 **근무 패턴**이 들어가기 때문이다.
+ */
+export function hasWorkingHours(shift: {
+  start_time?: string | null;
+  end_time?: string | null;
+}): boolean {
+  const start = String(shift.start_time ?? '').trim();
+  const end = String(shift.end_time ?? '').trim();
+  if (!start || !end) return false;
+  return start.slice(0, 5) !== end.slice(0, 5);
+}
+
 type ShiftDayKey = typeof DAY_KEYS[number];
 type ShiftDailySchedule = {
   enabled?: boolean | null;

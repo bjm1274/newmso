@@ -1,5 +1,6 @@
 'use client';
 import type { CommuteLog } from './commute-types';
+import { formatKoreanClock, parseDbTimestamp } from '@/lib/date-formatter';
 
 // ──────────────────────────────────────────────
 // getDisplayStatus 헬퍼 (차트/캘린더 내부 전용)
@@ -43,12 +44,9 @@ export function StatItem({ label, value, isWarning, isSuccess }: StatItemProps) 
 // AttendanceCalendar
 // ──────────────────────────────────────────────
 
-function formatHHmm(isoString: string | null | undefined) {
-  if (!isoString) return '';
-  const date = new Date(isoString);
-  if (Number.isNaN(date.getTime())) return '';
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-}
+// KST 고정. 예전에는 getHours() 라 렌더 환경의 TZ 를 따랐고, 서버 렌더
+// (Workers=UTC)에서는 출근 05:09 가 20:09 로 찍혔다.
+const formatHHmm = formatKoreanClock;
 
 export function AttendanceCalendar({ logs, currentMonth }: { logs: CommuteLog[]; currentMonth: Date }) {
   const year = currentMonth.getFullYear();
@@ -146,8 +144,9 @@ export function WorkHoursChart({ logs }: { logs: CommuteLog[] }) {
   if (logs.length === 0) return null;
 
   const data = [...logs].reverse().map((log) => {
-    const checkIn = log.check_in ? new Date(String(log.check_in)) : null;
-    const checkOut = log.check_out ? new Date(String(log.check_out)) : null;
+    // 공백형 DB 타임스탬프를 로컬 TZ 로 읽지 않도록 정본 파서를 쓴다.
+    const checkIn = log.check_in ? parseDbTimestamp(String(log.check_in)) : null;
+    const checkOut = log.check_out ? parseDbTimestamp(String(log.check_out)) : null;
     const hours =
       checkIn && checkOut && !Number.isNaN(checkIn.getTime()) && !Number.isNaN(checkOut.getTime())
         ? Math.min(12, Math.max(0, (checkOut.getTime() - checkIn.getTime()) / 3600000))

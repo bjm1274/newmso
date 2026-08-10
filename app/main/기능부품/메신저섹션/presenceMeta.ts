@@ -1,3 +1,5 @@
+import { formatKoreanClock } from '@/lib/date-formatter';
+
 export type PresenceState = 'working' | 'checked_out' | 'before_work';
 
 export type PresenceMeta = {
@@ -40,7 +42,8 @@ function formatClockLabel(value: unknown) {
       hour12: false,
       timeZone: 'Asia/Seoul' }).format(new Date(parsed));
   }
-  return text.length >= 16 && text[10] === 'T' ? text.slice(11, 16) : text.slice(0, 5);
+  // 폴백도 잘라 쓰지 않는다 — 잘라내면 UTC 값이 그대로 나온다.
+  return formatKoreanClock(text);
 }
 
 function getAttendanceCheckIn(attendance?: AttendanceSnapshot | null) {

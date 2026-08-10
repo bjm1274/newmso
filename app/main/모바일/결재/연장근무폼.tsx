@@ -14,6 +14,7 @@ import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import type { ErpUser } from '@/types';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
+import { formatKoreanClock } from '@/lib/date-formatter';
 import MIcon from '../공통/MIcon';
 import MCard from '../공통/MCard';
 import { MFormHeader } from '../인사관리/form-helpers';
@@ -33,10 +34,10 @@ type OvertimeRow = {
 function hrs(min: number): string {
   return (min / 60).toFixed(1);
 }
+// KST 고정. 예전에는 ISO 문자열에서 시각 부분을 그대로 잘라 써서 UTC 값이
+// 화면에 나왔다 — 항상 9시간 이르게 보였다.
 function timeOnly(ts: string | null): string {
-  if (!ts) return '-';
-  const m = /T(\d{2}:\d{2})/.exec(ts);
-  return m ? m[1] : ts.slice(11, 16) || '-';
+  return formatKoreanClock(ts) || '-';
 }
 
 export default function SApprovalOvertimeForm({
