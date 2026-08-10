@@ -39,6 +39,43 @@ type ChecklistRow = {
 
 type TabKey = 'active' | 'history';
 
+/**
+ * 오프보딩 상태 전이는 서버가 한다.
+ *
+ * 이 전이는 role·permissions·force_logout_at 을 함께 쓰는데, 그 컬럼들은 범용
+ * mutate 에서 관리자에게만 열려 있다(인사담당자가 자기 계정에 admin 을 심는 걸
+ * 막는 가드라 느슨하게 할 수 없다). 그래서 인사담당자에게는 오프보딩 네 동작이
+ * 전부 실패했다. 서버가 값을 정하면 인사담당자에게 열어도 권한 상승이 아니다.
+ */
+async function requestOffboardingTransition(
+  action: 'start' | 'cancel' | 'finalize' | 'restore',
+  staffId: string,
+  extra?: { exitDate?: string; reason?: string },
+) {
+  const response = await fetch('/api/staff/offboarding', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify({ action, staffId, ...extra }) });
+  const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+  if (!response.ok) {
+    throw new Error(payload?.error || `오프보딩 처리에 실패했습니다. (HTTP ${response.status})`);
+  }
+  return payload;
+}
+
+/**
+ * 실패 사유를 그대로 보여준다.
+ *
+ * 예전에는 네 동작 모두 "…중 오류가 발생했습니다" 한 줄만 띄웠다. 권한 때문에
+ * 막힌 것인지, 대상이 잘못된 것인지, 서버가 죽은 것인지 화면만 봐서는 구분할
+ * 수 없었다.
+ */
+function describeOffboardingError(error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message.trim() : String(error ?? '').trim();
+  return message ? `${fallback}\n\n${message}` : fallback;
+}
+
 function getOriginalStatus(staff: StaffMember) {
   const saved = staff.permissions?.offboarding_original_status;
   if (typeof saved === 'string' && saved.trim()) return saved.trim();
@@ -346,22 +383,7 @@ export default function OffboardingView({
     const actor = readClientAuditActor();
 
     try {
-      const nextPermissions = {
-        ...(staff.permissions || {}),
-        offboarding_original_status: staff.status || '재직',
-        offboarding_original_role: staff.role || 'staff',
-        offboarding_started_at: new Date().toISOString(),
-        offboarding_reason: reason };
-
-      const { error } = await db
-        .from('staff_members')
-        .update({
-          status: '퇴사예정',
-          resigned_at: exitDate,
-          permissions: nextPermissions })
-        .eq('id', selectedStaff);
-
-      if (error) throw error;
+      await requestOffboardingTransition('start', selectedStaff, { exitDate, reason });
 
       const checklistItems = getDefaultChecklist('퇴사');
       await persistChecklist(selectedStaff, checklistItems, getChecklistTargetDate('퇴사', exitDate));
@@ -394,7 +416,7 @@ export default function OffboardingView({
       onRefresh?.();
     } catch (error) {
       console.error('오프보딩 시작 실패:', error);
-      toast('오프보딩 시작 중 오류가 발생했습니다.', 'error');
+      toast(describeOffboardingError(error, '오프보딩 시작 중 오류가 발생했습니다.'), 'error');
     } finally {
       setLoading(false);
     }
@@ -411,25 +433,10 @@ export default function OffboardingView({
     const actor = readClientAuditActor();
 
     try {
-      const nextPermissions = { ...(staff.permissions || {}) };
-      delete nextPermissions.offboarding_original_status;
-      delete nextPermissions.offboarding_original_role;
-      delete nextPermissions.offboarding_started_at;
-      delete nextPermissions.offboarding_reason;
-
       const restoredStatus = getOriginalStatus(staff);
       const restoredRole = getOriginalRole(staff);
 
-      const { error } = await db
-        .from('staff_members')
-        .update({
-          status: restoredStatus,
-          role: restoredRole,
-          resigned_at: null,
-          permissions: nextPermissions })
-        .eq('id', staff.id);
-
-      if (error) throw error;
+      await requestOffboardingTransition('cancel', String(staff.id));
 
       await db
         .from('onboarding_checklists')
@@ -471,7 +478,7 @@ export default function OffboardingView({
       onRefresh?.();
     } catch (error) {
       console.error('오프보딩 취소 실패:', error);
-      toast('퇴사 예정 취소 중 오류가 발생했습니다.', 'error');
+      toast(describeOffboardingError(error, '퇴사 예정 취소 중 오류가 발생했습니다.'), 'error');
     } finally {
       setLoading(false);
     }
@@ -499,31 +506,7 @@ export default function OffboardingView({
 
     try {
       const finalizedAt = new Date().toISOString();
-      const nextPermissions = { ...(staff.permissions || {}) };
-      delete nextPermissions.offboarding_original_status;
-      delete nextPermissions.offboarding_original_role;
-      delete nextPermissions.offboarding_started_at;
-      delete nextPermissions.offboarding_reason;
-      nextPermissions.offboarding_finalized_at = finalizedAt;
-
-      const { error: staffUpdateError } = await withMissingColumnsFallback(
-        (omittedColumns) => {
-          const payload: Record<string, unknown> = {
-            status: '퇴사',
-            role: 'inactive',
-            resigned_at: staff.resigned_at || finalizedAt.slice(0, 10),
-            permissions: nextPermissions };
-
-          if (!omittedColumns.has('force_logout_at')) {
-            payload.force_logout_at = finalizedAt;
-          }
-
-          return db.from('staff_members').update(payload).eq('id', staffId);
-        },
-        ['force_logout_at'],
-      );
-
-      if (staffUpdateError) throw staffUpdateError;
+      await requestOffboardingTransition('finalize', staffId);
 
       if (hasChecklist) {
         await persistChecklist(staffId, checklistItems);
@@ -555,7 +538,7 @@ export default function OffboardingView({
       onRefresh?.();
     } catch (error) {
       console.error('오프보딩 완료 실패:', error);
-      toast('퇴사 처리 중 오류가 발생했습니다.', 'error');
+      toast(describeOffboardingError(error, '퇴사 처리 중 오류가 발생했습니다.'), 'error');
     } finally {
       setLoading(false);
     }
@@ -573,26 +556,10 @@ export default function OffboardingView({
     const actor = readClientAuditActor();
 
     try {
-      const nextPermissions = { ...(staff.permissions || {}) };
-      delete nextPermissions.offboarding_original_status;
-      delete nextPermissions.offboarding_original_role;
-      delete nextPermissions.offboarding_started_at;
-      delete nextPermissions.offboarding_reason;
-      delete nextPermissions.offboarding_finalized_at;
-
       const restoredStatus = '재직'; // 복구 시 기본 '재직'으로 세팅
       const restoredRole = 'staff';  // 복구 시 기본 'staff'로 세팅
 
-      const { error: staffUpdateError } = await db
-        .from('staff_members')
-        .update({
-          status: restoredStatus,
-          role: restoredRole,
-          resigned_at: null,
-          permissions: nextPermissions })
-        .eq('id', staff.id);
-
-      if (staffUpdateError) throw staffUpdateError;
+      await requestOffboardingTransition('restore', String(staff.id));
 
       // 진행 중이던 퇴사 체크리스트가 있으면 삭제
       await db
@@ -624,7 +591,7 @@ export default function OffboardingView({
       onRefresh?.();
     } catch (error) {
       console.error('퇴사 복구 실패:', error);
-      toast('퇴사 복구 중 오류가 발생했습니다.', 'error');
+      toast(describeOffboardingError(error, '퇴사 복구 중 오류가 발생했습니다.'), 'error');
     } finally {
       setLoading(false);
     }

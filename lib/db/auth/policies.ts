@@ -2030,8 +2030,28 @@ async function filterChatRoomsByMembership<T extends Record<string, unknown>>(
  * (app/api/d1/query/route.ts assertNoSensitiveFieldAccess).
  */
 export const STAFF_SECRET_ALWAYS_COLUMNS = new Set(['password', 'passwd']);
-/** 본인·관리자 외에는 응답에서 제거되는 PII. 위와 같은 이유로 필터·정렬에서도 차단된다. */
-export const STAFF_PII_SENSITIVE_COLUMNS = new Set([
+/**
+ * 관리자·본인만 볼 수 있는 컬럼.
+ *
+ * 권한 자체를 드러내는 값이라 인사담당자에게도 열지 않는다. 쓰기 쪽
+ * PRIVILEGED_STAFF_COLUMNS 와 같은 등급이다.
+ */
+const STAFF_ADMIN_ONLY_COLUMNS = new Set([
+  'permissions',
+  'is_admin',
+  'is_master',
+]);
+
+/**
+ * 관리자·**인사(회사 관리 권한)**·본인이 볼 수 있는 PII.
+ *
+ * 예전에는 아래 컬럼이 전부 "관리자 또는 본인" 이었다. 그런데 쓰기 가드
+ * (SENSITIVE_STAFF_COLUMNS)는 같은 컬럼을 인사담당자에게 이미 열어두고 있었다.
+ * 그래서 인사담당자가 **급여를 고칠 수는 있는데 볼 수는 없는** 상태가 됐고,
+ * 급여정산·4대보험 화면에서 타 직원 급여가 통째로 비어 보였다. 읽기 등급을
+ * 쓰기 등급에 맞춰 그 어긋남을 없앤다.
+ */
+const STAFF_HR_VISIBLE_PII_COLUMNS = new Set([
   'resident_no',
   'account_number',
   'bank_name',
@@ -2049,13 +2069,22 @@ export const STAFF_PII_SENSITIVE_COLUMNS = new Set([
   'birth_date',
   'phone',
   'email',
-  'permissions',
-  'is_admin',
-  'is_master',
+]);
+
+/**
+ * 필터·정렬 차단용 합집합.
+ *
+ * 등급과 무관하게 전부 막는다 — where/order 로 참조하면 결과 유무가 오라클이
+ * 되어 값을 이분탐색으로 복원할 수 있고, 그건 열람 권한과 별개의 문제다.
+ */
+export const STAFF_PII_SENSITIVE_COLUMNS = new Set([
+  ...STAFF_HR_VISIBLE_PII_COLUMNS,
+  ...STAFF_ADMIN_ONLY_COLUMNS,
 ]);
 
 function stripStaffSecrets<T extends Record<string, unknown>>(rows: T[], claims?: ErpClaims): T[] {
   const isAdmin = claims ? erpIsAdmin(claims) : false;
+  const canManageCompany = claims ? erpCanManageCompany(claims) : false;
   const myStaffId = claims ? String(erpStaffId(claims) || '').trim() : '';
 
   return rows.map((row) => {
@@ -2066,10 +2095,18 @@ function stripStaffSecrets<T extends Record<string, unknown>>(rows: T[], claims?
 
     const rowId = String(next.id || next.staff_id || '').trim();
     const isSelf = myStaffId !== '' && rowId === myStaffId;
+    if (isAdmin || isSelf) return next;
 
-    // 본인도 아니고 관리자도 아니면 타인의 민감 PII 컬럼(주민번호/계좌/급여/주소) 제거
-    if (!isAdmin && !isSelf) {
-      for (const col of STAFF_PII_SENSITIVE_COLUMNS) {
+    // 권한 컬럼은 인사담당자에게도 감춘다.
+    for (const col of STAFF_ADMIN_ONLY_COLUMNS) {
+      if (col in next) delete next[col];
+    }
+
+    // 급여·계좌·주민번호 등은 인사(회사 관리 권한)까지 열어준다.
+    // 쓰기 가드가 이미 같은 등급으로 열려 있어, 읽기만 막으면 "고칠 수는
+    // 있는데 볼 수는 없는" 상태가 된다 — 보호가 되지도 않고 화면만 깨진다.
+    if (!canManageCompany) {
+      for (const col of STAFF_HR_VISIBLE_PII_COLUMNS) {
         if (col in next) delete next[col];
       }
     }
