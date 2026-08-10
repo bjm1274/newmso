@@ -1404,7 +1404,14 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
         const uploadedAttachments = Array.isArray(postData.attachments) ? (postData.attachments as AttachmentItem[]) : [];
         const persistedAttachments = [...existingAttachmentItems, ...uploadedAttachments];
         const shouldPersistAttachments = boardWithAttach.includes(activeBoard);
-        let normalizedBoardContent = normalizedContent || '';
+        // 이미 조립된 본문(postData.content)에서 출발한다.
+        //
+        // 예전에는 `normalizedContent`(공용 textarea 상태)로 다시 시작했다.
+        // 경조사는 전용 폼이라 그 textarea 를 쓰지 않는다 — 대상자·분류·일시·장소·
+        // 마음 전하실 곳을 조립해 위에서 postData.content 에 넣어두는데, 여기서
+        // 빈 문자열로 덮어써서 **본문이 통째로 사라졌다.** 저장은 되는데 상세를
+        // 열면 내용이 비어 보인 것이 이것이다.
+        let normalizedBoardContent = String(postData.content ?? '') || normalizedContent || '';
         const normalizedPostMeta = {
           scheduled_publish_at: activeBoard === '공지사항' ? normalizedScheduledPublishAt || undefined : undefined,
           status: normalizeBoardPostStatus(postStatus) };

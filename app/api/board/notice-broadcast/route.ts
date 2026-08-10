@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readSessionFromRequest, isAdminSession } from '@/lib/server-session';
+import {
+  readSessionFromRequest,
+  isAdminSession,
+  normalizeSessionUser,
+  resolveLatestSessionUser } from '@/lib/server-session';
 import { dispatchChatPushForMessage } from '@/lib/chat-push-dispatch';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
 import {
@@ -152,10 +156,19 @@ export async function POST(request: NextRequest) {
       sessionStaff = null;
     }
 
-    // 세션에는 is_master·is_admin 이라는 필드가 없다(is_system_master 와 permissions 뿐).
-    // 그래서 이 조건은 항상 false 였고, 판정이 사실상 staff.role 하나에만 의존했다 —
-    // 시스템마스터나 permissions 로만 관리자인 계정이 403 으로 막혔다.
-    const isMasterOrAdmin = isAdminSession(session.user);
+    // 권한은 **세션이 아니라 DB** 에서 읽는다.
+    //
+    // 세션 쿠키는 4096바이트를 넘길 수 없어, 권한이 많은 계정은 토큰을 만들 때
+    // 권한 목록이 통째로 빠진다(server-session createSessionToken). 운영에서
+    // 실제로 4명이 그 상태였고 — 전부 admin/mso/hr 인 계정이다 — 세션만 보는
+    // 이 검사가 그들을 403 으로 막았다. 화면에는 "관리자 전용" 만 떴다.
+    //
+    // 그리고 이 주석이 말하는 대상은 Admin/MSO/**HR** 인데 코드에는 HR 이 없었다.
+    // 경조사·공지를 올리는 사람이 바로 인사담당자다.
+    const latestUser = await resolveLatestSessionUser(normalizeSessionUser(session.user));
+    const perms = (latestUser.permissions ?? {}) as Record<string, unknown>;
+    const isMasterOrAdmin =
+      isAdminSession(latestUser) || Boolean(perms.hr) || Boolean(perms.mso) || Boolean(perms.admin);
     const isManagerRole = isAdminRole(sessionStaff?.role);
     const allowed = isMasterOrAdmin || isManagerRole;
 

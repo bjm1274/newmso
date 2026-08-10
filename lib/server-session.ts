@@ -125,6 +125,60 @@ function base64UrlToString(value: string) {
   return decoder.decode(base64UrlToBytes(value));
 }
 
+/**
+ * 압축 토큰 표식.
+ *
+ * `~` 는 base64url 알파벳([A-Za-z0-9_-])에 없어서, 이 접두사가 붙어 있으면
+ * 압축본임을 확실히 구분할 수 있다. 접두사가 없는 예전 토큰은 종전대로
+ * 평문 base64url 로 읽는다 — 이미 로그인한 세션이 끊기지 않는다.
+ */
+const COMPRESSED_BODY_PREFIX = 'z~';
+
+async function collectStream(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) { chunks.push(value); total += value.length; }
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { out.set(chunk, offset); offset += chunk.length; }
+  return out;
+}
+
+/** payload JSON → 압축 body. 압축을 못 쓰는 런타임이면 null 을 돌려 평문으로 간다. */
+async function compressBody(json: string): Promise<string | null> {
+  if (typeof CompressionStream === 'undefined') return null;
+  try {
+    const input = new Blob([encoder.encode(json)]).stream();
+    const compressed = await collectStream(
+      input.pipeThrough(new CompressionStream('deflate-raw')) as ReadableStream<Uint8Array>,
+    );
+    return `${COMPRESSED_BODY_PREFIX}${bytesToBase64Url(compressed)}`;
+  } catch {
+    return null;
+  }
+}
+
+/** body → payload JSON. 압축 표식이 없으면 평문으로 읽는다. */
+async function decompressBody(body: string): Promise<string | null> {
+  if (!body.startsWith(COMPRESSED_BODY_PREFIX)) return base64UrlToString(body);
+  if (typeof DecompressionStream === 'undefined') return null;
+  try {
+    const bytes = base64UrlToBytes(body.slice(COMPRESSED_BODY_PREFIX.length));
+    const input = new Blob([bytes]).stream();
+    const plain = await collectStream(
+      input.pipeThrough(new DecompressionStream('deflate-raw')) as ReadableStream<Uint8Array>,
+    );
+    return decoder.decode(plain);
+  } catch {
+    return null;
+  }
+}
+
 async function importSigningKeyWithSecret(secret: string) {
   return getCryptoApi().subtle.importKey(
     'raw',
@@ -425,7 +479,10 @@ export async function createSessionToken(user: any, maxAgeSeconds = SESSION_MAX_
       iat: now,
       exp: now + maxAgeSeconds,
       user: userPayload };
-    const body = stringToBase64Url(JSON.stringify(payload));
+    const json = JSON.stringify(payload);
+    // 권한 키는 `board_`·`inventory_`·`hr_` 처럼 접두사가 반복돼 압축이 잘 먹는다.
+    // 실측으로 절반 아래(4255→1999바이트)가 되어, 권한을 떼지 않고도 쿠키에 들어간다.
+    const body = (await compressBody(json)) ?? stringToBase64Url(json);
     const signature = await signValue(body);
     return `${body}.${signature}`;
   };
@@ -466,7 +523,9 @@ export async function verifySessionTokenWithSecret(token: string | null | undefi
   if (!isValid) return null;
 
   try {
-    const payload = JSON.parse(base64UrlToString(body)) as SerializedSessionPayload;
+    const json = await decompressBody(body);
+    if (!json) return null;
+    const payload = JSON.parse(json) as SerializedSessionPayload;
     const now = Math.floor(Date.now() / 1000);
     if (!payload?.user?.name || !payload.exp || payload.exp <= now) {
       return null;
