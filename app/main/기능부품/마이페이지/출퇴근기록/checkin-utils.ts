@@ -79,9 +79,20 @@ export function buildShiftBoundary(
     shiftKnown: true };
 }
 
+/**
+ * 근무일(KST) + 시프트 시각(KST) → 절대 시각.
+ *
+ * 예전에는 `new Date(y, m, d, h, min)` 으로 **런타임 로컬** 시각을 만들었다.
+ * 그런데 비교 상대인 출퇴근 기록은 절대 시각(UTC 인스턴트)이라, KST 가 아닌
+ * 환경에서는 예정 시각이 통째로 어긋나 조퇴 분이 엉뚱하게 나왔다.
+ * 근무일도 시프트 시각도 KST 기준이므로 오프셋을 명시해 절대 시각으로 만든다.
+ */
 export function buildDateWithTime(dateStr: string, hour: number, minute: number): Date {
   const [year, month, day] = String(dateStr).slice(0, 10).split('-').map(Number);
-  return new Date(year, (month || 1) - 1, day || 1, hour, minute, 0, 0);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return new Date(
+    `${pad(year)}-${pad(month || 1)}-${pad(day || 1)}T${pad(hour)}:${pad(minute)}:00+09:00`,
+  );
 }
 
 export function calculateEarlyLeaveMinutes(
@@ -99,8 +110,11 @@ export function calculateEarlyLeaveMinutes(
   const scheduledStart = buildDateWithTime(workDate, boundary.hour, boundary.minute);
   const scheduledEnd = buildDateWithTime(workDate, boundary.endHour, boundary.endMinute);
 
+  // 날짜 이동은 UTC 기준으로 한다. setDate 는 런타임 로컬 달력을 쓰므로
+  // 서머타임이 있는 환경에서 하루가 23·25시간이 될 수 있다(한국엔 없지만
+  // 이 코드는 어느 기기에서든 같은 값을 내야 한다).
   if (scheduledEnd.getTime() <= scheduledStart.getTime()) {
-    scheduledEnd.setDate(scheduledEnd.getDate() + 1);
+    scheduledEnd.setUTCDate(scheduledEnd.getUTCDate() + 1);
   }
 
   // 야간근무자 자정 이후 체크인 보정
@@ -108,8 +122,8 @@ export function calculateEarlyLeaveMinutes(
   const startMin = boundary.hour * 60 + boundary.minute;
   const isNightShift = endMin < startMin;
   if (isNightShift && actualCheckOut.getTime() < scheduledStart.getTime()) {
-    scheduledStart.setDate(scheduledStart.getDate() - 1);
-    scheduledEnd.setDate(scheduledEnd.getDate() - 1);
+    scheduledStart.setUTCDate(scheduledStart.getUTCDate() - 1);
+    scheduledEnd.setUTCDate(scheduledEnd.getUTCDate() - 1);
   }
 
   return Math.max(0, Math.round((scheduledEnd.getTime() - actualCheckOut.getTime()) / 60000));

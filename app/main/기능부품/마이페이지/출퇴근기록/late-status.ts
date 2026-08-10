@@ -7,6 +7,7 @@
  * JM : 단일 책임(지각 판정 규칙), JM4: any 금지
  */
 import type { ShiftBoundary } from './commute-types';
+import { getKoreanMinutesOfDay } from '@/lib/date-formatter';
 
 /**
  * 근무유형 시작시각 기준 체크인 상태(정상/지각) 판정.
@@ -22,10 +23,12 @@ export function decideCheckInStatus(boundary: ShiftBoundary, checkInIso: string)
   if (!boundary.shiftKnown) return '정상';
   if (boundary.shiftType === '1일근무1일휴무' && !boundary.rosterAssigned) return '정상';
 
-  const checkIn = new Date(checkInIso);
-  if (Number.isNaN(checkIn.getTime())) return '정상';
+  // 비교 상대인 시프트 시작 시각(boundary)은 KST 다. 예전에는 getHours() 로
+  // 런타임 로컬 시각을 썼는데, KST 가 아닌 기기에서 체크인하면 지각 판정이
+  // 통째로 뒤집힌다(출근 05:09 가 UTC 20:09 로 읽혀 지각).
+  const nowMin = getKoreanMinutesOfDay(checkInIso);
+  if (nowMin === null) return '정상';
 
-  const nowMin = checkIn.getHours() * 60 + checkIn.getMinutes();
   const startMin = boundary.hour * 60 + boundary.minute;
   const isLateByStart = nowMin > startMin; // 유예 0분(엄격)
 

@@ -2,6 +2,8 @@
 
 import { isMissingColumnError } from '@/lib/db-compat';
 import type { InventoryItem } from '@/types';
+import { parseDbTimestamp } from '@/lib/date-formatter';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 
 const WARD_MESSAGE_FAVORITES_STORAGE_PREFIX = 'erp_op_check_ward_message_favorites';
 const WARD_MESSAGE_RECENTS_STORAGE_PREFIX = 'erp_op_check_ward_message_recents';
@@ -78,9 +80,10 @@ export function normalizeDateValue(value: unknown) {
   if (!raw) return '';
   const matched = raw.match(/^(\d{4}-\d{2}-\d{2})/);
   if (matched) return matched[1];
-  const parsed = new Date(raw);
+  // 타임스탬프의 '날짜' 는 어느 시간대로 보느냐에 따라 달라진다 — KST 로 고정한다.
+  const parsed = parseDbTimestamp(raw);
   if (Number.isNaN(parsed.getTime())) return raw;
-  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+  return formatKoreanDateKey(parsed);
 }
 
 export function normalizeTimeValue(value: unknown) {

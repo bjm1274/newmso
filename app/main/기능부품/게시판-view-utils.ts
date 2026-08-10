@@ -1,5 +1,7 @@
 import type { AttachmentItem, BoardPost, StaffMember } from '@/types';
 import { BOARD_POST_OPTIONAL_COLUMNS } from './게시판공통';
+import { parseDbTimestamp } from '@/lib/date-formatter';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 
 export const SCHEDULE_META_PREFIX = '[[SCHEDULE_META]]';
 export const SCHEDULE_META_SUFFIX = '[[/SCHEDULE_META]]';
@@ -230,9 +232,10 @@ export function normalizeScheduleDateValue(value: unknown) {
   const matched = raw.match(/^(\d{4}-\d{2}-\d{2})/);
   if (matched) return matched[1];
 
-  const parsed = new Date(raw);
+  // 타임스탬프의 '날짜' 는 시간대에 따라 달라진다 — KST 로 고정한다.
+  const parsed = parseDbTimestamp(raw);
   if (!Number.isNaN(parsed.getTime())) {
-    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+    return formatKoreanDateKey(parsed);
   }
 
   return raw;

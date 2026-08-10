@@ -6,6 +6,8 @@
 
 import type { BoardPost } from '@/types';
 import { logger } from '@/lib/logger';
+import { parseDbTimestamp } from '@/lib/date-formatter';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
 
 export type SortKey = 'recent' | 'views' | 'likes' | 'comments';
 export type ReadFilter = 'all' | 'unread' | 'favorite';
@@ -69,10 +71,9 @@ export function getCommentCount(post: BoardPost): number {
 export function formatShortDate(value: string | null | undefined, fallbackScheduled?: string | null): string {
   const source = fallbackScheduled || value;
   if (!source) return '';
-  const dt = new Date(source);
-  if (Number.isNaN(dt.getTime())) return '';
-  const yy = String(dt.getFullYear()).slice(2);
-  const mm = String(dt.getMonth() + 1).padStart(2, '0');
-  const dd = String(dt.getDate()).padStart(2, '0');
-  return `${yy}.${mm}.${dd}`;
+  // KST 고정 — 로컬 게터로 읽으면 서버 렌더에서 하루 밀린다.
+  const dateKey = formatKoreanDateKey(parseDbTimestamp(source));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return '';
+  const [year, mm, dd] = dateKey.split('-');
+  return `${year.slice(2)}.${mm}.${dd}`;
 }
