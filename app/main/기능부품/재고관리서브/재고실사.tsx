@@ -176,7 +176,7 @@ export default function InventoryCount({ user, inventory, fetchInventory }: { us
             <span className="text-2xl">✅</span>
             <div>
               <h3 className="text-base font-bold text-[var(--foreground)]">실사 완료</h3>
-              <p className="text-xs text-[var(--toss-gray-3)]">{new Date().toLocaleString('ko-KR')} · {user?.name}</p>
+              <p className="text-xs text-[var(--toss-gray-3)]">{new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} · {user?.name}</p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 mb-4">

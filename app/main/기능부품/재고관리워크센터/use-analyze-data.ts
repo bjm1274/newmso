@@ -164,7 +164,7 @@ function buildForecast(inventory: Row[], logs: Row[]): ForecastRow[] {
       if (stock === 0 && pred > 0) when = '즉시';
       else if (Number.isFinite(daysLeft) && daysLeft < 60) {
         const d = new Date(now + daysLeft * 24 * 60 * 60 * 1000);
-        when = d.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' });
+        when = d.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric' });
       }
 
       return { name, stock, pred, gap, when, conf, tone };

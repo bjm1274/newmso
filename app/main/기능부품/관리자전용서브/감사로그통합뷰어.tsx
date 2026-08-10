@@ -235,7 +235,7 @@ const AUDIT_COLUMNS: Column<AccessLog>[] = [
       const suspicious = isSuspicious(log);
       return (
         <span className={`font-bold ${suspicious ? 'text-danger' : ''}`}>
-          {parseDbTimestamp(log.created_at).toLocaleString('ko-KR', {
+          {parseDbTimestamp(log.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul',
             month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
           {suspicious && (
             <span className="ml-1 text-[9px] bg-danger text-white px-1 rounded-[var(--radius-md)]">새벽</span>

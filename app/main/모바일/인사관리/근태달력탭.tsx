@@ -91,7 +91,9 @@ export function CalTab({
             const day = i - firstDow + 1;
             if (day < 1 || day > lastDate) return <div key={i} style={{ aspectRatio: 1 }} />;
             const dt = new Date(y, m, day);
-            const dateStr = dt.toLocaleDateString('en-CA');
+            // 날짜 키는 숫자에서 바로 만든다. toLocaleDateString('en-CA') 은 렌더
+            // 환경의 TZ 를 따라, KST 가 아닌 기기에서 하루씩 밀렸다.
+            const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             const row = byDate.get(dateStr);
             const isToday = dateStr === todayStr;
             const isHoliday = isKoreanPublicHoliday(dateStr) || dt.getDay() === 0;

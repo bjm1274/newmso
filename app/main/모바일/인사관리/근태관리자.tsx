@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/db-client';
 import type { StaffMember, ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
+import { formatKoreanClock } from '@/lib/date-formatter';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
 import MBtn from '../공통/MBtn';
@@ -236,8 +237,9 @@ export default function 근태관리자({ staffs, company, user }: AdminAttendPr
               {activeStaffs.map((s) => {
                 const row = todayAttendances.find((a) => a.staff_id === s.id);
                 const status = row ? String(row.status || '').trim() : '결근';
-                const checkIn = row?.check_in_time ? row.check_in_time.slice(11, 16) : '—';
-                const checkOut = row?.check_out_time ? row.check_out_time.slice(11, 16) : '—';
+                // ISO 문자열을 잘라 쓰면 UTC 시각이 그대로 나온다(9시간 이르게).
+                const checkIn = formatKoreanClock(row?.check_in_time) || '—';
+                const checkOut = formatKoreanClock(row?.check_out_time) || '—';
 
                 const tones: Record<string, 'success' | 'warning' | 'danger' | 'accent' | ''> = {
                   present: 'success',

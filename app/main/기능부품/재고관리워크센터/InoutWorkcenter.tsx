@@ -99,7 +99,7 @@ function InoutPanel({
   );
   const emptyMessage = useEmptyMessage(loading, error, filtered.length);
 
-  const todayLabel = new Date().toLocaleDateString('ko-KR');
+  const todayLabel = new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
 
   return (
     <section className="app-card overflow-hidden">

@@ -64,6 +64,38 @@ export function formatKoreanClock(value: unknown): string {
     hourCycle: 'h23' }).format(parsed);
 }
 
+/**
+ * 저장된 타임스탬프 → **KST 기준 자정으로부터의 분**. 시각 비교의 정본.
+ *
+ * 표시가 아니라 판정에 쓰인다 — 출근이 시프트 시작보다 늦었는가(지각),
+ * 퇴근이 종료보다 일렀는가(조퇴), 어느 시프트에 배정된 출근인가.
+ *
+ * 예전에는 두 가지로 구했고 둘 다 KST 가 아니었다.
+ *  - ISO 문자열에서 첫 `HH:MM` 을 정규식으로 뽑기 → UTC 값이 그대로 나온다
+ *  - `getHours()` → 런타임 TZ. 서버(Workers)는 UTC 다
+ * 시프트 시작 시각(`07:00`)은 KST 인데 비교 대상이 UTC 라 9시간이 어긋났고,
+ * 정시 출근이 지각으로, 지각이 정시로 뒤집혔다.
+ *
+ * `HH:mm` 만 들어오면 이미 KST 로 보고 그대로 환산한다.
+ */
+export function getKoreanMinutesOfDay(value: unknown): number | null {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+
+  const timeOnly = /^(\d{1,2}):(\d{2})/.exec(raw);
+  if (timeOnly && !/\d{4}-\d{2}-\d{2}/.test(raw)) {
+    const hour = Number(timeOnly[1]);
+    const minute = Number(timeOnly[2]);
+    if (Number.isFinite(hour) && Number.isFinite(minute)) return hour * 60 + minute;
+  }
+
+  const parsed = parseDbTimestamp(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const [hour, minute] = formatKoreanClock(parsed.toISOString()).split(':').map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return hour * 60 + minute;
+}
+
 /** 저장된 타임스탬프 → KST `YYYY-MM-DD HH:mm`. 날짜까지 같이 보여야 할 때. */
 export function formatKoreanDateTime(value: unknown): string {
   const raw = String(value ?? '').trim();

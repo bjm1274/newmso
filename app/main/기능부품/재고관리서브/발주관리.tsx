@@ -691,7 +691,7 @@ export default function PurchaseOrderManagement({
                         )}
                       </div>
                       <p className="text-[11px] text-[var(--toss-gray-3)] font-bold mt-1 uppercase tracking-widest">
-                        {new Date(order.created_at).toLocaleDateString()} | {order.supplier_name || '미정'}
+                        {new Date(order.created_at).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })} | {order.supplier_name || '미정'}
                       </p>
                       {order.requestTitle && (
                         <p className="mt-1 text-xs font-semibold text-[var(--foreground)]">
@@ -899,7 +899,7 @@ export default function PurchaseOrderManagement({
                                       {h.qty}개 · {h.actor}
                                     </span>
                                     <span className="shrink-0 tabular-nums text-[10px]">
-                                      {h.at ? new Date(h.at).toLocaleString('ko-KR') : ''}
+                                      {h.at ? new Date(h.at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : ''}
                                     </span>
                                   </li>
                                 ))}

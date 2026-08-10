@@ -8,6 +8,7 @@ import {
   eq,
   desc } from '@/lib/db';
 import { resolveApprovalDocCategory } from '@/lib/document-repository-categories';
+import { formatKoreanDateTime } from '@/lib/date-formatter';
 
 type ApprovalArchiveSource = Record<string, unknown>;
 
@@ -109,9 +110,9 @@ function serializeFormFields(metaData: Record<string, unknown>): string {
 function formatApprovalArchiveDate(value: unknown) {
   const raw = String(value || '').trim();
   if (!raw) return '-';
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) return raw;
-  return date.toLocaleString('ko-KR');
+  // KST 고정 — timeZone 없이 부르면 서버(Workers=UTC)에서 만든 문서보관함
+  // 날짜가 9시간 이르게 박힌다.
+  return formatKoreanDateTime(raw) || raw;
 }
 
 function resolveApprovalDocNumber(item: ApprovalArchiveSource) {

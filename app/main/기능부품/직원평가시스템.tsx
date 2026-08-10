@@ -421,7 +421,7 @@ export default function StaffEvaluationSystem({ user, staffs = [] }: { user: any
                                                                 </span>
                                                             )}
                                                             <span className="text-[10px] text-[var(--toss-gray-3)] font-medium">
-                                                                {new Date(ev.created_at).toLocaleString()}
+                                                                {new Date(ev.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
                                                             </span>
                                                         </div>
                                                         {isAdmin && (

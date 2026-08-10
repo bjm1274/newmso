@@ -15,6 +15,7 @@
 import { logger } from '@/lib/logger';
 import { db } from '@/lib/db-client';
 import { withMissingColumnFallback } from '@/lib/db-compat';
+import { getKoreanMinutesOfDay } from '@/lib/date-formatter';
 
 /** 레거시(한글) → 모던(영문) status 맵 */
 export const LEGACY_STATUS_TO_MODERN: Record<string, string> = {
@@ -53,21 +54,10 @@ function toModernStatus(status: string | null | undefined): string {
   return LEGACY_STATUS_TO_MODERN[key] || 'present';
 }
 
-function parseTimeToMinutes(val: string): number | null {
-  const str = String(val || '').trim();
-  if (!str) return null;
-  const timeMatch = str.match(/(\d{1,2}):(\d{2})/);
-  if (timeMatch) {
-    const h = Number(timeMatch[1]);
-    const m = Number(timeMatch[2]);
-    if (!Number.isNaN(h) && !Number.isNaN(m)) return h * 60 + m;
-  }
-  const d = new Date(str);
-  if (!Number.isNaN(d.getTime())) {
-    return d.getHours() * 60 + d.getMinutes();
-  }
-  return null;
-}
+// KST 고정. 예전에는 ISO 문자열에서 **첫** `HH:MM` 을 정규식으로 뽑아
+// `2026-08-09T20:09:29Z` 에서 20:09(UTC)를 얻었고, 폴백의 getHours() 도
+// 런타임 TZ 를 따랐다. 비교 대상인 시프트 시작 시각은 KST 라 9시간 어긋났다.
+const parseTimeToMinutes = getKoreanMinutesOfDay;
 
 function workMinutes(
   checkIn: string | null | undefined,

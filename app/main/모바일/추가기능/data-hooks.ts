@@ -36,6 +36,7 @@ import {
 import { isActiveStaff } from '@/lib/active-staff';
 import type { StaffMember } from '@/types';
 import { getKoreanTodayString } from '@/lib/seoul-time';
+import { formatKoreanClock } from '@/lib/date-formatter';
 
 // ─────────────────────────────────────────────────────────────
 // 공용 유틸
@@ -274,21 +275,8 @@ function deriveRealtimeState(
 
 function formatSinceLabel(raw: string): string {
   if (!raw || raw === '-') return '-';
-  try {
-    const d = new Date(raw);
-    if (Number.isFinite(d.getTime())) {
-      return d.toLocaleTimeString('ko-KR', {
-        timeZone: 'Asia/Seoul',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      });
-    }
-  } catch {
-    /* fall through */
-  }
-  if (raw.length >= 16) return raw.slice(11, 16);
-  return raw;
+  // 폴백으로 잘라 쓰던 slice(11,16) 은 UTC 를 그대로 내보냈다.
+  return formatKoreanClock(raw) || raw;
 }
 
 export function useWorkNow(opts: { company?: string; pollMs?: number }) {

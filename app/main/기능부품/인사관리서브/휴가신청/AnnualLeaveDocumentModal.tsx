@@ -24,7 +24,7 @@ export default function AnnualLeaveDocumentModal({ isOpen, onClose, staff }: Ann
   if (!isOpen || !staff) return null;
 
   const stageLabel = staff.promotionStage === 2 ? '2차' : '1차';
-  const todayStr = new Date().toLocaleDateString('ko-KR', {
+  const todayStr = new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul',
     year: 'numeric',
     month: 'long',
     day: 'numeric',

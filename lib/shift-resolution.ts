@@ -1,3 +1,5 @@
+import { getKoreanMinutesOfDay } from '@/lib/date-formatter';
+
 export type ShiftLookupRecord = {
   id?: string | null;
   name?: string | null;
@@ -189,8 +191,9 @@ export function resolveAssignedShift(
     if (candidates.length === 1) return candidates[0];
 
     if (options?.checkInIso) {
-      const checkInDate = new Date(options.checkInIso);
-      const checkInMin = checkInDate.getHours() * 60 + checkInDate.getMinutes();
+      // KST 고정 — getHours() 는 서버(Workers=UTC)에서 9시간 어긋나
+      // 출근을 엉뚱한 시프트에 붙였다.
+      const checkInMin = getKoreanMinutesOfDay(options.checkInIso) ?? 0;
 
       let bestCandidate = candidates[0];
       let minDiff = Infinity;

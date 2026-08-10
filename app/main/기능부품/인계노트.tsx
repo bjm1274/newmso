@@ -110,11 +110,11 @@ function monthGrid(date: Date) {
 }
 
 function monthLabel(date: Date) {
-  return date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' });
+  return date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long' });
 }
 
 function fullDateLabel(date: Date) {
-  return date.toLocaleDateString('ko-KR', {
+  return date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -137,14 +137,14 @@ function createdLabel(value?: string | null) {
   if (!value) return '-';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return date.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function dateLabel(value?: string | null) {
   if (!value) return '-';
   const date = fromDateKey(value);
   if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'numeric', day: 'numeric' });
+  return date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'numeric', day: 'numeric' });
 }
 
 function emptySummary(): Summary {

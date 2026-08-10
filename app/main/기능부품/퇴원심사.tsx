@@ -888,7 +888,7 @@ export default function DischargeReviewPage({ user }: { user: any }) {
                                         <p className="text-xs text-[var(--toss-gray-3)] font-medium">{r.department} · {stayDays(r.admission_date, r.discharge_date)}일 · {r.items.length}개 항목</p>
                                     </div>
                                     <div className="text-right space-y-1">
-                                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">{new Date(r.created_at).toLocaleDateString()}</p>
+                                        <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">{new Date(r.created_at).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}</p>
                                         <p className="text-[10px] text-[var(--toss-gray-3)]">{r.items.filter(i => i.checked).length}/{r.items.length}</p>
                                     </div>
                                 </div>

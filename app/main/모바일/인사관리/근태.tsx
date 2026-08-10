@@ -405,7 +405,8 @@ function ScheduleTab({ rows, cursor }: { rows: AttendanceDailyRow[]; cursor: Dat
     const last = new Date(y, m + 1, 0).getDate();
     for (let d = 1; d <= last; d += 1) {
       const dt = new Date(y, m, d);
-      const dateStr = dt.toLocaleDateString('en-CA');
+      // 날짜 키는 숫자에서 바로 만든다 (렌더 환경 TZ 에 흔들리지 않도록).
+      const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       list.push({ dateStr, date: dt });
     }
     return list;

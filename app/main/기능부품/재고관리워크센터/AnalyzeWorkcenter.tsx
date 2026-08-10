@@ -152,7 +152,7 @@ function AbcPanel({
       </p>
     );
   }
-  const period = `${new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString('ko-KR')} ~ ${new Date().toLocaleDateString('ko-KR')}`;
+  const period = `${new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })} ~ ${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}`;
   return (
     <section className="app-card flex flex-col gap-3 p-4">
       <header className="flex items-center justify-between">

@@ -11,16 +11,15 @@ import type { ErpUser } from '@/types';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import { useDeposits } from './data-hooks';
+import { formatKoreanClock, getKoreanMinutesOfDay } from '@/lib/date-formatter';
 
 function fmt(n: number): string {
   return new Intl.NumberFormat('ko-KR').format(n);
 }
 
+// KST 고정 — getHours() 는 렌더 환경 TZ 를, slice 는 UTC 를 그대로 낸다.
 function timeOnly(value: string): string {
-  if (!value) return '-';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value.slice(11, 16);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return formatKoreanClock(value) || '-';
 }
 
 export default function 입금조회({ user, onBack }: { user: ErpUser; onBack: () => void }) {
@@ -30,9 +29,10 @@ export default function 입금조회({ user, onBack }: { user: ErpUser; onBack: 
   const hourly = useMemo(() => {
     const buckets = new Array(12).fill(0) as number[];
     for (const r of rows) {
-      const d = new Date(r.time);
-      if (Number.isNaN(d.getTime())) continue;
-      const hour = d.getHours();
+      // 시간대별 집계도 KST 기준이어야 한다 — getHours() 는 렌더 환경을 따른다.
+      const minutes = getKoreanMinutesOfDay(r.time);
+      if (minutes === null) continue;
+      const hour = Math.floor(minutes / 60);
       if (hour >= 9 && hour <= 20) buckets[hour - 9] += r.amount;
     }
     const max = Math.max(...buckets, 1);

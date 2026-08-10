@@ -281,7 +281,7 @@ ${stepToday === 1 ?
 
 귀하는 지정된 휴가일에 휴가를 사용하여야 하며, 지정된 휴가일에 출근하여 근로를 제공하더라도 회사는 수령거부 의사를 명확히 할 것이며 이에 따른 연차유급휴가 미사용 수당은 소멸됨을 재차 고지합니다.`}
 
-통보일자: ${new Date().toLocaleDateString('ko-KR')}
+통보일자: ${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}
 MSO 주식회사 대표이사 (직인생략)`;
 
         await db.from('document_repository').insert({

@@ -77,7 +77,7 @@ export default function AdminForms({ user, staffs, formType, extraData, setExtra
 
 상기 본인은 개인 사정${reasonStr}으로 인하여 ${dateStr}로 사직하고자 하오니 승인하여 주시기 바랍니다.
 
-${new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
+${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric' })}
 
 위 신청인: ${name} (인)
 
@@ -88,7 +88,7 @@ ${new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 
 
 
   if (formType === '금품청산 지급기일 연장 동의서') {
-    const todayStr = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+    const todayStr = new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric' });
     const currentYear = new Date().getFullYear();
 
     return (
@@ -141,7 +141,7 @@ ${new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 
   }
 
   if (formType === '퇴직 서약서') {
-    const todayStr = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+    const todayStr = new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric' });
     const currentYear = new Date().getFullYear();
 
     return (
@@ -176,7 +176,7 @@ ${new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 
   // 사직서 양식 전용 렌더링 분기
   if (formType === '사직서') {
     const selectedStaff = staffs.find(s => s.name === handoverTarget);
-    const todayStr = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+    const todayStr = new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric' });
     const currentYear = new Date().getFullYear();
 
     return (

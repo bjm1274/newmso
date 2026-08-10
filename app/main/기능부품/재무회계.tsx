@@ -856,7 +856,7 @@ export default function FinanceView({ user, subView, setSubView, selectedCompany
                             {sync.updated_at
                               ? (String(sync.updated_at).includes('동기화')
                                   ? sync.updated_at
-                                  : `${new Date(sync.updated_at).toLocaleTimeString()} 동기화`)
+                                  : `${new Date(sync.updated_at).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul' })} 동기화`)
                               : '미동기화'}
                           </p>
                         </div>

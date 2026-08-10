@@ -341,7 +341,7 @@ export default function MainContent({
 
 기한 내에 사용 계획을 제출하지 아니할 경우, 근로기준법 제61조 제2항에 의거하여 회사가 임의로 휴가 사용 시기를 지정하여 통보하게 되며, 이에 따른 휴가 미사용에 대하여는 수당이 지급되지 아니함을 알려드립니다.
 
-통보일자: ${new Date().toLocaleDateString('ko-KR')}
+통보일자: ${new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}
 MSO 주식회사 대표이사 (직인생략)`;
 
       // 2) 문서보관함 저장

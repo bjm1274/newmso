@@ -98,9 +98,11 @@ export function getDateRange(viewRange: TodoViewRange, selectedDate: string) {
     sunday.setDate(baseDate.getDate() - (day === 0 ? 7 : day));
     const saturday = new Date(sunday);
     saturday.setDate(sunday.getDate() + 6);
+    // 날짜 키는 KST 정본으로 만든다 — toLocaleDateString('en-CA') 은 렌더 환경
+    // TZ 를 따라 주 경계가 하루씩 밀렸다.
     return {
-      start: sunday.toLocaleDateString('en-CA'),
-      end: saturday.toLocaleDateString('en-CA') };
+      start: formatKoreanDateKey(sunday),
+      end: formatKoreanDateKey(saturday) };
   }
 
   const year = baseDate.getFullYear();
@@ -617,7 +619,7 @@ export function useTodoWorkflow(
     if (viewRange === 'day') base.setDate(base.getDate() + delta);
     else if (viewRange === 'week') base.setDate(base.getDate() + 7 * delta);
     else base.setMonth(base.getMonth() + delta);
-    setSelectedDate(base.toLocaleDateString('en-CA'));
+    setSelectedDate(formatKoreanDateKey(base));
   };
 
   return {

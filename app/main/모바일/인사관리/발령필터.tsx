@@ -10,6 +10,7 @@
  */
 
 import type { ReactNode } from 'react';
+import { formatKoreanDateKey, getKoreanTodayString } from '@/lib/seoul-time';
 
 export type AppointmentKind =
   | '신규채용'
@@ -49,9 +50,11 @@ export const RANGE_OPTIONS: ReadonlyArray<{
 export function rangeCutoffISO(range: AppointmentRange): string | null {
   const opt = RANGE_OPTIONS.find((o) => o.key === range);
   if (!opt || opt.days === null) return null;
-  const since = new Date();
-  since.setDate(since.getDate() - opt.days);
-  return since.toLocaleDateString('en-CA');
+  // '지금' 에서 거슬러 세는 값이라 반드시 KST 여야 한다. 예전에는 렌더 환경의
+  // TZ 를 따라, 서버(Workers=UTC)에서는 KST 오전 9시 이전에 기준일이 하루 밀렸다.
+  const since = new Date(`${getKoreanTodayString()}T00:00:00+09:00`);
+  since.setUTCDate(since.getUTCDate() - opt.days);
+  return formatKoreanDateKey(since);
 }
 
 /**

@@ -11,6 +11,7 @@
 import { useMemo, useState } from 'react';
 import { toast } from '@/lib/toast';
 import { enqueueD1Mutation } from '@/lib/offline-queue-d1';
+import { formatKoreanClock } from '@/lib/date-formatter';
 import type { ErpUser } from '@/types';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
@@ -151,7 +152,7 @@ export default function 인계노트({ user, onBack }: { user: ErpUser; onBack: 
                     {n.priority === 'High' && <MChip tone="danger">긴급</MChip>}
                     <div style={{ flex: 1 }} />
                     <span style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 600 }}>
-                      {n.created_at.slice(11, 16)}
+                      {formatKoreanClock(n.created_at)}
                     </span>
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: '-0.012em' }}>

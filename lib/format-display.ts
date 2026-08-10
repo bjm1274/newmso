@@ -1,6 +1,8 @@
 /**
  * Shared display formatters for mobile lists (timestamps, money).
  */
+import { formatKoreanClock, parseDbTimestamp } from '@/lib/date-formatter';
+import { formatKoreanDateKey, getKoreanTodayString } from '@/lib/seoul-time';
 
 export type FormatTsMode = 'relative' | 'datetime';
 
@@ -11,31 +13,27 @@ export type FormatTsMode = 'relative' | 'datetime';
  */
 export function formatTs(iso?: string | null, mode: FormatTsMode = 'relative'): string {
   if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
+  const parsed = parseDbTimestamp(iso);
+  if (Number.isNaN(parsed.getTime())) return '';
 
-  if (mode === 'datetime') {
-    return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  }
+  // 전부 KST 로 판단한다. 예전에는 getMonth()/getDate()/getHours() 를 써서
+  // 렌더 환경의 TZ 를 따랐고, 서버 렌더(Workers=UTC)에서는 시각이 9시간
+  // 이르게, 날짜 경계(오늘/어제)는 하루 밀려 보였다.
+  const dateKey = formatKoreanDateKey(parsed);
+  const clock = formatKoreanClock(iso);
+  const [, month, day] = dateKey.split('-');
+  const shortDate = `${Number(month)}/${Number(day)}`;
 
-  const now = new Date();
-  const sameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate();
-  if (sameDay) {
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  }
-  const yest = new Date(now);
-  yest.setDate(now.getDate() - 1);
-  if (
-    d.getFullYear() === yest.getFullYear() &&
-    d.getMonth() === yest.getMonth() &&
-    d.getDate() === yest.getDate()
-  ) {
-    return '어제';
-  }
-  return `${d.getMonth() + 1}/${d.getDate()}`;
+  if (mode === 'datetime') return `${shortDate} ${clock}`;
+
+  const todayKey = getKoreanTodayString();
+  if (dateKey === todayKey) return clock;
+
+  const yesterday = new Date(`${todayKey}T00:00:00+09:00`);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  if (dateKey === formatKoreanDateKey(yesterday)) return '어제';
+
+  return shortDate;
 }
 
 /** Number → locale string (ko-KR), floored. */
