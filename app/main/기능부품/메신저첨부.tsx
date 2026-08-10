@@ -313,47 +313,60 @@ export function isChatMessageDeleted(message: {
   return c === '삭제된 메시지입니다.' || c.startsWith('삭제된 메시지');
 }
 
+/** 첨부 URL → 클립보드에 넣을 PNG Blob. */
+async function fetchImageAsPngBlob(imageUrl: string): Promise<Blob> {
+  let target = imageUrl;
+  const internalUrl = rewritePublicR2UrlToInternal(target);
+  if (internalUrl) target = internalUrl;
+
+  let fetchUrl = target;
+  if (isInternalStorageObjectUrl(target)) {
+    try {
+      // 내부 프록시는 기본이 302 리다이렉트라 그대로 fetch 하면 본문이 오지 않는다.
+      const parsed = new URL(target, window.location.origin);
+      parsed.searchParams.set('proxy', '1');
+      fetchUrl = parsed.pathname + parsed.search;
+    } catch {
+      // 파싱 실패 시 원본 URL 로 시도한다.
+    }
+  }
+
+  const response = await fetch(fetchUrl, { credentials: 'same-origin' });
+  if (!response.ok) {
+    throw new Error(`이미지를 불러오지 못했습니다. (HTTP ${response.status})`);
+  }
+  const blob = await response.blob();
+  // 클립보드가 확실히 받는 형식은 PNG 다. JPEG·WebP 는 그대로 쓰면 거부된다.
+  if (blob.type === 'image/png') return blob;
+
+  const bitmap = await createImageBitmap(blob);
+  const canvas = document.createElement('canvas');
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return blob;
+  ctx.drawImage(bitmap, 0, 0);
+  const pngBlob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob((b) => resolve(b), 'image/png');
+  });
+  return pngBlob ?? blob;
+}
+
 export async function copyImageToClipboard(imageUrl: string): Promise<boolean> {
   try {
-    let fetchUrl = imageUrl;
-    const internalUrl = rewritePublicR2UrlToInternal(imageUrl);
-    if (internalUrl) {
-      imageUrl = internalUrl;
-      fetchUrl = internalUrl;
+    if (!navigator?.clipboard?.write || typeof ClipboardItem === 'undefined') {
+      throw new Error('이 브라우저는 이미지 클립보드 복사를 지원하지 않습니다.');
     }
 
-    if (isInternalStorageObjectUrl(imageUrl)) {
-      try {
-        const parsed = new URL(imageUrl, window.location.origin);
-        parsed.searchParams.set('proxy', '1');
-        fetchUrl = parsed.pathname + parsed.search;
-      } catch {
-        // fallback
-      }
-    }
-    const response = await fetch(fetchUrl);
-    const blob = await response.blob();
-    
-    let clipboardBlob = blob;
-    if (blob.type !== 'image/png') {
-      const bitmap = await createImageBitmap(blob);
-      const canvas = document.createElement('canvas');
-      canvas.width = bitmap.width;
-      canvas.height = bitmap.height;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(bitmap, 0, 0);
-        const pngBlob = await new Promise<Blob | null>((resolve) => {
-          canvas.toBlob((b) => resolve(b), 'image/png');
-        });
-        if (pngBlob) {
-          clipboardBlob = pngBlob;
-        }
-      }
-    }
-
+    // ClipboardItem 에 **Promise 를 그대로 넘긴다.**
+    //
+    // 예전에는 fetch → createImageBitmap → canvas.toBlob 을 모두 await 한 뒤에야
+    // clipboard.write 를 불렀다. 그 사이 사용자 제스처(클릭)의 유효 시간이 끝나
+    // 브라우저가 "user activation 없음" 으로 쓰기를 거부했다 — 버튼을 눌러도
+    // 아무 일도 일어나지 않는 것처럼 보인다. write 를 클릭 직후에 부르고
+    // 데이터는 Promise 로 넘기면 활성화가 유지된다.
     await navigator.clipboard.write([
-      new ClipboardItem({ [clipboardBlob.type]: clipboardBlob })
+      new ClipboardItem({ 'image/png': fetchImageAsPngBlob(imageUrl) }),
     ]);
     return true;
   } catch (error) {
