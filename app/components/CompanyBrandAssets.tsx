@@ -8,6 +8,7 @@
 import { useRef, useState } from 'react';
 import { toast } from '@/lib/toast';
 import { processBrandImage } from '@/lib/brand-image-process';
+import { resolveBrandAssetSrc } from '@/lib/company-brand-assets';
 import {
   saveCompanyLogo,
   saveCompanySeal,
@@ -171,7 +172,7 @@ export default function CompanyBrandAssets({
               className="shrink-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40 disabled:opacity-50"
               aria-label="회사 로고 업로드"
             >
-              <CheckerPreview src={logoUrl} alt="회사 로고" emptyLabel="로고 선택" />
+              <CheckerPreview src={resolveBrandAssetSrc(logoUrl)} alt="회사 로고" emptyLabel="로고 선택" />
             </button>
             <div className="min-w-0 flex-1 space-y-1">
               <p className="text-[11px] font-bold text-[var(--foreground)]">PNG / JPG / WEBP</p>
@@ -224,7 +225,7 @@ export default function CompanyBrandAssets({
               className="shrink-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40 disabled:opacity-50"
               aria-label="회사 직인 업로드"
             >
-              <CheckerPreview src={sealUrl} alt="회사 직인" emptyLabel="직인 선택" />
+              <CheckerPreview src={resolveBrandAssetSrc(sealUrl)} alt="회사 직인" emptyLabel="직인 선택" />
             </button>
             <div className="min-w-0 flex-1 space-y-1">
               <p className="text-[11px] font-bold text-[var(--foreground)]">원형 도장 이미지 권장</p>

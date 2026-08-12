@@ -10,6 +10,7 @@ import { db } from '@/lib/db-client';
 import { Card, SmBtn } from '../admin-workcenter-common';
 import TeamManager from '../../관리자전용서브/팀관리';
 import CompanyBrandAssets from '@/app/components/CompanyBrandAssets';
+import { resolveBrandAssetSrc } from '@/lib/company-brand-assets';
 
 interface CompanyData {
   id: string;
@@ -398,7 +399,7 @@ export default function CompanyBasicTab() {
                   <div className="flex items-center gap-2 min-w-0">
                     {c.logo_url ? (
                       <img
-                        src={c.logo_url}
+                        src={resolveBrandAssetSrc(c.logo_url)}
                         alt=""
                         className="h-8 w-8 shrink-0 rounded-md border border-[var(--border)] bg-white object-contain p-0.5"
                       />

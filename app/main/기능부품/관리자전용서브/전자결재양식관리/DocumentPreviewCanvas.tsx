@@ -1,5 +1,6 @@
 import type { TemplateDesign, PreviewRow } from './types';
 import { DEFAULT_LOGO_URL } from './design-utils';
+import { resolveBrandAssetSrc } from '@/lib/company-brand-assets';
 
 type Props = {
   design: TemplateDesign;
@@ -30,7 +31,7 @@ export default function DocumentPreviewCanvas({
         <div className="absolute inset-0 bg-[linear-gradient(180deg,#ffffff_0%,#fdfefe_76%,#f5f8fa_100%)]" />
         {design.showBackgroundLogo !== false && design.backgroundLogoUrl && (
           <img
-            src={design.backgroundLogoUrl}
+            src={resolveBrandAssetSrc(design.backgroundLogoUrl)}
             alt=""
             className="absolute left-1/2 top-[50%] h-24 w-24 -translate-x-1/2 -translate-y-1/2 object-contain mix-blend-multiply"
             style={{ opacity: design.backgroundLogoOpacity ?? 0.055 }}
@@ -43,7 +44,7 @@ export default function DocumentPreviewCanvas({
               className="flex h-[66px] w-[66px] shrink-0 items-center justify-center rounded-[var(--radius-lg)] bg-[var(--card)]"
               style={{ border: `1px solid ${design.borderColor || '#d5dce4'}` }}
             >
-              <img src={design.backgroundLogoUrl || DEFAULT_LOGO_URL} alt="" className="h-10 w-10 object-contain" />
+              <img src={resolveBrandAssetSrc(design.backgroundLogoUrl) || DEFAULT_LOGO_URL} alt="" className="h-10 w-10 object-contain" />
             </div>
             <div className="min-w-0 flex-1 pt-1">
               <h4 className="mt-1 text-[26px] font-black tracking-[-0.04em] text-[var(--foreground)]">
@@ -128,7 +129,7 @@ export default function DocumentPreviewCanvas({
                 <div className="-ml-8 relative z-10 flex h-[72px] w-[72px] items-center justify-center text-center text-[10px] font-black leading-4 text-[#b42318]">
                   {design.sealImageUrl ? (
                     <img
-                      src={design.sealImageUrl}
+                      src={resolveBrandAssetSrc(design.sealImageUrl)}
                       alt=""
                       className="h-full w-full object-contain mix-blend-multiply"
                     />

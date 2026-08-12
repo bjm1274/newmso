@@ -18,6 +18,7 @@ import { formatDateLabel as formatKstDateLabel } from '@/lib/date-formatter';
 import { buildApprovalPrintHtml, openApprovalPrintView } from '../전자결재서브/approval-print-utils';
 import { DEFAULT_APPROVAL_TEMPLATE_DESIGN } from '../전자결재서브/approval-constants';
 import { BUILTIN_TEMPLATE_DEFAULTS } from '../관리자전용서브/전자결재양식관리/design-utils';
+import { resolveBrandAssetSrc } from '@/lib/company-brand-assets';
 
 // ─────────────────────────────────────────────
 // 공용 유틸
@@ -316,10 +317,10 @@ window.onload = () => window.print();
 </head>
 <body>
   <main class="sheet" aria-label="${title}">
-    ${hasLogo ? `<img class="watermark" src="${logoUrl}" alt="" aria-hidden="true" />` : ''}
+    ${hasLogo ? `<img class="watermark" src="${resolveBrandAssetSrc(logoUrl)}" alt="" aria-hidden="true" />` : ''}
     <div class="stack">
       <header class="header">
-        <div class="logo-box">${hasLogo ? `<img src="${logoUrl}" alt="${companyLabel} 로고" />` : `<span class="logo-fallback">${logoInitial}</span>`}</div>
+        <div class="logo-box">${hasLogo ? `<img src="${resolveBrandAssetSrc(logoUrl)}" alt="${companyLabel} 로고" />` : `<span class="logo-fallback">${logoInitial}</span>`}</div>
         <h1 class="doc-title">${title}</h1>
       </header>
       <div class="accent-bar" aria-hidden="true"></div>
@@ -355,7 +356,7 @@ window.onload = () => window.print();
             <p class="company-sub">대표자 / 직인</p>
           </div>
           <div class="seal" aria-label="${companyLabel} 직인">
-            ${sealUrl ? `<img src="${sealUrl}" alt="" />` : `<span class="seal-fallback">회사<br/>직인</span>`}
+            ${sealUrl ? `<img src="${resolveBrandAssetSrc(sealUrl)}" alt="" />` : `<span class="seal-fallback">회사<br/>직인</span>`}
           </div>
         </div>
       </section>

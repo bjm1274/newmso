@@ -1,6 +1,7 @@
 'use client';
 
 import type { ContractClosingData } from '@/lib/contract-template-closing';
+import { resolveBrandAssetSrc } from '@/lib/company-brand-assets';
 
 type Props = ContractClosingData;
 
@@ -74,7 +75,7 @@ export default function ContractClosingBlock(props: Props) {
                                 <span className="truncate" title={companyCeo || ''}>{companyCeo || '-'}</span>
                                 {sealUrl ? (
                                     <img
-                                        src={sealUrl}
+                                        src={resolveBrandAssetSrc(sealUrl)}
                                         alt="직인"
                                         className="absolute right-4 w-16 h-16 object-contain select-none pointer-events-none z-10"
                                         style={{

@@ -16,6 +16,7 @@ import {
 import {
   calculateEmployeeInsuranceDeductions } from '@/lib/payroll-insurance-rates';
 import { buildPayrollDeductionRows } from '@/lib/payroll-slip-rows';
+import { resolveBrandAssetSrc } from '@/lib/company-brand-assets';
 
 function toNumber(value: unknown) {
   const numeric = Number(value);
@@ -696,7 +697,7 @@ export default function SalaryDetail({
                   style={{ backgroundColor: alphaColor(primaryColor, 0.12) }}
                 />
                 <img
-                  src={companySeal}
+                  src={resolveBrandAssetSrc(companySeal)}
                   alt="회사 직인"
                   className="relative h-16 w-16 object-contain mix-blend-multiply print:h-12 print:w-12"
                 />

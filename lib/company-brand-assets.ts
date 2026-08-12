@@ -6,6 +6,24 @@
 
 import { db } from '@/lib/db-client';
 import { DEFAULT_CONTRACT_TEMPLATE } from '@/lib/contract-template-defaults';
+import { rewritePublicR2UrlToInternal } from '@/lib/object-storage-url';
+
+/**
+ * 로고·직인 URL 을 화면에 걸 수 있는 형태로 바꾼다.
+ *
+ * DB 에는 `https://r2.pchos.kr/logos/...` 처럼 **공개 R2 도메인**이 저장돼 있다.
+ * 그런데 그 버킷은 공개로 열려 있지 않아서 `<img src>` 가 401/403 을 받고
+ * 그냥 깨진 이미지가 된다 — 증명서·계약서의 직인이 안 보이던 것이 이것이다.
+ *
+ * 내부 프록시(/api/storage/object)는 R2 바인딩으로 직접 읽으므로 버킷 공개
+ * 여부와 무관하다. `logos/`·`seals/` 프리픽스는 ACL 에서 public 이라
+ * 세션이 없어도 뜬다 — 인쇄창·PDF 처럼 쿠키가 안 실리는 곳에서도 보인다.
+ */
+export function resolveBrandAssetSrc(url: string | null | undefined): string {
+  const raw = String(url ?? '').trim();
+  if (!raw) return '';
+  return rewritePublicR2UrlToInternal(raw) || raw;
+}
 
 export async function uploadBrandAssetFile(params: {
   file: File;
@@ -95,12 +113,13 @@ export async function resolveCompanySealUrl(companyName: string): Promise<string
       db.from('companies').select('seal_url').eq('name', name).limit(1),
       db.from('contract_templates').select('seal_url').eq('company_name', '전체').limit(1),
     ]);
+    // 어느 폴백을 타든 화면에 걸 수 있는 형태로 돌려준다.
     const tmpl = tmplRes.data?.[0] as { seal_url?: string | null } | undefined;
-    if (tmpl?.seal_url) return String(tmpl.seal_url);
+    if (tmpl?.seal_url) return resolveBrandAssetSrc(tmpl.seal_url);
     const co = companyRes.data?.[0] as { seal_url?: string | null } | undefined;
-    if (co?.seal_url) return String(co.seal_url);
+    if (co?.seal_url) return resolveBrandAssetSrc(co.seal_url);
     const gTmpl = globalRes.data?.[0] as { seal_url?: string | null } | undefined;
-    if (gTmpl?.seal_url) return String(gTmpl.seal_url);
+    if (gTmpl?.seal_url) return resolveBrandAssetSrc(gTmpl.seal_url);
   } catch (err) {
     console.warn('[company-brand] resolveCompanySealUrl failed', err);
   }

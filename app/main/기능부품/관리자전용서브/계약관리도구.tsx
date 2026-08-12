@@ -14,6 +14,7 @@ import ContractStandardPreview from '@/app/main/기능부품/인사관리서브/
 import { fillEmploymentContractTemplate } from '@/lib/contract-template-render';
 import { processBrandImage } from '@/lib/brand-image-process';
 import { saveCompanySeal, uploadBrandAssetFile } from '@/lib/company-brand-assets';
+import { resolveBrandAssetSrc } from '@/lib/company-brand-assets';
 
 // COMPANIES 상수는 이제 DB에서 동적으로 관리됩니다.
 
@@ -243,7 +244,7 @@ export default function ContractManager({ initialCompany, onBack }: ContractMana
             <div className="flex items-center gap-4">
               <label className="w-24 h-24 border-2 border-dashed border-[var(--border)] flex flex-col items-center justify-center bg-[var(--muted)] rounded-2xl group hover:border-[var(--accent)]/30 transition-all cursor-pointer relative overflow-hidden shrink-0">
                 {sealUrl ? (
-                  <img src={sealUrl} alt="직인" className="w-full h-full object-contain p-2" />
+                  <img src={resolveBrandAssetSrc(sealUrl)} alt="직인" className="w-full h-full object-contain p-2" />
                 ) : (
                   <span className="text-2xl opacity-20">印</span>
                 )}

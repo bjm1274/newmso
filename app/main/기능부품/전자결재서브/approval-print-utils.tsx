@@ -2,6 +2,7 @@ import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
 import { DEFAULT_APPROVAL_TEMPLATE_DESIGN } from './approval-constants';
 import { normalizeApprovalCcUsers, alphaColor, escapeHtml } from '../전자결재-utils';
+import { resolveBrandAssetSrc } from '@/lib/company-brand-assets';
 import {
   renderApprovalAttachmentsHtml,
   renderLeaveRequestInfoHtml,
@@ -268,7 +269,7 @@ window.onload = () => window.print();
   const sealHtml = design.showSeal === false
     ? ''
     : sealImageUrl
-      ? `<div class="seal seal-trailing"><img src="${escapeHtml(sealImageUrl)}" alt=""></div>`
+      ? `<div class="seal seal-trailing"><img src="${escapeHtml(resolveBrandAssetSrc(sealImageUrl))}" alt=""></div>`
       : `<div class="seal seal-trailing">${escapeHtml(`${sealCompanyLabel} 직인`)}</div>`;
 
   const approvalBoxes = `${draftBox}${approverBoxes}`;

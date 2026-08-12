@@ -16,6 +16,7 @@ import {
   type IssuedCertificate,
   type IssuedCertificateContext } from '../마이페이지/certificate-print-utils';
 import { formatDateLabel as formatKstDateLabel } from '@/lib/date-formatter';
+import { resolveBrandAssetSrc } from '@/lib/company-brand-assets';
 
 // 정본(lib/date-formatter.formatDateLabel)에 위임 — 사본 복제로 생기던
 // timeZone drift 를 없앤다(8차 D12-012).
@@ -350,7 +351,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
               style={{ border: `1px solid ${borderColor}` }}
             >
               {companyLogoUrl ? (
-                <img src={companyLogoUrl} alt={`${companyLabel} 로고`} className="h-11 w-11 object-contain" />
+                <img src={resolveBrandAssetSrc(companyLogoUrl)} alt={`${companyLabel} 로고`} className="h-11 w-11 object-contain" />
               ) : (
                 <span className="text-[22px] font-black text-[var(--toss-gray-3)]">
                   {String(companyLabel || '회').replace(/\(.*?\)/g, '').trim().slice(0, 1) || '회'}
@@ -438,7 +439,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
                 <div className="-ml-10 relative z-10 flex h-[72px] w-[72px] items-center justify-center">
                   {seals[companyName] ? (
                     <img
-                      src={seals[companyName]}
+                      src={resolveBrandAssetSrc(seals[companyName])}
                       alt="seal"
                       className="relative h-[72px] w-[72px] rotate-12 object-contain opacity-95 mix-blend-multiply"
                     />
@@ -613,7 +614,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
                 <div className="flex items-center gap-4">
                   <div className="flex h-16 w-16 items-center justify-center rounded-[var(--radius-xl)] bg-[var(--card)]/95 shadow-sm">
                     {companyLogoUrl ? (
-                      <img src={companyLogoUrl} alt={`${companyLabel} 로고`} className="h-12 w-12 object-contain" />
+                      <img src={resolveBrandAssetSrc(companyLogoUrl)} alt={`${companyLabel} 로고`} className="h-12 w-12 object-contain" />
                     ) : (
                       <span className="text-2xl font-black text-[var(--toss-gray-3)]">
                         {String(companyLabel || '회').replace(/\(.*?\)/g, '').trim().slice(0, 1) || '회'}
@@ -732,7 +733,7 @@ export default function CertificateGenerator({ staffs: _staffs = [], selectedCo:
                       />
                       {seals[companyName] ? (
                         <img
-                          src={seals[companyName]}
+                          src={resolveBrandAssetSrc(seals[companyName])}
                           alt="seal"
                           className="relative h-20 w-20 rotate-12 object-contain opacity-95 mix-blend-multiply"
                         />
