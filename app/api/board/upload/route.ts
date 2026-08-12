@@ -24,9 +24,8 @@ import {
   MAX_VIDEO_SIZE_LABEL as SHARED_MAX_VIDEO_SIZE_LABEL } from '@/lib/upload-constants';
 import {
   isRawUploadRequest,
-  readRawUploadFileName,
-  readRawUploadMeta,
-  readRawUploadMimeType } from '@/lib/upload-raw-request';
+  readRawUpload,
+  readRawUploadMeta } from '@/lib/upload-raw-request';
 
 export const dynamic = 'force-dynamic';
 
@@ -233,36 +232,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (!canAccessBoard(latestUser, boardType, 'write')) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
-      if (!request.body) {
-        return NextResponse.json({ error: '업로드할 파일이 없습니다.' }, { status: 400 });
+      const raw = await readRawUpload(request, {
+        contentLength,
+        normalizeMimeType: normalizeUploadMimeType,
+        normalizeFileName: normalizeUploadFileName,
+        defaultContentType: DEFAULT_CONTENT_TYPE,
+        validate: validateUploadTarget });
+      if (!raw.ok) {
+        return NextResponse.json({ error: raw.error }, { status: raw.status });
       }
+      // 게시판만 추가로 매직바이트를 본다(채팅에는 이 검사가 없다).
+      validateKnownFileContentType(raw.mimeType, raw.body);
 
-      const rawName = readRawUploadFileName(request.headers);
-      const rawMime = normalizeUploadMimeType(
-        rawName,
-        readRawUploadMimeType(request.headers) || DEFAULT_CONTENT_TYPE,
-      );
-      const rawNormalizedName = normalizeUploadFileName(rawName, rawMime);
-      validateUploadTarget(rawNormalizedName, rawMime, contentLength);
-
-      // 본문을 한 번만 메모리에 올린다.
-      //
-      // request.body(ReadableStream)를 R2 바인딩에 그대로 넘기면 put 이 던진다 —
-      // OpenNext 를 거친 본문은 R2 가 받는 네이티브 스트림이 아니다. 예전에는 그
-      // 실패를 바인딩 헬퍼가 삼키고 presign 폴백으로 넘겨, 화면에는 자격증명
-      // 문제인 403 만 떴다. 복사는 한 벌이면 충분하다(예전 문제는 세 벌이었다).
-      const rawBody = await request.arrayBuffer();
-      validateKnownFileContentType(rawMime, rawBody);
-
-      const rawPath = buildSafeFilePath(rawNormalizedName, rawMime);
-      const rawUploaded = await uploadToR2(R2_BUCKET, rawPath, rawBody, rawMime);
+      const rawPath = buildSafeFilePath(raw.fileName, raw.mimeType);
+      const rawUploaded = await uploadToR2(R2_BUCKET, rawPath, raw.body, raw.mimeType);
       return NextResponse.json({
         success: true,
         provider: rawUploaded.provider,
         bucket: rawUploaded.bucket,
         path: rawUploaded.path,
-        fileName: rawNormalizedName,
-        type: detectAttachmentType(rawNormalizedName, rawMime),
+        fileName: raw.fileName,
+        type: detectAttachmentType(raw.fileName, raw.mimeType),
         url: rawUploaded.url });
     }
 

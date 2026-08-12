@@ -5,6 +5,7 @@
 import { parseOrFilter } from './filter';
 import type { FilterNode } from './filter';
 import type { QueryResult, QueryState, WhereCondition } from './types';
+import { WhereClauseBuilder } from './where-builder';
 
 export type { QueryResult };
 
@@ -39,11 +40,16 @@ async function executeQuery<T>(state: QueryState): Promise<QueryResult<T>> {
   }
 }
 
-export class QueryBuilder<T = any> implements PromiseLike<QueryResult<T>> {
+export class QueryBuilder<T = any> extends WhereClauseBuilder implements PromiseLike<QueryResult<T>> {
   private state: QueryState;
 
   constructor(state: QueryState) {
+    super();
     this.state = state;
+  }
+
+  protected get whereConditions() {
+    return this.state.where;
   }
 
   select(cols?: string, options?: { count?: 'exact' | 'planned' | 'estimated'; head?: boolean }): this {
@@ -61,43 +67,6 @@ export class QueryBuilder<T = any> implements PromiseLike<QueryResult<T>> {
     return this;
   }
 
-  eq(field: string, value: unknown): this {
-    this.state.where.push({ field, op: 'eq', value });
-    return this;
-  }
-  neq(field: string, value: unknown): this {
-    this.state.where.push({ field, op: 'neq', value });
-    return this;
-  }
-  lt(field: string, value: unknown): this {
-    this.state.where.push({ field, op: 'lt', value });
-    return this;
-  }
-  gt(field: string, value: unknown): this {
-    this.state.where.push({ field, op: 'gt', value });
-    return this;
-  }
-  lte(field: string, value: unknown): this {
-    this.state.where.push({ field, op: 'lte', value });
-    return this;
-  }
-  gte(field: string, value: unknown): this {
-    this.state.where.push({ field, op: 'gte', value });
-    return this;
-  }
-  is(field: string, value: unknown): this {
-    this.state.where.push({ field, op: 'is', value });
-    return this;
-  }
-  not(field: string, op: 'is' | 'eq', value: unknown): this {
-    const mapped: WhereCondition['op'] = op === 'is' ? 'isNot' : 'neq';
-    this.state.where.push({ field, op: mapped, value });
-    return this;
-  }
-  in(field: string, values: unknown[]): this {
-    this.state.where.push({ field, op: 'in', value: values });
-    return this;
-  }
   like(field: string, pattern: string): this {
     this.state.where.push({ field, op: 'like', value: pattern });
     return this;

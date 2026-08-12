@@ -14,9 +14,8 @@ import {
 import { MAX_SERVER_RELAY_SIZE_BYTES, MAX_SERVER_RELAY_SIZE_LABEL } from '@/lib/upload-constants';
 import {
   isRawUploadRequest,
-  readRawUploadFileName,
-  readRawUploadMeta,
-  readRawUploadMimeType } from '@/lib/upload-raw-request';
+  readRawUpload,
+  readRawUploadMeta } from '@/lib/upload-raw-request';
 import {
   DEFAULT_CONTENT_TYPE,
   normalizeUploadFileName,
@@ -200,29 +199,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         readRawUploadMeta(request.headers, 'roomId'),
       );
       if (rawRoomDenied) return rawRoomDenied;
-      if (!request.body) {
-        return NextResponse.json({ error: '업로드할 파일이 없습니다.' }, { status: 400 });
+
+      const raw = await readRawUpload(request, {
+        contentLength,
+        normalizeMimeType: normalizeUploadMimeType,
+        normalizeFileName: normalizeUploadFileName,
+        defaultContentType: DEFAULT_CONTENT_TYPE,
+        validate: validateUploadTarget });
+      if (!raw.ok) {
+        return NextResponse.json({ error: raw.error }, { status: raw.status });
       }
 
-      const rawName = readRawUploadFileName(request.headers);
-      const rawMime = normalizeUploadMimeType(
-        rawName,
-        readRawUploadMimeType(request.headers) || DEFAULT_CONTENT_TYPE,
-      );
-      const rawNormalizedName = normalizeUploadFileName(rawName, rawMime);
-      validateUploadTarget(rawNormalizedName, rawMime, contentLength);
-
-      // 본문을 한 번만 메모리에 올린다 — request.body 를 R2 바인딩에 그대로
-      // 넘기면 put 이 던진다(OpenNext 를 거친 본문은 네이티브 스트림이 아니다).
-      const rawBody = await request.arrayBuffer();
-      const rawPath = buildSafeFilePath(rawNormalizedName, rawMime);
-      const rawUploaded = await uploadToR2(R2_BUCKET, rawPath, rawBody, rawMime);
+      const rawPath = buildSafeFilePath(raw.fileName, raw.mimeType);
+      const rawUploaded = await uploadToR2(R2_BUCKET, rawPath, raw.body, raw.mimeType);
       return NextResponse.json({
         success: true,
         provider: rawUploaded.provider,
         bucket: rawUploaded.bucket,
         path: rawUploaded.path,
-        fileName: rawNormalizedName,
+        fileName: raw.fileName,
         url: rawUploaded.url });
     }
 

@@ -3,6 +3,7 @@
 // executeMutate + InsertBuilder / UpdateBuilder / DeleteBuilder.
 // ============================================================
 import type { QueryResult, InsertState, UpdateState, DeleteState, WhereCondition } from './types';
+import { WhereClauseBuilder } from './where-builder';
 
 function parseColumns(input: string | undefined): string[] | undefined {
   if (!input || input === '*') return undefined;
@@ -96,50 +97,18 @@ export class InsertBuilder<T = any> implements PromiseLike<QueryResult<T>> {
 // ─────────────────────────────────────────────────────────────
 // UpdateBuilder
 // ─────────────────────────────────────────────────────────────
-export class UpdateBuilder<T = any> implements PromiseLike<QueryResult<T>> {
+export class UpdateBuilder<T = any> extends WhereClauseBuilder implements PromiseLike<QueryResult<T>> {
   private state: UpdateState;
   constructor(state: UpdateState) {
+    super();
     this.state = state;
   }
 
+  protected get whereConditions() {
+    return this.state.where;
+  }
+
   // WHERE 체인 메소드
-  eq(field: string, value: unknown): this {
-    this.state.where.push({ field, op: 'eq', value });
-    return this;
-  }
-  neq(field: string, value: unknown): this {
-    this.state.where.push({ field, op: 'neq', value });
-    return this;
-  }
-  in(field: string, values: unknown[]): this {
-    this.state.where.push({ field, op: 'in', value: values });
-    return this;
-  }
-  is(field: string, value: unknown): this {
-    this.state.where.push({ field, op: 'is', value });
-    return this;
-  }
-  not(field: string, op: 'is' | 'eq', value: unknown): this {
-    const mapped: WhereCondition['op'] = op === 'is' ? 'isNot' : 'neq';
-    this.state.where.push({ field, op: mapped, value });
-    return this;
-  }
-  lt(field: string, value: unknown): this {
-    this.state.where.push({ field, op: 'lt', value });
-    return this;
-  }
-  gt(field: string, value: unknown): this {
-    this.state.where.push({ field, op: 'gt', value });
-    return this;
-  }
-  lte(field: string, value: unknown): this {
-    this.state.where.push({ field, op: 'lte', value });
-    return this;
-  }
-  gte(field: string, value: unknown): this {
-    this.state.where.push({ field, op: 'gte', value });
-    return this;
-  }
   filter(field: string, op: string, value: unknown): this {
     const mappedOp = op === 'eq' ? 'eq' : op === 'in' ? 'in' : 'eq';
     const parsedVal = op === 'in' && typeof value === 'string' && value.startsWith('(') && value.endsWith(')')
@@ -193,47 +162,15 @@ export class UpdateBuilder<T = any> implements PromiseLike<QueryResult<T>> {
 // ─────────────────────────────────────────────────────────────
 // DeleteBuilder
 // ─────────────────────────────────────────────────────────────
-export class DeleteBuilder<T = any> implements PromiseLike<QueryResult<T>> {
+export class DeleteBuilder<T = any> extends WhereClauseBuilder implements PromiseLike<QueryResult<T>> {
   private state: DeleteState;
   constructor(state: DeleteState) {
+    super();
     this.state = state;
   }
-  eq(field: string, value: unknown): this {
-    this.state.where.push({ field, op: 'eq', value });
-    return this;
-  }
-  neq(field: string, value: unknown): this {
-    this.state.where.push({ field, op: 'neq', value });
-    return this;
-  }
-  in(field: string, values: unknown[]): this {
-    this.state.where.push({ field, op: 'in', value: values });
-    return this;
-  }
-  is(field: string, value: unknown): this {
-    this.state.where.push({ field, op: 'is', value });
-    return this;
-  }
-  not(field: string, op: 'is' | 'eq', value: unknown): this {
-    const mapped: WhereCondition['op'] = op === 'is' ? 'isNot' : 'neq';
-    this.state.where.push({ field, op: mapped, value });
-    return this;
-  }
-  lt(field: string, value: unknown): this {
-    this.state.where.push({ field, op: 'lt', value });
-    return this;
-  }
-  gt(field: string, value: unknown): this {
-    this.state.where.push({ field, op: 'gt', value });
-    return this;
-  }
-  lte(field: string, value: unknown): this {
-    this.state.where.push({ field, op: 'lte', value });
-    return this;
-  }
-  gte(field: string, value: unknown): this {
-    this.state.where.push({ field, op: 'gte', value });
-    return this;
+
+  protected get whereConditions() {
+    return this.state.where;
   }
   then<TResult1 = QueryResult<T>, TResult2 = never>(
     onfulfilled?: ((value: QueryResult<T>) => TResult1 | PromiseLike<TResult1>) | null,

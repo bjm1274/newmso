@@ -62,3 +62,48 @@ export function readRawUploadFileName(headers: Headers): string {
 export function readRawUploadMimeType(headers: Headers): string {
   return decodeHeader(headers.get(RAW_UPLOAD_MIME_TYPE_HEADER));
 }
+
+/**
+ * 원본 본문 업로드의 공통 처리.
+ *
+ * 게시판·채팅 두 라우트가 같은 흐름을 글자 단위로 반복하고 있었다(파일명·MIME
+ * 정규화 → 상한 검사 → 본문 1회 복사 → R2 업로드). 다른 것은 버킷·객체키 규칙과
+ * 응답에 board 용 `type` 이 붙는지뿐이라, 그 둘만 인자로 받고 나머지를 모은다.
+ *
+ * 본문은 `arrayBuffer()` 로 **한 번만** 복사한다. request.body(스트림)를 R2
+ * 바인딩에 그대로 넘기면 put 이 던지고(OpenNext 를 거친 본문은 네이티브 스트림이
+ * 아니다), formData 로 받으면 파싱본까지 겹쳐 워커 메모리 한도를 넘긴다.
+ */
+export async function readRawUpload(
+  request: Request,
+  options: {
+    contentLength: number;
+    normalizeMimeType: (fileName: string, mimeType: string) => string;
+    normalizeFileName: (fileName: string, mimeType: string) => string;
+    defaultContentType: string;
+    validate: (fileName: string, mimeType: string, size: number) => void;
+  },
+): Promise<
+  | { ok: true; fileName: string; mimeType: string; body: ArrayBuffer }
+  | { ok: false; error: string; status: number }
+> {
+  if (!request.body) {
+    return { ok: false, error: '업로드할 파일이 없습니다.', status: 400 };
+  }
+
+  const rawName = readRawUploadFileName(request.headers);
+  const mimeType = options.normalizeMimeType(
+    rawName,
+    readRawUploadMimeType(request.headers) || options.defaultContentType,
+  );
+  const fileName = options.normalizeFileName(rawName, mimeType);
+
+  try {
+    options.validate(fileName, mimeType, options.contentLength);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '업로드할 수 없는 파일입니다.';
+    return { ok: false, error: message, status: 400 };
+  }
+
+  return { ok: true, fileName, mimeType, body: await request.arrayBuffer() };
+}
