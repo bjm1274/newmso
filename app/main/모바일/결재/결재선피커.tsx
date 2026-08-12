@@ -36,6 +36,7 @@ import {
   emptyStyle,
   actionStyle,
 } from './staff-picker/ui-atoms';
+import { PickerCandidateList, PickerFooter, PickerSearchField } from './staff-picker/ui-blocks';
 
 export type { ApproverPick } from './staff-picker/types';
 
@@ -233,121 +234,51 @@ export default function SApprovalApproverPicker({
         {/* 검색 + 후보 */}
         <section>
           <SectionLabel>결재자 추가</SectionLabel>
-          <label htmlFor="m-approver-pick-q" style={{ position: 'absolute', left: -10000 }}>
-            결재자 검색
-          </label>
-          <div
-            className="macos-glass"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '8px 12px',
-              borderRadius: 10,
-            }}
-          >
-            <MIcon name="search" size={14} color="var(--z-500)" />
-            <input
-              id="m-approver-pick-q"
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="이름·부서·직급"
-              style={{
-                flex: 1,
-                border: 'none',
-                outline: 'none',
-                background: 'transparent',
-                fontSize: 13,
-                fontWeight: 700,
-                color: 'var(--z-900)',
-              }}
-            />
-          </div>
+          <PickerSearchField
+            id="m-approver-pick-q"
+            label="결재자 검색"
+            value={query}
+            onChange={setQuery}
+          />
 
-          <div style={{ marginTop: 8, maxHeight: '40vh', overflowY: 'auto' }}>
-            {loading && <div style={emptyStyle}>직원 목록을 불러오는 중…</div>}
-            {!loading && staffRows !== null && groups.length === 0 && (
-              <div style={emptyStyle}>
-                {query ? `'${query}' 에 대한 결과가 없습니다` : '추가할 수 있는 직원이 없습니다'}
-              </div>
-            )}
-            {groups.map(([dept, members]) => (
-              <div key={dept} style={{ marginBottom: 8 }}>
-                <div
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 900,
-                    color: 'var(--z-500)',
-                    padding: '6px 4px 4px',
-                    letterSpacing: '0.04em',
-                  }}
-                >
-                  {dept}
+          <PickerCandidateList
+            loading={loading}
+            loaded={staffRows !== null}
+            query={query}
+            groups={groups}
+            renderMember={(s) => (
+              <button
+                key={String(s.id)}
+                type="button"
+                className="transition-all duration-150 active:bg-black/[0.04]"
+                onClick={() => addMember(s)}
+                style={memberRowStyle}
+                aria-label={`${s.name} 결재선에 추가`}
+              >
+                <MAvatar tone="blue" size="sm">
+                  {(s.name || '?').charAt(0)}
+                </MAvatar>
+                <div style={{ flex: 1, minWidth: 0, textAlign: 'left', marginLeft: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--z-900)' }}>{s.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>
+                    {[s.department, s.position].filter(Boolean).join(' / ') || ' '}
+                  </div>
                 </div>
-                {members.map((s) => (
-                  <button
-                    key={String(s.id)}
-                    type="button"
-                    className="transition-all duration-150 active:bg-black/[0.04]"
-                    onClick={() => addMember(s)}
-                    style={memberRowStyle}
-                    aria-label={`${s.name} 결재선에 추가`}
-                  >
-                    <MAvatar tone="blue" size="sm">
-                      {(s.name || '?').charAt(0)}
-                    </MAvatar>
-                    <div style={{ flex: 1, minWidth: 0, textAlign: 'left', marginLeft: 10 }}>
-                      <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--z-900)' }}>{s.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>
-                        {[s.department, s.position].filter(Boolean).join(' / ') || ' '}
-                      </div>
-                    </div>
-                    <MIcon name="plus" size={14} color="var(--m-accent)" />
-                  </button>
-                ))}
-              </div>
-            ))}
-          </div>
+                <MIcon name="plus" size={14} color="var(--m-accent)" />
+              </button>
+            )}
+          />
         </section>
       </div>
 
-      {/* sticky apply */}
-      <div
-        className="macos-glass"
-        style={{
-          position: 'sticky',
-          bottom: 0,
-          display: 'flex',
-          gap: 8,
-          padding: '10px 16px 14px',
-          borderTop: '1px solid rgba(255,255,255,0.4)',
-        }}
-      >
-        <button
-          type="button"
-          className="macos-squircle-sm transition-all active:scale-[0.98] duration-100"
-          onClick={onClose}
-          style={actionStyle('ghost')}
-          aria-label="결재선 변경 취소"
-        >
-          취소
-        </button>
-        <button
-          type="button"
-          className="macos-squircle-sm transition-all active:scale-[0.98] duration-100"
-          onClick={apply}
-          disabled={line.length === 0}
-          style={{
-            ...actionStyle('primary'),
-            opacity: line.length === 0 ? 0.5 : 1,
-            cursor: line.length === 0 ? 'not-allowed' : 'pointer',
-          }}
-          aria-label="결재선 적용"
-        >
-          적용
-        </button>
-      </div>
+      <PickerFooter
+        onCancel={onClose}
+        cancelAriaLabel="결재선 변경 취소"
+        onApply={apply}
+        applyAriaLabel="결재선 적용"
+        applyLabel="적용"
+        applyDisabled={line.length === 0}
+      />
     </MSheet>
   );
 }
