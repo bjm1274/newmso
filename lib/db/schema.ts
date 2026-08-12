@@ -1850,6 +1850,34 @@ export const roster_swap_requests = sqliteTable("roster_swap_requests", {
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`).notNull(),
 	updated_at: text().default(sql`(CURRENT_TIMESTAMP)`).notNull() });
 
+/**
+ * `salary_change_history.change_type` 이 받을 수 있는 값.
+ *
+ * 운영 테이블에는 CHECK 제약이 걸려 있고 **영문 코드만** 통과한다. 그런데
+ * 기록하는 코드는 `'급여인상'`(한국어)과 `'salary_increase'` 를 쓰고 있어서
+ * INSERT 가 매번 제약 위반으로 실패했다 — 이 표는 운영에서 **한 행도 없었다.**
+ * 결재로 급여가 올라가도 변경 전 금액이 어디에도 남지 않았고, 이 이력을 읽는
+ * 일할 계산(급여정산-utils)은 늘 빈 결과를 받았다.
+ *
+ * 화면 라벨은 lib/hr-history-ledger.ts 가 이 코드로 매핑한다(base_salary → 기본급).
+ */
+export const SALARY_CHANGE_TYPES = [
+  'base_salary',
+  'meal', 'meal_allowance',
+  'night_duty_allowance',
+  'vehicle', 'vehicle_allowance',
+  'childcare', 'childcare_allowance',
+  'research', 'research_allowance',
+  'other', 'other_taxfree',
+  'position_allowance',
+  'overtime_allowance',
+  'night_work_allowance',
+  'holiday_work_allowance',
+  'annual_leave_pay',
+] as const;
+
+export type SalaryChangeType = typeof SALARY_CHANGE_TYPES[number];
+
 export const salary_change_history = sqliteTable("salary_change_history", {
 	id: text().primaryKey().notNull(),
 	staff_id: text().notNull(),

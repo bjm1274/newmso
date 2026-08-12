@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { readSessionFromRequest, isAdminSession } from '@/lib/server-session';
-import { getD1Binding, getD1Drizzle, approvals, staff_members, salary_change_history, eq, and } from '@/lib/db';
+import {
+  getD1Binding, getD1Drizzle, approvals, staff_members, salary_change_history, eq, and,
+  type SalaryChangeType } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -172,7 +174,8 @@ export async function POST(request: Request) {
       await db.insert(salary_change_history).values({
         id: crypto.randomUUID(),
         staff_id: c.staffId,
-        change_type: 'salary_increase',
+        // CHECK 제약이 받는 코드로 맞춘다 — 'salary_increase' 는 목록에 없어 실패했다.
+        change_type: 'base_salary' satisfies SalaryChangeType,
         before_value: previous,
         after_value: c.newSalary,
         effective_date: (c.effectiveAt || nowIso).slice(0, 10),

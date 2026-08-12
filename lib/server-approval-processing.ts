@@ -23,7 +23,8 @@ import {
   staff_members as staffMembersTable,
   eq,
   getD1Binding,
-  getD1Drizzle } from '@/lib/db';
+  getD1Drizzle,
+  type SalaryChangeType } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 import {
   getCompletedProcessingSteps,
@@ -722,7 +723,9 @@ export async function processFinalApprovalEffects(
             await db.insert(salaryChangeHistoryTable).values({
               id: crypto.randomUUID(),
               staff_id: matchedStaffId,
-              change_type: '급여인상',
+              // CHECK 제약이 영문 코드만 받는다. `'급여인상'` 은 통과하지 못해
+              // 이 INSERT 가 매번 실패했다(SALARY_CHANGE_TYPES 주석 참고).
+              change_type: 'base_salary' satisfies SalaryChangeType,
               before_value: beforeSalary,
               after_value: Math.round(newSalary),
               effective_date: effectiveDate,
