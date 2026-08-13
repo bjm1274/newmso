@@ -72,6 +72,9 @@ function getTimelineItemKey(item: MessengerTimelineItem): string {
   return `msg-${String((item as MessengerMessageItem).id)}`;
 }
 
+/** 답글 미리보기에 넣을 원문 최대 길이 — 어차피 한 줄만 보인다. */
+const REPLY_PREVIEW_MAX_CHARS = 200;
+
 function findTimelineIndexForMessageId(
   items: MessengerTimelineItem[],
   messageId: string,
@@ -1165,15 +1168,21 @@ function MessengerTimelineComponent({
                                     <span>{parent ? `${parentSenderName}님에게 답글` : '답글 원문 메시지'}</span>
                                     <span className="ml-auto text-[10px] font-normal underline opacity-80">이동 ↑</span>
                                   </div>
-                                  <div className="truncate opacity-85 text-[11px] leading-tight">
+                                  <div className="block w-full overflow-hidden text-ellipsis whitespace-nowrap opacity-85 text-[11px] leading-tight [&_*]:whitespace-nowrap">
                                     {parent ? (
+                                      // 원문은 **한 줄만** 보여준다. 여러 줄짜리 원문이 그대로 펼쳐지면
+                                      // 미리보기가 본문보다 커져 대화가 읽히지 않는다.
+                                      // 전체는 이동해서 본다.
                                       renderWithInlineEmoticons(
                                         getMessageDisplayText(
                                           parent.content,
                                           parent.file_name,
                                           parent.file_url,
                                           '첨부 파일'
-                                        ),
+                                        )
+                                          .replace(/s+/g, ' ')
+                                          .trim()
+                                          .slice(0, REPLY_PREVIEW_MAX_CHARS),
                                         false,
                                         ''
                                       )
