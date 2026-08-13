@@ -603,7 +603,11 @@ function MessengerTimelineComponent({
       // DOM 이 없어 첫 클릭은 그냥 실패했고(그래서 여러 번 눌러야 움직였다),
       // 그 로드가 방 요약을 다시 계산하게 만들어 채팅방 목록까지 흔들었다.
       // 원문 내용은 이제 따로 조회해 그 자리에서 보여주므로 이동은 선택 사항이다.
-      if (targetIndex < 0) return;
+      if (targetIndex < 0) {
+        // 아직 로드되지 않았다 — 부모가 그 메시지 주변 히스토리를 불러와 이동한다.
+        onScrollToMessage(targetId);
+        return;
+      }
       setWindowStart((start) => {
         const next = Math.max(0, targetIndex - TIMELINE_JUMP_OVERSCAN);
         return next < start ? next : start;
@@ -933,8 +937,8 @@ function MessengerTimelineComponent({
               );
               const threadBadgeLabel =
                 threadSummary?.rootId && threadSummary.rootId !== String(msg.id)
-                  ? `스레드 보기 · 답글 ${threadSummary.replyCount}개`
-                  : `답글 ${threadSummary?.replyCount || 0}개`;
+                  ? `답글 ${threadSummary.replyCount}`
+                  : `답글 ${threadSummary?.replyCount || 0}`;
               const threadBadgeTitle = threadSummary
                 ? `참여 ${threadSummary.participantCount}명${threadSummary.latestReplyAt ? ` · 최근 답글 ${toChatDate(threadSummary.latestReplyAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}` : ''}`
                 : '';
@@ -1128,10 +1132,16 @@ function MessengerTimelineComponent({
                                 messages.find((message) => message.id === msg.reply_to_id) || null;
                               // 로드된 목록에 없으면 따로 조회해 둔 원문을 쓴다.
                               const parent = loadedParent || replyParents[String(msg.reply_to_id)] || null;
-                              // 렌더되는 타임라인에 있어야 스크롤 이동이 성립한다.
-                              const parentLoaded = timelineMessageIds.has(String(msg.reply_to_id));
+                              // 화면에 없으면 부모가 그 메시지 주변 히스토리를 불러와 이동한다.
+                              // (timelineMessageIds 는 즉시 이동 가능한지 판단용)
+                              const parentInTimeline = timelineMessageIds.has(String(msg.reply_to_id));
+                              // 따로 조회한 원문에는 staff 조인이 없다. 방 멤버 목록에서 보완한다
+                              // (예전에는 그대로 '사용자님에게 답글' 로 떨어졌다).
                               const parentSenderName = parent
                                 ? (parent.staff as { name?: string } | null | undefined)?.name
+                                  || roomMembers.find(
+                                      (member) => String(member?.id || '') === String(parent.sender_id || ''),
+                                    )?.name
                                   || String((parent as { sender_name?: string }).sender_name || '')
                                   || '사용자'
                                 : '이전 메시지';
@@ -1143,18 +1153,17 @@ function MessengerTimelineComponent({
                               return (
                                 <div
                                   data-testid={`chat-reply-preview-${msg.id}`}
-                                  className={`mb-1.5 p-2 rounded-[var(--radius-md)] text-[11px] border-l-3 transition-all shadow-2xs ${parentLoaded ? 'cursor-pointer hover:opacity-85' : 'cursor-default'} ${replyPreviewClass}`}
+                                  className={`mb-1.5 p-2 rounded-[var(--radius-md)] text-[11px] border-l-3 cursor-pointer hover:opacity-85 transition-all shadow-2xs ${replyPreviewClass}`}
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    if (!parentLoaded) return;
                                     handleScrollToMessage(msg.reply_to_id!);
                                   }}
-                                  title={parentLoaded ? '원문 메시지 위치로 이동' : '원문 메시지'}
+                                  title={parentInTimeline ? '원문 메시지 위치로 이동' : '원문 메시지로 이동 (불러오는 중일 수 있습니다)'}
                                 >
                                   <div className="flex items-center gap-1.5 font-bold opacity-90 mb-0.5">
                                     <span className="text-[10px]">↩</span>
                                     <span>{parent ? `${parentSenderName}님에게 답글` : '답글 원문 메시지'}</span>
-                                    {parentLoaded && <span className="ml-auto text-[10px] font-normal underline opacity-80">이동 ↑</span>}
+                                    <span className="ml-auto text-[10px] font-normal underline opacity-80">이동 ↑</span>
                                   </div>
                                   <div className="truncate opacity-85 text-[11px] leading-tight">
                                     {parent ? (
@@ -1233,6 +1242,21 @@ function MessengerTimelineComponent({
                             <div
                               className={`absolute bottom-0 z-10 ${isMine ? 'right-full mr-2 items-end' : 'left-full ml-2 items-start'} flex flex-col gap-0.5 whitespace-nowrap`}
                             >
+                              {/* 스레드 배지: 말풍선 아래 큰 알약이 아니라 시각 위 한 줄로 */}
+                              {showThreadBadge && threadSummary ? (
+                                <button
+                                  type="button"
+                                  data-testid={`chat-thread-badge-${msg.id}`}
+                                  title={threadBadgeTitle}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    onOpenThread(msg);
+                                  }}
+                                  className="text-[10px] font-bold text-[var(--accent)] underline underline-offset-2 hover:opacity-80"
+                                >
+                                  {threadBadgeLabel}
+                                </button>
+                              ) : null}
                               {displayedReadStatusSummary && (
                                 canOpenReadStatus ? (
                                   <button
@@ -1295,24 +1319,6 @@ function MessengerTimelineComponent({
                               수정됨
                             </p>
                           )}
-                          {showThreadBadge && threadSummary ? (
-                            <button
-                              type="button"
-                              data-testid={`chat-thread-badge-${msg.id}`}
-                              title={threadBadgeTitle}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                onOpenThread(msg);
-                              }}
-                              className={`mt-1 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-bold transition-colors ${
-                                isMine
-                                  ? 'self-end border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:border-blue-300 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-400 shadow-sm'
-                                  : 'border-[var(--accent)]/20 bg-[var(--toss-blue-light)] text-[var(--accent)] hover:bg-[var(--toss-blue-light)]/80'
-                              }`}
-                            >
-                              {threadBadgeLabel}
-                            </button>
-                          ) : null}
                         </div>
                       </div>
                       {isMine && deliveryStateLabel && (

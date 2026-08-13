@@ -735,6 +735,11 @@ export default function ChatView({
       lastScrolledMsgIdRef.current = normalizedMessageId;
       pendingScrollMsgIdRef.current = null;
     } else if (remainingAttempts > 0) {
+      // 아직 화면에 없다 — 로드가 필요할 수 있으니 대기 대상으로 걸어둔다.
+      // 이 ref 가 설정돼 있어야 '해당 메시지 주변 히스토리 로드' 가 돈다.
+      // 예전에는 여기서 걸지 않아, 답글 원문이 로드 범위 밖이면 재시도만 하다
+      // 3초 뒤 포기했다 — 사용자에게는 '눌러도 안 움직인다' 로 보였다.
+      pendingScrollMsgIdRef.current = normalizedMessageId;
       setTimeout(() => {
         scrollToMessage(normalizedMessageId, remainingAttempts - 1);
       }, 100);
