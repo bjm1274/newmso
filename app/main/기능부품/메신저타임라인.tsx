@@ -554,6 +554,30 @@ function MessengerTimelineComponent({
     }
   }, [loadingOlderMessages]);
 
+  // 이동이 가능한 대상 = **렌더되는 타임라인**에 있는 메시지.
+  // messages 에 있어도 combinedTimeline 에 없으면 스크롤할 DOM 이 없다.
+  const timelineMessageIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const item of combinedTimeline) {
+      if (item.type === 'poll') continue;
+      if (item.type === 'album') {
+        // 앨범은 묶음 자체와 그 안의 각 메시지 모두 이동 대상이 된다
+        // (findTimelineIndexForMessageId 와 같은 규칙).
+        const album = item as MessengerAlbumItem;
+        const albumId = String(album.id ?? '').trim();
+        if (albumId) ids.add(albumId);
+        for (const albumMessage of album.albumMessages || []) {
+          const memberId = String(albumMessage.id ?? '').trim();
+          if (memberId) ids.add(memberId);
+        }
+        continue;
+      }
+      const id = String((item as MessengerMessageItem).id ?? '').trim();
+      if (id) ids.add(id);
+    }
+    return ids;
+  }, [combinedTimeline]);
+
   // 답글이 가리키는 원문 중 화면에 없는 것만 따로 조회한다(과거 이력 전체 로드 대신).
   const loadedMessageIds = useMemo(
     () => new Set(messages.map((message) => String(message.id || ''))),
@@ -573,21 +597,23 @@ function MessengerTimelineComponent({
       const targetId = String(messageId || '').trim();
       if (!targetId) return;
       const targetIndex = findTimelineIndexForMessageId(combinedTimeline, targetId);
-      if (targetIndex >= 0) {
-        setWindowStart((start) => {
-          const next = Math.max(0, targetIndex - TIMELINE_JUMP_OVERSCAN);
-          return next < start ? next : start;
-        });
-      } else {
-        // 현재 로드된 타임라인에 없으면 이전 이력 로드 실행
-        onLoadOlderMessages?.();
-      }
+      // 타임라인에 없으면 이동하지 않는다.
+      //
+      // 예전에는 여기서 과거 이력을 통째로 불러왔다. 로드가 끝날 때까지 스크롤할
+      // DOM 이 없어 첫 클릭은 그냥 실패했고(그래서 여러 번 눌러야 움직였다),
+      // 그 로드가 방 요약을 다시 계산하게 만들어 채팅방 목록까지 흔들었다.
+      // 원문 내용은 이제 따로 조회해 그 자리에서 보여주므로 이동은 선택 사항이다.
+      if (targetIndex < 0) return;
+      setWindowStart((start) => {
+        const next = Math.max(0, targetIndex - TIMELINE_JUMP_OVERSCAN);
+        return next < start ? next : start;
+      });
       // 윈도우 확장 페인트 후 부모가 msgRefs로 scrollIntoView
       window.requestAnimationFrame(() => {
         onScrollToMessage(targetId);
       });
     },
-    [combinedTimeline, onScrollToMessage, onLoadOlderMessages],
+    [combinedTimeline, onScrollToMessage],
   );
 
   useEffect(() => {
@@ -1102,8 +1128,8 @@ function MessengerTimelineComponent({
                                 messages.find((message) => message.id === msg.reply_to_id) || null;
                               // 로드된 목록에 없으면 따로 조회해 둔 원문을 쓴다.
                               const parent = loadedParent || replyParents[String(msg.reply_to_id)] || null;
-                              // 화면에 있어야 스크롤 이동이 의미가 있다.
-                              const parentLoaded = Boolean(loadedParent);
+                              // 렌더되는 타임라인에 있어야 스크롤 이동이 성립한다.
+                              const parentLoaded = timelineMessageIds.has(String(msg.reply_to_id));
                               const parentSenderName = parent
                                 ? (parent.staff as { name?: string } | null | undefined)?.name
                                   || String((parent as { sender_name?: string }).sender_name || '')
@@ -1117,9 +1143,10 @@ function MessengerTimelineComponent({
                               return (
                                 <div
                                   data-testid={`chat-reply-preview-${msg.id}`}
-                                  className={`mb-1.5 p-2 rounded-[var(--radius-md)] text-[11px] border-l-3 cursor-pointer hover:opacity-85 transition-all shadow-2xs ${replyPreviewClass}`}
+                                  className={`mb-1.5 p-2 rounded-[var(--radius-md)] text-[11px] border-l-3 transition-all shadow-2xs ${parentLoaded ? 'cursor-pointer hover:opacity-85' : 'cursor-default'} ${replyPreviewClass}`}
                                   onClick={(event) => {
                                     event.stopPropagation();
+                                    if (!parentLoaded) return;
                                     handleScrollToMessage(msg.reply_to_id!);
                                   }}
                                   title={parentLoaded ? '원문 메시지 위치로 이동' : '원문 메시지'}
