@@ -21,6 +21,7 @@ import type { ThreadSummary } from './메신저파생훅';
 import { MessageActionsHost } from './메신저액션서브';
 import { MenuIcon } from './조직도서브/조직도측면창';
 import { useIsMobile } from '@/app/components/useIsMobile';
+import { useReplyParentMessages } from './메신저답글원문훅';
 
 /** 하단(최신) 기준으로 처음 렌더할 타임라인 항목 수. 이하면 전체 렌더. */
 /** 서버 페이지(~20)보다 약간 크게 — load-older 로 쌓인 구간 중 최근만 우선 마운트 */
@@ -553,6 +554,20 @@ function MessengerTimelineComponent({
     }
   }, [loadingOlderMessages]);
 
+  // 답글이 가리키는 원문 중 화면에 없는 것만 따로 조회한다(과거 이력 전체 로드 대신).
+  const loadedMessageIds = useMemo(
+    () => new Set(messages.map((message) => String(message.id || ''))),
+    [messages],
+  );
+  const replyTargetIds = useMemo(
+    () =>
+      messages
+        .map((message) => String(message.reply_to_id || '').trim())
+        .filter(Boolean),
+    [messages],
+  );
+  const replyParents = useReplyParentMessages(replyTargetIds, loadedMessageIds);
+
   const handleScrollToMessage = useCallback(
     (messageId: string) => {
       const targetId = String(messageId || '').trim();
@@ -1083,8 +1098,19 @@ function MessengerTimelineComponent({
                             aria-label={`${msg.staff?.name || '이름 없음'} ${isDeletedMessage ? '삭제된 메시지' : '메시지'}`}
                           >
                             {!isDeletedMessage && msg.reply_to_id && (() => {
-                              const parent = messages.find((message) => message.id === msg.reply_to_id);
-                              const parentSenderName = parent ? (parent.staff as { name?: string } | null | undefined)?.name || '사용자' : '이전 메시지';
+                              const loadedParent =
+                                messages.find((message) => message.id === msg.reply_to_id) || null;
+                              // 로드된 목록에 없으면 따로 조회해 둔 원문을 쓴다.
+                              const parent = loadedParent || replyParents[String(msg.reply_to_id)] || null;
+                              // 화면에 있어야 스크롤 이동이 의미가 있다.
+                              const parentLoaded = Boolean(loadedParent);
+                              const parentSenderName = parent
+                                ? (parent.staff as { name?: string } | null | undefined)?.name
+                                  || String((parent as { sender_name?: string }).sender_name || '')
+                                  || '사용자'
+                                : '이전 메시지';
+                              // 원문을 아직 못 찾았을 때만 조회 대기 상태다.
+                              const parentPending = !parent && !(String(msg.reply_to_id) in replyParents);
                               const replyPreviewClass = isMine
                                 ? 'bg-white/15 border-white/50 text-white/95'
                                 : 'bg-[var(--muted)] border-[var(--accent)]/50 text-[var(--foreground)]';
@@ -1096,12 +1122,12 @@ function MessengerTimelineComponent({
                                     event.stopPropagation();
                                     handleScrollToMessage(msg.reply_to_id!);
                                   }}
-                                  title="원문 메시지 위치로 이동"
+                                  title={parentLoaded ? '원문 메시지 위치로 이동' : '원문 메시지'}
                                 >
                                   <div className="flex items-center gap-1.5 font-bold opacity-90 mb-0.5">
                                     <span className="text-[10px]">↩</span>
                                     <span>{parent ? `${parentSenderName}님에게 답글` : '답글 원문 메시지'}</span>
-                                    {!parent && <span className="ml-auto text-[10px] font-normal underline opacity-80">이동 ↑</span>}
+                                    {parentLoaded && <span className="ml-auto text-[10px] font-normal underline opacity-80">이동 ↑</span>}
                                   </div>
                                   <div className="truncate opacity-85 text-[11px] leading-tight">
                                     {parent ? (
@@ -1115,8 +1141,10 @@ function MessengerTimelineComponent({
                                         false,
                                         ''
                                       )
+                                    ) : parentPending ? (
+                                      <span className="italic opacity-70">원문 메시지를 불러오는 중…</span>
                                     ) : (
-                                      <span className="italic opacity-85">원문 메시지 위치로 이동하려면 클릭하세요 ⬆</span>
+                                      <span className="italic opacity-70">삭제되었거나 찾을 수 없는 메시지</span>
                                     )}
                                   </div>
                                 </div>

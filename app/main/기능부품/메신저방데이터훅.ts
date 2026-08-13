@@ -38,6 +38,7 @@ import {
   DATE_JUMP_CONTEXT_BEFORE,
   MESSAGE_PAGE_SIZE } from './메신저방데이터-types';
 import { defaultLegacySelectChatMessagesWithFallback, describeQueryError, normalizeMessageCursorTime } from './메신저방데이터-utils';
+import { shouldApplyRoomSummary } from '@/lib/chat-room-summary';
 import { selectMessageBookmarkRows, selectMessageReactionRows } from './메신저방데이터-queries';
 
 export function useChatRoomDataSync({
@@ -297,17 +298,31 @@ export function useChatRoomDataSync({
           new Set([...(convRoomIds.length > 0 ? convRoomIds : [targetRoomId]), targetRoomId].filter(Boolean)),
         );
         if (!prev.some((room: ChatRoom) => targetIds.includes(String(room.id)))) return prev;
-        return sortChatRoomsWithNoticeFirst(
-          prev.map((room: ChatRoom) =>
-            targetIds.includes(String(room.id))
-              ? {
-                  ...room,
-                  last_message: summary.last_message || room.last_message,
-                  last_message_preview: summary.last_message_preview || room.last_message_preview,
-                  last_message_at: summary.last_message_at || room.last_message_at }
-              : room,
-          ),
-        );
+
+        // 요약을 **과거로 되돌리지 않는다.**
+        //
+        // 이 요약은 "지금 로드된 메시지" 에서 계산한다. 그래서 과거 이력을 더
+        // 불러오거나 특정 메시지 주변만 불러온 직후에 부르면, 창에 들어온 것이
+        // 옛 메시지뿐이라 방의 마지막 메시지가 며칠 전으로 후퇴한다. 게다가 이
+        // 갱신은 대화 그룹의 모든 방에 적용되고 목록을 재정렬하므로, 답글의
+        // "원문 보기" 를 한 번 누르면 채팅방 목록 전체가 흔들려 보였다.
+        //
+        // DB 의 chat_rooms.last_message_at 은 정확하다(운영 대조 확인). 클라이언트
+        // 계산이 그보다 오래됐다면 버린다.
+        let changed = false;
+        const next = prev.map((room: ChatRoom) => {
+          if (!targetIds.includes(String(room.id))) return room;
+          if (!shouldApplyRoomSummary(room.last_message_at, summary.last_message_at)) {
+            return room;
+          }
+          changed = true;
+          return {
+            ...room,
+            last_message: summary.last_message || room.last_message,
+            last_message_preview: summary.last_message_preview || room.last_message_preview,
+            last_message_at: summary.last_message_at || room.last_message_at };
+        });
+        return changed ? sortChatRoomsWithNoticeFirst(next) : prev;
       });
     },
     [setChatRooms],
