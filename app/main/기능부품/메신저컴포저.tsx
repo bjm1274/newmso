@@ -476,7 +476,7 @@ function MessengerComposerImpl({
         </div>
       )}
 
-      <div className={`chat-composer items-end ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
+      <div className={`chat-composer ${selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
         ? 'opacity-60 pointer-events-none'
         : ''
         }`}>
@@ -499,64 +499,13 @@ function MessengerComposerImpl({
           multiple
         />
 
-        {/* 좌측 액션바: +(첨부) / 이모지 — 투표는 채팅방 정보(드로어)에서, 멘션은 @ 입력으로 */}
-        <div className="chat-comp-actions shrink-0 pb-0.5">
-          {/* 첨부 */}
-          {canAttachFile && (
-            <button
-              type="button"
-              data-testid="chat-attach-button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={fileUploading}
-              aria-label="파일 첨부"
-              title="파일 첨부"
-              className="flex h-[30px] w-[30px] items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)] disabled:opacity-40"
-            >
-              {fileUploading ? (
-                <span className="animate-pulse text-[10px]">…</span>
-              ) : (
-                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M10 4v12M4 10h12" />
-                </svg>
-              )}
-            </button>
-          )}
-          {/* 이모지 팝오버 */}
-          <div className="relative">
-            <button
-              type="button"
-              data-testid="chat-emoji-button"
-              onClick={handleEmojiButtonClick}
-              aria-label="이모지 삽입"
-              aria-expanded={showEmojiPicker}
-              title="이모지"
-              className="flex h-[30px] w-[30px] items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)]"
-            >
-              <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="10" cy="10" r="7.5" />
-                <path d="M7 11.5s.8 1.5 3 1.5 3-1.5 3-1.5" />
-                <circle cx="7.5" cy="8.5" r="0.8" fill="currentColor" stroke="none" />
-                <circle cx="12.5" cy="8.5" r="0.8" fill="currentColor" stroke="none" />
-              </svg>
-            </button>
-            {showEmojiPicker && (
-              <EmojiPicker
-                x={pickerAnchor.x}
-                y={pickerAnchor.y}
-                onPick={handleInsertEmoji}
-                onClose={() => setShowEmojiPicker(false)}
-              />
-            )}
-          </div>
-        </div>
-
         {/* 가운데: 자라나는 textarea */}
-        <div className="chat-comp-input relative flex-1">
+        <div className="chat-comp-input relative">
           <textarea
             ref={composerRef}
             data-testid="chat-message-input"
             rows={1}
-            className="block min-h-[30px] w-full min-w-0 resize-none bg-transparent px-1 py-1 text-[16px] font-semibold leading-5 outline-none md:min-h-[36px] md:px-1.5 md:py-2 md:text-sm md:leading-5"
+            className="block min-h-[30px] w-full min-w-0 resize-none bg-transparent text-[16px] font-semibold leading-5 outline-none md:min-h-[36px] md:text-sm md:leading-5"
             placeholder={
               selectedRoomId === NOTICE_ROOM_ID && !canWriteNotice
                 ? '부서장 이상만 공지 작성 가능'
@@ -591,18 +540,72 @@ function MessengerComposerImpl({
           )}
         </div>
 
-        {/* 우측: 라이브 §2-2 .chat-comp-send */}
-        <button
-          type="button"
-          data-testid="chat-send-button"
-          onClick={() => void onSendMessage()}
-          aria-label="메시지 전송"
-          className="chat-comp-send shrink-0 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 mb-0.5"
-        >
-          <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 10l12-6-4 6 4 6-12-6z" />
-          </svg>
-        </button>
+        {/* 아래 툴바: 첨부 / 이모지 — 투표는 채팅방 정보(드로어)에서, 멘션은 @ 입력으로 */}
+        <div className="chat-comp-actions items-center">
+          {/* 첨부 */}
+          {canAttachFile && (
+            <button
+              type="button"
+              data-testid="chat-attach-button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={fileUploading}
+              aria-label="파일 첨부"
+              title="파일 첨부"
+              className="flex h-[30px] w-[30px] items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)] disabled:opacity-40"
+            >
+              {fileUploading ? (
+                <span className="animate-pulse text-[10px]">…</span>
+              ) : (
+                // 플러스는 "추가" 라는 뜻만 있어 무엇이 붙는지 안 보였다. 클립으로.
+                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15.5 9.5l-5.7 5.7a3.4 3.4 0 0 1-4.8-4.8l6.4-6.4a2.3 2.3 0 0 1 3.2 3.2l-6.4 6.4a1.1 1.1 0 0 1-1.6-1.6l5.7-5.7" />
+                </svg>
+              )}
+            </button>
+          )}
+          {/* 이모지 팝오버 */}
+          <div className="relative">
+            <button
+              type="button"
+              data-testid="chat-emoji-button"
+              onClick={handleEmojiButtonClick}
+              aria-label="이모지 삽입"
+              aria-expanded={showEmojiPicker}
+              title="이모지"
+              className="flex h-[30px] w-[30px] items-center justify-center rounded-[var(--radius-md)] text-[var(--toss-gray-4)] transition-colors hover:bg-[var(--tab-bg)] hover:text-[var(--foreground)]"
+            >
+              <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="10" cy="10" r="7.5" />
+                <path d="M7 11.5s.8 1.5 3 1.5 3-1.5 3-1.5" />
+                <circle cx="7.5" cy="8.5" r="0.8" fill="currentColor" stroke="none" />
+                <circle cx="12.5" cy="8.5" r="0.8" fill="currentColor" stroke="none" />
+              </svg>
+            </button>
+            {showEmojiPicker && (
+              <EmojiPicker
+                x={pickerAnchor.x}
+                y={pickerAnchor.y}
+                onPick={handleInsertEmoji}
+                onClose={() => setShowEmojiPicker(false)}
+              />
+            )}
+          </div>
+
+          <span className="ml-auto mr-1 select-none text-[11px] font-semibold text-[var(--zinc-400)]">
+            Enter 전송
+          </span>
+          <button
+            type="button"
+            data-testid="chat-send-button"
+            onClick={() => void onSendMessage()}
+            aria-label="메시지 전송"
+            className="chat-comp-send shrink-0 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+          >
+            <svg aria-hidden="true" viewBox="0 0 20 20" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 10l12-6-4 6 4 6-12-6z" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   );

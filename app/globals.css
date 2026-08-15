@@ -2960,11 +2960,11 @@ body.ios-safe-root > div[class*="min-h-screen"] {
 .chat-room {
   position: relative;
   display: grid;
-  grid-template-columns: 30px 1fr auto;
-  gap: 8px;
+  grid-template-columns: 36px 1fr auto;
+  gap: 10px;
   align-items: center;
-  padding: 8px 6px;
-  border-radius: 8px;
+  padding: 9px 14px;
+  border-radius: 0;
   cursor: pointer;
   min-width: 0;
   border: 0;
@@ -2976,12 +2976,22 @@ body.ios-safe-root > div[class*="min-h-screen"] {
 .chat-room:hover { background: var(--surface-subtle); }
 .chat-room.on { background: var(--accent-soft); }
 .chat-room.on .chat-room-name { color: var(--accent); }
+/* 선택 상태를 배경색만으로 알리면 accent-soft 가 옅어 놓치기 쉽다. 좌측 바를 함께. */
+.chat-room.on::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--accent);
+}
 
 .chat-room-pic {
   position: relative;
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
   font-size: 12px;
@@ -3024,7 +3034,7 @@ body.ios-safe-root > div[class*="min-h-screen"] {
   min-width: 0;
 }
 .chat-room-name {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 800;
   letter-spacing: -0.015em;
   color: var(--foreground);
@@ -3047,7 +3057,7 @@ body.ios-safe-root > div[class*="min-h-screen"] {
   font-feature-settings: "tnum";
 }
 .chat-room-last {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--toss-gray-3);
   margin-top: 2px;
   white-space: nowrap;
@@ -3181,9 +3191,9 @@ body.ios-safe-root > div[class*="min-h-screen"] {
   min-width: 0;
 }
 .chat-bub-name {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--toss-gray-5);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--zinc-600);
   margin-bottom: 2px;
   padding: 0 4px;
 }
@@ -3195,8 +3205,8 @@ body.ios-safe-root > div[class*="min-h-screen"] {
 .chat-bub {
   padding: 9px 13px;
   border-radius: 16px;
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: 13.5px;
+  line-height: 1.6;
   word-break: keep-all;
   max-width: 100%;
 }
@@ -3212,8 +3222,8 @@ body.ios-safe-root > div[class*="min-h-screen"] {
   border-bottom-left-radius: 5px;
 }
 .chat-bub-ts {
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 600;
   color: var(--zinc-400);
   white-space: nowrap;
   flex-shrink: 0;
@@ -3394,17 +3404,17 @@ body.ios-safe-root > div[class*="min-h-screen"] {
 .chat-composer {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 10px 12px;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 10px;
-  align-items: center;
+  border-radius: 14px;
+  /* 툴바가 입력 칸 왼쪽에 있으면 한 줄짜리 입력에도 세로 정렬이 흔들렸다.
+     입력 → 툴바 순서로 쌓아 박스 안에 넣는다. */
+  padding: 0;
+  display: block;
   box-shadow: var(--shadow-xs);
 }
 .chat-comp-actions {
   display: flex;
   gap: 4px;
+  padding: 4px 8px 8px;
 }
 .chat-comp-actions button {
   width: 30px;
@@ -3427,17 +3437,18 @@ body.ios-safe-root > div[class*="min-h-screen"] {
   resize: none;
   border: 0;
   outline: 0;
-  font-size: 13px;
+  font-size: 13.5px;
   line-height: 1.5;
+  padding: 10px 14px;
   color: var(--foreground);
   background: transparent;
 }
 .chat-comp-input textarea::placeholder { color: var(--zinc-400); }
 .chat-comp-send {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 14px;
   background: var(--accent);
   color: #fff;
   cursor: pointer;

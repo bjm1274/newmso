@@ -639,18 +639,22 @@ function MessengerTimelineComponent({
   }, []);
 
   const renderDateDivider = (dateLabel: string, dateKey: string, dateShort?: string) => (
-    <div data-testid="chat-date-divider" data-date-label={dateLabel} data-date-short={dateShort || dateLabel} className="my-2 flex items-center justify-center md:my-3">
+    // 알약이 아니라 좌우 헤어라인 + 중앙 라벨 — 시스템 안내 알약과 같은 모양이라
+    // 어느 쪽이 시간 눈금인지 구분되지 않았다. 모바일과 같은 규칙으로 맞춘다.
+    <div data-testid="chat-date-divider" data-date-label={dateLabel} data-date-short={dateShort || dateLabel} className="my-2 flex items-center gap-2.5 md:my-3">
+      <span aria-hidden="true" className="h-px flex-1 bg-[var(--border)]" />
       <button
         type="button"
         onClick={() => {
           if (dateKey) onOpenDateJump?.(dateKey);
         }}
-        className="shrink-0 rounded-full bg-[var(--muted)] px-2.5 py-0.5 text-[10px] font-semibold text-[var(--toss-gray-3)] transition-colors hover:bg-[var(--toss-blue-light)] hover:text-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
+        className="shrink-0 rounded-full px-1 text-[11px] font-bold text-[var(--zinc-400)] transition-colors hover:text-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30"
         title="날짜로 이동"
         aria-label={`${dateLabel} 날짜로 이동`}
       >
         {dateLabel}
       </button>
+      <span aria-hidden="true" className="h-px flex-1 bg-[var(--border)]" />
     </div>
   );
 
@@ -820,7 +824,7 @@ function MessengerTimelineComponent({
                           <MessengerAvatar
                             name={senderName}
                             photoUrl={(albumItem.staff as { photo_url?: string | null } | null)?.photo_url || null}
-                            className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-[var(--muted)] text-[10px] font-bold text-[var(--toss-gray-4)]"
+                            className="flex h-[30px] w-[30px] items-center justify-center overflow-hidden rounded-[9px] bg-[var(--muted)] text-[11px] font-bold text-[var(--toss-gray-4)]"
                             decorative
                           />
                         </button>
@@ -1021,7 +1025,7 @@ function MessengerTimelineComponent({
                               <MessengerAvatar
                                 name={senderName}
                                 photoUrl={senderPhotoUrl}
-                                className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-[var(--tab-bg)] text-[10px] font-bold text-[var(--toss-gray-3)] ring-1 ring-black/5"
+                                className="flex h-[30px] w-[30px] items-center justify-center overflow-hidden rounded-[9px] bg-[var(--tab-bg)] text-[11px] font-bold text-[var(--toss-gray-3)]"
                                 decorative
                               />
                             </button>
@@ -1151,22 +1155,29 @@ function MessengerTimelineComponent({
                               // 원문을 아직 못 찾았을 때만 조회 대기 상태다.
                               const parentPending = !parent && !(String(msg.reply_to_id) in replyParents);
                               const replyPreviewClass = isMine
-                                ? 'bg-white/15 border-white/50 text-white/95'
-                                : 'bg-[var(--muted)] border-[var(--accent)]/50 text-[var(--foreground)]';
+                                ? 'bg-white/15 text-white/95'
+                                : 'bg-[var(--muted)] text-[var(--foreground)]';
                               return (
                                 <div
                                   data-testid={`chat-reply-preview-${msg.id}`}
-                                  className={`mb-1.5 p-2 rounded-[var(--radius-md)] text-[11px] border-l-3 cursor-pointer hover:opacity-85 transition-all shadow-2xs ${replyPreviewClass}`}
+                                  className={`mb-1.5 flex gap-2 rounded-[10px] p-2 text-[11px] cursor-pointer hover:opacity-85 transition-all ${replyPreviewClass}`}
                                   onClick={(event) => {
                                     event.stopPropagation();
                                     handleScrollToMessage(msg.reply_to_id!);
                                   }}
                                   title={parentInTimeline ? '원문 메시지 위치로 이동' : '원문 메시지로 이동 (불러오는 중일 수 있습니다)'}
                                 >
+                                  {/* border-left 대신 실제 바 — 인용 블록 안 여백과 어긋나지 않는다 */}
+                                  <span
+                                    aria-hidden="true"
+                                    className={`w-[3px] shrink-0 self-stretch rounded-[2px] ${isMine ? 'bg-white/70' : 'bg-[var(--accent)]'}`}
+                                  />
+                                  <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-1.5 font-bold opacity-90 mb-0.5">
-                                    <span className="text-[10px]">↩</span>
                                     <span>{parent ? `${parentSenderName}님에게 답글` : '답글 원문 메시지'}</span>
-                                    <span className="ml-auto text-[10px] font-normal underline opacity-80">이동 ↑</span>
+                                    <svg aria-hidden="true" viewBox="0 0 20 20" className="ml-auto h-3.5 w-3.5 opacity-80" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <path d="M5 12l5-5 5 5" />
+                                    </svg>
                                   </div>
                                   <div className="block w-full overflow-hidden text-ellipsis whitespace-nowrap opacity-85 text-[11px] leading-tight [&_*]:whitespace-nowrap">
                                     {parent ? (
@@ -1180,7 +1191,7 @@ function MessengerTimelineComponent({
                                           parent.file_url,
                                           '첨부 파일'
                                         )
-                                          .replace(/s+/g, ' ')
+                                          .replace(/\s+/g, ' ')
                                           .trim()
                                           .slice(0, REPLY_PREVIEW_MAX_CHARS),
                                         false,
@@ -1191,6 +1202,7 @@ function MessengerTimelineComponent({
                                     ) : (
                                       <span className="italic opacity-70">삭제되었거나 찾을 수 없는 메시지</span>
                                     )}
+                                  </div>
                                   </div>
                                 </div>
                               );
@@ -1237,7 +1249,7 @@ function MessengerTimelineComponent({
                                           event.stopPropagation();
                                           onOpenReactionDetail(msg, emoji);
                                         }}
-                                        className={`px-1.5 py-0.5 rounded text-[11px] transition-colors ${isMine ? 'bg-[var(--card)]/20 hover:bg-[var(--card)]/30' : 'bg-[var(--muted)] hover:bg-[var(--toss-blue-light)]'}`}
+                                        className={`inline-flex h-6 items-center gap-1 rounded-full border px-[9px] text-[11px] font-bold transition-colors ${isMine ? 'border-white/30 bg-[var(--card)]/20 hover:bg-[var(--card)]/30' : 'border-[var(--border)] bg-[var(--card)] text-[var(--zinc-600)] hover:bg-[var(--toss-blue-light)]'}`}
                                         aria-label={`${emoji} 반응 누른 사람 ${count}명 보기`}
                                       >
                                         {emoji} {count}
