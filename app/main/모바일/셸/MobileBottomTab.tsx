@@ -118,7 +118,7 @@ function MobileBottomTabBase({
 
   return (
     <nav
-      className="m-bottom-tab macos-glass"
+      className="m-bottom-tab"
       aria-label="주 네비게이션"
       data-testid="mobile-tabbar"
       style={{
@@ -128,8 +128,10 @@ function MobileBottomTabBase({
         right: '16px',
         height: '64px',
         borderRadius: '22px',
-        border: '1px solid rgba(255, 255, 255, 0.4)',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+        // 유리 대신 카드 배경 — 반투명은 스크롤 콘텐츠에 따라 대비가 무너진다.
+        background: 'var(--m-card)',
+        border: '1px solid var(--m-border)',
+        boxShadow: '0 8px 28px rgba(24, 24, 27, 0.14)',
         display: 'flex',
         alignItems: 'center',
         padding: '0 10px',
@@ -180,8 +182,8 @@ function MobileBottomTabBase({
               cursor: 'pointer',
               outline: 'none',
               position: 'relative',
-              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-              transform: on ? 'scale(1.08) translateY(-1px)' : 'scale(1)' }}
+              // scale 은 탭 폭을 흔들어 가로 스크롤 위치가 튄다 — transform 을 쓰지 않는다.
+              transition: 'color 0.2s ease' }}
           >
             <div
               className="ico-wrap"
@@ -204,7 +206,7 @@ function MobileBottomTabBase({
                 strokeLinejoin="round"
                 aria-hidden="true"
                 style={{
-                  filter: on ? 'drop-shadow(0 2px 8px rgba(0, 122, 255, 0.35))' : 'none' }}
+                  filter: on ? 'drop-shadow(0 2px 8px rgba(37, 99, 235, 0.35))' : 'none' }}
               >
                 {TAB_ICONS[t.id]}
               </svg>
@@ -240,39 +242,25 @@ function MobileBottomTabBase({
                     alignItems: 'center',
                     justifyContent: 'center',
                     lineHeight: 1,
-                    boxShadow: '0 2px 5px rgba(255, 59, 48, 0.3)' }}
+                    border: '2px solid var(--m-card)' }}
                 >
                   {badgeCount > 99 ? '99+' : badgeCount}
                 </span>
               )}
             </div>
             
-            {/* 맥OS 독 스타일 활성 인디케이터 라이트 닷 또는 레이블 */}
-            {on ? (
-              <span
-                className="macos-dock-indicator"
-                style={{
-                  width: 4,
-                  height: 4,
-                  borderRadius: '50%',
-                  background: 'var(--m-accent)',
-                  boxShadow: '0 0 5px var(--m-accent)',
-                  marginTop: 6,
-                  display: 'block' }}
-              />
-            ) : (
-              <span
-                className="lab"
-                style={{
-                  fontSize: 9.5,
-                  fontWeight: 700,
-                  color: 'var(--z-500)',
-                  marginTop: 4,
-                  letterSpacing: '-0.02em' }}
-              >
-                {t.label}
-              </span>
-            )}
+            {/* 활성 탭도 라벨을 유지한다 — 점으로 바뀌면 무슨 탭인지 알 수 없다. */}
+            <span
+              className="lab"
+              style={{
+                fontSize: on ? 10 : 9.5,
+                fontWeight: on ? 800 : 700,
+                color: on ? 'var(--m-accent)' : 'var(--z-500)',
+                marginTop: 4,
+                letterSpacing: '-0.02em' }}
+            >
+              {t.label}
+            </span>
           </button>
         );
       })}

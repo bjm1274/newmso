@@ -279,23 +279,23 @@ export default function SChatList({ user, rooms, roomsLoading = false, onOpen, o
       <PullRefreshIndicator refreshing={refreshing} pullProgress={pullProgress} />
       {searchOpen && (
         <div
-          className="macos-glass"
           style={{
-            height: 48,
-            padding: '6px 16px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
+            height: 52,
+            padding: '8px 16px',
+            background: 'var(--m-card)',
+            borderBottom: '1px solid var(--m-border)',
             display: 'flex',
             alignItems: 'center',
             gap: 8 }}
         >
           <label
-            className="macos-squircle-sm"
             style={{
               flex: 1,
               display: 'flex',
               alignItems: 'center',
               gap: 8,
-              background: 'rgba(0, 0, 0, 0.04)',
+              borderRadius: 10,
+              background: 'var(--z-100)',
               padding: '6px 12px' }}
           >
             <MIcon name="search" size={16} color="var(--z-500)" />
@@ -340,23 +340,22 @@ export default function SChatList({ user, rooms, roomsLoading = false, onOpen, o
         </div>
       )}
       <div
-        className="macos-glass"
         style={{
           display: 'flex',
           alignItems: 'center',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
+          background: 'var(--m-card)',
+          borderBottom: '1px solid var(--m-border)',
           padding: '8px 12px 8px 16px' }}
       >
         <div
-          className="m-seg macos-glass macos-squircle-sm"
           role="tablist"
           aria-label="채팅 필터"
           style={{
             flex: 1,
-            background: 'rgba(0, 0, 0, 0.04)',
-            border: 'none',
-            padding: '2px',
             display: 'flex',
+            gap: 6,
+            overflowX: 'auto',
+            scrollbarWidth: 'none',
             marginRight: 8 }}
         >
           <ChipBtn label="채팅" active={tab === 'chat'} onClick={() => setTab('chat')} />
@@ -370,17 +369,19 @@ export default function SChatList({ user, rooms, roomsLoading = false, onOpen, o
           <ChipBtn label="1:1" active={tab === 'direct'} onClick={() => setTab('direct')} />
         </div>
         <button
-          className="msm-ibtn macos-glass macos-squircle-sm"
+          className="msm-ibtn"
           type="button"
           onClick={() => setSearchOpen((prev) => !prev)}
           aria-label="검색"
           style={{
             flexShrink: 0,
-            width: 32,
-            height: 32,
+            width: 36,
+            height: 36,
+            borderRadius: 10,
             display: 'grid',
             placeItems: 'center',
-            background: searchOpen ? 'rgba(0, 0, 0, 0.08)' : 'transparent',
+            background: searchOpen ? 'var(--m-accent-soft)' : 'var(--z-100)',
+            color: searchOpen ? 'var(--m-accent)' : 'var(--z-600)',
             border: 'none',
             cursor: 'pointer' }}
         >
@@ -423,10 +424,10 @@ export default function SChatList({ user, rooms, roomsLoading = false, onOpen, o
                     const name = staff.name || '직원';
                     const tone = pickAvatarTone(String(staff.id) + name);
                     return (
-                      <div key={String(staff.id)} style={{ padding: '0 16px 8px' }}>
+                      <div key={String(staff.id)}>
                         <button
                           type="button"
-                          className="m-list-row macos-glass macos-squircle-sm"
+                          className="m-list-row"
                           onClick={() => handleStartDirectChat(String(staff.id), name)}
                           style={{
                             width: '100%',
@@ -436,7 +437,10 @@ export default function SChatList({ user, rooms, roomsLoading = false, onOpen, o
                             alignItems: 'center',
                             gap: 12,
                             padding: '12px 16px',
-                            border: 'none' }}
+                            background: 'var(--m-card)',
+                            color: 'var(--z-900)',
+                            border: 'none',
+                            borderBottom: '1px solid var(--m-border)' }}
                         >
                           <MAvatar tone={tone}>{name.charAt(0)}</MAvatar>
                           <div style={{ flex: 1 }}>
@@ -641,12 +645,11 @@ function MessageHitRow({ hit, rooms, staffs, userId, query, last, onClick }: Mes
   const tone = pickAvatarTone(hit.roomId + roomTitle);
 
   return (
-    <div style={{ padding: '0 16px 8px' }}>
+    <div>
       <button
         type="button"
         onClick={onClick}
         aria-label={`${roomTitle} 대화 열기`}
-        className="macos-glass macos-squircle-sm"
         style={{
           display: 'grid',
           gridTemplateColumns: '40px 1fr auto',
@@ -655,7 +658,11 @@ function MessageHitRow({ hit, rooms, staffs, userId, query, last, onClick }: Mes
           padding: '12px 16px',
           width: '100%',
           textAlign: 'left',
-          border: 'none' }}
+          background: 'var(--m-card)',
+          color: 'var(--z-900)',
+          cursor: 'pointer',
+          border: 'none',
+          borderBottom: '1px solid var(--m-border)' }}
       >
         <MAvatar tone={tone}>
           <span>{roomTitle.charAt(0) || '방'}</span>
@@ -703,17 +710,20 @@ function ChipBtn({ label, active, onClick }: ChipBtnProps) {
       type="button"
       role="tab"
       aria-selected={active}
-      className={active ? 'on macos-glass macos-squircle-sm' : 'macos-squircle-sm'}
       style={{
-        flex: 1,
-        border: 'none',
-        padding: '6px 2px',
-        fontSize: '12px',
-        fontWeight: active ? 700 : 500,
-        color: active ? 'var(--z-900)' : 'var(--z-600)',
+        flexShrink: 0,
+        height: 32,
+        padding: '0 13px',
+        borderRadius: 999,
+        fontSize: 12.5,
+        fontWeight: active ? 800 : 700,
         cursor: 'pointer',
-        transition: 'all 0.2s ease',
-        background: 'transparent' }}
+        transition: 'background-color 0.2s ease, color 0.2s ease',
+        // 예전에는 인라인 background:'transparent' 가 .m-seg button.on 을 덮어
+        // 활성 상태가 굵기로만 표시됐다. 배경을 직접 준다.
+        background: active ? 'var(--z-900)' : 'var(--m-card)',
+        color: active ? 'var(--m-card)' : 'var(--z-600)',
+        border: active ? 'none' : '1px solid var(--m-border)' }}
       onClick={onClick}
     >
       {label}
@@ -771,24 +781,28 @@ function RoomRow({ room, userId, staffs, presenceMap, last, onClick }: RoomRowPr
   const showPresence = Boolean(peerName && !isGroup && !isNotice);
 
   return (
-    <div style={{ padding: '0 16px 8px' }}>
-      <button
-        type="button"
-        onClick={onClick}
-        aria-label={`${title} 채팅방 열기`}
-        data-testid={`chat-room-${room.id}`}
-        className="macos-glass macos-squircle-sm"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '52px 1fr auto',
-          gap: 12,
-          alignItems: 'center',
-          padding: '14px 16px',
-          width: '100%',
-          textAlign: 'left',
-          border: 'none',
-          transition: 'transform 0.15s ease, background-color 0.15s ease' }}
-      >
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`${title} 채팅방 열기`}
+      data-testid={`chat-room-${room.id}`}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '52px 1fr auto',
+        gap: 12,
+        alignItems: 'center',
+        padding: '12px 16px',
+        width: '100%',
+        textAlign: 'left',
+        background: 'var(--m-card)',
+        border: 'none',
+        borderBottom: '1px solid var(--m-border)',
+        // <button> 은 color 를 상속하지 않는다. 명시하지 않으면 다크 모드에서
+        // 방 제목이 검정으로 떨어져 읽히지 않았다.
+        color: 'var(--z-900)',
+        cursor: 'pointer',
+        transition: 'background-color 0.15s ease' }}
+    >
         <div style={{ position: 'relative', width: 44, height: 44 }}>
           <MAvatar tone={tone} data-testid={`chat-room-icon-${room.id}`}>
             {isNotice ? (
@@ -873,8 +887,7 @@ function RoomRow({ room, userId, staffs, presenceMap, last, onClick }: RoomRowPr
             </span>
           )}
         </div>
-      </button>
-    </div>
+    </button>
   );
 }
 
@@ -903,18 +916,20 @@ function OrgBrowseTab({
       {groups.map((g) => {
         const isExpanded = expanded[g.department] !== false;
         return (
-          <div key={g.department} style={{ margin: '0 16px 10px' }}>
+          <div key={g.department}>
             <button
               type="button"
               onClick={() => toggle(g.department)}
-              className="macos-glass macos-squircle-sm"
               style={{
                 width: '100%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '12px 16px',
+                padding: '11px 16px',
+                background: 'var(--z-100)',
+                color: 'var(--z-900)',
                 border: 'none',
+                borderBottom: '1px solid var(--m-border)',
                 cursor: 'pointer',
                 textAlign: 'left' }}
             >
@@ -938,7 +953,7 @@ function OrgBrowseTab({
                     <button
                       key={String(m.id)}
                       type="button"
-                      className="m-list-row macos-glass macos-squircle-sm"
+                      className="m-list-row"
                       onClick={() => onStartChat(String(m.id), name)}
                       style={{
                         width: '100%',
@@ -947,8 +962,11 @@ function OrgBrowseTab({
                         display: 'flex',
                         alignItems: 'center',
                         gap: 12,
-                        padding: '10px 16px',
-                        border: 'none' }}
+                        padding: '11px 16px',
+                        background: 'var(--m-card)',
+                        color: 'var(--z-900)',
+                        border: 'none',
+                        borderBottom: '1px solid var(--m-border)' }}
                     >
                       <MAvatar tone={tone}>{name.charAt(0)}</MAvatar>
                       <div style={{ flex: 1 }}>
