@@ -14,7 +14,7 @@ export type MobileHeaderProps = {
 export default function MobileHeader({ title, sub, eyebrow, back, backIcon, actions }: MobileHeaderProps) {
   return (
     <div
-      className="m-header macos-glass"
+      className="m-header"
       style={{
         /* 상태바 침범은 .mso-mobile top:sat 가 원천 차단 — 헤더는 이중 sat 패딩 금지 */
         paddingTop: 14,
@@ -24,13 +24,12 @@ export default function MobileHeader({ title, sub, eyebrow, back, backIcon, acti
         display: 'flex',
         alignItems: 'center',
         gap: 12,
-        borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+        borderBottom: '1px solid var(--m-border)',
         position: 'sticky',
         top: 0,
         zIndex: 99,
-        background: 'rgba(255, 255, 255, 0.65)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)' }}
+        // 반투명 유리는 스크롤되는 콘텐츠에 따라 제목 대비가 바뀐다. 카드 배경 고정.
+        background: 'var(--m-card)' }}
     >
 
 

@@ -18,7 +18,24 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 
+import { MenuIcon } from '../조직도서브/조직도측면창';
+
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '🙏', '👌'] as const;
+
+/**
+ * 메뉴 한 줄. 모바일 시트와 PC 팝오버가 이 정의를 공유한다.
+ * 아이콘은 이모지 대신 선 아이콘 이름 (ICON_PATHS 키).
+ */
+type MenuItemDef = {
+  key: string;
+  icon: string;
+  label: string;
+  shortcut?: string;
+  onSelect: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+  defaultFocus?: boolean;
+};
 
 const MENU_WIDTH = 240;
 const MENU_HEIGHT_APPROX = 340;
@@ -158,6 +175,55 @@ export default function MessageContextMenu({
 
   if (!mounted) return null;
 
+  /**
+   * 항목 정의를 한 벌만 둔다.
+   *
+   * 예전에는 모바일 시트와 PC 팝오버가 같은 9개 항목을 각자 <button> 으로 적어
+   * 두 벌이었다 — 라벨이 한쪽만 바뀌거나(전달 아이콘 📤 vs ➡️) 조건이 어긋나는
+   * 일이 실제로 있었다. 렌더 껍데기만 갈라 두고 목록은 여기서 만든다.
+   */
+  const items: MenuItemDef[] = [
+    { key: 'reply', icon: 'reply', label: '답글로 전송', shortcut: 'R', defaultFocus: true, onSelect: onReply },
+    ...(onEdit
+      ? [{ key: 'edit', icon: 'edit', label: '메시지 수정', disabled: !canEdit, onSelect: onEdit }]
+      : []),
+    { key: 'copy', icon: 'document', label: '메시지 복사', shortcut: isMac ? '⌘C' : 'Ctrl+C', onSelect: onCopy },
+    { key: 'forward', icon: 'arrow-right', label: '다른 대화로 전달', onSelect: onForward },
+    { key: 'bookmark', icon: 'tag', label: '북마크에 저장', shortcut: 'B', onSelect: onBookmark },
+    ...(onPin
+      ? [{ key: 'pin', icon: 'bell', label: isPinned ? '공지 해제' : '공지로 등록', onSelect: onPin }]
+      : []),
+    { key: 'task', icon: 'check', label: '할 일로 변환', onSelect: onTask },
+    ...(onOpenThread
+      ? [{
+          key: 'thread',
+          icon: 'chat',
+          label: threadReplyCount && threadReplyCount > 0 ? `스레드 답글 (${threadReplyCount})` : '스레드 답글',
+          onSelect: onOpenThread }]
+      : []),
+    ...(onReadDetail
+      ? [{ key: 'read', icon: 'search', label: '읽음 확인', onSelect: onReadDetail }]
+      : []),
+  ];
+
+  const deleteItem: MenuItemDef = {
+    key: 'delete',
+    icon: 'trash',
+    label: '메시지 삭제',
+    disabled: !canDelete,
+    danger: true,
+    onSelect: () => onDelete?.() };
+
+  const run = (item: MenuItemDef) => {
+    if (item.disabled) return;
+    item.onSelect();
+    onClose();
+  };
+
+  const separator = (
+    <div role="separator" aria-hidden="true" className="my-1 h-px bg-[var(--border)]" />
+  );
+
   if (isMobile) {
     return createPortal(
       <>
@@ -169,7 +235,6 @@ export default function MessageContextMenu({
             onClose();
           }}
         />
-        {/* Mobile BottomSheet container (macOS glass 스타일) */}
         <div
           ref={ref}
           role="menu"
@@ -178,14 +243,14 @@ export default function MessageContextMenu({
           style={{
             paddingBottom: 'calc(24px + env(safe-area-inset-bottom))'
           }}
-          className={`fixed bottom-0 left-0 right-0 z-[var(--z-bottomsheet)] rounded-t-[24px] bg-white dark:bg-[#1c1c1e] border-x-0 border-b-0 border-t border-[rgba(0,0,0,0.08)] dark:border-[rgba(255,255,255,0.08)] shadow-[0_-4px_24px_rgba(0,0,0,0.06)] p-4 text-[14px] transition-all duration-300 ease-out transform ${
+          className={`fixed bottom-0 left-0 right-0 z-[var(--z-bottomsheet)] rounded-t-[24px] bg-[var(--card)] border-x-0 border-b-0 border-t border-[var(--border)] shadow-[0_-4px_24px_rgba(0,0,0,0.06)] p-4 text-[14px] transition-all duration-300 ease-out transform ${
             ready ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'
           }`}
         >
           {/* Drag Handle Indicator */}
-          <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-[rgba(0,0,0,0.15)] dark:bg-[rgba(255,255,255,0.15)]" />
+          <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-[var(--border)]" />
 
-          {/* Quick reactions row */}
+          {/* Quick reactions row — 44×44 (터치 타깃 최소치) */}
           <div className="flex items-center justify-between gap-1 px-1 py-2">
             {QUICK_REACTIONS.map((emoji) => (
               <button
@@ -198,7 +263,7 @@ export default function MessageContextMenu({
                   onReact(emoji);
                   onClose();
                 }}
-                className="grid h-10 w-10 place-items-center rounded-xl text-[22px] transition-transform active:scale-125 hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]"
+                className="grid h-11 w-11 place-items-center rounded-xl text-[22px] transition-transform active:scale-125 hover:bg-[var(--muted)]"
               >
                 {emoji}
               </button>
@@ -208,176 +273,57 @@ export default function MessageContextMenu({
               role="menuitem"
               aria-label="이모지 추가"
               onClick={handleAddEmoji}
-              className="grid h-10 w-10 place-items-center rounded-xl border border-dashed border-[rgba(0,0,0,0.15)] dark:border-[rgba(255,255,255,0.15)] text-[20px] text-[var(--toss-gray-4)] hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]"
+              className="grid h-11 w-11 place-items-center rounded-xl border border-dashed border-[var(--border)] text-[var(--zinc-500)] hover:bg-[var(--muted)]"
             >
-              +
+              <MenuIcon name="plus" className="h-[19px] w-[19px]" />
             </button>
           </div>
 
-          <div role="separator" aria-hidden="true" className="my-2 h-px bg-[rgba(0,0,0,0.06)] dark:bg-[rgba(255,255,255,0.08)]" />
+          {separator}
 
-          {/* Action Menu List */}
-          <div className="flex flex-col gap-1 max-h-[60vh] overflow-y-auto">
-            <button
-              type="button"
-              role="menuitem"
-              data-default-focus
-              onClick={() => {
-                onReply();
-                onClose();
-              }}
-              className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.08)] dark:active:bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
-            >
-              <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">💬</span>
-              <span>답글로 전송</span>
-            </button>
-
-            {onEdit && (
+          {/*
+            2열 그리드. 세로 한 줄이면 9개 × 48px 로 시트가 화면 대부분을 덮고
+            스크롤까지 생겼다. 삭제만 전폭으로 떼어 오조작을 줄인다.
+          */}
+          <div className="grid grid-cols-2 gap-x-2.5 gap-y-1">
+            {items.map((item) => (
               <button
+                key={item.key}
                 type="button"
                 role="menuitem"
-                disabled={!canEdit}
-                aria-disabled={!canEdit}
-                onClick={() => {
-                  if (canEdit) {
-                    onEdit();
-                    onClose();
-                  }
-                }}
-                className={`flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] transition-colors ${
-                  canEdit
-                    ? 'text-[var(--foreground)] active:bg-[rgba(0,0,0,0.08)] dark:active:bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]'
-                    : 'cursor-not-allowed text-[var(--toss-gray-5)] opacity-65'
+                disabled={item.disabled}
+                aria-disabled={item.disabled}
+                {...(item.defaultFocus ? { 'data-default-focus': true } : {})}
+                onClick={() => run(item)}
+                className={`flex h-[48px] w-full items-center gap-2.5 rounded-[var(--radius-lg)] px-3 text-left text-[14px] transition-colors ${
+                  item.disabled
+                    ? 'cursor-not-allowed text-[var(--toss-gray-5)] opacity-65'
+                    : 'text-[var(--foreground)] active:bg-[var(--muted)] hover:bg-[var(--muted)]'
                 }`}
               >
-                <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">✏️</span>
-                <span>메시지 수정</span>
+                <MenuIcon name={item.icon} className="h-[19px] w-[19px] shrink-0 text-[var(--zinc-500)]" />
+                <span className="truncate">{item.label}</span>
               </button>
-            )}
-
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                onCopy();
-                onClose();
-              }}
-              className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.08)] dark:active:bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
-            >
-              <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">📋</span>
-              <span>메시지 복사</span>
-            </button>
-
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                onForward();
-                onClose();
-              }}
-              className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.08)] dark:active:bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
-            >
-              <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">📤</span>
-              <span>다른 대화로 전달</span>
-            </button>
-
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                onBookmark();
-                onClose();
-              }}
-              className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.08)] dark:active:bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
-            >
-              <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">🔖</span>
-              <span>북마크에 저장</span>
-            </button>
-
-            {onPin && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  onPin();
-                  onClose();
-                }}
-                className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.08)] dark:active:bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
-              >
-                <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">📌</span>
-                <span>{isPinned ? '공지 해제' : '공지로 등록'}</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                onTask();
-                onClose();
-              }}
-              className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.08)] dark:active:bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
-            >
-              <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">✅</span>
-              <span>할 일로 변환</span>
-            </button>
-
-            {(onOpenThread || onReadDetail) && (
-              <>
-                <div role="separator" aria-hidden="true" className="my-1 h-px bg-[rgba(0,0,0,0.06)] dark:bg-[rgba(255,255,255,0.08)]" />
-                {onOpenThread && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      onOpenThread();
-                      onClose();
-                    }}
-                    className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.08)] dark:active:bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
-                  >
-                    <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">💬</span>
-                    <span>스레드 답글 {threadReplyCount && threadReplyCount > 0 ? `(${threadReplyCount})` : ''}</span>
-                  </button>
-                )}
-                {onReadDetail && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      onReadDetail();
-                      onClose();
-                    }}
-                    className="flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] text-[var(--foreground)] transition-colors active:bg-[rgba(0,0,0,0.08)] dark:active:bg-[rgba(255,255,255,0.12)] hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
-                  >
-                    <span aria-hidden="true" className="text-[18px] text-[var(--toss-gray-4)]">👀</span>
-                    <span>읽음 확인</span>
-                  </button>
-                )}
-              </>
-            )}
-
-            <div role="separator" aria-hidden="true" className="my-1 h-px bg-[rgba(0,0,0,0.06)] dark:bg-[rgba(255,255,255,0.08)]" />
-            <button
-              type="button"
-              role="menuitem"
-              disabled={!canDelete}
-              aria-disabled={!canDelete}
-              onClick={() => {
-                if (canDelete) {
-                  onDelete?.();
-                  onClose();
-                }
-              }}
-              className={`flex h-[48px] w-full items-center gap-3.5 rounded-[var(--radius-lg)] px-3 text-left text-[14.5px] transition-colors ${
-                canDelete
-                  ? 'text-[var(--danger)] active:bg-[rgba(239,68,68,0.12)] dark:active:bg-[rgba(239,68,68,0.22)] hover:bg-[rgba(239,68,68,0.08)] dark:hover:bg-[rgba(239,68,68,0.15)]'
-                  : 'cursor-not-allowed text-[var(--toss-gray-5)] opacity-65'
-              }`}
-            >
-              <span aria-hidden="true" className="text-[18px] text-[var(--danger)]">🗑️</span>
-              <span>메시지 삭제</span>
-            </button>
+            ))}
           </div>
+
+          {separator}
+
+          <button
+            type="button"
+            role="menuitem"
+            disabled={deleteItem.disabled}
+            aria-disabled={deleteItem.disabled}
+            onClick={() => run(deleteItem)}
+            className={`flex h-[48px] w-full items-center gap-2.5 rounded-[var(--radius-lg)] px-3 text-left text-[14px] transition-colors ${
+              deleteItem.disabled
+                ? 'cursor-not-allowed text-[var(--toss-gray-5)] opacity-65'
+                : 'text-[var(--danger)] active:bg-[rgba(239,68,68,0.12)] hover:bg-[rgba(239,68,68,0.08)]'
+            }`}
+          >
+            <MenuIcon name={deleteItem.icon} className="h-[19px] w-[19px] shrink-0" />
+            <span>{deleteItem.label}</span>
+          </button>
         </div>
       </>,
       document.querySelector('.mso-mobile') || document.body
@@ -402,7 +348,7 @@ export default function MessageContextMenu({
           left: pos.left,
           top: pos.top,
         }}
-        className={`message-ctx-menu bg-white dark:bg-[#1c1c1e] border border-[rgba(0,0,0,0.08)] dark:border-[rgba(255,255,255,0.08)] shadow-[0_8px_30px_rgba(0,0,0,0.12)] fixed z-[100] min-w-[220px] rounded-[20px] p-2.5 text-[13px] transition-opacity duration-100 ${ready ? 'opacity-100' : 'opacity-0'}`}
+        className={`message-ctx-menu bg-[var(--card)] border border-[var(--border)] shadow-[0_8px_30px_rgba(0,0,0,0.12)] fixed z-[100] min-w-[220px] rounded-[20px] p-2.5 text-[13px] transition-opacity duration-100 ${ready ? 'opacity-100' : 'opacity-0'}`}
       >
         {/* Quick reactions row */}
         <div className="flex items-center gap-1 p-1">
@@ -417,7 +363,7 @@ export default function MessageContextMenu({
                 onReact(emoji);
                 onClose();
               }}
-              className="grid h-7 w-7 place-items-center rounded-[10px] text-[15px] transition-transform hover:scale-[1.18] hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]"
+              className="grid h-7 w-7 place-items-center rounded-[10px] text-[15px] transition-transform hover:scale-[1.18] hover:bg-[var(--muted)]"
             >
               {emoji}
             </button>
@@ -427,158 +373,57 @@ export default function MessageContextMenu({
             role="menuitem"
             aria-label="이모지 추가"
             onClick={handleAddEmoji}
-            className="ml-0.5 grid h-7 w-7 place-items-center rounded-[10px] border-l border-dashed border-[rgba(0,0,0,0.15)] dark:border-[rgba(255,255,255,0.15)] pl-1.5 text-[var(--toss-gray-4)] hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]"
+            className="ml-0.5 grid h-7 w-7 place-items-center rounded-[10px] border-l border-dashed border-[var(--border)] pl-1.5 text-[var(--zinc-500)] hover:bg-[var(--muted)]"
           >
-            +
+            <MenuIcon name="plus" className="h-4 w-4" />
           </button>
         </div>
-        <div role="separator" aria-hidden="true" className="my-1 h-px bg-[rgba(0,0,0,0.06)] dark:bg-[rgba(255,255,255,0.08)]" />
-        <button
-          type="button"
-          role="menuitem"
-          data-default-focus
-          onClick={() => {
-            onReply();
-            onClose();
-          }}
-          className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
-        >
-          <span aria-hidden="true" className="text-[var(--toss-gray-4)]">💬</span>
-          <span>답글로 전송</span>
-          <kbd className="rounded-[4px] bg-[rgba(0,0,0,0.05)] dark:bg-[rgba(255,255,255,0.08)] px-1.5 py-px font-mono text-[11px] font-bold text-[var(--toss-gray-6)] dark:text-[var(--toss-gray-4)]">R</kbd>
-        </button>
-        {onEdit && (
+
+        {separator}
+
+        {items.map((item) => (
           <button
+            key={item.key}
             type="button"
             role="menuitem"
-            disabled={!canEdit}
-            aria-disabled={!canEdit}
-            onClick={() => {
-              if (canEdit) {
-                onEdit();
-                onClose();
-              }
-            }}
+            disabled={item.disabled}
+            aria-disabled={item.disabled}
+            {...(item.defaultFocus ? { 'data-default-focus': true } : {})}
+            onClick={() => run(item)}
             className={`grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] transition-colors ${
-              canEdit
-                ? 'text-[var(--foreground)] hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]'
-                : 'cursor-not-allowed text-[var(--toss-gray-5)] opacity-65'
+              item.disabled
+                ? 'cursor-not-allowed text-[var(--toss-gray-5)] opacity-65'
+                : 'text-[var(--foreground)] hover:bg-[var(--muted)]'
             }`}
           >
-            <span aria-hidden="true" className="text-[var(--toss-gray-4)]">✏️</span>
-            <span>메시지 수정</span>
-            <span />
+            <MenuIcon name={item.icon} className="h-[17px] w-[17px] text-[var(--zinc-500)]" />
+            <span className="truncate">{item.label}</span>
+            {item.shortcut ? (
+              <kbd className="rounded-[4px] bg-[var(--muted)] px-1.5 py-px font-mono text-[11px] font-bold text-[var(--zinc-500)]">
+                {item.shortcut}
+              </kbd>
+            ) : (
+              <span />
+            )}
           </button>
-        )}
-        <button
-          type="button"
-          role="menuitem"
-          onClick={() => {
-            onCopy();
-            onClose();
-          }}
-          className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
-        >
-          <span aria-hidden="true" className="text-[var(--toss-gray-4)]">📋</span>
-          <span>메시지 복사</span>
-          <kbd className="rounded-[4px] bg-[rgba(0,0,0,0.05)] dark:bg-[rgba(255,255,255,0.08)] px-1.5 py-px font-mono text-[11px] font-bold text-[var(--toss-gray-6)] dark:text-[var(--toss-gray-4)]">{isMac ? '⌘C' : 'Ctrl+C'}</kbd>
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          onClick={() => {
-            onForward();
-            onClose();
-          }}
-          className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
-        >
-          <span aria-hidden="true" className="text-[var(--toss-gray-4)]">📤</span>
-          <span>다른 대화로 전달</span>
-          <span />
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          onClick={() => {
-            onBookmark();
-            onClose();
-          }}
-          className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
-        >
-          <span aria-hidden="true" className="text-[var(--toss-gray-4)]">🔖</span>
-          <span>북마크에 저장</span>
-          <kbd className="rounded-[4px] bg-[rgba(0,0,0,0.05)] dark:bg-[rgba(255,255,255,0.08)] px-1.5 py-px font-mono text-[11px] font-bold text-[var(--toss-gray-6)] dark:text-[var(--toss-gray-4)]">B</kbd>
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          onClick={() => {
-            onTask();
-            onClose();
-          }}
-          className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
-        >
-          <span aria-hidden="true" className="text-[var(--toss-gray-4)]">✅</span>
-          <span>할 일로 변환</span>
-          <span />
-        </button>
+        ))}
 
-        {(onOpenThread || onReadDetail) && (
-          <>
-            <div role="separator" aria-hidden="true" className="my-1 h-px bg-[rgba(0,0,0,0.06)] dark:bg-[rgba(255,255,255,0.08)]" />
-            {onOpenThread && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  onOpenThread();
-                  onClose();
-                }}
-                className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
-              >
-                <span aria-hidden="true" className="text-[var(--toss-gray-4)]">💬</span>
-                <span>스레드 답글 {threadReplyCount && threadReplyCount > 0 ? `(${threadReplyCount})` : ''}</span>
-                <span />
-              </button>
-            )}
-            {onReadDetail && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  onReadDetail();
-                  onClose();
-                }}
-                className="grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] text-[var(--foreground)] transition-colors hover:bg-[rgba(0,0,0,0.08)] dark:hover:bg-[rgba(255,255,255,0.12)]"
-              >
-                <span aria-hidden="true" className="text-[var(--toss-gray-4)]">👀</span>
-                <span>읽음 확인</span>
-                <span />
-              </button>
-            )}
-          </>
-        )}
+        {separator}
 
-        <div role="separator" aria-hidden="true" className="my-1 h-px bg-[rgba(0,0,0,0.06)] dark:bg-[rgba(255,255,255,0.08)]" />
         <button
           type="button"
           role="menuitem"
-          disabled={!canDelete}
-          aria-disabled={!canDelete}
-          onClick={() => {
-            if (canDelete) {
-              onDelete?.();
-              onClose();
-            }
-          }}
+          disabled={deleteItem.disabled}
+          aria-disabled={deleteItem.disabled}
+          onClick={() => run(deleteItem)}
           className={`grid h-9 w-full grid-cols-[20px_1fr_auto] items-center gap-2 rounded-[var(--radius-md)] px-2 text-left text-[12.5px] transition-colors ${
-            canDelete
-              ? 'text-[var(--danger)] hover:bg-[rgba(239,68,68,0.08)] dark:hover:bg-[rgba(239,68,68,0.15)]'
-              : 'cursor-not-allowed text-[var(--toss-gray-5)] opacity-65'
+            deleteItem.disabled
+              ? 'cursor-not-allowed text-[var(--toss-gray-5)] opacity-65'
+              : 'text-[var(--danger)] hover:bg-[rgba(239,68,68,0.08)]'
           }`}
         >
-          <span aria-hidden="true" className="text-[var(--danger)]">🗑️</span>
-          <span>메시지 삭제</span>
+          <MenuIcon name={deleteItem.icon} className="h-[17px] w-[17px]" />
+          <span>{deleteItem.label}</span>
           <span />
         </button>
       </div>
