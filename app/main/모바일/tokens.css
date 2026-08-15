@@ -52,9 +52,11 @@
   --m-safe-bottom: env(safe-area-inset-bottom, 0px);
   --m-safe-left: env(safe-area-inset-left, 0px);
 
-  --m-bubble-in-bg: rgba(255, 255, 255, 0.75);
-  --m-bubble-in-border: rgba(255, 255, 255, 0.3);
-  --m-reply-bg: rgba(0, 0, 0, 0.05);
+  /* 유리 버블 → 카드 기반. 반투명 흰색은 배경에 따라 대비가 무너지고,
+     스크롤 중 blur 재계산 비용도 컸다(디자인 2a §4.1). */
+  --m-bubble-in-bg: var(--m-card);
+  --m-bubble-in-border: var(--m-border);
+  --m-reply-bg: var(--z-100);
 
   /*
    * 원천 차단: 셸 자체를 상태바(시계) 아래로 붙인다.
@@ -104,9 +106,10 @@
   --m-warning-soft: rgba(245, 158, 11, 0.16);
   --m-danger-soft: rgba(239, 68, 68, 0.16);
 
-  --m-bubble-in-bg: rgba(30, 30, 32, 0.75);
-  --m-bubble-in-border: rgba(255, 255, 255, 0.08);
-  --m-reply-bg: rgba(255, 255, 255, 0.08);
+  /* 다크에서는 테두리 없이 명도차로 구분한다. */
+  --m-bubble-in-bg: var(--z-100);
+  --m-bubble-in-border: transparent;
+  --m-reply-bg: var(--z-200);
 }
 
 /* 리셋 — .mso-mobile 내부만 */

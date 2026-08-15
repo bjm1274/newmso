@@ -155,6 +155,36 @@ export default function MessageBubble({
   const wasEdited = Boolean(message.edited_at);
   const isPending = Boolean(message.status === 'sending' || message.is_pending || message.sending || message.is_sending);
   const hasThreadReplies = Boolean(threadReplyCount && threadReplyCount > 0);
+
+  /**
+   * 말풍선 옆 메타 스택 (전송중·수정됨·읽음·시각).
+   *
+   * mine / !mine 두 곳에 글자 단위로 같은 코드가 있었다. 크기도 색도 제각각이라
+   * (10px 에 색 4종) 시선이 흩어졌다 — 크기는 한 종류, 강조는 읽음 하나로 모은다.
+   * `답글 N` 은 여기서 빼서 말풍선 아래 pill 로 옮겼다.
+   */
+  const renderMeta = (align: 'flex-end' | 'flex-start') => (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: align, gap: 2, flexShrink: 0 }}>
+      {isPending && (
+        <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--m-accent)', whiteSpace: 'nowrap' }}>
+          전송중
+        </span>
+      )}
+      {wasEdited && (
+        <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--z-400)', whiteSpace: 'nowrap' }}>
+          수정됨
+        </span>
+      )}
+      {displayedReadCount > 0 && (
+        <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--m-accent)', whiteSpace: 'nowrap' }}>
+          읽음 {displayedReadCount}
+        </span>
+      )}
+      <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--z-400)', whiteSpace: 'nowrap' }}>
+        {ts}
+      </span>
+    </div>
+  );
   const canEditMessage = mine && message.is_deleted !== true && !hasFile && !isSystemMessage && Boolean(text.trim());
 
   const handleCopy = useCallback(() => {
@@ -192,14 +222,14 @@ export default function MessageBubble({
           padding: '4px 0',
           opacity: swiping ? 0.9 : 1,
           transition: 'opacity 0.2s, background-color 0.5s',
-          backgroundColor: highlighted ? 'rgba(0, 122, 255, 0.1)' : 'transparent' }}
+          backgroundColor: highlighted ? 'var(--m-accent-soft)' : 'transparent' }}
       >
         {!mine && (
           <div style={{ width: 4, flexShrink: 0 }} />
         )}
         <div
           style={{
-            maxWidth: '72%',
+            maxWidth: '78%',
             minWidth: 0,
             display: 'flex',
             flexDirection: 'column',
@@ -208,9 +238,9 @@ export default function MessageBubble({
           {!mine && (
             <div
               style={{
-                fontSize: 11,
+                fontSize: 11.5,
                 fontWeight: 700,
-                color: 'var(--z-600)',
+                color: 'var(--z-500)',
                 marginBottom: 3,
                 padding: '0 4px' }}
             >
@@ -226,81 +256,25 @@ export default function MessageBubble({
               minWidth: 0,
               maxWidth: '100%' }}
           >
-            {mine && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
-                {isPending && (
-                  <span style={{ fontSize: 10, color: '#007AFF', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                    전송중
-                  </span>
-                )}
-                {wasEdited && (
-                  <span style={{ fontSize: 10, color: 'var(--z-400)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                    수정됨
-                  </span>
-                )}
-                {hasThreadReplies && (
-                  <button
-                    type="button"
-                    onClick={() => onOpenThread?.(message)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      padding: 0,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: '#007AFF',
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap' }}
-                  >
-                    답글 {threadReplyCount}
-                  </button>
-                )}
-                {displayedReadCount > 0 && (
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: 'var(--m-green)',
-                      textDecoration: 'underline',
-                      textUnderlineOffset: '2px' }}
-                  >
-                    {displayedReadCount}
-                  </span>
-                )}
-                <span
-                  style={{
-                    fontSize: 10,
-                    color: 'var(--z-400)',
-                    fontWeight: 600,
-                    whiteSpace: 'nowrap' }}
-                >
-                  {ts}
-                </span>
-              </div>
-            )}
+            {mine && renderMeta('flex-end')}
 
 
             <div
               data-testid={`chat-message-${message.id}`}
               style={{
                 padding: (imageMode || isEmoticonOrSticker) && !replyTarget ? 0 : '10px 14px',
-                borderRadius: 18,
+                borderRadius: 16,
                 background: ((imageMode || isEmoticonOrSticker) && !replyTarget
                   ? 'transparent'
                   : mine
-                    ? 'linear-gradient(135deg, #007AFF, #0A55E1)'
+                    ? 'var(--m-accent)'
                     : 'var(--m-bubble-in-bg)') as React.CSSProperties['background'],
-                backdropFilter: !(imageMode || isEmoticonOrSticker) || replyTarget
-                  ? mine
-                    ? undefined
-                    : 'blur(12px)'
-                  : undefined,
                 color: mine && !((imageMode || isEmoticonOrSticker) && !replyTarget) ? '#fff' : 'var(--z-900)',
                 border: (mine || ((imageMode || isEmoticonOrSticker) && !replyTarget) ? 'none' : '1px solid var(--m-bubble-in-border)') as React.CSSProperties['border'],
-                borderBottomRightRadius: mine ? 4 : 18,
-                borderBottomLeftRadius: mine ? 18 : 4,
-                fontSize: 14,
-                lineHeight: 1.5,
+                borderBottomRightRadius: mine ? 5 : 16,
+                borderBottomLeftRadius: mine ? 16 : 5,
+                fontSize: 14.5,
+                lineHeight: 1.55,
                 fontWeight: 500,
                 wordBreak: 'break-word',
                 overflowWrap: 'anywhere',
@@ -308,7 +282,7 @@ export default function MessageBubble({
                 overflow: 'hidden',
                 minWidth: 0,
                 flexShrink: 1,
-                boxShadow: mine || ((imageMode || isEmoticonOrSticker) && !replyTarget) ? undefined : '0 4px 12px rgba(0, 0, 0, 0.05)' }}
+                textWrap: 'pretty' }}
             >
               {(replyTarget || message.reply_to_id) && (
                 <div 
@@ -319,22 +293,21 @@ export default function MessageBubble({
                     }
                   }}
                   style={{
-                    background: (mine ? 'rgba(255, 255, 255, 0.15)' : 'var(--m-reply-bg)') as React.CSSProperties['background'],
-                    borderRadius: 8,
-                    padding: '6px 10px',
+                    background: (mine ? 'rgba(255, 255, 255, 0.16)' : 'var(--z-100)') as React.CSSProperties['background'],
+                    borderRadius: 10,
+                    padding: '7px 10px 7px 9px',
                     fontSize: 12,
-                    borderLeft: `3px solid ${mine ? 'rgba(255, 255, 255, 0.8)' : '#007AFF'}`,
+                    borderLeft: `2px solid ${mine ? 'rgba(255, 255, 255, 0.85)' : 'var(--m-accent)'}`,
                     color: mine ? 'rgba(255, 255, 255, 0.9)' : 'var(--z-700)',
-                    marginBottom: 8,
+                    margin: '0 -4px 8px',
                     cursor: 'pointer' }}
                 >
-                  <div style={{ fontWeight: 700, marginBottom: 2, color: mine ? '#fff' : '#007AFF', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 2, color: mine ? '#fff' : 'var(--m-accent)', display: 'flex', alignItems: 'center', gap: 4 }}>
                     {replyTarget ? (
                       `${replyTarget.sender_name || staffs.find((s) => String(s.id) === String(replyTarget.sender_id))?.name || '알 수 없음'}에게 답장`
                     ) : (
                       '이전 대화 답글'
                     )}
-                    <span style={{ fontSize: 10, opacity: 0.7 }}>(원문 보기)</span>
                   </div>
                   <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', opacity: 0.9 }}>
                     {replyTarget ? (
@@ -415,59 +388,34 @@ export default function MessageBubble({
             </div>
 
 
-            {!mine && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, flexShrink: 0 }}>
-                {isPending && (
-                  <span style={{ fontSize: 10, color: '#007AFF', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                    전송중
-                  </span>
-                )}
-                {wasEdited && (
-                  <span style={{ fontSize: 10, color: 'var(--z-400)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                    수정됨
-                  </span>
-                )}
-                {hasThreadReplies && (
-                  <button
-                    type="button"
-                    onClick={() => onOpenThread?.(message)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      padding: 0,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: '#007AFF',
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap' }}
-                  >
-                    답글 {threadReplyCount}
-                  </button>
-                )}
-                {displayedReadCount > 0 && (
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: 'var(--m-green)',
-                      textDecoration: 'underline',
-                      textUnderlineOffset: '2px' }}
-                  >
-                    {displayedReadCount}
-                  </span>
-                )}
-                <span
-                  style={{
-                    fontSize: 10,
-                    color: 'var(--z-400)',
-                    fontWeight: 600,
-                    whiteSpace: 'nowrap' }}
-                >
-                  {ts}
-                </span>
-              </div>
-            )}
+            {!mine && renderMeta('flex-start')}
           </div>
+
+          {hasThreadReplies && (
+            <button
+              type="button"
+              aria-label={`스레드 답글 ${threadReplyCount}개 보기`}
+              onClick={() => onOpenThread?.(message)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                height: 26,
+                marginTop: 6,
+                padding: '0 10px',
+                borderRadius: 999,
+                background: 'var(--m-accent-soft)',
+                color: 'var(--m-accent)',
+                fontSize: 11.5,
+                fontWeight: 800,
+                border: 'none',
+                cursor: 'pointer' }}
+            >
+              <MIcon name="chat" size={13} />
+              답글 {threadReplyCount}
+              <MIcon name="chevR" size={12} />
+            </button>
+          )}
 
           {reactionEntries.length > 0 && (
             <div
@@ -498,13 +446,14 @@ export default function MessageBubble({
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: 3,
-                      padding: '2px 7px',
+                      height: 24,
+                      padding: '0 9px',
                       borderRadius: 999,
-                      background: mineReaction ? 'rgba(0, 122, 255, 0.15)' : 'rgba(0, 0, 0, 0.04)',
-                      color: mineReaction ? '#007AFF' : 'var(--z-700)',
-                      fontSize: 11,
-                      fontWeight: 700,
-                      border: mineReaction ? '1px solid rgba(0, 122, 255, 0.3)' : '1px solid transparent',
+                      background: mineReaction ? 'var(--m-accent-soft)' : 'var(--m-card)',
+                      color: mineReaction ? 'var(--m-accent)' : 'var(--z-600)',
+                      fontSize: 11.5,
+                      fontWeight: 800,
+                      border: `1px solid ${mineReaction ? 'rgba(37, 99, 235, 0.28)' : 'var(--m-border)'}`,
                       cursor: 'pointer' }}
                   >
                     {entry.emoji} {entry.users.length}
@@ -519,11 +468,3 @@ export default function MessageBubble({
   );
 }
 
-const metaBtnStyle: React.CSSProperties = {
-  background: 'transparent',
-  border: 'none',
-  padding: 0,
-  fontSize: 10,
-  fontWeight: 600,
-  color: 'var(--z-500)',
-  cursor: 'pointer' };

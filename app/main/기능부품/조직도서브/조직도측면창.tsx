@@ -543,6 +543,32 @@ const ICON_PATHS: Record<string, React.ReactNode> = {
       <line x1="3" x2="3.01" y1="18" y2="18" />
     </>
   ),
+  // 채팅 액션시트·답장에서 쓰던 이름들. 없어서 fallback 도형(원+사각)으로 렌더됐다.
+  camera: (
+    <>
+      <path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" />
+      <circle cx="12" cy="13" r="3.4" />
+    </>
+  ),
+  image: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2.5" />
+      <circle cx="8.5" cy="9.5" r="1.6" />
+      <path d="m5 18 5-6 3.5 4 2.5-3 4 5" />
+    </>
+  ),
+  file: (
+    <>
+      <path d="M7 3h7l4 4v14H7z" />
+      <path d="M14 3v5h5" />
+    </>
+  ),
+  reply: (
+    <>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10a6 6 0 1 1 0 12h-2" />
+    </>
+  ),
   filter: (
     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
   ) };
@@ -593,12 +619,14 @@ const LUCIDE_ICON_ALIASES: Record<string, string> = {
   ChevronLeft: 'arrow-left',
   ChevronRight: 'chevron-right',
   ChevronUp: 'chevron-up',
+  Reply: 'reply',
   ChevronDown: 'chevron-down',
   CircleParking: 'circle-parking',
   ClipboardCheck: 'clipboard',
   ClipboardList: 'clipboard',
   Clock: 'history',
   Clock3: 'history',
+  Camera: 'camera',
   Copy: 'document',
   Download: 'download',
   Eraser: 'eraser',
@@ -608,9 +636,10 @@ const LUCIDE_ICON_ALIASES: Record<string, string> = {
   FileCheck2: 'document',
   FileClock: 'document',
   FilePenLine: 'document',
-  FileText: 'document',
+  FileText: 'file',
   FileWarning: 'alert',
   Filter: 'filter',
+  ImageIcon: 'image',
   FolderOpen: 'folder',
   Forward: 'arrow-right',
   History: 'history',
