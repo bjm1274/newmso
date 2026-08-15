@@ -385,13 +385,13 @@
 }
 .mso-mobile .m-avatar.lg { width: 56px; height: 56px; font-size: 18px; border-radius: 16px; }
 .mso-mobile .m-avatar.sm { width: 32px; height: 32px; font-size: 11px; border-radius: 9px; }
-.mso-mobile .m-avatar.tone-blue   { background: linear-gradient(135deg, #3B82F6, #2563EB); }
-.mso-mobile .m-avatar.tone-violet { background: linear-gradient(135deg, #8B5CF6, #7C3AED); }
-.mso-mobile .m-avatar.tone-pink   { background: linear-gradient(135deg, #EC4899, #DB2777); }
-.mso-mobile .m-avatar.tone-green  { background: linear-gradient(135deg, #10B981, #059669); }
-.mso-mobile .m-avatar.tone-orange { background: linear-gradient(135deg, #F59E0B, #D97706); }
-.mso-mobile .m-avatar.tone-cyan   { background: linear-gradient(135deg, #06B6D4, #0891B2); }
-.mso-mobile .m-avatar.tone-gray   { background: linear-gradient(135deg, #94A3B8, #64748B); }
+.mso-mobile .m-avatar.tone-blue   { background: #2563EB; }
+.mso-mobile .m-avatar.tone-violet { background: #7C3AED; }
+.mso-mobile .m-avatar.tone-pink   { background: #DB2777; }
+.mso-mobile .m-avatar.tone-green  { background: #059669; }
+.mso-mobile .m-avatar.tone-orange { background: #D97706; }
+.mso-mobile .m-avatar.tone-cyan   { background: #0891B2; }
+.mso-mobile .m-avatar.tone-gray   { background: #64748B; }
 
 /* ─── 보조 유틸 ─────────────────────────────────────────────*/
 .mso-mobile .m-tnum { font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }

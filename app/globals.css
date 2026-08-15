@@ -2995,14 +2995,14 @@ body.ios-safe-root > div[class*="min-h-screen"] {
   font-size: 14px;
   border-radius: 10px;
 }
-.chat-room-pic.tone-accent { background: linear-gradient(135deg, #3B82F6, #1D4ED8); }
-.chat-room-pic.tone-blue   { background: linear-gradient(135deg, #3B82F6, #2563EB); }
-.chat-room-pic.tone-amber  { background: linear-gradient(135deg, #F59E0B, #D97706); }
-.chat-room-pic.tone-green  { background: linear-gradient(135deg, #10B981, #059669); }
-.chat-room-pic.tone-cyan   { background: linear-gradient(135deg, #06B6D4, #0891B2); }
-.chat-room-pic.tone-violet { background: linear-gradient(135deg, #8B5CF6, #7C3AED); }
-.chat-room-pic.tone-pink   { background: linear-gradient(135deg, #EC4899, #DB2777); }
-.chat-room-pic.tone-gray   { background: linear-gradient(135deg, #94A3B8, #64748B); }
+.chat-room-pic.tone-accent { background: #2563EB; }
+.chat-room-pic.tone-blue   { background: #2563EB; }
+.chat-room-pic.tone-amber  { background: #D97706; }
+.chat-room-pic.tone-green  { background: #059669; }
+.chat-room-pic.tone-cyan   { background: #0891B2; }
+.chat-room-pic.tone-violet { background: #7C3AED; }
+.chat-room-pic.tone-pink   { background: #DB2777; }
+.chat-room-pic.tone-gray   { background: #64748B; }
 
 .chat-room-dot {
   position: absolute;
@@ -3167,17 +3167,17 @@ body.ios-safe-root > div[class*="min-h-screen"] {
   flex-shrink: 0;
   overflow: hidden;
 }
-.chat-bub-pic.tone-blue   { background: linear-gradient(135deg, #3B82F6, #2563EB); }
-.chat-bub-pic.tone-amber  { background: linear-gradient(135deg, #F59E0B, #D97706); }
-.chat-bub-pic.tone-green  { background: linear-gradient(135deg, #10B981, #059669); }
-.chat-bub-pic.tone-cyan   { background: linear-gradient(135deg, #06B6D4, #0891B2); }
-.chat-bub-pic.tone-pink   { background: linear-gradient(135deg, #EC4899, #DB2777); }
-.chat-bub-pic.tone-violet { background: linear-gradient(135deg, #8B5CF6, #7C3AED); }
-.chat-bub-pic.tone-gray   { background: linear-gradient(135deg, #94A3B8, #64748B); }
+.chat-bub-pic.tone-blue   { background: #2563EB; }
+.chat-bub-pic.tone-amber  { background: #D97706; }
+.chat-bub-pic.tone-green  { background: #059669; }
+.chat-bub-pic.tone-cyan   { background: #0891B2; }
+.chat-bub-pic.tone-pink   { background: #DB2777; }
+.chat-bub-pic.tone-violet { background: #7C3AED; }
+.chat-bub-pic.tone-gray   { background: #64748B; }
 .chat-bub-col {
   display: flex;
   flex-direction: column;
-  max-width: 70%;
+  max-width: 76%;
   min-width: 0;
 }
 .chat-bub-name {
@@ -3193,9 +3193,9 @@ body.ios-safe-root > div[class*="min-h-screen"] {
   gap: 6px;
 }
 .chat-bub {
-  padding: 8px 12px;
-  border-radius: 14px;
-  font-size: 13px;
+  padding: 9px 13px;
+  border-radius: 16px;
+  font-size: 14px;
   line-height: 1.55;
   word-break: keep-all;
   max-width: 100%;
@@ -3203,13 +3203,13 @@ body.ios-safe-root > div[class*="min-h-screen"] {
 .chat-bub.mine {
   background: var(--accent);
   color: #fff;
-  border-bottom-right-radius: 4px;
+  border-bottom-right-radius: 5px;
 }
 .chat-bub.other {
   background: var(--card);
   color: var(--foreground);
   border: 1px solid var(--border);
-  border-bottom-left-radius: 4px;
+  border-bottom-left-radius: 5px;
 }
 .chat-bub-ts {
   font-size: 10px;
@@ -3353,10 +3353,10 @@ body.ios-safe-root > div[class*="min-h-screen"] {
   font-size: 12px;
   font-weight: 800;
 }
-.chat-mem.tone-blue   { background: linear-gradient(135deg, #3B82F6, #2563EB); }
-.chat-mem.tone-pink   { background: linear-gradient(135deg, #EC4899, #DB2777); }
-.chat-mem.tone-violet { background: linear-gradient(135deg, #8B5CF6, #7C3AED); }
-.chat-mem.tone-green  { background: linear-gradient(135deg, #10B981, #059669); }
+.chat-mem.tone-blue   { background: #2563EB; }
+.chat-mem.tone-pink   { background: #DB2777; }
+.chat-mem.tone-violet { background: #7C3AED; }
+.chat-mem.tone-green  { background: #059669; }
 .chat-mem.tone-gray   {
   background: var(--toss-gray-2);
   color: var(--toss-gray-3);
