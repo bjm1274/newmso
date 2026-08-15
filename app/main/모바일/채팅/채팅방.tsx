@@ -31,6 +31,7 @@ import { buildStorageInlineUrl, buildStorageDownloadUrl } from '@/lib/object-sto
 import MIcon from '../공통/MIcon';
 import MAvatar from '../공통/MAvatar';
 import MSheet from '../공통/MSheet';
+import { useRoomNotice } from './공지훅';
 import {
   getRoomTitle,
   pickAvatarTone,
@@ -112,6 +113,7 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
     searchMessageId: hookSearchMessageId } = useChatMessagesForRoom(String(room.id), userId);
 
   const activeSearchMessageId = hookSearchMessageId || searchMessageId;
+  const { notice } = useRoomNotice(String(room.id));
 
   useEffect(() => {
     if (searchMessageId) {
@@ -202,6 +204,8 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
 
   // Poll
   const [infoOpen, setInfoOpen] = useState(false);
+  /** 상세 시트의 사진·파일 그리드 — 기본은 접어 두고 퀵액션으로 편다. */
+  const [filesOpen, setFilesOpen] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -971,17 +975,59 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 28,
-              height: 28,
-              borderRadius: 8,
+              width: 36,
+              height: 36,
+              borderRadius: 10,
               background: 'var(--z-100)',
-              border: '1px solid rgba(0, 0, 0, 0.05)',
+              color: 'var(--z-600)',
+              border: 'none',
               cursor: 'pointer' }}
           >
             <MIcon name="menu" size={18} color="var(--z-600)" />
           </button>
         </div>
       </div>
+
+      {/*
+        상단 공지 바.
+        공지는 pinned_messages 에 저장돼 있는데 모바일에서는 상세 시트를 열어야
+        볼 수 있었고, 그마저도 "등록된 공지가 없습니다" 고정 문구라 PC 에서 건
+        공지가 아예 보이지 않았다. 대화방에 들어오면 바로 보이는 자리로 옮긴다.
+      */}
+      {notice && (
+        <button
+          type="button"
+          onClick={() => { void jumpToMessage(notice.messageId); }}
+          aria-label={`공지: ${notice.text}`}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            width: '100%',
+            padding: '9px 14px',
+            background: 'var(--m-accent-soft)',
+            borderBottom: '1px solid var(--m-border)',
+            border: 'none',
+            textAlign: 'left',
+            cursor: 'pointer' }}
+        >
+          <MIcon name="pin" size={14} color="var(--m-accent)" />
+          <span
+            style={{
+              flex: 1,
+              minWidth: 0,
+              fontSize: 12,
+              fontWeight: 700,
+              color: 'var(--m-accent)',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis' }}
+          >
+            {notice.text}
+          </span>
+          <MIcon name="chevR" size={14} color="var(--m-accent)" />
+        </button>
+      )}
 
       <div
         ref={scrollRef}
@@ -1399,42 +1445,94 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
           gap: 16,
           background: 'var(--m-card)',
           borderTop: '1px solid var(--m-border)' }}>
-          {/* Section 1: 대화방 개요 */}
-          <div style={{ background: 'var(--z-100)', padding: '14px', borderRadius: 12, border: '1px solid rgba(0, 0, 0, 0.02)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 800, color: 'var(--z-900)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
-              {canRenameRoom && (
-                <button
-                  type="button"
-                  aria-label="채팅방 이름 수정"
-                  onClick={() => {
-                    setRenameDraft(typeof room.name === 'string' ? room.name : title);
-                    setRenameOpen(true);
-                  }}
-                  style={{
-                    flexShrink: 0,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 3,
-                    padding: '5px 10px',
-                    borderRadius: 8,
-                    background: 'var(--m-accent-soft)',
-                    color: 'var(--m-accent)',
-                    fontSize: 11,
-                    fontWeight: 800,
-                    border: 'none',
-                    cursor: 'pointer' }}
-                >
-                  <MIcon name="edit" size={13} />
-                  이름 수정
-                </button>
+          {/*
+            아이덴티티 블록 — 예전에는 방 이름이 회색 상자 안 한 줄이라 어느 방의
+            설정인지 눈에 들어오지 않았다. 아바타를 세워 방을 먼저 알아보게 한다.
+          */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <MAvatar tone={headerTone} size="lg">
+              {isNotice ? (
+                <MIcon name="bell" size={22} color="#fff" />
+              ) : peerPhotoUrl ? (
+                <img src={peerPhotoUrl} alt={peerName || title} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} />
+              ) : isGroup ? (
+                <span>{getGroupChatRoomBadgeText(title)}</span>
+              ) : (
+                <span>{title.charAt(0) || '방'}</span>
               )}
+            </MAvatar>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--z-900)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--z-500)', marginTop: 2, fontWeight: 600 }}>
+                {isGroup ? '그룹 대화방' : '1:1 대화방'} · 참여자 {memberProfiles.length}명
+              </div>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--z-500)', marginTop: 4, display: 'flex', gap: 8 }}>
-              <span>유형: {isGroup ? '그룹 대화방' : '1:1 대화방'}</span>
-              <span>·</span>
-              <span>참여자: {memberProfiles.length}명</span>
-            </div>
+            {canRenameRoom && (
+              <button
+                type="button"
+                aria-label="채팅방 이름 수정"
+                onClick={() => {
+                  setRenameDraft(typeof room.name === 'string' ? room.name : title);
+                  setRenameOpen(true);
+                }}
+                style={{
+                  flexShrink: 0,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  height: 32,
+                  padding: '0 11px',
+                  borderRadius: 10,
+                  background: 'var(--z-100)',
+                  color: 'var(--z-700)',
+                  fontSize: 11.5,
+                  fontWeight: 800,
+                  border: 'none',
+                  cursor: 'pointer' }}
+              >
+                <MIcon name="edit" size={13} />
+                이름
+              </button>
+            )}
+          </div>
+
+          {/*
+            퀵액션 행. 사진·파일은 아래 그리드를 접었다 편다.
+            지시서는 4열(대화 검색/사진·파일/투표/북마크)이지만 모바일에는 대화
+            검색·방 단위 북마크 화면이 없어 3열로 줄였다. 알림은 아래 토글 행이
+            이미 켜짐/꺼짐을 보여주므로 여기 넣지 않았다.
+          */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+            {([
+              { key: 'files', icon: 'image', label: '사진·파일', onPress: () => setFilesOpen((v) => !v), disabled: false },
+              { key: 'poll', icon: 'list', label: '투표', onPress: () => { setInfoOpen(false); setPollComposerOpen(true); }, disabled: false },
+              { key: 'member', icon: 'users', label: '참여자 추가', onPress: () => setAddMemberOpen(true), disabled: !canManageMembers },
+            ] as const).map((action) => (
+              <button
+                key={action.key}
+                type="button"
+                aria-label={action.label}
+                disabled={action.disabled}
+                onClick={action.onPress}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '12px 4px',
+                  borderRadius: 12,
+                  background: 'var(--z-100)',
+                  color: action.disabled ? 'var(--z-400)' : 'var(--z-700)',
+                  border: 'none',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: action.disabled ? 'not-allowed' : 'pointer',
+                  opacity: action.disabled ? 0.55 : 1 }}
+              >
+                <MIcon name={action.icon} size={20} color={action.disabled ? 'var(--z-400)' : 'var(--m-accent)'} />
+                {action.label}
+              </button>
+            ))}
           </div>
 
           {/* Section 2: 알림 설정 */}
@@ -1464,15 +1562,38 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
 
           <div style={{ height: 1, background: 'rgba(0, 0, 0, 0.05)' }} />
 
-          {/* Section 3: 상단 공지 */}
+          {/* Section 3: 상단 공지 — pinned_messages 를 실제로 읽는다 */}
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
-              <span style={{ fontSize: 11 }}>📌</span>
-              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--z-600)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>상단 공지</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
+              <MIcon name="pin" size={13} color="var(--z-600)" />
+              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--z-600)' }}>상단 공지</div>
             </div>
-            <div style={{ padding: '10px 12px', background: 'var(--z-100)', borderRadius: 10, fontSize: 12, color: 'var(--z-500)', fontWeight: 600, border: '1px solid rgba(0, 0, 0, 0.02)' }}>
-              등록된 대화방 공지가 없습니다.
-            </div>
+            {notice ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setInfoOpen(false);
+                  void jumpToMessage(notice.messageId);
+                }}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '10px 12px',
+                  background: 'var(--m-accent-soft)',
+                  borderRadius: 10,
+                  border: 'none',
+                  cursor: 'pointer' }}
+              >
+                <div style={{ fontSize: 12.5, color: 'var(--z-900)', fontWeight: 700, lineHeight: 1.5 }}>{notice.text}</div>
+                {notice.senderName && (
+                  <div style={{ fontSize: 11, color: 'var(--z-500)', marginTop: 3, fontWeight: 600 }}>{notice.senderName}</div>
+                )}
+              </button>
+            ) : (
+              <div style={{ padding: '10px 12px', background: 'var(--z-100)', borderRadius: 10, fontSize: 12, color: 'var(--z-500)', fontWeight: 600 }}>
+                등록된 대화방 공지가 없습니다.
+              </div>
+            )}
           </div>
 
           <div style={{ height: 1, background: 'rgba(0, 0, 0, 0.05)' }} />
@@ -1560,9 +1681,10 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
 
           <div style={{ height: 1, background: 'rgba(0, 0, 0, 0.05)' }} />
 
-          {/* Section 5: 공유된 사진 및 파일 */}
+          {/* Section 5: 공유된 사진 및 파일 — 기본은 접어 두고 퀵액션으로 편다 */}
+          {filesOpen && (
           <div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--z-600)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 10 }}>공유된 사진 및 파일 ({attachments.length})</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--z-600)', marginBottom: 10 }}>공유된 사진 및 파일 ({attachments.length})</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
               {attachments.length === 0 && (
                 <div style={{ gridColumn: '1 / -1', padding: '20px 0', textAlign: 'center', fontSize: 11, color: 'var(--z-400)', fontWeight: 600 }}>
@@ -1586,10 +1708,11 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
               ))}
             </div>
           </div>
+          )}
 
-          <div style={{ height: 1, background: 'rgba(0, 0, 0, 0.05)' }} />
+          <div style={{ height: 1, background: 'var(--m-border)' }} />
 
-          {/* Section 6: 방 나가기 */}
+          {/* Section 6: 방 나가기 — 되돌릴 수 없는 동작이라 위험 톤으로 */}
           <button
             type="button"
             onClick={() => {
@@ -1603,8 +1726,8 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
               width: '100%',
               padding: '12px',
               borderRadius: 10,
-              background: 'var(--m-accent-soft)',
-              color: 'var(--m-accent)',
+              background: canLeaveRoom ? 'var(--m-danger-soft)' : 'var(--z-100)',
+              color: canLeaveRoom ? 'var(--m-danger)' : 'var(--z-700)',
               fontSize: 13,
               fontWeight: 800,
               border: 'none',
