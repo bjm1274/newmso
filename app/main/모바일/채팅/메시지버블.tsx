@@ -152,6 +152,21 @@ export default function MessageBubble({
     return /^\[(초대|내보내기|퇴장|전달)\]/.test(trimmed);
   }, [text]);
 
+  /**
+   * 시스템 안내를 말풍선 대신 중앙 pill 로 낸다.
+   *
+   * 지금까지 `[초대] 박준호님이 참여했습니다.` 가 남의 말풍선과 똑같이 렌더돼
+   * 누가 한 말처럼 보였고, 대괄호 접두사도 그대로 노출됐다. 접두사는 종류를
+   * 고르는 데만 쓰고 화면에서는 뗀다.
+   */
+  const systemNotice = useMemo(() => {
+    const matched = /^\[(초대|내보내기|퇴장|전달)\]\s*(.*)$/s.exec(text.trim());
+    if (!matched) return null;
+    const kind = matched[1];
+    const icon = kind === '전달' ? 'share' : kind === '퇴장' || kind === '내보내기' ? 'out' : 'users';
+    return { icon, body: matched[2] || kind } as const;
+  }, [text]);
+
   const wasEdited = Boolean(message.edited_at);
   const isPending = Boolean(message.status === 'sending' || message.is_pending || message.sending || message.is_sending);
   const hasThreadReplies = Boolean(threadReplyCount && threadReplyCount > 0);
@@ -193,6 +208,30 @@ export default function MessageBubble({
       toast('메시지가 복사되었습니다.', 'success');
     }
   }, [text]);
+
+  if (systemNotice && message.is_deleted !== true) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', margin: '6px 0' }}>
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            maxWidth: '86%',
+            padding: '5px 12px',
+            borderRadius: 999,
+            background: 'var(--z-100)',
+            color: 'var(--z-500)',
+            fontSize: 11.5,
+            fontWeight: 700,
+            lineHeight: 1.4 }}
+        >
+          <MIcon name={systemNotice.icon} size={13} color="var(--z-500)" />
+          {systemNotice.body}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <MessageActionsHost

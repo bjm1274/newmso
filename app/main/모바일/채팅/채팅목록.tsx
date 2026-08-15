@@ -38,6 +38,7 @@ import { useChatPresenceMap } from '@/app/main/hooks/useChatPresenceMap';
 import { usePullToRefresh } from '../공통/usePullToRefresh';
 import PullRefreshIndicator from '../공통/PullRefreshIndicator';
 import { createOrUpsertChatRoom } from '@/lib/chat-rooms-client';
+import { sanitizeChatPreview } from '@/lib/chat-room-preview';
 import { toast } from '@/lib/toast';
 
 const SEARCH_DEBOUNCE_MS = 150;
@@ -748,17 +749,12 @@ function RoomRow({ room, userId, staffs, presenceMap, last, onClick }: RoomRowPr
     (typeof room.last_message_preview === 'string' && room.last_message_preview) ||
     (typeof room.last_message === 'string' && room.last_message) ||
     '';
-  // file:// · 삭제 전 잔존 미리보기 정리 (PC getRoomPreviewText 와 동일 규칙)
-  const lastMsg = (() => {
-    const t = String(rawPreview).trim();
-    if (!t) return '';
-    if (t === '삭제된 메시지입니다.' || t.startsWith('삭제된 메시지')) return '삭제된 메시지입니다.';
-    if (/^file:\/\//i.test(t) || /^blob:/i.test(t) || /^[A-Za-z]:[\\/]/.test(t)) return '파일';
-    if (/^https?:\/\//i.test(t) && /\.(png|jpe?g|gif|webp|pdf|docx?|xlsx?|zip|hwp)(\?|#|$)/i.test(t)) {
-      return '파일';
-    }
-    return t;
-  })();
+  // 정리 규칙은 lib/chat-room-preview 가 정본이다. 여기 있던 사본은 같은 정규식을
+  // 손으로 옮겨 적은 3번째 벌이었다.
+  const lastMsg = sanitizeChatPreview(rawPreview);
+  // 첨부만 있고 파일명이 비어 미리보기가 '파일' 로 떨어진 경우 — 글자만 보면
+  // 누가 "파일" 이라고 친 것과 구분이 안 된다. 클립 아이콘을 앞에 붙인다.
+  const previewIsAttachment = lastMsg === '파일';
   const ts = formatChatTimestamp(room.last_message_at || room.created_at);
   const unread = room.unread_count || 0;
   const memberCount = normalizeMemberIds(room.members).length;
@@ -866,6 +862,9 @@ function RoomRow({ room, userId, staffs, presenceMap, last, onClick }: RoomRowPr
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
+            {previewIsAttachment && (
+              <MIcon name="paperclip" size={12} color="var(--z-500)" />
+            )}
             <span
               style={{
                 fontSize: 12,

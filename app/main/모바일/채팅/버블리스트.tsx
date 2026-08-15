@@ -292,7 +292,7 @@ export default function BubbleList({
       ) : null}
       {visibleItems.map((item) => {
         if (item.kind === 'date') {
-          return <SystemBubble key={item.key} label={item.label} />;
+          return <DateDivider key={item.key} label={item.label} />;
         }
         if (item.kind === 'poll') {
           return (
@@ -341,21 +341,19 @@ export default function BubbleList({
   );
 }
 
-function SystemBubble({ label }: { label: string }) {
+/**
+ * 날짜 구분선.
+ *
+ * 예전에는 시스템 안내와 같은 pill 을 썼다 — "2월 3일" 과 "박준호님이 참여했습니다"
+ * 가 같은 모양이라 어느 쪽이 시간 눈금인지 구분되지 않았다. 날짜는 좌우 헤어라인,
+ * 시스템 안내는 pill(메시지버블.tsx)로 갈라 둔다.
+ */
+function DateDivider({ label }: { label: string }) {
   return (
-    <div style={{ textAlign: 'center', margin: '10px 0' }}>
-      <span
-        style={{
-          display: 'inline-block',
-          padding: '4px 12px',
-          borderRadius: 999,
-          background: 'rgba(0, 0, 0, 0.04)',
-          fontSize: 11,
-          fontWeight: 600,
-          color: 'rgba(0, 0, 0, 0.5)' }}
-      >
-        {label}
-      </span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '10px 16px 4px' }}>
+      <span style={{ flex: 1, height: 1, background: 'var(--m-border)' }} />
+      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--z-400)' }}>{label}</span>
+      <span style={{ flex: 1, height: 1, background: 'var(--m-border)' }} />
     </div>
   );
 }
