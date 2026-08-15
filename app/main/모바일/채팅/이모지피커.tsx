@@ -28,9 +28,12 @@ export { COMPOSER_EMOJI_PALETTE } from '@/app/main/기능부품/메신저액션�
 
 type TrayTabId = 'recent' | 'hospital' | 'worker' | 'emoji';
 
+/** 스티커 카테고리 — 아래 전용 탭이 따로 있으므로 이모지 탭에서는 뺀다. */
+const STICKER_CATEGORY_IDS = new Set<string>(['stickers', 'hospital', 'worker']);
+
 /** 순수 이모지만 모은 목록 — 최근/스티커 탭에 이미 들어간 것은 뺀다. */
 const PLAIN_EMOJI: EmojiEntry[] = CATEGORIES.filter(
-  (cat) => cat.id !== 'stickers' && cat.id !== 'frequent',
+  (cat) => !STICKER_CATEGORY_IDS.has(cat.id) && cat.id !== 'frequent',
 ).flatMap((cat) => cat.list);
 
 const TRAY_TABS: { id: TrayTabId; label: string; sticker: boolean; list: EmojiEntry[] }[] = [

@@ -44,7 +44,8 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<CategoryId>('stickers');
-  const [subGroup, setSubGroup] = useState<'all' | 'worker' | 'hospital' | 'cat'>('all');
+  // 병원·직장 스티커도 고양이와 같은 큰 타일 그리드를 쓴다.
+  const isStickerCategory = category === 'stickers' || category === 'hospital' || category === 'worker';
   const [focusIdx, setFocusIdx] = useState(0);
 
   const pos = useMemo(() => {
@@ -86,7 +87,7 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
     if (!cat) return FREQUENT;
 
     return cat.list;
-  }, [query, category, subGroup]);
+  }, [query, category]);
 
   useEffect(() => {
     setFocusIdx(0);
@@ -191,7 +192,6 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
                 aria-label={cat.label}
                 onClick={() => {
                   setCategory(cat.id);
-                  if (cat.id !== 'stickers') setSubGroup('all'); // Reset subGroup on other tabs
                 }}
                 className={`flex-1 h-7 rounded-md text-sm transition-colors ${
                   active ? 'bg-[var(--accent)]/15 text-[var(--accent)]' : 'text-[var(--toss-gray-4)] hover:bg-[var(--muted)]'
@@ -213,10 +213,10 @@ export default function EmojiPicker({ x, y, onPick, onClose }: EmojiPickerProps)
           <div className="grid h-32 place-items-center text-[12px] text-[var(--toss-gray-4)]">결과 없음</div>
         ) : (
           <div className="max-h-[240px] overflow-y-auto pr-1">
-            <div className={!query && category === 'stickers' ? "grid grid-cols-4 gap-2 py-1" : "grid grid-cols-8 gap-0.5"}>
+            <div className={!query && isStickerCategory ? "grid grid-cols-4 gap-2 py-1" : "grid grid-cols-8 gap-0.5"}>
               {items.map((entry, idx) => {
                 const focused = idx === focusIdx;
-                const isEmoticonCat = !query && category === 'stickers';
+                const isEmoticonCat = !query && isStickerCategory;
                 const isCustomEmo = entry.e.startsWith('[emo:');
                 const isSticker = entry.e.startsWith('[stat:');
                 

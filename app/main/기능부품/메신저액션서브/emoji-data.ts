@@ -253,6 +253,8 @@ export const CELEBRATE: EmojiEntry[] = [
 
 export const CATEGORIES = [
   { id: 'stickers', label: '스티커 이모티콘', icon: '🎨', list: STICKERS_ENTRIES },
+  { id: 'hospital', label: '병원 스티커', icon: '🏥', list: HOSPITAL_STICKER_ENTRIES },
+  { id: 'worker', label: '직장 스티커', icon: '💼', list: WORKER_STICKER_ENTRIES },
   { id: 'frequent', label: '최근', icon: '🕐', list: FREQUENT },
   { id: 'faces', label: '표정', icon: '😀', list: FACES },
   { id: 'animals', label: '동물', icon: '🐶', list: ANIMALS },
