@@ -386,7 +386,7 @@ export default function SApprovalAttendanceFixForm({
                   width: 48,
                   height: 48,
                   borderRadius: '50%',
-                  background: 'rgba(0, 122, 255, 0.08)',
+                  background: 'var(--m-accent-soft)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -410,7 +410,7 @@ export default function SApprovalAttendanceFixForm({
                   fontSize: 12,
                   fontWeight: 900,
                   color: '#fff',
-                  background: '#007AFF',
+                  background: 'var(--m-accent)',
                   border: 'none',
                   cursor: 'pointer' }}
                 className="transition-all active:scale-95 duration-100"
@@ -464,10 +464,10 @@ export default function SApprovalAttendanceFixForm({
                       padding: 12,
                       borderRadius: 12,
                       border: isSelected
-                        ? '2px solid #007AFF'
+                        ? '2px solid var(--m-accent)'
                         : '1px solid rgba(255, 255, 255, 0.35)',
                       background: isSelected
-                        ? 'rgba(0, 122, 255, 0.06)'
+                        ? 'var(--m-accent-soft)'
                         : 'rgba(255, 255, 255, 0.45)',
                       boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
                       textAlign: 'left',
@@ -481,7 +481,7 @@ export default function SApprovalAttendanceFixForm({
                           height: 14,
                           borderRadius: 4,
                           border: '1px solid var(--m-border)',
-                          background: isSelected ? '#007AFF' : 'transparent' }}
+                          background: isSelected ? 'var(--m-accent)' : 'transparent' }}
                       />
                     </div>
                     <span
@@ -497,7 +497,7 @@ export default function SApprovalAttendanceFixForm({
                       {badge.icon} {displayLabel}
                     </span>
                     <div style={{ fontSize: 10, color: 'var(--z-500)', fontWeight: 800, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      {schedStart && <div style={{ color: '#007AFF', fontWeight: 900 }}>예정: {schedStart}</div>}
+                      {schedStart && <div style={{ color: 'var(--m-accent)', fontWeight: 900 }}>예정: {schedStart}</div>}
                       {checkInTime && <div>출근: {checkInTime}</div>}
                       {checkOutTime && <div>퇴근: {checkOutTime}</div>}
                       {!checkInTime && !checkOutTime && <div>기록 없음</div>}

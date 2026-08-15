@@ -122,7 +122,9 @@ export function getPriorityMeta(priority: unknown) {
     case 'low':
       return { label: '낮음', color: '#8E8E93', className: 'bg-[var(--muted)] text-[var(--toss-gray-4)] text-gray-400' };
     default:
-      return { label: '보통', color: '#007AFF', className: 'bg-blue-500/20 text-blue-600 text-blue-500' };
+      // PC·모바일 양쪽에서 쓰이는 값이라 --m-* 토큰을 쓸 수 없다. 토큰과 같은
+      // 리터럴(#2563EB)로 맞춘다 — 여기만 iOS 파랑이라 다른 파랑이 섞였다.
+      return { label: '보통', color: '#2563EB', className: 'bg-blue-500/20 text-blue-600 text-blue-500' };
   }
 }
 

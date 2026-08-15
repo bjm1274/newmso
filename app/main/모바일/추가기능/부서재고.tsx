@@ -75,8 +75,8 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
           type="button"
           className={`macos-squircle-sm ${filter === 'all' ? 'on' : ''}`}
           style={{
-            background: filter === 'all' ? 'rgba(0, 122, 255, 0.12)' : 'rgba(255, 255, 255, 0.55)',
-            border: filter === 'all' ? '1px solid rgba(0, 122, 255, 0.25)' : '1px solid rgba(0, 0, 0, 0.08)',
+            background: filter === 'all' ? 'var(--m-accent-soft)' : 'rgba(255, 255, 255, 0.55)',
+            border: filter === 'all' ? '1px solid var(--m-accent-soft)' : '1px solid rgba(0, 0, 0, 0.08)',
             color: filter === 'all' ? '#007aff' : 'var(--z-700)',
             borderRadius: '16px',
             padding: '6px 12px',
@@ -92,7 +92,7 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
           <span
             className="cnt"
             style={{
-              background: filter === 'all' ? 'rgba(0, 122, 255, 0.2)' : 'rgba(0, 0, 0, 0.06)',
+              background: filter === 'all' ? 'var(--m-accent-soft)' : 'rgba(0, 0, 0, 0.06)',
               color: filter === 'all' ? '#007aff' : 'var(--z-600)',
               borderRadius: '8px',
               padding: '1px 6px',
@@ -171,8 +171,8 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
           type="button"
           className={`macos-squircle-sm ${filter === 'med' ? 'on' : ''}`}
           style={{
-            background: filter === 'med' ? 'rgba(0, 122, 255, 0.12)' : 'rgba(255, 255, 255, 0.55)',
-            border: filter === 'med' ? '1px solid rgba(0, 122, 255, 0.25)' : '1px solid rgba(0, 0, 0, 0.08)',
+            background: filter === 'med' ? 'var(--m-accent-soft)' : 'rgba(255, 255, 255, 0.55)',
+            border: filter === 'med' ? '1px solid var(--m-accent-soft)' : '1px solid rgba(0, 0, 0, 0.08)',
             color: filter === 'med' ? '#007aff' : 'var(--z-700)',
             borderRadius: '16px',
             padding: '6px 12px',
@@ -187,8 +187,8 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
           type="button"
           className={`macos-squircle-sm ${filter === 'office' ? 'on' : ''}`}
           style={{
-            background: filter === 'office' ? 'rgba(0, 122, 255, 0.12)' : 'rgba(255, 255, 255, 0.55)',
-            border: filter === 'office' ? '1px solid rgba(0, 122, 255, 0.25)' : '1px solid rgba(0, 0, 0, 0.08)',
+            background: filter === 'office' ? 'var(--m-accent-soft)' : 'rgba(255, 255, 255, 0.55)',
+            border: filter === 'office' ? '1px solid var(--m-accent-soft)' : '1px solid rgba(0, 0, 0, 0.08)',
             color: filter === 'office' ? '#007aff' : 'var(--z-700)',
             borderRadius: '16px',
             padding: '6px 12px',
@@ -206,8 +206,8 @@ export default function 부서재고({ user, onBack }: { user: ErpUser; onBack: 
           className="macos-glass macos-squircle"
           style={{
             padding: '14px 16px',
-            background: isHQ ? 'rgba(0, 122, 255, 0.06)' : 'rgba(255, 149, 0, 0.06)',
-            border: isHQ ? '1px solid rgba(0, 122, 255, 0.15)' : '1px solid rgba(255, 149, 0, 0.15)',
+            background: isHQ ? 'var(--m-accent-soft)' : 'rgba(255, 149, 0, 0.06)',
+            border: isHQ ? '1px solid var(--m-accent-soft)' : '1px solid rgba(255, 149, 0, 0.15)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
             boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',

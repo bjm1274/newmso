@@ -324,14 +324,14 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
           style={{
             fontSize: 13,
             fontWeight: 800,
-            background: canSubmit ? '#007AFF' : 'rgba(0, 0, 0, 0.04)',
+            background: canSubmit ? 'var(--m-accent)' : 'rgba(0, 0, 0, 0.04)',
             color: canSubmit ? '#fff' : 'var(--z-400)',
             border: 'none',
             padding: '5px 12px',
             borderRadius: 8,
             cursor: 'pointer',
             opacity: submitting ? 0.5 : 1,
-            boxShadow: canSubmit ? '0 2px 8px rgba(0, 122, 255, 0.2)' : 'none' }}
+            boxShadow: canSubmit ? 'none' : 'none' }}
         >
           {submitting ? '저장중…' : isEdit ? '수정' : '게시'}
         </button>
@@ -368,12 +368,12 @@ export default function SFormPost({ user, canAdmin = false, initialCat, editPost
                       borderRadius: 8,
                       fontSize: 12,
                       fontWeight: 800,
-                      background: on ? '#007AFF' : 'rgba(0, 0, 0, 0.04)',
+                      background: on ? 'var(--m-accent)' : 'rgba(0, 0, 0, 0.04)',
                       color: on ? '#fff' : 'var(--z-700)',
                       opacity: isEdit && !on ? 0.4 : 1,
                       border: 'none',
                       cursor: isEdit && !on ? 'not-allowed' : 'pointer',
-                      boxShadow: on ? '0 2px 8px rgba(0, 122, 255, 0.2)' : 'none' }}
+                      boxShadow: on ? 'none' : 'none' }}
                   >
                     {c.label}
                   </button>

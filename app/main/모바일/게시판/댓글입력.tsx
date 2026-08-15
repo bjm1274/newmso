@@ -48,8 +48,8 @@ const CommentComposer = forwardRef<HTMLInputElement, CommentComposerProps>(funct
             alignItems: 'center',
             gap: 6,
             padding: '6px 12px',
-            background: 'rgba(0, 122, 255, 0.08)',
-            color: '#007AFF',
+            background: 'var(--m-accent-soft)',
+            color: 'var(--m-accent)',
             borderRadius: 10,
             fontSize: 12,
             fontWeight: 800 }}
@@ -66,8 +66,8 @@ const CommentComposer = forwardRef<HTMLInputElement, CommentComposerProps>(funct
               width: 20,
               height: 20,
               borderRadius: '50%',
-              background: 'rgba(0, 122, 255, 0.15)',
-              color: '#007AFF',
+              background: 'var(--m-accent-soft)',
+              color: 'var(--m-accent)',
               display: 'grid',
               placeItems: 'center',
               border: 'none',
@@ -121,14 +121,14 @@ const CommentComposer = forwardRef<HTMLInputElement, CommentComposerProps>(funct
             width: 32,
             height: 32,
             borderRadius: '50%',
-            background: draft.trim() ? '#007AFF' : 'rgba(0, 0, 0, 0.08)',
+            background: draft.trim() ? 'var(--m-accent)' : 'rgba(0, 0, 0, 0.08)',
             color: draft.trim() ? '#fff' : 'var(--z-400)',
             display: 'grid',
             placeItems: 'center',
             opacity: sending ? 0.5 : 1,
             border: 'none',
             cursor: 'pointer',
-            boxShadow: draft.trim() ? '0 2px 8px rgba(0, 122, 255, 0.25)' : 'none' }}
+            boxShadow: draft.trim() ? '0 2px 8px var(--m-accent-soft)' : 'none' }}
         >
           <MIcon name="send" size={14} />
         </button>

@@ -145,7 +145,7 @@ export default function SApprovalLeavePlanForm({
           <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--z-700)' }}>
             {balLoading ? '잔여 연차 확인 중...' : `남은 연차 ${remaining}일`}
           </div>
-          <div style={{ fontSize: 13, fontWeight: 900, color: '#007AFF' }}>
+          <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--m-accent)' }}>
             선택 {sortedDates.length} / {remaining}일
           </div>
         </div>

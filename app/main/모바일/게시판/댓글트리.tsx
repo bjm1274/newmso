@@ -121,7 +121,7 @@ function CommentBody({
             position: 'absolute',
             left: -14,
             top: 14,
-            color: 'rgba(0, 122, 255, 0.4)',
+            color: 'var(--z-400)',
             fontSize: 12,
             fontWeight: 800 }}
         >
@@ -141,11 +141,11 @@ function CommentBody({
               style={{
                 marginLeft: 'auto',
                 fontSize: 10.5,
-                color: '#007AFF',
+                color: 'var(--m-accent)',
                 fontWeight: 800,
                 padding: '2px 6px',
                 borderRadius: 4,
-                background: 'rgba(0, 122, 255, 0.06)',
+                background: 'var(--m-accent-soft)',
                 border: 'none',
                 cursor: 'pointer' }}
             >

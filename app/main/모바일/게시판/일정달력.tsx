@@ -190,11 +190,11 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
                 borderBottom: idx < 35 ? '1px solid rgba(0, 0, 0, 0.05)' : 'none',
                 padding: 4,
                 background: isSelected
-                  ? 'rgba(0, 122, 255, 0.15)'
+                  ? 'var(--m-accent-soft)'
                   : inMonth
                     ? 'rgba(255, 255, 255, 0.45)'
                     : 'rgba(0, 0, 0, 0.02)',
-                boxShadow: isSelected ? 'inset 0 0 0 2px #007AFF' : 'none',
+                boxShadow: isSelected ? 'inset 0 0 0 2px var(--m-accent)' : 'none',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 2,
@@ -210,7 +210,7 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
                     : dow === 0
                       ? '#FF3B30'
                       : dow === 6
-                        ? '#007AFF'
+                        ? 'var(--m-accent)'
                         : 'var(--z-800)' }}
               >
                 {d.getDate()}
@@ -222,11 +222,11 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
                     width: '100%',
                     textAlign: 'left',
                     borderRadius: 6,
-                    background: 'rgba(0, 122, 255, 0.08)',
+                    background: 'var(--m-accent-soft)',
                     padding: '3px 4px',
                     fontSize: 9,
                     fontWeight: 800,
-                    color: '#007AFF',
+                    color: 'var(--m-accent)',
                     lineHeight: 1.2,
                     overflow: 'hidden',
                     whiteSpace: 'nowrap',
@@ -242,7 +242,7 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
                   style={{
                     fontSize: 9,
                     fontWeight: 800,
-                    color: '#007AFF',
+                    color: 'var(--m-accent)',
                     textAlign: 'center',
                     padding: '2px 0',
                     pointerEvents: 'none' }}
@@ -285,7 +285,7 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
                       boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)' }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                      <span style={{ fontSize: 13, fontWeight: 900, color: '#007AFF' }}>
+                      <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--m-accent)' }}>
                         {ev.schedule_time || '시간 미지정'}
                       </span>
                       <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--z-500)' }}>

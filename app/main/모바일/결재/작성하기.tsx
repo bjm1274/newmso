@@ -131,7 +131,7 @@ export default function SApprovalWrite({ onBack, onPick }: SApprovalWriteProps) 
                   onClick={() => onPick(item.slug, item.name)}
                   aria-label={`${item.name} 양식 선택`}
                 >
-                  <div className="ico-tile tone-accent" aria-hidden="true" style={{ width: 28, height: 28, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'rgba(0, 122, 255, 0.08)', color: '#007AFF' }}>
+                  <div className="ico-tile tone-accent" aria-hidden="true" style={{ width: 28, height: 28, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'var(--m-accent-soft)', color: 'var(--m-accent)' }}>
                     <MIcon name="fileText" size={15} />
                   </div>
                   <div style={{ minWidth: 0, flex: 1, marginLeft: 12 }}>

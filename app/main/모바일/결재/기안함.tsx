@@ -147,12 +147,12 @@ export default function SApprovalSent({
                 padding: '6px 12px',
                 fontSize: 12,
                 fontWeight: 900,
-                background: on ? '#007AFF' : 'rgba(255, 255, 255, 0.5)',
+                background: on ? 'var(--m-accent)' : 'rgba(255, 255, 255, 0.5)',
                 color: on ? '#fff' : 'var(--z-700)',
                 border: on ? 'none' : '1px solid rgba(255, 255, 255, 0.4)',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
-                boxShadow: on ? '0 2px 8px rgba(0, 122, 255, 0.25)' : 'none' }}
+                boxShadow: on ? '0 2px 8px var(--m-accent-soft)' : 'none' }}
             >
               {FILTER_LABEL[f]}
               <span style={{ fontSize: 10, opacity: 0.8, marginLeft: 3 }}>{counts[f]}</span>

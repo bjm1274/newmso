@@ -256,7 +256,7 @@ export default function SApprovalOvertimeForm({
                           alignItems: 'center',
                           padding: '12px 16px',
                           borderBottom: i < records.length - 1 ? '1px solid rgba(0, 0, 0, 0.04)' : 'none',
-                          background: isSel ? 'rgba(0, 122, 255, 0.06)' : 'transparent',
+                          background: isSel ? 'var(--m-accent-soft)' : 'transparent',
                           cursor: 'pointer',
                           borderLeft: 'none',
                           borderRight: 'none',
@@ -269,7 +269,7 @@ export default function SApprovalOvertimeForm({
                             height: 20,
                             borderRadius: 6,
                             border: isSel ? 'none' : '2px solid var(--z-300)',
-                            background: isSel ? '#007AFF' : 'transparent',
+                            background: isSel ? 'var(--m-accent)' : 'transparent',
                             display: 'grid',
                             placeItems: 'center' }}
                         >

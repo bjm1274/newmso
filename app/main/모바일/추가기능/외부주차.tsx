@@ -69,12 +69,12 @@ export default function 외부주차({ user, onBack }: { user: ErpUser; onBack: 
               style={{
                 width: 72,
                 height: 72,
-                background: 'rgba(0, 122, 255, 0.12)',
+                background: 'var(--m-accent-soft)',
                 color: '#007aff',
                 display: 'grid',
                 placeItems: 'center',
                 margin: '0 auto 18px',
-                boxShadow: '0 4px 12px rgba(0, 122, 255, 0.1)' }}
+                boxShadow: 'none' }}
             >
               <MIcon name="box" size={32} strokeWidth={1.4} />
             </div>
@@ -112,7 +112,7 @@ export default function 외부주차({ user, onBack }: { user: ErpUser; onBack: 
                     borderRadius: '12px',
                     background: '#007aff',
                     border: 'none',
-                    boxShadow: '0 4px 12px rgba(0, 122, 255, 0.3)',
+                    boxShadow: '0 4px 12px var(--m-accent-soft)',
                     color: '#fff',
                     fontWeight: 600,
                     fontSize: '14px' }}

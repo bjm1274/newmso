@@ -253,7 +253,7 @@ export default function 조직도({ user, onBack }: { user: ErpUser; onBack: () 
                 className="macos-squircle"
                 style={{
                   padding: '10px 18px',
-                  background: 'linear-gradient(135deg, #007AFF, #0A55E1)',
+                  background: 'var(--m-accent)',
                   color: '#fff',
                   fontSize: 14,
                   fontWeight: 800,
@@ -294,12 +294,12 @@ export default function 조직도({ user, onBack }: { user: ErpUser; onBack: () 
                 border: '1px solid rgba(59, 130, 246, 0.15)',
                 fontSize: 12,
                 fontWeight: 600,
-                color: '#007AFF',
+                color: 'var(--m-accent)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8 }}
             >
-              <MIcon name="info" size={16} color="#007AFF" />
+              <MIcon name="info" size={16} color="var(--m-accent)" />
               풀 조직도(드래그·재구성)는 데스크톱에서 확인하세요.
             </div>
           </div>

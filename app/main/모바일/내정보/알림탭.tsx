@@ -43,7 +43,7 @@ type NotifItem = {
 
 /** macOS Launchpad 감성의 그라데이션 컬러 및 아이콘 매핑 (홈.tsx와 1대1 싱크) */
 const NOTIF_LAUNCHPAD_THEMES: Record<string, { bg: string; icon: string }> = {
-  approval:    { bg: 'linear-gradient(135deg, #007AFF, #0A55E1)', icon: 'checkCircle' },
+  approval:    { bg: 'var(--m-accent)', icon: 'checkCircle' },
   inventory:   { bg: 'linear-gradient(135deg, #FF3B30, #C2160C)', icon: 'box' },
   chat:        { bg: 'linear-gradient(135deg, #34C759, #119F35)', icon: 'chat' },
   attendance:  { bg: 'linear-gradient(135deg, #FF9500, #FF5E3A)', icon: 'clock' },

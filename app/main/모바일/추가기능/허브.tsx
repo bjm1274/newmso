@@ -73,7 +73,7 @@ export function canAccessAddonModule(
 
 /** macOS Launchpad 감성의 그라데이션 컬러 및 아이콘 매핑 (홈.tsx와 일치) */
 const ADDON_THEMES: Record<AddonModuleKey, { bg: string; icon: string }> = {
-  org:       { bg: 'linear-gradient(135deg, #007AFF, #0A55E1)', icon: 'users' },
+  org:       { bg: 'var(--m-accent)', icon: 'users' },
   worknow:   { bg: 'linear-gradient(135deg, #FF9500, #FF5E3A)', icon: 'clock' },
   inventory: { bg: 'linear-gradient(135deg, #FF3B30, #C2160C)', icon: 'box' },
   parking:   { bg: 'linear-gradient(135deg, #8E8E93, #636366)', icon: 'shield' },

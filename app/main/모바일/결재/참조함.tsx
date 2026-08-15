@@ -148,7 +148,7 @@ export default function SApprovalRef({
                     type="button"
                     className="m-list-row transition-all duration-150 active:bg-black/[0.04]"
                     style={{
-                      background: read ? 'transparent' : 'rgba(0, 122, 255, 0.05)',
+                      background: read ? 'transparent' : 'var(--m-accent-soft)',
                       textAlign: 'left',
                       width: '100%',
                       padding: '12px 16px',
@@ -186,7 +186,7 @@ export default function SApprovalRef({
                               width: 6,
                               height: 6,
                               borderRadius: 999,
-                              background: '#007AFF',
+                              background: 'var(--m-accent)',
                               flexShrink: 0 }}
                           />
                         )}

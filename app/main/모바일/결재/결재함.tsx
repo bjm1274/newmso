@@ -313,12 +313,12 @@ export default function SApproval({
             padding: '6px 12px',
             fontSize: 12,
             fontWeight: 900,
-            background: seg === 'inbox' ? '#007AFF' : 'rgba(255, 255, 255, 0.5)',
+            background: seg === 'inbox' ? 'var(--m-accent)' : 'rgba(255, 255, 255, 0.5)',
             color: seg === 'inbox' ? '#fff' : 'var(--z-700)',
             border: seg === 'inbox' ? 'none' : '1px solid rgba(255, 255, 255, 0.4)',
             cursor: 'pointer',
             whiteSpace: 'nowrap',
-            boxShadow: seg === 'inbox' ? '0 2px 8px rgba(0, 122, 255, 0.25)' : 'none' }}
+            boxShadow: seg === 'inbox' ? '0 2px 8px var(--m-accent-soft)' : 'none' }}
         >
           결재함<span style={{ fontSize: 10, opacity: 0.8, marginLeft: 3 }}>{inbox.length}</span>
         </button>

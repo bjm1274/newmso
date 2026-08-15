@@ -140,7 +140,7 @@ const LAUNCHPAD_COLORS: Record<string, { bg: string; shadow: string }> = {
   payslip: { bg: 'linear-gradient(135deg, #30B0C7, #007A8D)', shadow: 'rgba(48, 176, 199, 0.3)' },
   cert: { bg: 'linear-gradient(135deg, #BF5AF2, #8F22D0)', shadow: 'rgba(191, 90, 242, 0.3)' },
   records: { bg: 'linear-gradient(135deg, #BF5AF2, #8F22D0)', shadow: 'rgba(191, 90, 242, 0.3)' },
-  approval: { bg: 'linear-gradient(135deg, #007AFF, #0A55E1)', shadow: 'rgba(0, 122, 255, 0.3)' },
+  approval: { bg: 'var(--m-accent)', shadow: 'var(--m-accent-soft)' },
   stock: { bg: 'linear-gradient(135deg, #FF3B30, #C2160C)', shadow: 'rgba(255, 59, 48, 0.3)' },
   org: { bg: 'linear-gradient(135deg, #5856D6, #3B39C1)', shadow: 'rgba(88, 86, 214, 0.3)' },
   more: { bg: 'linear-gradient(135deg, #8E8E93, #636366)', shadow: 'rgba(142, 142, 147, 0.3)' } };
@@ -427,9 +427,9 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                         borderRadius: 999,
                         fontSize: 9.5,
                         fontWeight: 800,
-                        background: 'rgba(0, 122, 255, 0.12)',
+                        background: 'var(--m-accent-soft)',
                         color: 'var(--m-accent)',
-                        border: '1px solid rgba(0, 122, 255, 0.15)' }}
+                        border: '1px solid var(--m-accent-soft)' }}
                     >
                       {user.company}
                     </span>
@@ -463,11 +463,11 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                   width: '36px',
                   height: '36px',
                   borderRadius: '12px',
-                  background: 'rgba(0, 122, 255, 0.08)',
-                  border: '1px solid rgba(0, 122, 255, 0.15)',
+                  background: 'var(--m-accent-soft)',
+                  border: '1px solid var(--m-accent-soft)',
                   cursor: 'pointer',
                   color: 'var(--m-accent)',
-                  boxShadow: '0 2px 6px rgba(0, 122, 255, 0.05)',
+                  boxShadow: '0 2px 6px var(--m-accent-soft)',
                   transition: 'background 0.2s ease',
                   alignSelf: 'center',
                   flexShrink: 0 }}
@@ -504,7 +504,7 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
               {[
                 { label: '이번달 지각', value: lateCountLabel, color: monthlyAttendance?.late && monthlyAttendance.late > 0 ? '#FF3B30' : 'var(--foreground)' },
                 { label: '잔여 연차', value: leaveRemaining == null ? '…' : `${leaveRemaining}일`, color: '#34C759' },
-                { label: '미결재', value: `${counts.pendingApproval}건`, color: counts.pendingApproval > 0 ? '#007AFF' : 'var(--foreground)' },
+                { label: '미결재', value: `${counts.pendingApproval}건`, color: counts.pendingApproval > 0 ? 'var(--m-accent)' : 'var(--foreground)' },
               ].map((st, idx) => (
                 <div
                   key={st.label}
@@ -732,11 +732,11 @@ function SHomeBase({ user, onSub, onLogout, onSwitchTab }: SHomeProps) {
                       width: 28,
                       height: 28,
                       borderRadius: 8,
-                      background: '#007AFF',
+                      background: 'var(--m-accent)',
                       color: '#ffffff',
                       display: 'grid',
                       placeItems: 'center',
-                      boxShadow: '0 2px 6px rgba(0, 122, 255, 0.2)' }}
+                      boxShadow: 'none' }}
                   >
                     <MIcon name="checkSquare" size={16} />
                   </div>

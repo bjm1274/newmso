@@ -222,8 +222,8 @@ export default function 직원평가({ user, onBack }: { user: ErpUser; onBack: 
                 gap: 10,
                 alignItems: 'center',
                 borderLeft: '4px solid var(--m-accent)',
-                border: '1px solid rgba(0, 122, 255, 0.15)',
-                background: 'rgba(0, 122, 255, 0.04)',
+                border: '1px solid var(--m-accent-soft)',
+                background: 'var(--m-accent-soft)',
                 borderRadius: '12px' }}
             >
               <MIcon name="info" size={18} />
@@ -465,13 +465,13 @@ function EvalWriteForm({
             style={{
               width: '100%',
               padding: '14px 0',
-              background: 'linear-gradient(135deg, #007AFF, #0A55E1)',
+              background: 'var(--m-accent)',
               color: '#ffffff',
               fontSize: 13.5,
               fontWeight: 800,
               borderRadius: '16px',
               border: 0,
-              boxShadow: '0 4px 14px rgba(0, 122, 255, 0.3)',
+              boxShadow: '0 4px 14px var(--m-accent-soft)',
               cursor: saving ? 'default' : 'pointer',
               opacity: saving ? 0.7 : 1,
               transition: 'all 0.2s ease',

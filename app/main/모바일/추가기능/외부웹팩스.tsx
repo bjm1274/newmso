@@ -54,7 +54,7 @@ export default function 외부웹팩스({ user, onBack }: { user: ErpUser; onBac
               display: 'grid',
               placeItems: 'center',
               margin: '0 auto 16px',
-              boxShadow: '0 8px 20px rgba(0, 122, 255, 0.15)' }}
+              boxShadow: '0 8px 20px var(--m-accent-soft)' }}
           >
             <MIcon name="send" size={32} strokeWidth={1.4} />
           </div>

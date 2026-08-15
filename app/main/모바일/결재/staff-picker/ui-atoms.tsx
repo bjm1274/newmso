@@ -96,10 +96,10 @@ export function actionStyle(kind: 'primary' | 'ghost'): CSSProperties {
   if (kind === 'primary') {
     return {
       ...base,
-      background: '#007AFF',
+      background: 'var(--m-accent)',
       color: '#fff',
       border: 'none',
-      boxShadow: '0 2px 8px rgba(0, 122, 255, 0.2)',
+      boxShadow: 'none',
     };
   }
   return { ...base, background: 'rgba(255, 255, 255, 0.6)', color: 'var(--z-700)' };

@@ -223,15 +223,15 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
               className="macos-glass macos-squircle-sm"
               style={{
                 padding: '16px',
-                background: 'rgba(0, 122, 255, 0.08)',
-                borderColor: 'rgba(0, 122, 255, 0.2)',
+                background: 'var(--m-accent-soft)',
+                borderColor: 'var(--m-accent-soft)',
                 color: '#007aff',
                 fontSize: 12,
                 fontWeight: 700,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
-                boxShadow: '0 4px 16px 0 rgba(0, 122, 255, 0.04)' }}
+                boxShadow: '0 4px 16px 0 var(--m-accent-soft)' }}
             >
               <MIcon name="info" size={16} color="#007aff" />
               주간 마감 현황은 데스크톱에서 확인하세요. 모바일은 오늘 체크리스트만 제공합니다.
@@ -244,15 +244,15 @@ export default function 마감보고({ user, onBack }: { user: ErpUser; onBack: 
               className="macos-glass macos-squircle-sm"
               style={{
                 padding: '16px',
-                background: 'rgba(0, 122, 255, 0.08)',
-                borderColor: 'rgba(0, 122, 255, 0.2)',
+                background: 'var(--m-accent-soft)',
+                borderColor: 'var(--m-accent-soft)',
                 color: '#007aff',
                 fontSize: 12,
                 fontWeight: 700,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
-                boxShadow: '0 4px 16px 0 rgba(0, 122, 255, 0.04)' }}
+                boxShadow: '0 4px 16px 0 var(--m-accent-soft)' }}
             >
               <MIcon name="info" size={16} color="#007aff" />
               월 마감 보고서·차트는 데스크톱에서 PDF 발행

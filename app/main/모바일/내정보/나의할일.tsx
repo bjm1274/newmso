@@ -118,10 +118,10 @@ export default function 나의할일({ user: initialUser, onBack, onSwitchTab }:
           color: var(--z-300);
         }
         .macos-filter-chip.active {
-          background: #007AFF !important;
+          background: var(--m-accent) !important;
           color: #ffffff !important;
-          border-color: #007AFF !important;
-          box-shadow: 0 4px 12px rgba(0, 122, 255, 0.2);
+          border-color: var(--m-accent) !important;
+          box-shadow: none;
         }
         .macos-filter-chip .cnt {
           font-size: 11px;
@@ -212,7 +212,7 @@ export default function 나의할일({ user: initialUser, onBack, onSwitchTab }:
         }
         .macos-quick-add-plus {
           font-size: 18px;
-          color: #007AFF;
+          color: var(--m-accent);
           font-weight: 300;
           user-select: none;
         }
@@ -258,7 +258,7 @@ export default function 나의할일({ user: initialUser, onBack, onSwitchTab }:
 
         .macos-quick-add-submit-btn {
           margin-left: auto;
-          background: #007AFF;
+          background: var(--m-accent);
           color: #ffffff;
           border: none;
           padding: 5px 12px;
@@ -291,7 +291,7 @@ export default function 나의할일({ user: initialUser, onBack, onSwitchTab }:
         .macos-list-title {
           font-size: 16px;
           font-weight: 700;
-          color: #007AFF;
+          color: var(--m-accent);
         }
         .macos-list-subtitle {
           font-size: 11px;
@@ -360,12 +360,12 @@ export default function 나의할일({ user: initialUser, onBack, onSwitchTab }:
         /* 우선순위별 체크박스 테두리색 및 활성색 */
         .macos-checkbox-container.urgent .macos-checkbox-custom { border-color: #FF3B30; }
         .macos-checkbox-container.high .macos-checkbox-custom { border-color: #FF9500; }
-        .macos-checkbox-container.medium .macos-checkbox-custom { border-color: #007AFF; }
+        .macos-checkbox-container.medium .macos-checkbox-custom { border-color: var(--m-accent); }
         .macos-checkbox-container.low .macos-checkbox-custom { border-color: #8E8E93; }
 
         .macos-checkbox-container.urgent:hover .macos-checkbox-custom { background: rgba(255, 59, 48, 0.08); }
         .macos-checkbox-container.high:hover .macos-checkbox-custom { background: rgba(255, 149, 0, 0.08); }
-        .macos-checkbox-container.medium:hover .macos-checkbox-custom { background: rgba(0, 122, 255, 0.08); }
+        .macos-checkbox-container.medium:hover .macos-checkbox-custom { background: var(--m-accent-soft); }
 
         /* 완료(checked) 상태 */
         .macos-checkbox-hidden:checked + .macos-checkbox-custom {
@@ -386,8 +386,8 @@ export default function 나의할일({ user: initialUser, onBack, onSwitchTab }:
           border-color: #FF9500 !important;
         }
         .macos-checkbox-container.medium .macos-checkbox-hidden:checked + .macos-checkbox-custom {
-          background: #007AFF !important;
-          border-color: #007AFF !important;
+          background: var(--m-accent) !important;
+          border-color: var(--m-accent) !important;
         }
 
         /* 할일 타이틀 & 메타 */
@@ -668,7 +668,7 @@ export default function 나의할일({ user: initialUser, onBack, onSwitchTab }:
           <div className="macos-todo-items-scroll">
             {loading ? (
               <div className="flex justify-center py-20">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--border)] border-t-[#007AFF]" />
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--border)] border-t-[var(--m-accent)]" />
               </div>
             ) : !effectiveUserId ? (
               <div className="macos-empty-state">

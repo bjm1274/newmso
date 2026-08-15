@@ -195,7 +195,7 @@ export default function SApprovalDocs({
           style={{
             height: 40,
             borderRadius: 8,
-            background: '#007AFF',
+            background: 'var(--m-accent)',
             color: '#fff',
             fontSize: 13,
             fontWeight: 900,
@@ -205,7 +205,7 @@ export default function SApprovalDocs({
             gap: 6,
             border: 'none',
             cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(0, 122, 255, 0.25)' }}
+            boxShadow: '0 2px 8px var(--m-accent-soft)' }}
         >
           <span style={{ display: 'inline-flex' }}><MIcon name="search" size={15} /></span>
           조회

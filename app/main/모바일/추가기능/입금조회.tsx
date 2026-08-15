@@ -122,9 +122,9 @@ export default function 입금조회({ user, onBack }: { user: ErpUser; onBack: 
                       style={{
                         flex: 1,
                         height: `${Math.max(2, h.pct)}%`,
-                        background: h.pct > 0 ? 'linear-gradient(to top, rgba(0, 122, 255, 0.85), rgba(0, 122, 255, 0.55))' : 'rgba(0, 122, 255, 0.1)',
+                        background: h.pct > 0 ? 'var(--m-accent)' : 'var(--m-accent-soft)',
                         borderRadius: '6px 6px 2px 2px',
-                        boxShadow: h.pct > 0 ? '0 2px 6px rgba(0, 122, 255, 0.2)' : 'none' }}
+                        boxShadow: h.pct > 0 ? 'none' : 'none' }}
                     />
                   ))}
                 </div>

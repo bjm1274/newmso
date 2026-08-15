@@ -154,12 +154,12 @@ function BoardHomeView({
                     height: 32,
                     display: 'grid',
                     placeItems: 'center',
-                    background: c.tone === 'accent' ? 'rgba(0, 122, 255, 0.12)' :
+                    background: c.tone === 'accent' ? 'var(--m-accent-soft)' :
                                 c.tone === 'success' ? 'rgba(52, 199, 89, 0.12)' :
                                 c.tone === 'warn' ? 'rgba(255, 149, 0, 0.12)' :
                                 c.tone === 'danger' ? 'rgba(255, 59, 48, 0.12)' :
                                 'rgba(0, 0, 0, 0.05)',
-                    color: c.tone === 'accent' ? '#007AFF' :
+                    color: c.tone === 'accent' ? 'var(--m-accent)' :
                            c.tone === 'success' ? '#34C759' :
                            c.tone === 'warn' ? '#FF9500' :
                            c.tone === 'danger' ? '#FF3B30' :
@@ -205,14 +205,14 @@ function BoardHomeView({
             style={{
               width: '100%',
               padding: '12px 16px',
-              background: 'rgba(0, 122, 255, 0.08)',
-              border: '1px solid rgba(0, 122, 255, 0.15)',
+              background: 'var(--m-accent-soft)',
+              border: '1px solid var(--m-accent-soft)',
               fontSize: 13,
               fontWeight: 800,
-              color: '#007AFF',
+              color: 'var(--m-accent)',
               textAlign: 'center',
               cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(0, 122, 255, 0.05)' }}
+              boxShadow: '0 4px 12px var(--m-accent-soft)' }}
           >
             전체 글 보기
           </button>
@@ -414,7 +414,7 @@ function SBoardBase({
                 fontSize: 12,
                 fontWeight: 800,
                 borderRadius: 8,
-                background: active ? '#007AFF' : 'rgba(0, 0, 0, 0.04)',
+                background: active ? 'var(--m-accent)' : 'rgba(0, 0, 0, 0.04)',
                 color: active ? '#fff' : 'var(--z-700)',
                 border: 'none',
                 cursor: 'pointer',
@@ -422,7 +422,7 @@ function SBoardBase({
                 alignItems: 'center',
                 gap: 4,
                 whiteSpace: 'nowrap',
-                boxShadow: active ? '0 2px 8px rgba(0, 122, 255, 0.25)' : 'none',
+                boxShadow: active ? '0 2px 8px var(--m-accent-soft)' : 'none',
                 // 카운트 자리 고정 — 숫자 바뀔 때 칩 폭 점프 완화
                 minWidth: 56,
                 justifyContent: 'center',

@@ -135,8 +135,8 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
               fontWeight: 800,
               padding: '2px 6px',
               borderRadius: 6,
-              background: 'rgba(0, 122, 255, 0.08)',
-              color: '#007AFF' }}
+              background: 'var(--m-accent-soft)',
+              color: 'var(--m-accent)' }}
           >
             {post.status || '게시중'}
           </span>
@@ -194,7 +194,7 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
               display: 'inline-flex',
               alignItems: 'center',
               gap: 3,
-              color: commentCount > 0 ? '#007AFF' : 'var(--z-500)' }}
+              color: commentCount > 0 ? 'var(--m-accent)' : 'var(--z-500)' }}
           >
             <MIcon name="chat" size={11} />
             {commentCount}
