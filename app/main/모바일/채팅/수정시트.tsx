@@ -51,14 +51,14 @@ export function MessageEditSheet({ message, saving, onClose, onSave }: MessageEd
             padding: '14px',
             fontSize: 14,
             fontFamily: 'inherit',
-            background: 'rgba(120, 120, 128, 0.08)',
+            background: 'var(--z-200)',
             border: '1px solid rgba(120, 120, 128, 0.15)',
             outline: 'none',
             resize: 'none',
             color: 'var(--z-900)',
             transition: 'border-color 0.2s' }}
           onFocus={(e) => {
-            e.target.style.borderColor = '#007AFF';
+            e.target.style.borderColor = 'var(--m-accent)';
           }}
           onBlur={(e) => {
             e.target.style.borderColor = 'rgba(120, 120, 128, 0.15)';
@@ -91,14 +91,14 @@ export function MessageEditSheet({ message, saving, onClose, onSave }: MessageEd
             style={{
               flex: 1,
               padding: '13px',
-              background: draft.trim() ? 'linear-gradient(135deg, #007AFF, #0A55E1)' : 'rgba(120, 120, 128, 0.08)',
+              background: draft.trim() ? 'var(--m-accent)' : 'var(--z-200)',
               color: draft.trim() ? '#fff' : 'rgba(120, 120, 128, 0.35)',
               fontSize: 14,
               fontWeight: 600,
               border: 'none',
               cursor: saving || !draft.trim() ? 'not-allowed' : 'pointer',
               opacity: saving ? 0.7 : 1,
-              boxShadow: draft.trim() ? '0 4px 12px rgba(0, 122, 255, 0.3)' : 'none',
+              boxShadow: draft.trim() ? 'none' : 'none',
               transition: 'all 0.2s' }}
           >
             {saving ? '저장 중…' : '저장'}

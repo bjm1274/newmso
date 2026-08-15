@@ -24,16 +24,16 @@ function StaffRow({ staff, tone }: { staff: StaffDirectoryEntry; tone?: 'success
   const photoUrl = staff.photo_url || staff.avatar_url;
   return (
     <div
-      className="macos-glass macos-squircle-sm"
+      className="macos-squircle-sm"
       style={{
         display: 'flex',
         alignItems: 'center',
         gap: 10,
         padding: '10px 12px',
         marginBottom: 6,
-        background: 'rgba(255, 255, 255, 0.65)',
-        border: '1px solid rgba(255, 255, 255, 0.35)',
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)' }}
+        background: 'var(--m-card)',
+        border: '1px solid var(--m-border)',
+        boxShadow: '0 2px 8px var(--z-100)' }}
     >
       <MAvatar tone={avatarTone} size="sm">
         {photoUrl ? (
@@ -201,18 +201,18 @@ export function ReadStatusSheet({ message, roomId, memberIds, staffs, onClose }:
                 읽지 않음 ({unreadStaffs.length})
               </div>
               {unreadStaffs.length === 0 ? (
-                <div style={{ fontSize: 12, color: 'var(--z-400)', fontWeight: 600, padding: '10px 12px', background: 'rgba(0,0,0,0.02)', borderRadius: 8 }}>모두 읽었습니다.</div>
+                <div style={{ fontSize: 12, color: 'var(--z-400)', fontWeight: 600, padding: '10px 12px', background: 'var(--z-100)', borderRadius: 8 }}>모두 읽었습니다.</div>
               ) : (
                 unreadStaffs.map((staff) => <StaffRow key={`unread-${staff.id}`} staff={staff} />)
               )}
             </div>
-            <div style={{ height: 1, background: 'rgba(0, 0, 0, 0.06)', margin: '4px 0' }} />
+            <div style={{ height: 1, background: 'var(--z-100)', margin: '4px 0' }} />
             <div>
               <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--m-success, #10b981)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6, paddingLeft: 4 }}>
                 읽음 ({readStaffs.length})
               </div>
               {readStaffs.length === 0 ? (
-                <div style={{ fontSize: 12, color: 'var(--z-400)', fontWeight: 600, padding: '10px 12px', background: 'rgba(0,0,0,0.02)', borderRadius: 8 }}>아직 읽은 사람이 없습니다.</div>
+                <div style={{ fontSize: 12, color: 'var(--z-400)', fontWeight: 600, padding: '10px 12px', background: 'var(--z-100)', borderRadius: 8 }}>아직 읽은 사람이 없습니다.</div>
               ) : (
                 readStaffs.map((staff) => <StaffRow key={`read-${staff.id}`} staff={staff} tone="success" />)
               )}

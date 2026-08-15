@@ -58,14 +58,14 @@ function ThreadRow({
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 13, fontWeight: 800, color: mine ? '#007AFF' : 'var(--z-700)' }}>
+          <span style={{ fontSize: 13, fontWeight: 800, color: mine ? 'var(--m-accent)' : 'var(--z-700)' }}>
             {senderName(message, staffs)}
           </span>
           <span style={{ fontSize: 10, color: 'var(--z-400)', fontWeight: 600 }}>
             {formatBubbleTimestamp(message.created_at)}
           </span>
           {mine && (
-            <span style={{ fontSize: 9, background: 'rgba(0,122,255,0.1)', color: '#007AFF', padding: '1px 4px', borderRadius: 4, fontWeight: 700 }}>
+            <span style={{ fontSize: 9, background: 'var(--m-accent-soft)', color: 'var(--m-accent)', padding: '1px 4px', borderRadius: 4, fontWeight: 700 }}>
               내 글
             </span>
           )}
@@ -105,21 +105,18 @@ function ThreadRow({
         </span>
       </div>
       <div
-        className={mine ? '' : 'macos-glass'}
         style={{
           maxWidth: '80%',
-          padding: '10px 14px',
-          fontSize: 13,
-          lineHeight: 1.5,
+          padding: '9px 12px',
+          fontSize: 13.5,
+          lineHeight: 1.55,
           wordBreak: 'break-word',
           whiteSpace: 'pre-wrap',
-          background: mine
-            ? 'linear-gradient(135deg, #007AFF, #0A55E1)'
-            : 'rgba(255, 255, 255, 0.75)',
-          borderRadius: mine ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
-          border: mine ? 'none' : '1px solid rgba(255, 255, 255, 0.4)',
-          color: mine ? '#fff' : 'var(--z-900)',
-          boxShadow: mine ? '0 4px 12px rgba(0, 122, 255, 0.15)' : '0 4px 12px rgba(0, 0, 0, 0.02)' }}
+          // 본 타임라인 말풍선과 같은 규칙 — 꼬리 5px, 그림자 없음
+          background: mine ? 'var(--m-accent)' : 'var(--m-bubble-in-bg)',
+          borderRadius: mine ? '16px 16px 5px 16px' : '16px 16px 16px 5px',
+          border: mine ? 'none' : '1px solid var(--m-bubble-in-border)',
+          color: mine ? '#fff' : 'var(--z-900)' }}
       >
         {message.file_url ? (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: mine ? '#fff' : 'var(--m-accent)', fontWeight: 600 }}>
@@ -207,17 +204,17 @@ export function ThreadSheet({
           <div style={{ padding: '8px 20px 16px', flex: 1, overflowY: 'auto' }}>
             {/* 루트 메시지 */}
             <div
-              className="macos-glass macos-squircle"
+              className="macos-squircle"
               style={{
-                background: 'rgba(255, 255, 255, 0.45)',
+                background: 'var(--m-card)',
                 padding: '14px 16px',
-                borderLeft: '4px solid #007AFF',
+                borderLeft: '4px solid var(--m-accent)',
                 borderTop: 'none',
                 borderRight: 'none',
                 borderBottom: 'none',
                 marginBottom: 16 }}
             >
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#007AFF', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--m-accent)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
                 원문 메시지
               </div>
               <ThreadRow
@@ -229,10 +226,10 @@ export function ThreadSheet({
             </div>
 
             <div style={{ display: 'flex', gap: 8, margin: '12px 0 8px', justifyContent: 'center' }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--z-500)', background: 'rgba(120, 120, 128, 0.08)', padding: '2px 8px', borderRadius: 12 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--z-500)', background: 'var(--z-200)', padding: '2px 8px', borderRadius: 12 }}>
                 답글 {replies.length}개
               </span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--z-500)', background: 'rgba(120, 120, 128, 0.08)', padding: '2px 8px', borderRadius: 12 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--z-500)', background: 'var(--z-200)', padding: '2px 8px', borderRadius: 12 }}>
                 참여 {participantCount}명
               </span>
             </div>
@@ -267,7 +264,7 @@ export function ThreadSheet({
               display: 'flex',
               alignItems: 'center',
               gap: 10,
-              background: 'rgba(255, 255, 255, 0.35)',
+              background: 'var(--m-border)',
               backdropFilter: 'blur(5px)',
               WebkitBackdropFilter: 'blur(5px)' }}
           >
@@ -289,19 +286,19 @@ export function ThreadSheet({
                 padding: '11px 16px',
                 fontSize: 14,
                 fontFamily: 'inherit',
-                background: 'rgba(120, 120, 128, 0.08)',
+                background: 'var(--z-200)',
                 border: '1px solid rgba(120, 120, 128, 0.15)',
                 borderRadius: 22,
                 outline: 'none',
                 color: 'var(--z-900)',
                 transition: 'all 0.2s' }}
               onFocus={(e) => {
-                e.target.style.borderColor = '#007AFF';
-                e.target.style.background = 'rgba(255, 255, 255, 0.85)';
+                e.target.style.borderColor = 'var(--m-accent)';
+                e.target.style.background = 'var(--m-card)';
               }}
               onBlur={(e) => {
                 e.target.style.borderColor = 'rgba(120, 120, 128, 0.15)';
-                e.target.style.background = 'rgba(120, 120, 128, 0.08)';
+                e.target.style.background = 'var(--z-200)';
               }}
             />
             <button
@@ -314,7 +311,7 @@ export function ThreadSheet({
                 height: 38,
                 borderRadius: '50%',
                 background: draft.trim() && !sending
-                  ? 'linear-gradient(135deg, #007AFF, #0A55E1)'
+                  ? 'var(--m-accent)'
                   : 'rgba(120, 120, 128, 0.15)',
                 color: draft.trim() && !sending ? '#fff' : 'rgba(120, 120, 128, 0.35)',
                 display: 'flex',
@@ -323,7 +320,7 @@ export function ThreadSheet({
                 border: 'none',
                 flexShrink: 0,
                 cursor: draft.trim() && !sending ? 'pointer' : 'not-allowed',
-                boxShadow: draft.trim() && !sending ? '0 4px 10px rgba(0, 122, 255, 0.25)' : 'none',
+                boxShadow: draft.trim() && !sending ? 'none' : 'none',
                 transition: 'all 0.2s' }}
             >
               <MIcon name="send" size={15} color={draft.trim() && !sending ? '#fff' : 'rgba(120, 120, 128, 0.4)'} />

@@ -1697,7 +1697,7 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
                     width: '100%',
                     padding: '14px 16px',
                     textAlign: 'left',
-                    background: 'rgba(255, 255, 255, 0.65)',
+                    background: 'var(--m-card)',
                     border: '1px solid rgba(0, 0, 0, 0.05)',
                     borderRadius: 12,
                     fontSize: 13,

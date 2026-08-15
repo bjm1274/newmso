@@ -50,7 +50,7 @@ export function PollComposerSheet({ open, submitting, onClose, onSubmit }: PollC
     padding: '11px 14px',
     fontSize: 14,
     fontFamily: 'inherit',
-    background: 'rgba(120, 120, 128, 0.08)',
+    background: 'var(--z-200)',
     border: '1px solid rgba(120, 120, 128, 0.15)',
     outline: 'none',
     color: 'var(--z-900)',
@@ -78,12 +78,12 @@ export function PollComposerSheet({ open, submitting, onClose, onSubmit }: PollC
             className="macos-squircle-sm"
             disabled={submitting}
             onFocus={(e) => {
-              e.target.style.borderColor = '#007AFF';
-              e.target.style.background = 'rgba(255, 255, 255, 0.85)';
+              e.target.style.borderColor = 'var(--m-accent)';
+              e.target.style.background = 'var(--m-card)';
             }}
             onBlur={(e) => {
               e.target.style.borderColor = 'rgba(120, 120, 128, 0.15)';
-              e.target.style.background = 'rgba(120, 120, 128, 0.08)';
+              e.target.style.background = 'var(--z-200)';
             }}
           />
         </div>
@@ -99,12 +99,12 @@ export function PollComposerSheet({ open, submitting, onClose, onSubmit }: PollC
             className="macos-squircle-sm"
             disabled={submitting}
             onFocus={(e) => {
-              e.target.style.borderColor = '#007AFF';
-              e.target.style.background = 'rgba(255, 255, 255, 0.85)';
+              e.target.style.borderColor = 'var(--m-accent)';
+              e.target.style.background = 'var(--m-card)';
             }}
             onBlur={(e) => {
               e.target.style.borderColor = 'rgba(120, 120, 128, 0.15)';
-              e.target.style.background = 'rgba(120, 120, 128, 0.08)';
+              e.target.style.background = 'var(--z-200)';
             }}
           />
         </div>
@@ -125,12 +125,12 @@ export function PollComposerSheet({ open, submitting, onClose, onSubmit }: PollC
                   className="macos-squircle-sm"
                   disabled={submitting}
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#007AFF';
-                    e.target.style.background = 'rgba(255, 255, 255, 0.85)';
+                    e.target.style.borderColor = 'var(--m-accent)';
+                    e.target.style.background = 'var(--m-card)';
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = 'rgba(120, 120, 128, 0.15)';
-                    e.target.style.background = 'rgba(120, 120, 128, 0.08)';
+                    e.target.style.background = 'var(--z-200)';
                   }}
                 />
                 {options.length > MIN_OPTIONS && (
@@ -207,8 +207,8 @@ export function PollComposerSheet({ open, submitting, onClose, onSubmit }: PollC
               flex: 1,
               padding: '13px',
               background: (question.trim() && options.filter(o => o.trim()).length >= 2)
-                ? 'linear-gradient(135deg, #007AFF, #0A55E1)'
-                : 'rgba(120, 120, 128, 0.08)',
+                ? 'var(--m-accent)'
+                : 'var(--z-200)',
               color: (question.trim() && options.filter(o => o.trim()).length >= 2)
                 ? '#fff'
                 : 'rgba(120, 120, 128, 0.35)',
@@ -218,7 +218,7 @@ export function PollComposerSheet({ open, submitting, onClose, onSubmit }: PollC
               cursor: submitting ? 'not-allowed' : 'pointer',
               opacity: submitting ? 0.7 : 1,
               boxShadow: (question.trim() && options.filter(o => o.trim()).length >= 2)
-                ? '0 4px 12px rgba(0, 122, 255, 0.3)'
+                ? 'none'
                 : 'none',
               transition: 'all 0.2s' }}
           >
@@ -249,17 +249,17 @@ export function PollCard({ poll, voteCounts, myVote, voting, onVote }: PollCardP
 
   return (
     <div
-      className="macos-glass macos-squircle"
+      className="macos-squircle"
       style={{
-        background: 'rgba(255, 255, 255, 0.65)',
+        background: 'var(--m-card)',
         padding: '16px',
         margin: '12px 0',
-        border: '1px solid rgba(255, 255, 255, 0.4)',
-        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.03)' }}
+        border: '1px solid var(--m-border)',
+        boxShadow: '0 4px 24px var(--z-100)' }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-        <MIcon name="list" size={15} color="#007AFF" />
-        <span style={{ fontSize: 12, fontWeight: 800, color: '#007AFF', letterSpacing: '0.02em' }}>
+        <MIcon name="list" size={15} color="var(--m-accent)" />
+        <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--m-accent)', letterSpacing: '0.02em' }}>
           투표 진행중
         </span>
         {deadlinePassed && (
@@ -284,18 +284,18 @@ export function PollCard({ poll, voteCounts, myVote, voting, onVote }: PollCardP
               aria-pressed={mine}
               onClick={() => onVote(poll.id, index)}
               disabled={voting || deadlinePassed}
-              className="macos-glass macos-squircle-sm"
+              className="macos-squircle-sm"
               style={{
                 position: 'relative',
                 width: '100%',
                 padding: '12px 14px',
-                border: mine ? '1.5px solid #007AFF' : '1px solid rgba(120, 120, 128, 0.15)',
-                background: mine ? 'rgba(0, 122, 255, 0.03)' : 'rgba(255, 255, 255, 0.45)',
+                border: mine ? '1.5px solid var(--m-accent)' : '1px solid var(--m-border)',
+                background: mine ? 'var(--m-accent-soft)' : 'var(--m-card)',
                 overflow: 'hidden',
                 cursor: voting || deadlinePassed ? 'not-allowed' : 'pointer',
                 textAlign: 'left',
                 transition: 'all 0.2s',
-                boxShadow: mine ? '0 2px 8px rgba(0, 122, 255, 0.08)' : 'none' }}
+                boxShadow: mine ? '0 2px 8px var(--m-accent-soft)' : 'none' }}
             >
               <span
                 aria-hidden="true"
@@ -305,15 +305,15 @@ export function PollCard({ poll, voteCounts, myVote, voting, onVote }: PollCardP
                   top: 0,
                   bottom: 0,
                   width: `${pct}%`,
-                  background: mine ? 'rgba(0, 122, 255, 0.12)' : 'rgba(120, 120, 128, 0.06)',
+                  background: mine ? 'var(--m-accent-soft)' : 'rgba(120, 120, 128, 0.06)',
                   transition: 'width 0.4s cubic-bezier(0.16, 1, 0.3, 1)' }}
               />
               <span style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--z-900)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  {mine && <MIcon name="check" size={14} color="#007AFF" />}
+                  {mine && <MIcon name="check" size={14} color="var(--m-accent)" />}
                   {option}
                 </span>
-                <span style={{ fontSize: 12, fontWeight: 800, color: mine ? '#007AFF' : 'var(--z-500)', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 12, fontWeight: 800, color: mine ? 'var(--m-accent)' : 'var(--z-500)', whiteSpace: 'nowrap' }}>
                   {count}표 ({pct}%)
                 </span>
               </span>

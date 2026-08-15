@@ -134,17 +134,16 @@ export default function SFormChat({ user, onBack, onCreated }: SFormChatProps) {
         saveDisabled={saveDisabled}
       />
       <div
-        className="macos-glass"
-        style={{
+                style={{
           padding: '10px 16px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.15)' }}
+          borderBottom: '1px solid var(--m-border)' }}
       >
         <div
-          className="m-seg macos-glass macos-squircle-sm"
+          className="m-seg macos-squircle-sm"
           role="tablist"
           aria-label="대화 방식"
           style={{
-            background: 'rgba(0, 0, 0, 0.04)',
+            background: 'var(--z-100)',
             border: 'none',
             padding: '2px',
             display: 'flex' }}
@@ -165,10 +164,9 @@ export default function SFormChat({ user, onBack, onCreated }: SFormChatProps) {
 
       {tab !== 'channel' && (
         <div
-          className="macos-glass"
-          style={{
+                    style={{
             padding: '10px 16px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.15)' }}
+            borderBottom: '1px solid var(--m-border)' }}
         >
           <label
             className="macos-squircle-sm"
@@ -176,7 +174,7 @@ export default function SFormChat({ user, onBack, onCreated }: SFormChatProps) {
               display: 'flex',
               alignItems: 'center',
               gap: 8,
-              background: 'rgba(0, 0, 0, 0.04)',
+              background: 'var(--z-100)',
               padding: '6px 12px' }}
           >
             <MIcon name="search" size={16} color="var(--z-500)" />
@@ -244,12 +242,12 @@ type FormHeaderProps = {
 function FormHeader({ onCancel, title, onSave, saveLabel, saveDisabled }: FormHeaderProps) {
   return (
     <div
-      className="m-header macos-glass"
+      className="m-header "
       style={{
         padding: '16px 16px 12px',
         display: 'flex',
         alignItems: 'center',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.15)' }}
+        borderBottom: '1px solid var(--m-border)' }}
     >
       <button
         type="button"
@@ -261,7 +259,7 @@ function FormHeader({ onCancel, title, onSave, saveLabel, saveDisabled }: FormHe
           fontSize: 14,
           fontWeight: 600,
           padding: '6px 12px',
-          background: 'rgba(0, 0, 0, 0.04)',
+          background: 'var(--z-100)',
           border: 'none',
           cursor: 'pointer' }}
       >
@@ -283,7 +281,7 @@ function FormHeader({ onCancel, title, onSave, saveLabel, saveDisabled }: FormHe
           fontSize: 14,
           fontWeight: 700,
           padding: '6px 14px',
-          background: saveDisabled ? 'rgba(0, 0, 0, 0.04)' : 'linear-gradient(135deg, #007AFF, #0A55E1)',
+          background: saveDisabled ? 'var(--z-100)' : 'var(--m-accent)',
           border: 'none',
           cursor: saveDisabled ? 'default' : 'pointer',
           transition: 'all 0.2s ease' }}
@@ -301,7 +299,7 @@ function SegBtn({ label, active, onClick }: SegBtnProps) {
       type="button"
       role="tab"
       aria-selected={active}
-      className={active ? 'on macos-glass macos-squircle-sm' : 'macos-squircle-sm'}
+      className={active ? 'on macos-squircle-sm' : 'macos-squircle-sm'}
       style={{
         flex: 1,
         border: 'none',
@@ -330,10 +328,9 @@ type PickedChipRowProps = {
 function PickedChipRow({ pickedIds, staffs, onRemove }: PickedChipRowProps) {
   return (
     <div
-      className="macos-glass"
-      style={{
+            style={{
         padding: '10px 16px',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
+        borderBottom: '1px solid var(--m-border)',
         display: 'flex',
         gap: 8,
         overflowX: 'auto' }}
@@ -352,10 +349,10 @@ function PickedChipRow({ pickedIds, staffs, onRemove }: PickedChipRowProps) {
               alignItems: 'center',
               gap: 6,
               padding: '4px 8px 4px 10px',
-              background: 'rgba(0, 122, 255, 0.1)',
+              background: 'var(--m-accent-soft)',
               fontSize: 12,
               fontWeight: 700,
-              color: '#007AFF',
+              color: 'var(--m-accent)',
               flex: '0 0 auto' }}
           >
             {name}
@@ -367,7 +364,7 @@ function PickedChipRow({ pickedIds, staffs, onRemove }: PickedChipRowProps) {
                 width: 16,
                 height: 16,
                 borderRadius: '50%',
-                background: '#007AFF',
+                background: 'var(--m-accent)',
                 color: '#fff',
                 display: 'grid',
                 placeItems: 'center',
@@ -465,7 +462,7 @@ function MemberRow({ member, department, checked, onToggle }: MemberRowProps) {
     <div style={{ padding: '0 16px 8px' }}>
       <button
         type="button"
-        className="m-list-row macos-glass macos-squircle-sm"
+        className="m-list-row macos-squircle-sm"
         onClick={onToggle}
         aria-pressed={checked}
         aria-label={`${name} 선택 토글`}
@@ -490,11 +487,11 @@ function MemberRow({ member, department, checked, onToggle }: MemberRowProps) {
             height: 20,
             borderRadius: '50%',
             border: checked ? 'none' : '1.5px solid var(--z-300)',
-            background: checked ? 'linear-gradient(135deg, #007AFF, #0A55E1)' : 'transparent',
+            background: checked ? 'var(--m-accent)' : 'transparent',
             color: '#fff',
             display: 'grid',
             placeItems: 'center',
-            boxShadow: checked ? '0 2px 5px rgba(0, 122, 255, 0.3)' : 'none',
+            boxShadow: checked ? 'none' : 'none',
             transition: 'all 0.15s ease' }}
           aria-hidden="true"
         >

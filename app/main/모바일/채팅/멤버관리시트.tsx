@@ -86,8 +86,8 @@ export function AddMemberSheet({
             padding: '10px 12px',
             fontSize: 14,
             fontFamily: 'inherit',
-            background: 'rgba(0, 0, 0, 0.04)',
-            border: '1px solid rgba(0, 0, 0, 0.08)',
+            background: 'var(--z-100)',
+            border: '1px solid var(--z-100)',
             borderRadius: 10,
             outline: 'none',
             color: 'var(--z-900)' }}
@@ -105,16 +105,16 @@ export function AddMemberSheet({
               return (
                 <label
                   key={staff.id}
-                  className="macos-glass macos-squircle-sm"
+                  className="macos-squircle-sm"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: 10,
                     padding: '10px 12px',
                     borderRadius: 10,
-                    border: checked ? '1px solid #007AFF' : '1px solid rgba(255, 255, 255, 0.35)',
-                    background: checked ? 'rgba(0, 122, 255, 0.08)' : 'rgba(255, 255, 255, 0.65)',
-                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                    border: checked ? '1px solid var(--m-accent)' : '1px solid var(--m-border)',
+                    background: checked ? 'var(--m-accent-soft)' : 'var(--m-card)',
+                    boxShadow: '0 2px 8px var(--z-100)',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease-in-out' }}
                 >
@@ -152,17 +152,17 @@ export function AddMemberSheet({
             type="button"
             onClick={handleClose}
             disabled={submitting}
-            className="macos-glass macos-squircle-sm"
+            className="macos-squircle-sm"
             style={{
               flex: 1,
               padding: '12px',
-              background: 'rgba(255, 255, 255, 0.65)',
+              background: 'var(--m-card)',
               color: 'var(--z-700)',
               fontSize: 13,
               fontWeight: 800,
               border: 'none',
               cursor: submitting ? 'not-allowed' : 'pointer',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)' }}
+              boxShadow: '0 1px 2px var(--z-100)' }}
           >
             취소
           </button>
@@ -174,14 +174,14 @@ export function AddMemberSheet({
             style={{
               flex: 1,
               padding: '12px',
-              background: selectedIds.length > 0 ? 'linear-gradient(135deg, #007AFF, #0A55E1)' : 'rgba(0, 0, 0, 0.08)',
+              background: selectedIds.length > 0 ? 'var(--m-accent)' : 'var(--z-100)',
               color: selectedIds.length > 0 ? '#fff' : 'var(--z-400)',
               fontSize: 13,
               fontWeight: 800,
               border: 'none',
               cursor: submitting || selectedIds.length === 0 ? 'not-allowed' : 'pointer',
               opacity: submitting ? 0.7 : 1,
-              boxShadow: selectedIds.length > 0 ? '0 4px 12px rgba(0, 122, 255, 0.24)' : 'none' }}
+              boxShadow: selectedIds.length > 0 ? 'none' : 'none' }}
           >
             {submitting ? '추가 중…' : `추가하기${selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}`}
           </button>
