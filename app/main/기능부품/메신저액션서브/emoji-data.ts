@@ -92,6 +92,23 @@ export const STICKERS_ENTRIES: EmojiEntry[] = [
   }))
 ];
 
+/**
+ * 병원 / 직장 스티커.
+ *
+ * `public/emoticon/static/` 에 hospital-1~20, worker-1~20 PNG 가 있고 라벨 배열도
+ * 위에 정의돼 있는데, 어느 카테고리 목록에도 들어가 있지 않아 피커에서 고를 수
+ * 없었다(고양이 28종만 노출). 40종을 목록에 올린다.
+ */
+export const HOSPITAL_STICKER_ENTRIES: EmojiEntry[] = STATIC_HOSPITAL_LABELS.map((label, i) => ({
+  e: `[stat:hospital-${i + 1}]`,
+  name: `:hospital-${i + 1}:`,
+  keywords: [label, '병원', '의료', '간호', 'hospital', 'static', 'sticker'] }));
+
+export const WORKER_STICKER_ENTRIES: EmojiEntry[] = STATIC_WORKER_LABELS.map((label, i) => ({
+  e: `[stat:worker-${i + 1}]`,
+  name: `:worker-${i + 1}:`,
+  keywords: [label, '직장', '회사', '업무', 'worker', 'office', 'static', 'sticker'] }));
+
 /* ------------------------------------------------------------------ */
 /*  Emoji category arrays                                              */
 /* ------------------------------------------------------------------ */

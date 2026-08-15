@@ -1,28 +1,45 @@
 'use client';
 
 /**
- * 모바일 채팅 컴포저용 프리미엄 이모지 & 이모티콘 피커.
- * PC 버전의 EmojiPicker.tsx 및 emoticon-engine.ts와 100% 기능 동기화:
- * - 9개 카테고리 탭 (움직이는 이모티콘, 스티커 이모티콘, 최근, 표정, 동물, 음식, 스포츠, 아이디어, 축하)
- * - 움직이는 이모티콘/스티커 용 서브그룹 탭 (전체, 직장인, 병원)
- * - 실시간 이모지/이모티콘 한글 키워드 및 slug 검색 기능
- * - 4열 대형 그리드(움직이는 이모티콘/스티커용) / 8열 컴팩트 그리드(정적 이모지용)
- * - 선택 및 호버링 대상의 실시간 고화질 애니메이션/이미지 프리뷰 푸터
+ * 모바일 채팅 컴포저용 스티커 트레이.
+ *
+ * 예전에는 탭이 이모지 글리프(🎨 🕐 😀 🐶 🍕 ⚽ 💡 🎉) 9개라 무슨 분류인지
+ * 열어보기 전에는 알 수 없었고, 하단 프리뷰 푸터가 385px 중 38px 을 상시
+ * 차지해 정작 고를 그리드가 좁았다. 탭을 텍스트 4개(최근/병원/직장/이모지)로
+ * 줄이고 푸터를 없앤다. 검색은 탭 행 우측 버튼으로 전환한다.
+ *
+ * 렌더 분기([stat:*]→PNG, [emo:*]→buildEmoticonSVG, 순수 이모지→글리프)와
+ * "선택 즉시 전송" 동작은 그대로다.
  */
 
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import MIcon from '../공통/MIcon';
 import { getEmoticonDef, buildEmoticonSVG } from '@/app/main/기능부품/메신저액션서브/emoticon-engine';
 import {
   CATEGORIES,
   FREQUENT,
-  STATIC_WORKER_LABELS,
-  STATIC_HOSPITAL_LABELS,
-  STATIC_CAT_LABELS,
-  type EmojiEntry,
-  type CategoryId } from '@/app/main/기능부품/메신저액션서브/emoji-data';
+  STICKERS_ENTRIES,
+  HOSPITAL_STICKER_ENTRIES,
+  WORKER_STICKER_ENTRIES,
+  type EmojiEntry } from '@/app/main/기능부품/메신저액션서브/emoji-data';
 
 // Re-export for backward compatibility — other modules import this from here
 export { COMPOSER_EMOJI_PALETTE } from '@/app/main/기능부품/메신저액션서브/emoji-data';
+
+type TrayTabId = 'recent' | 'hospital' | 'worker' | 'emoji';
+
+/** 순수 이모지만 모은 목록 — 최근/스티커 탭에 이미 들어간 것은 뺀다. */
+const PLAIN_EMOJI: EmojiEntry[] = CATEGORIES.filter(
+  (cat) => cat.id !== 'stickers' && cat.id !== 'frequent',
+).flatMap((cat) => cat.list);
+
+const TRAY_TABS: { id: TrayTabId; label: string; sticker: boolean; list: EmojiEntry[] }[] = [
+  { id: 'recent', label: '최근', sticker: false, list: FREQUENT },
+  // 고양이 스티커는 키워드가 '간호사/nurse' 라 병원 쪽에 둔다.
+  { id: 'hospital', label: '병원', sticker: true, list: [...HOSPITAL_STICKER_ENTRIES, ...STICKERS_ENTRIES] },
+  { id: 'worker', label: '직장', sticker: true, list: WORKER_STICKER_ENTRIES },
+  { id: 'emoji', label: '이모지', sticker: false, list: PLAIN_EMOJI },
+];
 
 export type EmojiPickerProps = {
   open: boolean;
@@ -32,6 +49,38 @@ export type EmojiPickerProps = {
   bottomOffset?: number;
 };
 
+/** 타일 하나 — [stat:*] / [emo:*] / 순수 이모지 세 갈래 렌더. */
+function TrayTile({ entry, size }: { entry: EmojiEntry; size: number }) {
+  const emoId = /^\[emo:([a-z0-9-]+)\]$/.exec(entry.e)?.[1];
+  if (emoId) {
+    const def = getEmoticonDef(emoId);
+    if (def) {
+      return (
+        <div
+          className={`emo ${def.anim}`}
+          style={{ width: size, height: size }}
+          dangerouslySetInnerHTML={{ __html: buildEmoticonSVG(def) }}
+        />
+      );
+    }
+    return <span style={{ fontSize: size * 0.6 }}>{entry.e}</span>;
+  }
+
+  const statId = /^\[stat:([a-z0-9-]+)\]$/.exec(entry.e)?.[1];
+  if (statId) {
+    return (
+      <img
+        src={`/emoticon/static/${statId}.png`}
+        alt={entry.name}
+        style={{ width: size, height: size, objectFit: 'contain' }}
+        loading="lazy"
+      />
+    );
+  }
+
+  return <span style={{ fontSize: size }}>{entry.e}</span>;
+}
+
 export default function EmojiPicker({
   open,
   onClose,
@@ -39,9 +88,8 @@ export default function EmojiPicker({
   bottomOffset = 78 }: EmojiPickerProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState<CategoryId>('stickers');
-  const [subGroup, setSubGroup] = useState<'all' | 'worker' | 'hospital' | 'cat'>('all');
-  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [tab, setTab] = useState<TrayTabId>('hospital');
 
   // ESC 키 닫기
   useEffect(() => {
@@ -74,34 +122,33 @@ export default function EmojiPicker({
     };
   }, [open, onClose]);
 
+  const activeTab = TRAY_TABS.find((t) => t.id === tab) ?? TRAY_TABS[0];
+
   const items = useMemo<EmojiEntry[]>(() => {
     const lower = query.trim().toLowerCase();
-    if (lower) {
-      const all = CATEGORIES.flatMap((cat) => cat.list);
-      const seen = new Set<string>();
-      const filtered: EmojiEntry[] = [];
-      for (const entry of all) {
-        if (seen.has(entry.e)) continue;
-        const matches =
-          entry.name.toLowerCase().includes(lower) ||
-          entry.keywords.some((k) => k.toLowerCase().includes(lower));
-        if (matches) {
-          seen.add(entry.e);
-          filtered.push(entry);
-        }
+    if (!lower) return activeTab.list;
+    // 검색은 탭을 가리지 않고 스티커까지 통째로 훑는다.
+    const all = [
+      ...HOSPITAL_STICKER_ENTRIES,
+      ...WORKER_STICKER_ENTRIES,
+      ...STICKERS_ENTRIES,
+      ...FREQUENT,
+      ...PLAIN_EMOJI,
+    ];
+    const seen = new Set<string>();
+    const filtered: EmojiEntry[] = [];
+    for (const entry of all) {
+      if (seen.has(entry.e)) continue;
+      const matches =
+        entry.name.toLowerCase().includes(lower) ||
+        entry.keywords.some((k) => k.toLowerCase().includes(lower));
+      if (matches) {
+        seen.add(entry.e);
+        filtered.push(entry);
       }
-      return filtered;
     }
-    const cat = CATEGORIES.find((c) => c.id === category);
-    if (!cat) return FREQUENT;
-
-    return cat.list;
-  }, [query, category, subGroup]);
-
-  // 카테고리/아이템 목록 변경 시 인덱스 리셋
-  useEffect(() => {
-    setHoveredIdx(null);
-  }, [items]);
+    return filtered;
+  }, [query, activeTab]);
 
   const handleSelect = useCallback(
     (emoji: string) => {
@@ -114,215 +161,163 @@ export default function EmojiPicker({
     [onSelect, onClose],
   );
 
-  const activeEntry = useMemo(() => {
-    if (hoveredIdx !== null && items[hoveredIdx]) {
-      return items[hoveredIdx];
-    }
-    return items[0] ?? null;
-  }, [hoveredIdx, items]);
-
   if (!open) return null;
 
-  const isEmoticonCat = !query && category === 'stickers';
+  // 검색 중에는 스티커가 섞여 나오므로 큰 타일 기준을 쓴다.
+  const bigTiles = activeTab.sticker || Boolean(query.trim());
+  const columns = bigTiles ? 4 : 8;
+  const tileSize = bigTiles ? 48 : 24;
 
   return (
     <div
       ref={containerRef}
       role="dialog"
-      aria-label="이모지 선택"
-      className="macos-squircle"
+      aria-label="스티커 선택"
       style={{
         position: 'fixed',
-        left: 12,
-        right: 12,
+        left: 0,
+        right: 0,
         // 키보드 오프셋은 MobileShell --m-kb-offset (상속)
         bottom: `calc(${bottomOffset}px + var(--m-kb-offset, 0px))`,
         zIndex: 1200,
-        padding: 10,
         display: 'flex',
         flexDirection: 'column',
-        maxHeight: 385,
+        // 떠 있는 유리 카드가 아니라 컴포저 위에 붙은 판. 대화가 가려지는 높이를
+        // 385 → 268 로 줄였다(탭 44 + 그리드 214 + 여백).
+        background: 'var(--m-card)',
+        borderTop: '1px solid var(--m-border)',
         transition: 'bottom 0.12s ease-out' }}
     >
-      {/* 🔍 검색 바 */}
-      <div style={{ position: 'relative', marginBottom: 8 }}>
-        <span
-          style={{
-            position: 'absolute',
-            left: 10,
-            top: '50%',
-            transform: 'translateY(-50%)',
-            fontSize: 13,
-            opacity: 0.6,
-            pointerEvents: 'none' }}
-        >
-          🔍
-        </span>
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="이모지 검색…"
-          aria-label="이모지 검색"
-          style={{
-            height: 34,
-            width: '100%',
-            borderRadius: 8,
-            border: '1px solid var(--z-100)',
-            background: 'var(--m-card)',
-            color: 'var(--z-900)',
-            paddingLeft: 30,
-            paddingRight: 10,
-            fontSize: 12.5,
-            fontWeight: 600,
-            outline: 'none',
-            boxSizing: 'border-box' }}
-        />
-      </div>
-
-      {/* 📁 카테고리 탭 목록 (Segmented Control 스타일) */}
-      {!query && (
+      {searchOpen ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', height: 44 }}>
+          <label style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, height: 32, borderRadius: 10, background: 'var(--z-100)', padding: '0 10px' }}>
+            <MIcon name="search" size={14} color="var(--z-500)" />
+            <input
+              type="text"
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="스티커·이모지 검색"
+              aria-label="스티커·이모지 검색"
+              style={{
+                flex: 1,
+                minWidth: 0,
+                border: 'none',
+                outline: 'none',
+                background: 'transparent',
+                color: 'var(--z-900)',
+                fontSize: 13,
+                fontWeight: 600 }}
+            />
+          </label>
+          <button
+            type="button"
+            aria-label="검색 닫기"
+            onClick={() => {
+              setSearchOpen(false);
+              setQuery('');
+            }}
+            style={{
+              flexShrink: 0,
+              width: 34,
+              height: 34,
+              borderRadius: 10,
+              display: 'grid',
+              placeItems: 'center',
+              background: 'var(--z-100)',
+              color: 'var(--z-600)',
+              border: 'none',
+              cursor: 'pointer' }}
+          >
+            <MIcon name="x" size={16} />
+          </button>
+        </div>
+      ) : (
         <div
           role="tablist"
-          aria-label="이모지 카테고리"
-          style={{
-            display: 'flex',
-            gap: 2,
-            overflowX: 'auto',
-            padding: 3,
-            marginBottom: 8,
-            background: 'var(--z-100)',
-            borderRadius: 10,
-            whiteSpace: 'nowrap',
-            scrollbarWidth: 'none' }}
+          aria-label="스티커 분류"
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', height: 44 }}
         >
-          {CATEGORIES.map((cat) => {
-            const active = cat.id === category;
-            return (
-              <button
-                key={cat.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                aria-label={cat.label}
-                onClick={() => {
-                  setCategory(cat.id);
-                  if (cat.id !== 'stickers') {
-                    setSubGroup('all');
-                  }
-                }}
-                style={{
-                  minWidth: 36,
-                  height: 28,
-                  borderRadius: 7,
-                  fontSize: 15,
-                  display: 'grid',
-                  placeItems: 'center',
-                  background: active ? '#ffffff' : 'transparent',
-                  color: active ? 'var(--m-accent)' : 'var(--z-600)',
-                  boxShadow: active ? '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px var(--z-100)' : 'none',
-                  border: 0,
-                  cursor: 'pointer',
-                  flexShrink: 0,
-                  transition: 'all 0.15s ease-in-out' }}
-                title={cat.label}
-              >
-                {cat.icon}
-              </button>
-            );
-          })}
+          <div style={{ flex: 1, display: 'flex', gap: 2, padding: 2, borderRadius: 11, background: 'var(--z-100)' }}>
+            {TRAY_TABS.map((t) => {
+              const active = t.id === tab;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  aria-label={t.label}
+                  onClick={() => setTab(t.id)}
+                  style={{
+                    flex: 1,
+                    height: 28,
+                    borderRadius: 9,
+                    fontSize: 12.5,
+                    fontWeight: active ? 800 : 700,
+                    background: active ? 'var(--m-card)' : 'transparent',
+                    color: active ? 'var(--z-900)' : 'var(--z-500)',
+                    boxShadow: active ? '0 1px 2px rgba(24, 24, 27, 0.08)' : 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.15s ease, color 0.15s ease' }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            aria-label="검색"
+            onClick={() => setSearchOpen(true)}
+            style={{
+              flexShrink: 0,
+              width: 34,
+              height: 34,
+              borderRadius: 10,
+              display: 'grid',
+              placeItems: 'center',
+              background: 'var(--z-100)',
+              color: 'var(--z-600)',
+              border: 'none',
+              cursor: 'pointer' }}
+          >
+            <MIcon name="search" size={16} />
+          </button>
         </div>
       )}
 
-      
-
-      {/* 📦 그리드 리스트 영역 */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          minHeight: 140,
-          maxHeight: 200,
-          paddingRight: 2 }}
-      >
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: isEmoticonCat ? 'repeat(4, 1fr)' : 'repeat(8, 1fr)',
-            gap: isEmoticonCat ? 6 : 4 }}
-        >
-          {items.map((entry, idx) => {
-            const isCustomEmo = entry.e.startsWith('[emo:');
-            const isSticker = entry.e.startsWith('[stat:');
-
-            return (
-              <button
-                key={`${entry.e}-${idx}`}
-                type="button"
-                onClick={() => handleSelect(entry.e)}
-                onMouseEnter={() => setHoveredIdx(idx)}
-                onTouchStart={() => setHoveredIdx(idx)}
-                aria-label={`${entry.name} 선택`}
-                className={isEmoticonCat ? 'macos-squircle-sm' : ''}
-                style={{
-                  aspectRatio: '1',
-                  borderRadius: isEmoticonCat ? 10 : 6,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: isEmoticonCat ? 'var(--m-card)' : 'transparent',
-                  border: '0',
-                  boxShadow: isEmoticonCat ? '0 1px 3px var(--z-100)' : 'none',
-                  cursor: 'pointer',
-                  padding: isEmoticonCat ? 5 : 2,
-                  boxSizing: 'border-box',
-                  overflow: 'hidden' }}
-              >
-                {isCustomEmo ? (
-                  (() => {
-                    const id = entry.e.match(/^\[emo:([a-z0-9-]+)\]$/)?.[1];
-                    const def = id ? getEmoticonDef(id) : null;
-                    if (def) {
-                      return (
-                        <div
-                          className={`emo ${def.anim}`}
-                          style={{ width: isEmoticonCat ? 48 : 24, height: isEmoticonCat ? 48 : 24 }}
-                          dangerouslySetInnerHTML={{ __html: buildEmoticonSVG(def) }}
-                        />
-                      );
-                    }
-                    return entry.e;
-                  })()
-                ) : isSticker ? (
-                  (() => {
-                    const id = entry.e.match(/^\[stat:([a-z0-9-]+)\]$/)?.[1];
-                    if (id) {
-                      return (
-                        <img
-                          src={`/emoticon/static/${id}.png`}
-                          alt={id}
-                          style={{
-                            width: isEmoticonCat ? 48 : 24,
-                            height: isEmoticonCat ? 48 : 24,
-                            objectFit: 'contain' }}
-                          loading="lazy"
-                        />
-                      );
-                    }
-                    return entry.e;
-                  })()
-                ) : (
-                  <span style={{ fontSize: 20 }}>{entry.e}</span>
-                )}
-              </button>
-            );
-          })}
+      <div style={{ height: 214, overflowY: 'auto', padding: '0 12px 8px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 8 }}>
+          {items.map((entry, idx) => (
+            <button
+              key={`${entry.e}-${idx}`}
+              type="button"
+              onClick={() => handleSelect(entry.e)}
+              aria-label={`${entry.name} 선택`}
+              style={{
+                aspectRatio: '1',
+                borderRadius: bigTiles ? 10 : 8,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: bigTiles ? 'var(--z-100)' : 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: bigTiles ? 5 : 2,
+                boxSizing: 'border-box',
+                overflow: 'hidden' }}
+            >
+              <TrayTile entry={entry} size={tileSize} />
+            </button>
+          ))}
           {items.length === 0 && (
             <div
               style={{
                 gridColumn: '1 / -1',
                 textAlign: 'center',
-                padding: '36px 0',
+                padding: '48px 0',
                 color: 'var(--z-400)',
                 fontSize: 12.5,
                 fontWeight: 600 }}
@@ -331,138 +326,6 @@ export default function EmojiPicker({
             </div>
           )}
         </div>
-      </div>
-
-      {/* 🖼 하단 상세 프리뷰 푸터 */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          borderTop: '1px solid var(--m-border)',
-          paddingTop: 8,
-          marginTop: 6,
-          minHeight: 38,
-          boxSizing: 'border-box' }}
-      >
-        {activeEntry ? (
-          <>
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'var(--m-card)',
-                borderRadius: 6,
-                overflow: 'hidden',
-                flexShrink: 0,
-                border: '1px solid var(--z-100)' }}
-            >
-              {activeEntry.e.startsWith('[emo:') ? (
-                (() => {
-                  const id = activeEntry.e.match(/^\[emo:([a-z0-9-]+)\]$/)?.[1];
-                  const def = id ? getEmoticonDef(id) : null;
-                  if (def) {
-                    return (
-                      <div
-                        className="emo"
-                        style={{ width: 26, height: 26 }}
-                        dangerouslySetInnerHTML={{ __html: buildEmoticonSVG(def) }}
-                      />
-                    );
-                  }
-                  return null;
-                })()
-              ) : activeEntry.e.startsWith('[stat:') ? (
-                (() => {
-                  const id = activeEntry.e.match(/^\[stat:([a-z0-9-]+)\]$/)?.[1];
-                  if (id) {
-                    return (
-                      <img
-                        src={`/emoticon/static/${id}.png`}
-                        alt=""
-                        style={{ width: 26, height: 26, objectFit: 'contain' }}
-                      />
-                    );
-                  }
-                  return null;
-                })()
-              ) : (
-                <span style={{ fontSize: 18 }}>{activeEntry.e}</span>
-              )}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 'bold',
-                  color: 'var(--z-900)',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis' }}
-              >
-                {activeEntry.e.startsWith('[emo:') ? (
-                  (() => {
-                    const id = activeEntry.e.match(/^\[emo:([a-z0-9-]+)\]$/)?.[1];
-                    const def = id ? getEmoticonDef(id) : null;
-                    return def ? def.label : activeEntry.name;
-                  })()
-                ) : activeEntry.e.startsWith('[stat:') ? (
-                  (() => {
-                    const id = activeEntry.e.match(/^\[stat:([a-z0-9-]+)\]$/)?.[1];
-                    if (id) {
-                      const isHospital = id.startsWith('hospital-');
-                      const isCat = id.startsWith('cat-');
-                      const num = parseInt(id.split('-')[1], 10);
-                      if (isCat) {
-                        return "";
-                      }
-                      return isHospital
-                        ? STATIC_HOSPITAL_LABELS[num - 1] || id
-                        : STATIC_WORKER_LABELS[num - 1] || id;
-                    }
-                    return activeEntry.name;
-                  })()
-                ) : (
-                  activeEntry.name
-                )}
-              </div>
-              <div
-                style={{
-                  fontSize: 9.5,
-                  color: 'var(--z-400)',
-                  fontWeight: 600,
-                  fontFamily: 'monospace' }}
-              >
-                {activeEntry.name}
-              </div>
-            </div>
-          </>
-        ) : (
-          <div style={{ flex: 1, fontSize: 11.5, color: 'var(--z-400)' }}>
-            이모티콘을 선택하세요.
-          </div>
-        )}
-
-        <button
-          type="button"
-          onClick={onClose}
-          className="macos-squircle-sm"
-          style={{
-            fontSize: 11.5,
-            fontWeight: 'bold',
-            color: 'var(--z-700)',
-            padding: '5px 12px',
-            background: 'var(--m-card)',
-            border: 'none',
-            cursor: 'pointer',
-            flexShrink: 0,
-            boxShadow: '0 1px 2px var(--z-100)' }}
-        >
-          닫기
-        </button>
       </div>
     </div>
   );
