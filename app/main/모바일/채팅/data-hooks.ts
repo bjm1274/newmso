@@ -16,6 +16,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { db } from '@/lib/db-client';
+import { readViewCache, writeViewCache } from '@/lib/view-cache';
 import { pickAvatarTone as pickAvatarToneLib, type AvatarTone } from '@/lib/avatar-tone';
 import { bindMockChatMessageInsert } from '@/app/main/기능부품/메신저테스트이벤트';
 import {
@@ -322,6 +323,8 @@ export function useChatRoomsForMobile(
 // ─────────────────────────────────────────────
 
 const MESSAGES_LIMIT = 20;
+/** 방별 최근 메시지 캐시 스코프 (lib/view-cache) */
+const MESSAGES_CACHE_SCOPE = 'chat:messages';
 const ROOM_MESSAGE_POLL_INTERVAL_MS = 5000; // polling-bus 채팅 기본값(5초)과 정렬. 개별 방도 동일 간격 적용.
 
 type UseChatMessagesResult = {
@@ -417,6 +420,9 @@ export function useChatMessagesForRoom(
   userId: string | null | undefined,
 ): UseChatMessagesResult {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // 캐시 렌더가 이미 도착한 네트워크 결과를 덮지 않도록 최신 값을 ref 로도 본다.
+  const messagesRef = useRef<ChatMessage[]>([]);
+  messagesRef.current = messages;
   const [loading, setLoading] = useState(true);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -453,6 +459,19 @@ export function useChatMessagesForRoom(
       oldestRef.current = null;
       return;
     }
+    // 저장분을 먼저 그린다. 방을 다시 열 때 빈 화면 + 스피너를 보지 않게 하려는
+    // 것뿐이고, 정답은 아래 네트워크 응답이다(도착하면 그대로 갈아끼운다).
+    void (async () => {
+      if (messagesRef.current.length > 0) return;
+      const cached = await readViewCache<ChatMessage[]>(userId, MESSAGES_CACHE_SCOPE, currentRoomId);
+      if (!cached || cached.length === 0) return;
+      if (isStaleRoom(currentRoomId, gen)) return;
+      // 네트워크 응답이 이미 그려졌으면 캐시로 되돌리지 않는다.
+      if (messagesRef.current.length > 0) return;
+      setMessages(cached);
+      setLoading(false);
+    })();
+
     try {
       const { data, error } = await selectChatMessagesWithFallback<ChatMessage[]>(
         ({ selectClause }) =>
@@ -486,6 +505,7 @@ export function useChatMessagesForRoom(
         const withReactions = await fetchAndMergeReactions(ordered);
         if (isStaleRoom(currentRoomId, gen)) return;
         setMessages(withReactions);
+        void writeViewCache(userId, MESSAGES_CACHE_SCOPE, currentRoomId, withReactions);
       }
     } catch {
       if (isStaleRoom(currentRoomId, gen)) return;

@@ -122,4 +122,14 @@ export async function performClientLogout(): Promise<void> {
   } catch {
     // ignore
   }
+
+  // 4. 화면 캐시(IndexedDB) 삭제.
+  // 채팅 메시지·게시판 목록에는 환자명과 차트번호가 들어간다. 공용 단말에서
+  // 다음 사용자가 앱 인증 없이 이전 대화를 읽는 일이 없어야 한다.
+  try {
+    const { clearViewCache } = await import('@/lib/view-cache');
+    await clearViewCache();
+  } catch (err) {
+    logger.warn('[client-logout] 화면 캐시 삭제 실패:', err);
+  }
 }

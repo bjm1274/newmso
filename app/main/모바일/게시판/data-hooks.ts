@@ -26,6 +26,7 @@ import {
 import { withMissingColumnsFallback } from '@/lib/db-compat';
 import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 import { loadStarSet } from './별표훅';
+import { readViewCache, writeViewCache } from '@/lib/view-cache';
 
 // create / notice-broadcast / author resolve — PC·모바일 공유 SSOT
 export {
@@ -115,6 +116,9 @@ const BOARD_LIST_UNUSED_COLUMNS = new Set([
 const BOARD_LIST_OPTIONAL_COLUMNS = BOARD_POST_OPTIONAL_COLUMNS.filter(
   (c) => !BOARD_LIST_UNUSED_COLUMNS.has(c),
 );
+
+/** 목록 캐시 스코프 (lib/view-cache) — 새로고침 후에도 즉시 그리기 위함 */
+const BOARD_LIST_CACHE_SCOPE = 'board:list';
 
 /** 목록 상한. 타입별 1000 → 전체 1000 (현재 전체 게시글이 616건) */
 const BOARD_LIST_LIMIT = 1000;
@@ -294,6 +298,30 @@ export function useBoardPosts(
       }));
     };
 
+    // 메모리 캐시가 없을 때만 저장분을 먼저 그린다. 새로고침 직후 빈 화면 대신
+    // 지난번 목록을 보여주고, 아래 네트워크 응답이 오면 갈아끼운다.
+    if (!hasCache) {
+      void (async () => {
+        const cached = await readViewCache<BoardListPost[]>(
+          userId,
+          BOARD_LIST_CACHE_SCOPE,
+          companyKey ?? 'all',
+        );
+        if (!cached || cached.length === 0) return;
+        // 그 사이 **이 조합의** 실제 응답이 도착했으면 캐시로 되돌리지 않는다.
+        // (다른 사용자·회사의 캐시가 남아 있을 수 있으므로 신원까지 대조한다.)
+        if (
+          boardPostsCache &&
+          boardPostsCache.userId === userId &&
+          boardPostsCache.company === companyKey
+        ) {
+          return;
+        }
+        setPosts(cached);
+        setLoading(false);
+      })();
+    }
+
     try {
       // 동일 user 동시 요청 합치기
       if (!boardPostsInflight) {
@@ -304,6 +332,7 @@ export function useBoardPosts(
       const enriched = await boardPostsInflight;
       boardPostsCache = { userId, company: companyKey, posts: enriched };
       setPosts(enriched);
+      void writeViewCache(userId, BOARD_LIST_CACHE_SCOPE, companyKey ?? 'all', enriched);
     } catch (err) {
       toast(`게시판 조회 실패: ${(err as Error)?.message ?? '오류'}`, 'error');
       // 캐시가 있으면 빈 목록으로 지우지 않음 (숫자 깜빡임 방지)
