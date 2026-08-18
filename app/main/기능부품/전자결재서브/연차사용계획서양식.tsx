@@ -32,7 +32,7 @@ export default function AnnualLeavePlanForm({
     // 15일 폴백 금지 — staff 컬럼 없으면 0 (SSOT leave_balances 와 정합을 위해 과대 표시 방지)
     const total = Number(staff.annual_leave_total ?? 0) || 0;
     const used = Number(staff.annual_leave_used ?? 0) || 0;
-    setRemainingLeave(Math.max(0, total - used));
+    setRemainingLeave(total - used);
   }, [_staffs, _user.id]);
 
   useEffect(() => {

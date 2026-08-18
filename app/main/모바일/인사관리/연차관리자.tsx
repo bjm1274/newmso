@@ -119,8 +119,8 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
           const remainingRaw = (row as { remaining_days?: number }).remaining_days;
           const remaining =
             remainingRaw != null && !Number.isNaN(Number(remainingRaw))
-              ? Math.max(0, Number(remainingRaw))
-              : Math.max(0, total - used - expired - compensated);
+              ? Number(remainingRaw)
+              : total - used - expired - compensated;
           map[sid] = { total, used, remaining, expired, compensated };
         }
       }
@@ -143,7 +143,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
       const total = bal?.total ?? Number(s.annual_leave_total ?? 0);
       const used = bal?.used ?? 0;
       const remaining =
-        bal?.remaining ?? Math.max(0, total - used);
+        bal?.remaining ?? (total - used);
       return {
         staff: s,
         total,

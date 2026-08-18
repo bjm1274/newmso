@@ -197,7 +197,7 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
         // 15일 폴백 금지 — 미등록 시 0 (leave_balances/직원 필드 SSOT 와 맞춤)
         const total = s.annual_leave_total ?? 0;
         const used = s.annual_leave_used ?? 0;
-        const remain = Math.max(0, total - used);
+        const remain = total - used;
         if (remain <= 0) continue;
 
         const step1Key = formatKoreanDateKey(schedule.step1Date);

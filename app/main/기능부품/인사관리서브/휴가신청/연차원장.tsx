@@ -205,9 +205,10 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
           const used = balance?.used ?? Number(staff.annual_leave_used ?? approvedDays);
           const expired = balance?.expired ?? 0;
           const compensated = balance?.compensated ?? 0;
+          // 잔고이므로 음수를 그대로 둔다 — 초과 사용을 0 으로 가리지 않는다.
           const remaining = balance?.remaining !== undefined
-            ? Math.max(0, balance.remaining)
-            : Math.max(0, total - used - expired - compensated);
+            ? balance.remaining
+            : total - used - expired - compensated;
           return {
             id: staff.id,
             staff,
@@ -261,7 +262,12 @@ export default function AnnualLeaveLedger({ staffs, selectedCo }: AnnualLeaveLed
         key: 'remaining',
         label: '잔여',
         align: 'right',
-        render: (row) => <span className="font-semibold text-green-600">{row.remaining.toFixed(1)}</span> },
+        // 초과 사용(음수)은 초록으로 내면 "남았다" 로 읽힌다. 빨강으로 가른다.
+        render: (row) => (
+          <span className={`font-semibold ${row.remaining < 0 ? 'text-red-600' : 'text-green-600'}`}>
+            {row.remaining.toFixed(1)}
+          </span>
+        ) },
       {
         key: 'approvedCount',
         label: '승인 건수',

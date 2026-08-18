@@ -239,7 +239,11 @@ export function aggregateLedgerEntries(rows: LedgerRowLike[], cycle: LeaveCycle)
     used: roundDays(Math.max(0, used)),
     expired: roundDays(Math.max(0, expired)),
     compensated: roundDays(Math.max(0, compensated)),
-    remaining: roundDays(Math.max(0, remainingRaw)),
+    // used/expired/compensated 는 "얼마나 썼나" 라는 크기라 음수가 될 수 없다.
+    // 하지만 remaining 은 잔고다 — 총발생보다 더 쓰면 실제로 마이너스가 된다.
+    // 예전에는 여기서 0 으로 깎아 초과 사용이 화면에서 사라졌고, 0.5일을 더 쓴
+    // 직원과 딱 맞게 쓴 직원이 똑같이 "0일" 로 보였다. 잔고는 그대로 낸다.
+    remaining: roundDays(remainingRaw),
   };
 }
 

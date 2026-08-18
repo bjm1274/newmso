@@ -291,8 +291,8 @@ export default function MainContent({
           const compensated = Number(balanceData.compensated_days) || 0;
           remaining =
             balanceData.remaining_days != null && !Number.isNaN(Number(balanceData.remaining_days))
-              ? Math.max(0, Number(balanceData.remaining_days))
-              : Math.max(0, total - used - expired - compensated);
+              ? Number(balanceData.remaining_days)
+              : total - used - expired - compensated;
         }
 
         const currentMonth = new Date().getMonth() + 1;

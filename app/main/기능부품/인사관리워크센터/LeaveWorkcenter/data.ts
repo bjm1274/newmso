@@ -122,7 +122,7 @@ function normalizeBalance(row: Record<string, unknown>, now: Date): LeaveBalance
   const used = pickNumber(row.used_days ?? row.annual_used ?? 0);
   const remaining = pickNumber(
     row.remaining_days ?? row.balance ?? (total - used),
-    Math.max(0, total - used),
+    total - used,
   );
   const expiryRaw = pickString(row.expiry_date);
   const expiryFallback = new Date(now.getFullYear(), 11, 31);

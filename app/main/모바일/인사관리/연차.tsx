@@ -133,6 +133,8 @@ function HeroSection({
   used: number;
   progressPct: number;
 }) {
+  // 막대 비율은 flex 값이라 음수를 넣으면 칸이 사라진다. 표시용 숫자와 달리
+  // 여기서는 0 으로 접는다 — 초과 사용이면 사용 칸이 막대를 다 채운다.
   const remainingFlex = Math.max(0, total - used);
   const usedFlex = used;
   return (
@@ -158,7 +160,8 @@ function HeroSection({
           fontSize: 48,
           fontWeight: 800,
           letterSpacing: '-0.04em',
-          color: 'var(--m-accent)',
+          // 초과 사용이면 강조색(파랑)으로 내면 정상처럼 읽힌다.
+          color: remaining < 0 ? 'var(--m-danger)' : 'var(--m-accent)',
           marginTop: 4 }}
       >
         {remaining}

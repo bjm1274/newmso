@@ -294,7 +294,7 @@ export default function LeaveDashboard({
             const ss = s as Record<string, unknown>;
             const total = (ss.annual_leave_total as number) ?? 0;
             const used = (ss.annual_leave_used as number) ?? 0;
-            const remain = Math.max(0, total - used);
+            const remain = total - used;
             const staffId = String(ss.id);
             const promotionStatus = logsLoaded
               ? resolvePromotionStatus(staffId, remain, promotionLogs)
