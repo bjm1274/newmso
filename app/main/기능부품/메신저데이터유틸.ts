@@ -70,6 +70,43 @@ function normalizeRoomIds(roomIds: string[]): string[] {
   );
 }
 
+/**
+ * 서버 집계로 방별 안 읽은 수를 가져온다.
+ *
+ * 실패하면 null 을 돌려 호출부가 기존 행-다운로드 경로로 되돌아가게 한다.
+ * (라우트 배포 전 클라이언트나 오프라인 상황에서 배지가 통째로 0 이 되면 안 된다.)
+ */
+async function fetchUnreadCountsViaServer(
+  params: FetchUnreadCountsForRoomIdsParams,
+  roomIds: string[],
+): Promise<Record<string, number> | null> {
+  if (typeof fetch !== 'function') return null;
+  try {
+    const res = await fetch('/api/chat/unread-counts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        rooms: roomIds.map((roomId) => {
+          const cursor = params.cursorMap[roomId];
+          return { roomId, cursor: cursor ? toUtcSqlTimestamp(cursor) : null };
+        }) }) });
+    if (!res.ok) return null;
+    const json = (await res.json().catch(() => null)) as
+      | { ok: true; counts: Record<string, number> }
+      | { ok: false }
+      | null;
+    if (!json || json.ok !== true || !json.counts) return null;
+    const counts = Object.fromEntries(roomIds.map((roomId) => [roomId, 0])) as Record<string, number>;
+    for (const [roomId, n] of Object.entries(json.counts)) {
+      if (roomId in counts) counts[roomId] = Number(n) || 0;
+    }
+    return counts;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchUnreadCountsForRoomIds(
   client: ChatDataClient,
   params: FetchUnreadCountsForRoomIdsParams,
@@ -79,6 +116,13 @@ export async function fetchUnreadCountsForRoomIds(
   const counts = Object.fromEntries(roomIds.map((roomId) => [roomId, 0])) as Record<string, number>;
 
   if (!normalizedUserId || roomIds.length === 0) return counts;
+
+  // 집계는 DB 가 한다. 예전에는 안 읽은 메시지 **행 자체를** 1000행씩 페이징해
+  // 내려받아 클라이언트에서 세었다 — 메시지 1800건짜리 방이면 배지 숫자 하나에
+  // 1800행, 그것도 방 목록 폴링마다 5초 간격으로. 아래 행-다운로드 경로는
+  // 라우트가 없거나 실패했을 때를 위한 폴백으로만 남는다.
+  const serverCounts = await fetchUnreadCountsViaServer(params, roomIds);
+  if (serverCounts) return serverCounts;
 
   // D1 query engine has a max filter node limit of 60.
   // Each cursor term `and(room_id.eq.X,created_at.gt.Y)` occupies 3 nodes.

@@ -80,6 +80,9 @@ export type SBoardProps = {
 };
 
 // ─── 필터 유틸 ────────────────────────────────────────────
+/** 한 번에 그리는 카드 수. 스크롤이 끝에 닿으면 이만큼씩 늘린다. */
+const BOARD_PAGE_SIZE = 30;
+
 function filterByCat(posts: BoardListPost[], cat: BoardCatId): BoardListPost[] {
   if (cat === 'all') return posts;
   return posts.filter((p) => boardTypeToCat(p.board_type as string | null) === cat);
@@ -260,6 +263,20 @@ function SBoardBase({
       ),
     );
   }, [posts, cat, query]);
+
+  /*
+   * 카드 렌더 창.
+   *
+   * '전체' 탭은 filtered 가 600건을 넘는데 그걸 그대로 .map() 으로 그리고 있었다.
+   * 카드 하나가 인라인 스타일 노드를 수십 개 만들어서, 목록을 여는 순간 저사양
+   * 안드로이드에서 몇 초씩 멈췄다. 첫 화면에 필요한 만큼만 그리고 스크롤로 늘린다.
+   */
+  const [visibleCount, setVisibleCount] = useState(BOARD_PAGE_SIZE);
+  useEffect(() => {
+    setVisibleCount(BOARD_PAGE_SIZE);
+  }, [cat, query]);
+  const visible = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+  const hasMoreToShow = filtered.length > visible.length;
 
   const { containerRef, refreshing, pullProgress } = usePullToRefresh({
     onRefresh: onRefresh ?? (() => Promise.resolve()),
@@ -468,13 +485,32 @@ function SBoardBase({
               </div>
             </div>
           )}
-          {filtered.map((post) => (
+          {visible.map((post) => (
             <PostCardMemo
               key={String(post.id)}
               post={post}
               onOpen={() => onOpen(String(post.id))}
             />
           ))}
+          {hasMoreToShow && (
+            <button
+              type="button"
+              onClick={() => setVisibleCount((n) => n + BOARD_PAGE_SIZE)}
+              aria-label={`게시글 ${BOARD_PAGE_SIZE}개 더 보기`}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: 10,
+                background: 'var(--z-100)',
+                color: 'var(--z-700)',
+                fontSize: 13,
+                fontWeight: 800,
+                border: 'none',
+                cursor: 'pointer' }}
+            >
+              더 보기 ({filtered.length - visible.length}건 남음)
+            </button>
+          )}
         </div>
         )}
       </div>

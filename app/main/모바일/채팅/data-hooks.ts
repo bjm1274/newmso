@@ -59,26 +59,65 @@ type StaffDirectoryEntry = Pick<
   'id' | 'name' | 'company' | 'department' | 'position' | 'photo_url' | 'avatar_url' | 'status' | 'permissions'
 >;
 
+/**
+ * 직원 디렉터리 캐시 (모듈 스코프).
+ *
+ * 예전에는 채팅방을 열 때마다 staff_members 전체를 다시 받았다. 방을 세 번
+ * 오가면 같은 62명을 세 번 내려받는다. 이름·부서는 대화 중에 바뀌지 않으므로
+ * 한 번 받아 공유하고, 동시 요청은 하나로 합친다.
+ */
+let staffDirectoryCache: StaffDirectoryEntry[] | null = null;
+let staffDirectoryInflight: Promise<StaffDirectoryEntry[]> | null = null;
+let staffDirectoryFetchedAt = 0;
+const STAFF_DIRECTORY_TTL_MS = 5 * 60 * 1000;
+
+/** 입·퇴사 반영이 필요할 때 호출 (다음 조회에서 다시 받는다). */
+export function invalidateChatStaffDirectory() {
+  staffDirectoryCache = null;
+  staffDirectoryFetchedAt = 0;
+}
+
+async function loadChatStaffDirectory(): Promise<StaffDirectoryEntry[]> {
+  const fresh = staffDirectoryCache && Date.now() - staffDirectoryFetchedAt < STAFF_DIRECTORY_TTL_MS;
+  if (fresh) return staffDirectoryCache!;
+  if (staffDirectoryInflight) return staffDirectoryInflight;
+
+  staffDirectoryInflight = (async () => {
+    const { data, error } = await db
+      .from('staff_members')
+      // permissions 는 빼둔다. 직원 1명당 2.5KB 짜리 JSON 이라 62명이면 157KB —
+      // 방을 열 때마다 이걸 받고 있었는데 채팅 어디서도 읽지 않는다
+      // (채널 생성 권한은 세션 사용자 user.permissions 로 판정한다).
+      .select('id, name, department, position, photo_url, avatar_url, status, company');
+    if (error || !Array.isArray(data)) return [];
+    return data.map((staff) => normalizeProfileUser(staff) as StaffDirectoryEntry);
+  })();
+
+  try {
+    const rows = await staffDirectoryInflight;
+    // 실패(빈 배열)는 캐시하지 않는다 — 다음 진입에서 다시 시도해야 한다.
+    if (rows.length > 0) {
+      staffDirectoryCache = rows;
+      staffDirectoryFetchedAt = Date.now();
+    }
+    return rows;
+  } finally {
+    staffDirectoryInflight = null;
+  }
+}
+
 export function useChatStaffDirectory(_company?: string | null) {
   // 채팅 디렉터리는 회사 격리 대상이 아니다 — MSO 특성상 1:1·그룹 대화 상대가
   // 다른 회사일 수 있어, 회사로 필터하면 상대 이름/발신자가 '알 수 없음'으로 깨진다.
   // (PC 메신저도 staff_members 전체를 로드한다. `_company`는 호환용으로만 유지.)
-  const [staffs, setStaffs] = useState<StaffDirectoryEntry[]>([]);
+  const [staffs, setStaffs] = useState<StaffDirectoryEntry[]>(() => staffDirectoryCache ?? []);
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        const { data, error } = await db
-          .from('staff_members')
-          .select('id, name, department, position, photo_url, avatar_url, status, permissions, company');
-        if (!active) return;
-        if (error || !Array.isArray(data)) {
-          setStaffs([]);
-          return;
-        }
-        const normalized = data.map((staff) => normalizeProfileUser(staff) as StaffDirectoryEntry);
-        setStaffs(normalized);
+        const rows = await loadChatStaffDirectory();
+        if (active) setStaffs(rows);
       } catch {
         if (active) setStaffs([]);
       }

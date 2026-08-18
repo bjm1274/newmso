@@ -80,6 +80,45 @@ const LIST_BOARD_TYPES = BOARD_CATS
 /** 목록에서 제외 (폐지 보드) */
 const REMOVED_BOARD_TYPES = new Set(['익명소리함', '직원제안함']);
 
+/** 레거시 board_type → 현재 타입. 한 벌 쿼리로 받으므로 역매핑으로 정규화한다. */
+const LEGACY_BOARD_TYPE_ALIASES: Record<string, string[]> = {
+  'MRI일정': ['MRI일정표', 'mri'],
+  '수술일정': ['수술'] };
+
+const LEGACY_BOARD_TYPE_TO_CANONICAL = new Map<string, string>(
+  Object.entries(LEGACY_BOARD_TYPE_ALIASES).flatMap(([canonical, aliases]) =>
+    [canonical, ...aliases].map((alias) => [alias, canonical] as [string, string]),
+  ),
+);
+
+/** 목록 조회에 쓰는 board_type 전체 (레거시 별칭 포함) */
+const ALL_LIST_BOARD_TYPES = Array.from(
+  new Set(LIST_BOARD_TYPES.flatMap((t) => [t, ...(LEGACY_BOARD_TYPE_ALIASES[t] ?? [])])),
+);
+
+/**
+ * 목록에서 쓰지 않는 선택 컬럼은 받지 않는다.
+ *
+ * board_id / updated_at / company_id / tags / poll / poll_votes 는 목록 카드·달력
+ * 어디서도 읽지 않는데 616행 × 6컬럼이라 응답의 13% 를 차지했다. 상세 화면은
+ * useBoardPostDetail 이 따로 조회하므로 영향이 없다.
+ */
+const BOARD_LIST_UNUSED_COLUMNS = new Set([
+  'board_id',
+  'updated_at',
+  'company_id',
+  'tags',
+  'poll',
+  'poll_votes',
+]);
+
+const BOARD_LIST_OPTIONAL_COLUMNS = BOARD_POST_OPTIONAL_COLUMNS.filter(
+  (c) => !BOARD_LIST_UNUSED_COLUMNS.has(c),
+);
+
+/** 목록 상한. 타입별 1000 → 전체 1000 (현재 전체 게시글이 616건) */
+const BOARD_LIST_LIMIT = 1000;
+
 /** board_type → cat. 미매칭(전역 subView '전체' 등)은 'all' — free로 강제하지 않음 */
 export function boardTypeToCat(boardType: string | null | undefined): BoardCatId {
   if (!boardType || boardType === '전체' || boardType === 'all') return 'all';
@@ -171,61 +210,45 @@ export function useBoardPosts(
     if (!hasCache) setLoading(true);
 
     const run = async (): Promise<BoardListPost[]> => {
-      const fetchOneType = async (boardType: string): Promise<BoardPost[]> => {
-        const types =
-          boardType === 'MRI일정'
-            ? ['MRI일정', 'MRI일정표', 'mri']
-            : boardType === '수술일정'
-            ? ['수술일정', '수술']
-            : [boardType];
+      // 예전에는 보드 타입마다 따로 쿼리를 날렸다(6회 × limit 1000). 모바일에서는
+      // 왕복 6번이 그대로 체감 지연이 되고, 응답 봉투도 6벌이 온다. 한 번에 받는다.
+      const { data, error } = await withMissingColumnsFallback<BoardPost[]>(
+        async (omittedColumns) => {
+          const result = await db
+            .from('board_posts')
+            .select(
+              buildSelectColumns(
+                BOARD_POST_REQUIRED_SELECT_COLUMNS,
+                BOARD_LIST_OPTIONAL_COLUMNS,
+                omittedColumns,
+              ),
+            )
+            .in('board_type', ALL_LIST_BOARD_TYPES)
+            .order('created_at', { ascending: false })
+            .limit(BOARD_LIST_LIMIT);
+          return result as unknown as { data: BoardPost[] | null; error: unknown };
+        },
+        [...BOARD_LIST_OPTIONAL_COLUMNS],
+      );
+      if (error) {
+        throw error instanceof Error
+          ? error
+          : new Error(
+              typeof error === 'object' && error && 'message' in error
+                ? String((error as { message?: string }).message)
+                : '게시판 조회 실패',
+            );
+      }
 
-        const { data, error } = await withMissingColumnsFallback<BoardPost[]>(
-          async (omittedColumns) => {
-            const q = db
-              .from('board_posts')
-              .select(
-                buildSelectColumns(
-                  BOARD_POST_REQUIRED_SELECT_COLUMNS,
-                  BOARD_POST_OPTIONAL_COLUMNS,
-                  omittedColumns,
-                ),
-              )
-              .in('board_type', types);
-
-            const result = await q
-              .order('created_at', { ascending: false })
-              .limit(1000);
-            return result as unknown as { data: BoardPost[] | null; error: unknown };
-          },
-          [...BOARD_POST_OPTIONAL_COLUMNS],
-        );
-        if (error) {
-          throw error instanceof Error
-            ? error
-            : new Error(
-                typeof error === 'object' && error && 'message' in error
-                  ? String((error as { message?: string }).message)
-                  : '게시판 조회 실패',
-              );
-        }
-        if (!Array.isArray(data)) return [];
-        return data.map((p) => {
-          const normalized = normalizeBoardPost(p);
-          // 레거시 board_type (mri -> MRI일정 등) 정규화
-          if (types.includes(String(normalized.board_type))) {
-            normalized.board_type = boardType;
-          }
-          return normalized;
-        });
-      };
-
-      const batches = await Promise.all(LIST_BOARD_TYPES.map((t) => fetchOneType(t)));
       const byId = new Map<string, BoardPost>();
-      for (const batch of batches) {
-        for (const p of batch) {
-          const id = String(p.id ?? '');
-          if (id) byId.set(id, p);
-        }
+      for (const p of Array.isArray(data) ? data : []) {
+        const id = String(p.id ?? '');
+        if (!id) continue;
+        const normalized = normalizeBoardPost(p);
+        // 레거시 board_type (mri -> MRI일정 등) 정규화
+        const canonical = LEGACY_BOARD_TYPE_TO_CANONICAL.get(String(normalized.board_type ?? '').trim());
+        if (canonical) normalized.board_type = canonical;
+        byId.set(id, normalized);
       }
       let rawList = Array.from(byId.values()).sort((a, b) => {
         const ta = new Date(String(a.created_at ?? 0)).getTime();

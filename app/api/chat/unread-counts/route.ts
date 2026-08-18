@@ -1,0 +1,125 @@
+/**
+ * /api/chat/unread-counts
+ *
+ * POST — 방별 안 읽은 메시지 수를 서버에서 집계해 돌려준다.
+ *   body: { rooms: Array<{ roomId: string; cursor?: string | null }> }
+ *   resp: { ok: true, counts: Record<roomId, number> }
+ *
+ * 왜 라우트가 따로 필요한가:
+ * 클라이언트 D1 게이트웨이(/api/d1/query)는 컬럼 화이트리스트(`^[a-zA-Z_]\w*$`)만
+ * 허용해 COUNT/GROUP BY 를 쓸 수 없다. 그래서 모바일·PC 모두 안 읽은 메시지의
+ * **행 자체를 전부 내려받아** 클라이언트에서 세고 있었다(1000행씩 페이징).
+ * 메시지 1800건짜리 방이면 배지 숫자 하나 그리려고 1800행을 받는다 —
+ * 그것도 방 목록 폴링마다 5초 간격으로. 집계는 DB 가 할 일이다.
+ *
+ * 보안:
+ *  - user_id 는 세션에서만 취득한다(본문 신뢰 안 함).
+ *  - 요청한 방마다 멤버십을 확인하고, 비멤버 방은 결과에서 제외한다.
+ *  - D1 바인딩이 없으면 fail-closed (멤버십 검증 불가 → 거부).
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import { readSessionFromRequest } from '@/lib/server-session';
+import { getD1Binding, getD1Drizzle } from '@/lib/db';
+import { canAccessChatRoom, loadChatRoomMembership } from '@/lib/chat-room-membership';
+
+export const dynamic = 'force-dynamic';
+
+/** 한 요청에서 집계할 수 있는 방 수 상한 — 무제한 IN 절을 막는다. */
+const MAX_ROOMS = 300;
+
+type RoomRequest = { roomId: string; cursor: string | null };
+
+function parseRooms(value: unknown): RoomRequest[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: RoomRequest[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') continue;
+    const row = raw as Record<string, unknown>;
+    const roomId = String(row.roomId ?? '').trim();
+    if (!roomId || seen.has(roomId)) continue;
+    seen.add(roomId);
+    const cursorRaw = row.cursor;
+    const cursor = typeof cursorRaw === 'string' && cursorRaw.trim() ? cursorRaw.trim() : null;
+    out.push({ roomId, cursor });
+    if (out.length >= MAX_ROOMS) break;
+  }
+  return out;
+}
+
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  const session = await readSessionFromRequest(req);
+  const userId = String(session?.user?.id ?? session?.user?.user_id ?? '').trim();
+  if (!userId) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ ok: false, error: 'Invalid JSON' }, { status: 400 });
+  }
+
+  const rooms = parseRooms((body as Record<string, unknown> | null)?.rooms);
+  if (rooms.length === 0) {
+    return NextResponse.json({ ok: true, counts: {} });
+  }
+
+  const d1 = await getD1Binding();
+  if (!d1) {
+    console.error('[chat/unread-counts] D1 binding 없음 — 멤버십 검증 불가로 거부');
+    return NextResponse.json({ ok: false, error: 'D1 binding not available' }, { status: 500 });
+  }
+
+  try {
+    const db = getD1Drizzle(d1);
+    const allowed: RoomRequest[] = [];
+    for (const room of rooms) {
+      const membership = await loadChatRoomMembership(db, room.roomId);
+      if (membership && canAccessChatRoom(membership, userId)) allowed.push(room);
+    }
+    if (allowed.length === 0) {
+      return NextResponse.json({ ok: true, counts: {} });
+    }
+
+    // 커서가 있는 방과 없는 방을 한 문장에서 함께 센다.
+    //   (room_id = ? AND created_at > ?)  또는  (room_id = ?)
+    // 파라미터 바인딩만 쓴다 — roomId·커서를 SQL 에 문자열로 붙이지 않는다.
+    const clauses: string[] = [];
+    const binds: string[] = [];
+    for (const room of allowed) {
+      if (room.cursor) {
+        clauses.push('(room_id = ? AND created_at > ?)');
+        binds.push(room.roomId, room.cursor);
+      } else {
+        clauses.push('(room_id = ?)');
+        binds.push(room.roomId);
+      }
+    }
+
+    const sql =
+      'SELECT room_id, COUNT(*) AS n FROM messages' +
+      ' WHERE is_deleted = 0 AND sender_id <> ?' +
+      ` AND (${clauses.join(' OR ')})` +
+      ' GROUP BY room_id';
+
+    const result = await d1
+      .prepare(sql)
+      .bind(userId, ...binds)
+      .all<{ room_id: string; n: number }>();
+
+    const counts: Record<string, number> = {};
+    for (const room of allowed) counts[room.roomId] = 0;
+    for (const row of result.results ?? []) {
+      const roomId = String(row.room_id ?? '').trim();
+      if (roomId in counts) counts[roomId] = Number(row.n) || 0;
+    }
+
+    return NextResponse.json({ ok: true, counts });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal error';
+    console.error('[chat/unread-counts]', message);
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+  }
+}
