@@ -303,12 +303,18 @@ export default function MessageActionsHost({
       >
         {children}
       </div>
-      {/* 퀵 바와 시트는 동시에 뜨지 않는다 — 하나를 열면 다른 하나는 닫힌 상태다. */}
+      {/*
+        모바일 롱프레스는 이 바 하나로 끝낸다. 예전에는 `더보기` 가 바텀 시트를
+        다시 열어 같은 메뉴가 두 벌이 됐다 — 시트 경로 자체를 두지 않는다.
+        (MessageContextMenu 는 PC 우클릭 전용으로 남는다.)
+      */}
       {quickRect && !ctxMenu && (
         <QuickActionBar
           rect={quickRect}
           mine={mine}
           canDelete={canDelete ?? mine}
+          canEdit={Boolean(onEdit) && (canDelete ?? mine)}
+          threadReplyCount={threadReplyCount}
           onReact={handleReactClose}
           onOpenPicker={(x, y) => {
             setQuickRect(null);
@@ -317,12 +323,14 @@ export default function MessageActionsHost({
           onReply={onReply}
           onForward={onForward}
           onCopy={onCopy}
+          onBookmark={onBookmark}
           onTask={onTask}
+          onEdit={onEdit}
           onDelete={onDelete}
-          onMore={(x, y) => {
-            setQuickRect(null);
-            setCtxMenu({ x, y });
-          }}
+          onOpenThread={onOpenThread}
+          onReadDetail={onReadDetail}
+          onPin={onPin}
+          isPinned={isPinned}
           onClose={() => setQuickRect(null)}
         />
       )}
