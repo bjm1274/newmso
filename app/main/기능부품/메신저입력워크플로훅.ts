@@ -55,6 +55,8 @@ type UseChatWorkflowDraftsResult = {
   setPrizeWinnerCount: Dispatch<SetStateAction<number>>;
   setPrizeName: Dispatch<SetStateAction<string>>;
   isKickPoll: boolean;
+  pollAnonymous: boolean;
+  setPollAnonymous: (value: boolean) => void;
   setIsKickPoll: Dispatch<SetStateAction<boolean>>;
   kickTargetId: string;
   setKickTargetId: Dispatch<SetStateAction<string>>;
@@ -90,6 +92,8 @@ export function useChatWorkflowDrafts({
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState<string[]>(DEFAULT_POLL_OPTIONS);
   const [pollDeadlineAt, setPollDeadlineAt] = useState('');
+  // 익명 투표 — 실제 익명성은 /api/chat/poll-votes 가 user_id 를 빼는 것이 본체다.
+  const [pollAnonymous, setPollAnonymous] = useState(false);
   const [prizeEnabled, setPrizeEnabled] = useState(false);
   const [prizeWinnerCount, setPrizeWinnerCount] = useState(1);
   const [prizeName, setPrizeName] = useState('');
@@ -141,6 +145,7 @@ export function useChatWorkflowDrafts({
         creator_id: effectiveChatUserId || user?.id,
         question: buildPollQuestionContent(pollQuestion, {
           deadlineAt: pollDeadlineAt,
+          anonymous: pollAnonymous,
           prize: prizeMeta,
           isKickPoll,
           kickTargetId: isKickPoll ? kickTargetId : undefined }),
@@ -168,6 +173,7 @@ export function useChatWorkflowDrafts({
         room_id: selectedRoomId,
         question: buildPollQuestionContent(pollQuestion, {
           deadlineAt: pollDeadlineAt,
+          anonymous: pollAnonymous,
           prize: prizeMeta,
           isKickPoll,
           kickTargetId: isKickPoll ? kickTargetId : undefined }),
@@ -177,6 +183,7 @@ export function useChatWorkflowDrafts({
       setPollQuestion('');
       setPollOptions(DEFAULT_POLL_OPTIONS);
       setPollDeadlineAt('');
+      setPollAnonymous(false);
       setPrizeEnabled(false);
       setPrizeWinnerCount(1);
       setPrizeName('');
@@ -524,6 +531,8 @@ export function useChatWorkflowDrafts({
     setPrizeName,
     isKickPoll,
     setIsKickPoll,
+    pollAnonymous,
+    setPollAnonymous,
     kickTargetId,
     setKickTargetId,
     openPollModal,

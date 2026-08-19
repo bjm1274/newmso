@@ -226,7 +226,7 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
   const [pollComposerOpen, setPollComposerOpen] = useState(false);
   const [pollSubmitting, setPollSubmitting] = useState(false);
   const [pollVoting, setPollVoting] = useState(false);
-  const [pollData, setPollData] = useState<RoomPollsResult>({ polls: [], voteCounts: {}, myVotes: {} });
+  const [pollData, setPollData] = useState<RoomPollsResult>({ polls: [], voteCounts: {}, myVotes: {}, voters: {} });
   // 방 이름 수정
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameDraft, setRenameDraft] = useState('');
@@ -541,7 +541,7 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
   }, [room.id, refreshPolls]);
 
   const handleCreatePoll = useCallback(
-    async (input: { question: string; options: string[]; deadlineAt: string }) => {
+    async (input: { question: string; options: string[]; deadlineAt: string; anonymous: boolean }) => {
       if (!userId) {
         toast('로그인 정보를 찾을 수 없습니다.', 'error');
         return;
@@ -553,7 +553,8 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
           creatorId: userId,
           question: input.question,
           options: input.options,
-          deadlineAt: input.deadlineAt });
+          deadlineAt: input.deadlineAt,
+          anonymous: input.anonymous });
         if (!result.ok) {
           toast(result.error, 'error');
           return;

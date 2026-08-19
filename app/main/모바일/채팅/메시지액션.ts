@@ -207,6 +207,7 @@ export async function createMobilePoll(input: {
   question: string;
   options: string[];
   deadlineAt?: string;
+  anonymous?: boolean;
 }): Promise<ActionResult> {
   const question = input.question.trim();
   if (!question) return { ok: false, error: '투표 질문을 입력해 주세요.' };
@@ -215,6 +216,7 @@ export async function createMobilePoll(input: {
   try {
     const meta: PollMeta = {};
     if (input.deadlineAt && input.deadlineAt.trim()) meta.deadlineAt = input.deadlineAt.trim();
+    if (input.anonymous) meta.anonymous = true;
     const { error } = await db.from('polls').insert([
       {
         room_id: input.roomId,
@@ -259,13 +261,51 @@ export type RoomPollsResult = {
   voteCounts: Record<string, Record<number, number>>;
   /** pollId → 내가 선택한 optionIndex (없으면 undefined) */
   myVotes: Record<string, number>;
+  /** pollId → (optionIndex → 투표자 이름). 익명 투표는 비어 있다. */
+  voters: Record<string, Record<number, string[]>>;
 };
+
+type PollAggregate = {
+  voteCounts: Record<string, Record<number, number>>;
+  myVotes: Record<string, number>;
+  voters: Record<string, Record<number, string[]>>;
+};
+
+/** 서버 집계. 실패하면 null 을 돌려 호출부가 기존 경로로 되돌아간다. */
+async function fetchPollAggregate(pollIds: string[]): Promise<PollAggregate | null> {
+  if (typeof fetch !== 'function' || pollIds.length === 0) return null;
+  try {
+    const res = await fetch('/api/chat/poll-votes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ pollIds }) });
+    if (!res.ok) return null;
+    const json = (await res.json().catch(() => null)) as
+      | { ok: true; polls: Record<string, { counts: Record<number, number>; myVote: number | null; voters: Record<number, string[]> }> }
+      | { ok: false }
+      | null;
+    if (!json || json.ok !== true || !json.polls) return null;
+
+    const voteCounts: Record<string, Record<number, number>> = {};
+    const myVotes: Record<string, number> = {};
+    const voters: Record<string, Record<number, string[]>> = {};
+    for (const [pollId, result] of Object.entries(json.polls)) {
+      voteCounts[pollId] = result.counts ?? {};
+      if (typeof result.myVote === 'number') myVotes[pollId] = result.myVote;
+      voters[pollId] = result.voters ?? {};
+    }
+    return { voteCounts, myVotes, voters };
+  } catch {
+    return null;
+  }
+}
 
 export async function fetchRoomPolls(
   roomId: string,
   userId: string | null,
 ): Promise<RoomPollsResult> {
-  const empty: RoomPollsResult = { polls: [], voteCounts: {}, myVotes: {} };
+  const empty: RoomPollsResult = { polls: [], voteCounts: {}, myVotes: {}, voters: {} };
   if (!roomId) return empty;
   try {
     const { data, error } = await db
@@ -284,8 +324,20 @@ export async function fetchRoomPolls(
       created_at: (row.created_at as string | null | undefined) ?? null }));
 
     const pollIds = polls.map((p) => p.id).filter(Boolean);
-    if (pollIds.length === 0) return { polls, voteCounts: {}, myVotes: {} };
+    if (pollIds.length === 0) return { polls, voteCounts: {}, myVotes: {}, voters: {} };
 
+    /*
+     * 집계는 서버가 한다.
+     *
+     * 예전에는 poll_votes 에서 (poll_id, option_index, user_id) 를 전부 받아
+     * 여기서 세었다. 화면에 이름을 안 그릴 뿐, 누가 무엇에 투표했는지가
+     * 응답에 그대로 실려 있었다 — 익명 투표를 만들 수가 없는 구조였다.
+     * 라우트는 익명 투표의 user_id 를 아예 내려주지 않는다.
+     */
+    const aggregated = await fetchPollAggregate(pollIds);
+    if (aggregated) return { polls, ...aggregated };
+
+    // ── 폴백: 라우트가 없거나 실패했을 때 (익명 보장 없음) ──
     const { data: votes } = await db
       .from('poll_votes')
       .select('poll_id, option_index, user_id')
@@ -304,7 +356,7 @@ export async function fetchRoomPolls(
       }
     });
 
-    return { polls, voteCounts, myVotes };
+    return { polls, voteCounts, myVotes, voters: {} };
   } catch {
     return empty;
   }

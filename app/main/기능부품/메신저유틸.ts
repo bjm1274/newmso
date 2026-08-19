@@ -543,6 +543,15 @@ export type PollPrizeWinner = {
 
 export type PollMeta = {
   deadlineAt?: string | null;
+  /**
+   * 익명 투표 여부.
+   *
+   * polls 테이블에 컬럼을 더하지 않고 질문에 심는 기존 메타 규약을 그대로 쓴다
+   * (deadlineAt·prize 와 같은 자리). 실제 익명성은 이 플래그만으로는 성립하지
+   * 않는다 — /api/chat/poll-votes 가 익명 투표의 user_id 를 내려주지 않는 것이
+   * 본체이고, 이 값은 그 판정 근거다.
+   */
+  anonymous?: boolean | null;
   prize?: PollPrize | null;
   prizeWinners?: PollPrizeWinner[] | null;
   isKickPoll?: boolean | null;
@@ -556,6 +565,7 @@ export function buildPollQuestionContent(
   const normalizedQuestion = String(question || '').trim();
   const hasMeta =
     (meta?.deadlineAt && String(meta.deadlineAt).trim()) ||
+    meta?.anonymous ||
     meta?.prize ||
     meta?.prizeWinners ||
     meta?.isKickPoll ||
@@ -566,6 +576,7 @@ export function buildPollQuestionContent(
   const metaObj: PollMeta = {};
   const deadlineAt = String(meta?.deadlineAt || '').trim();
   if (deadlineAt) metaObj.deadlineAt = deadlineAt;
+  if (meta?.anonymous) metaObj.anonymous = true;
   if (meta?.prize) metaObj.prize = meta.prize;
   if (meta?.prizeWinners) metaObj.prizeWinners = meta.prizeWinners;
   if (meta?.isKickPoll) metaObj.isKickPoll = meta.isKickPoll;
@@ -577,6 +588,7 @@ export function buildPollQuestionContent(
 export function extractPollMetaFromQuestion(value: unknown): {
   displayQuestion: string;
   deadlineAt: string;
+  anonymous: boolean;
   prize: PollPrize | null;
   prizeWinners: PollPrizeWinner[] | null;
   isKickPoll: boolean;
@@ -587,7 +599,7 @@ export function extractPollMetaFromQuestion(value: unknown): {
   const end = raw.indexOf(POLL_META_SUFFIX);
 
   if (start === -1 || end === -1 || end <= start) {
-    return { displayQuestion: raw.trim(), deadlineAt: '', prize: null, prizeWinners: null, isKickPoll: false, kickTargetId: null };
+    return { displayQuestion: raw.trim(), deadlineAt: '', anonymous: false, prize: null, prizeWinners: null, isKickPoll: false, kickTargetId: null };
   }
 
   const displayQuestion = raw.slice(0, start).trim();
@@ -598,6 +610,7 @@ export function extractPollMetaFromQuestion(value: unknown): {
     return {
       displayQuestion,
       deadlineAt: String(parsed?.deadlineAt || '').trim(),
+      anonymous: Boolean(parsed?.anonymous),
       prize: parsed?.prize ?? null,
       prizeWinners: parsed?.prizeWinners ?? null,
       isKickPoll: parsed?.isKickPoll ?? false,
@@ -606,6 +619,7 @@ export function extractPollMetaFromQuestion(value: unknown): {
     return {
       displayQuestion: raw.trim(),
       deadlineAt: '',
+      anonymous: false,
       prize: null,
       prizeWinners: null,
       isKickPoll: false,

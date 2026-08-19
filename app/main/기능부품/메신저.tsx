@@ -1345,6 +1345,8 @@ export default function ChatView({
     setPrizeName,
     isKickPoll,
     setIsKickPoll,
+    pollAnonymous,
+    setPollAnonymous,
     kickTargetId,
     setKickTargetId,
     slashCommand,
@@ -3418,6 +3420,8 @@ export default function ChatView({
           prizeWinnerCount={prizeWinnerCount}
           prizeName={prizeName}
           isKickPoll={isKickPoll}
+          anonymous={pollAnonymous}
+          onAnonymousChange={setPollAnonymous}
           kickTargetId={kickTargetId}
           onQuestionChange={setPollQuestion}
           onDeadlineAtChange={setPollDeadlineAt}

@@ -301,6 +301,7 @@ export default function BubbleList({
                 poll={item.poll}
                 voteCounts={pollData?.voteCounts[item.poll.id] || {}}
                 myVote={pollData?.myVotes[item.poll.id]}
+                voters={pollData?.voters?.[item.poll.id] || {}}
                 voting={pollVoting}
                 onVote={(pid, opt) => onVotePoll?.(pid, opt)}
               />

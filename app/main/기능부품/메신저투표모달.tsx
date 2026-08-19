@@ -28,6 +28,8 @@ type PollComposerModalProps = {
   onPrizeNameChange: (value: string) => void;
   isKickPoll: boolean;
   onIsKickPollChange: (value: boolean) => void;
+  anonymous: boolean;
+  onAnonymousChange: (value: boolean) => void;
   kickTargetId: string;
   onKickTargetIdChange: (value: string) => void;
   onClose: () => void;
@@ -63,6 +65,8 @@ export function PollComposerModal({
   onPrizeNameChange,
   isKickPoll,
   onIsKickPollChange,
+  anonymous,
+  onAnonymousChange,
   kickTargetId,
   onKickTargetIdChange,
   onClose,
@@ -97,6 +101,28 @@ export function PollComposerModal({
               className="w-full mt-1 p-3 bg-[var(--input-bg)] border border-[var(--border)] rounded-[var(--radius-lg)] text-xs font-bold outline-none focus:border-[var(--accent)]"
             />
           </div>
+          {/*
+            익명 투표. 체크만으로 화면에서 이름을 가리는 방식이면 개발자도구로
+            그대로 보인다 — /api/chat/poll-votes 가 익명 투표의 user_id 를
+            응답에서 아예 빼는 것이 실제 동작이다.
+          */}
+          <label className="flex items-start gap-3 rounded-[var(--radius-lg)] bg-[var(--muted)] p-3 cursor-pointer">
+            <input
+              type="checkbox"
+              data-testid="chat-poll-anonymous"
+              checked={anonymous}
+              onChange={(event) => onAnonymousChange(event.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent)]"
+            />
+            <span className="min-w-0">
+              <span className="block text-xs font-bold text-[var(--foreground)]">익명 투표</span>
+              <span className="mt-0.5 block text-[11px] font-semibold text-[var(--toss-gray-3)]">
+                {anonymous
+                  ? '누가 무엇을 골랐는지 아무도 볼 수 없습니다'
+                  : '선택지 아래에 투표한 사람이 표시됩니다'}
+              </span>
+            </span>
+          </label>
           <div>
             <label className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase">선택지</label>
             <div className="mt-1 space-y-2">

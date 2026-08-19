@@ -25,18 +25,20 @@ export type PollComposerSheetProps = {
   open: boolean;
   submitting: boolean;
   onClose: () => void;
-  onSubmit: (input: { question: string; options: string[]; deadlineAt: string }) => void;
+  onSubmit: (input: { question: string; options: string[]; deadlineAt: string; anonymous: boolean }) => void;
 };
 
 export function PollComposerSheet({ open, submitting, onClose, onSubmit }: PollComposerSheetProps) {
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<string[]>(['', '']);
   const [deadlineAt, setDeadlineAt] = useState('');
+  const [anonymous, setAnonymous] = useState(false);
 
   const reset = () => {
     setQuestion('');
     setOptions(['', '']);
     setDeadlineAt('');
+    setAnonymous(false);
   };
 
   const handleClose = () => {
@@ -179,6 +181,39 @@ export function PollComposerSheet({ open, submitting, onClose, onSubmit }: PollC
           </div>
         </div>
 
+        {/*
+          익명 투표 — 서버가 poll_votes 의 user_id 를 응답에서 빼는 것이 본체다.
+          체크만으로 화면에서 이름을 안 그리는 방식이면, 개발자도구로 그대로 보인다.
+        */}
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '12px 14px',
+            borderRadius: 10,
+            background: 'var(--z-100)',
+            cursor: submitting ? 'not-allowed' : 'pointer' }}
+        >
+          <input
+            type="checkbox"
+            checked={anonymous}
+            onChange={(e) => setAnonymous(e.target.checked)}
+            disabled={submitting}
+            style={{ width: 18, height: 18, accentColor: 'var(--m-accent)', flexShrink: 0 }}
+          />
+          <span style={{ minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: 13.5, fontWeight: 800, color: 'var(--z-900)' }}>
+              익명 투표
+            </span>
+            <span style={{ display: 'block', fontSize: 11.5, color: 'var(--z-500)', fontWeight: 600, marginTop: 2 }}>
+              {anonymous
+                ? '누가 무엇을 골랐는지 아무도 볼 수 없습니다'
+                : '선택지를 누르면 투표한 사람이 보입니다'}
+            </span>
+          </span>
+        </label>
+
         <div style={{ display: 'flex', gap: 12, paddingTop: 6 }}>
           <button
             type="button"
@@ -200,7 +235,7 @@ export function PollComposerSheet({ open, submitting, onClose, onSubmit }: PollC
           </button>
           <button
             type="button"
-            onClick={() => onSubmit({ question, options, deadlineAt })}
+            onClick={() => onSubmit({ question, options, deadlineAt, anonymous })}
             disabled={submitting || !question.trim() || options.filter(o => o.trim()).length < 2}
             className="macos-squircle-sm"
             style={{
@@ -234,13 +269,16 @@ export type PollCardProps = {
   poll: MobilePoll;
   voteCounts: Record<number, number>;
   myVote: number | undefined;
+  /** 선택지 index → 투표자 이름. 익명 투표면 서버가 비워서 보낸다. */
+  voters?: Record<number, string[]>;
   voting: boolean;
   onVote: (pollId: string, optionIndex: number) => void;
 };
 
-export function PollCard({ poll, voteCounts, myVote, voting, onVote }: PollCardProps) {
-  const { displayQuestion, deadlineAt } = extractPollMetaFromQuestion(poll.question);
+export function PollCard({ poll, voteCounts, myVote, voters, voting, onVote }: PollCardProps) {
+  const { displayQuestion, deadlineAt, anonymous } = extractPollMetaFromQuestion(poll.question);
   const totalVotes = Object.values(voteCounts).reduce((sum, n) => sum + n, 0);
+  const hasVoterNames = Object.values(voters ?? {}).some((names) => names.length > 0);
   const deadlinePassed = (() => {
     if (!deadlineAt) return false;
     const dt = toChatDate(deadlineAt);
@@ -262,6 +300,11 @@ export function PollCard({ poll, voteCounts, myVote, voting, onVote }: PollCardP
         <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--m-accent)', letterSpacing: '0.02em' }}>
           투표 진행중
         </span>
+        {anonymous && (
+          <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--z-600)', background: 'var(--z-100)', padding: '2px 7px', borderRadius: 999 }}>
+            익명
+          </span>
+        )}
         {deadlinePassed && (
           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--z-500)', marginLeft: 'auto', background: 'rgba(120, 120, 128, 0.1)', padding: '2px 6px', borderRadius: 4 }}>
             마감됨
@@ -321,9 +364,29 @@ export function PollCard({ poll, voteCounts, myVote, voting, onVote }: PollCardP
           );
         })}
       </div>
+      {/*
+        기명 투표만 투표자를 보여준다. 익명 투표는 서버가 이름을 보내지 않으므로
+        이 목록은 애초에 비어 있다 — 화면에서 가리는 방식이 아니다.
+      */}
+      {!anonymous && hasVoterNames && (
+        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {poll.options.map((option, index) => {
+            const names = voters?.[index] ?? [];
+            if (names.length === 0) return null;
+            return (
+              <div key={`voters-${index}`} style={{ fontSize: 11.5, color: 'var(--z-500)', fontWeight: 600, lineHeight: 1.5 }}>
+                <span style={{ fontWeight: 800, color: 'var(--z-600)' }}>{option}</span>
+                <span style={{ margin: '0 4px' }}>·</span>
+                {names.join(', ')}
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div style={{ fontSize: 12, color: 'var(--z-500)', fontWeight: 600, marginTop: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
         <MIcon name="users" size={13} color="var(--z-400)" />
         총 {totalVotes}명 참여
+        {anonymous && <span style={{ marginLeft: 6 }}>· 누가 골랐는지는 공개되지 않습니다</span>}
       </div>
     </div>
   );
