@@ -11,6 +11,7 @@
  */
 
 import { useMemo, useState } from 'react';
+import { useBoardScheduleMonth } from './data-hooks';
 import { normalizeScheduleDateValue } from '@/app/main/기능부품/게시판-view-utils';
 import MIcon from '../공통/MIcon';
 import type { BoardListPost } from './data-hooks';
@@ -33,19 +34,32 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
+
+  /*
+   * 달력이 보는 달만 따로 받는다.
+   *
+   * 예전에는 목록이 받아 둔 전건(617건, 620KB)을 그대로 썼다. 목록을 100건
+   * 페이지로 끊으면서 그 배열에는 지난 달 일정이 없다 — 달력은 자기 달을
+   * 스스로 받아야 한다. 서버가 [[SCHEDULE_META]] 를 해석한 뒤 걸러 주므로
+   * schedule_date 컬럼이 비어 있는 147건도 제 날짜에 뜬다.
+   */
+  const monthKey = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, '0')}`;
+  const { posts: monthPosts, loading: monthLoading } = useBoardScheduleMonth(monthKey);
+  // 서버 조회가 실패하면(라우트 없음·오프라인) 부모가 준 목록으로 되돌아간다.
+  const sourcePosts = monthPosts ?? posts;
   const [search, setSearch] = useState('');
   const [selectedDate, setSelectedDate] = useState<string>(() => toKey(new Date()));
 
   const { eventsByDate, days, month, hasAny } = useMemo(() => {
     const searchLower = search.trim().toLowerCase();
     const filtered = searchLower
-      ? posts.filter(
+      ? sourcePosts.filter(
           (p) =>
             String(p.patient_name ?? '').toLowerCase().includes(searchLower) ||
             String(p.content ?? '').toLowerCase().includes(searchLower) ||
             String(p.title ?? '').toLowerCase().includes(searchLower),
         )
-      : posts;
+      : sourcePosts;
 
     const map: Record<string, BoardListPost[]> = {};
     filtered.forEach((p) => {
@@ -66,7 +80,7 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
     });
 
     return { eventsByDate: map, days: grid, month: m, hasAny: Object.keys(map).length > 0 };
-  }, [posts, search, calendarMonth]);
+  }, [sourcePosts, search, calendarMonth]);
 
   const goMonth = (delta: number) => {
     setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));

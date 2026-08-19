@@ -10,7 +10,7 @@
  * JM(파일당 500줄), JM2(필요한 칼럼만 select·useMemo), JM3(toast), JM6(button 시맨틱)
  */
 
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import MobileHeader from '../셸/MobileHeader';
 import MIcon from '../공통/MIcon';
 import {
@@ -67,6 +67,10 @@ export type SBoardProps = {
   onStarChanged: (postId: string, starred: boolean) => void;
   /** PTR 콜백 — 부모 refetch */
   onRefresh?: () => Promise<void>;
+  /** 서버에서 다음 페이지를 이어붙인다 (없으면 로컬 창만 늘린다) */
+  onLoadMore?: () => Promise<void>;
+  /** 서버에 더 남아 있는지 */
+  hasMore?: boolean;
   /** Phase 6: true이면 카테고리 홈을 표시 */
   showHome?: boolean;
   /** Phase 6: 카테고리 클릭 시 호출 */
@@ -238,6 +242,8 @@ function SBoardBase({
   onWrite,
   onBack,
   onRefresh,
+  onLoadMore,
+  hasMore = false,
   showHome,
   onOpenCategory,
   company,
@@ -276,7 +282,31 @@ function SBoardBase({
     setVisibleCount(BOARD_PAGE_SIZE);
   }, [cat, query]);
   const visible = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
-  const hasMoreToShow = filtered.length > visible.length;
+  // 로컬 창에 아직 안 그린 게 남았거나, 서버에 더 받을 게 남았으면 버튼을 낸다.
+  const hasMoreToShow = filtered.length > visible.length || hasMore;
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  /**
+   * 더 보기.
+   *
+   * 먼저 이미 받아 둔 것을 더 그리고, 다 그렸는데도 서버에 남아 있으면
+   * 그때 다음 페이지를 받는다. 첫 진입에 617건을 통째로 받던 것을 100건씩
+   * 끊었기 때문에 두 단계가 필요하다.
+   */
+  const handleLoadMore = useCallback(async () => {
+    if (filtered.length > visible.length) {
+      setVisibleCount((n) => n + BOARD_PAGE_SIZE);
+      return;
+    }
+    if (!hasMore || !onLoadMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      await onLoadMore();
+      setVisibleCount((n) => n + BOARD_PAGE_SIZE);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [filtered.length, visible.length, hasMore, onLoadMore, loadingMore]);
 
   const { containerRef, refreshing, pullProgress } = usePullToRefresh({
     onRefresh: onRefresh ?? (() => Promise.resolve()),
@@ -495,7 +525,8 @@ function SBoardBase({
           {hasMoreToShow && (
             <button
               type="button"
-              onClick={() => setVisibleCount((n) => n + BOARD_PAGE_SIZE)}
+              onClick={() => { void handleLoadMore(); }}
+              disabled={loadingMore}
               aria-label={`게시글 ${BOARD_PAGE_SIZE}개 더 보기`}
               style={{
                 width: '100%',
@@ -508,7 +539,7 @@ function SBoardBase({
                 border: 'none',
                 cursor: 'pointer' }}
             >
-              더 보기 ({filtered.length - visible.length}건 남음)
+              {loadingMore ? '불러오는 중…' : `더 보기 (${filtered.length - visible.length}건 남음)`}
             </button>
           )}
         </div>

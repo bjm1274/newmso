@@ -12,7 +12,7 @@
  * 글 작성 create: 기능부품/게시판서브/create-board-post.ts SSOT re-export
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import { pickAvatarTone as pickAvatarToneLib, type AvatarTone } from '@/lib/avatar-tone';
@@ -185,6 +185,10 @@ export type UseBoardPostsResult = {
   posts: BoardListPost[];
   loading: boolean;
   refetch: () => Promise<void>;
+  /** 다음 페이지를 이어붙인다. 서버 페이징이 동작할 때만 의미가 있다. */
+  loadMore: () => Promise<void>;
+  /** 서버에 더 남아 있는지 */
+  hasMore: boolean;
 };
 
 /**
@@ -193,6 +197,39 @@ export type UseBoardPostsResult = {
  */
 let boardPostsCache: { userId: string | null; company: string | null; posts: BoardListPost[] } | null = null;
 let boardPostsInflight: Promise<BoardListPost[]> | null = null;
+
+/** 한 번에 받아오는 글 수. 카드는 30개만 그리므로 첫 페이지는 이 정도면 충분하다. */
+const BOARD_PAGE_SIZE = 100;
+
+type BoardPageResult = { posts: BoardPost[]; nextCursor: string | null } | null;
+
+/**
+ * 서버 페이지 조회.
+ *
+ * 클라이언트 D1 게이트웨이로는 페이지를 끊을 수 없다 — 일정 글 147건은
+ * schedule_date 가 비어 있고 날짜가 본문 [[SCHEDULE_META]] 안에만 있어서,
+ * SQL 로 거르면 달력에서 사라진다. 서버가 META 를 먼저 해석하고 끊어 준다.
+ * 실패하면 null 을 돌려 호출부가 기존 전건 조회로 되돌아간다.
+ */
+async function fetchBoardPageFromServer(cursor: string | null): Promise<BoardPageResult> {
+  if (typeof fetch !== 'function') return null;
+  try {
+    const res = await fetch('/api/board/list', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ mode: 'list', limit: BOARD_PAGE_SIZE, cursor }) });
+    if (!res.ok) return null;
+    const json = (await res.json().catch(() => null)) as
+      | { ok: true; posts: BoardPost[]; nextCursor: string | null }
+      | { ok: false }
+      | null;
+    if (!json || json.ok !== true || !Array.isArray(json.posts)) return null;
+    return { posts: json.posts, nextCursor: json.nextCursor ?? null };
+  } catch {
+    return null;
+  }
+}
 
 /**
  * 게시글 목록 조회 (활성 보드 타입별 병렬 + 병합).
@@ -212,6 +249,68 @@ export function useBoardPosts(
       : null;
   const [posts, setPosts] = useState<BoardListPost[]>(() => cached ?? []);
   const [loading, setLoading] = useState(() => !cached);
+  // 서버 페이징 커서. null 이면 더 없음(또는 폴백으로 전건을 받은 상태).
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const loadingMoreRef = useRef(false);
+
+  /**
+   * 조회 경로가 어디든 목록으로 만드는 공통 처리.
+   * (서버 페이지·폴백 전건 조회·추가 페이지가 모두 이걸 쓴다)
+   */
+  const enrich = useCallback(async (input: BoardPost[]): Promise<BoardListPost[]> => {
+    const byId = new Map<string, BoardPost>();
+    for (const p of input) {
+      const id = String(p.id ?? '');
+      if (!id) continue;
+      const normalized = normalizeBoardPost(p);
+      // 레거시 board_type (mri -> MRI일정 등) 정규화
+      const canonical = LEGACY_BOARD_TYPE_TO_CANONICAL.get(String(normalized.board_type ?? '').trim());
+      if (canonical) normalized.board_type = canonical;
+      byId.set(id, normalized);
+    }
+    let rawList = Array.from(byId.values()).sort((a, b) => {
+      const ta = new Date(String(a.created_at ?? 0)).getTime();
+      const tb = new Date(String(b.created_at ?? 0)).getTime();
+      return tb - ta;
+    });
+
+    rawList = rawList.filter(
+      (p) => !REMOVED_BOARD_TYPES.has(String(p.board_type ?? '').trim()),
+    );
+
+    const nowMs = Date.now();
+    const list = rawList.filter((p) => {
+      const sched = (p as { scheduled_publish_at?: string | null }).scheduled_publish_at;
+      if (!sched) return true;
+      const t = new Date(sched).getTime();
+      if (!Number.isFinite(t) || t <= nowMs) return true;
+      return userId && String(p.author_id ?? '') === String(userId);
+    });
+
+    const ids = list.map((p) => String(p.id)).filter(Boolean);
+    const commentCounts: Record<string, number> = {};
+    const CHUNK = 200;
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK);
+      const { data: commentRows } = await db
+        .from('board_post_comments')
+        .select('post_id')
+        .in('post_id', chunk);
+      if (Array.isArray(commentRows)) {
+        for (const row of commentRows as { post_id: string }[]) {
+          const key = String(row.post_id);
+          commentCounts[key] = (commentCounts[key] || 0) + 1;
+        }
+      }
+    }
+
+    const starSet = await loadStarSet(userId);
+    return list.map((p) => ({
+      ...(p as BoardListPost),
+      comment_count: commentCounts[String(p.id)] || 0,
+      starred: starSet.has(String(p.id)),
+    }));
+  }, [userId]);
 
   const fetchPosts = useCallback(async () => {
     // 캐시가 있으면 소프트 리프레시 — loading 깜빡임 없이 배경 갱신
@@ -224,8 +323,17 @@ export function useBoardPosts(
     if (!hasCache) setLoading(true);
 
     const run = async (): Promise<BoardListPost[]> => {
-      // 예전에는 보드 타입마다 따로 쿼리를 날렸다(6회 × limit 1000). 모바일에서는
-      // 왕복 6번이 그대로 체감 지연이 되고, 응답 봉투도 6벌이 온다. 한 번에 받는다.
+      // 서버 페이지가 먼저다. 첫 진입에 617건(620KB)을 통째로 받던 것을
+      // 100건(89KB)으로 끊는다. 라우트가 없거나 실패하면 아래 전건 조회로 간다.
+      const page = await fetchBoardPageFromServer(null);
+      if (page) {
+        setNextCursor(page.nextCursor);
+        return enrich(page.posts);
+      }
+      setNextCursor(null);
+
+      // ── 폴백: 예전 경로(전건 조회) ──
+      // 보드 타입마다 따로 쿼리하던 것을 한 번으로 합쳐 둔 상태다.
       const { data, error } = await withMissingColumnsFallback<BoardPost[]>(
         async (omittedColumns) => {
           const result = await db
@@ -254,59 +362,9 @@ export function useBoardPosts(
             );
       }
 
-      const byId = new Map<string, BoardPost>();
-      for (const p of Array.isArray(data) ? data : []) {
-        const id = String(p.id ?? '');
-        if (!id) continue;
-        const normalized = normalizeBoardPost(p);
-        // 레거시 board_type (mri -> MRI일정 등) 정규화
-        const canonical = LEGACY_BOARD_TYPE_TO_CANONICAL.get(String(normalized.board_type ?? '').trim());
-        if (canonical) normalized.board_type = canonical;
-        byId.set(id, normalized);
-      }
-      let rawList = Array.from(byId.values()).sort((a, b) => {
-        const ta = new Date(String(a.created_at ?? 0)).getTime();
-        const tb = new Date(String(b.created_at ?? 0)).getTime();
-        return tb - ta;
-      });
-
-      rawList = rawList.filter(
-        (p) => !REMOVED_BOARD_TYPES.has(String(p.board_type ?? '').trim()),
-      );
-
-      const nowMs = Date.now();
-      const list = rawList.filter((p) => {
-        const sched = (p as { scheduled_publish_at?: string | null }).scheduled_publish_at;
-        if (!sched) return true;
-        const t = new Date(sched).getTime();
-        if (!Number.isFinite(t) || t <= nowMs) return true;
-        return userId && String(p.author_id ?? '') === String(userId);
-      });
-
-      const ids = list.map((p) => String(p.id)).filter(Boolean);
-      const commentCounts: Record<string, number> = {};
-      const CHUNK = 200;
-      for (let i = 0; i < ids.length; i += CHUNK) {
-        const chunk = ids.slice(i, i + CHUNK);
-        const { data: commentRows } = await db
-          .from('board_post_comments')
-          .select('post_id')
-          .in('post_id', chunk);
-        if (Array.isArray(commentRows)) {
-          for (const row of commentRows as { post_id: string }[]) {
-            const key = String(row.post_id);
-            commentCounts[key] = (commentCounts[key] || 0) + 1;
-          }
-        }
-      }
-
-      const starSet = await loadStarSet(userId);
-      return list.map((p) => ({
-        ...(p as BoardListPost),
-        comment_count: commentCounts[String(p.id)] || 0,
-        starred: starSet.has(String(p.id)),
-      }));
+      return enrich(Array.isArray(data) ? data : []);
     };
+
 
     // 메모리 캐시가 없을 때만 저장분을 먼저 그린다. 새로고침 직후 빈 화면 대신
     // 지난번 목록을 보여주고, 아래 네트워크 응답이 오면 갈아끼운다.
@@ -363,11 +421,38 @@ export function useBoardPosts(
     }
   }, [userId, company]);
 
+  /**
+   * 다음 페이지를 이어붙인다.
+   *
+   * 폴백 경로(전건 조회)로 받았을 때는 커서가 없으므로 아무 일도 하지 않는다 —
+   * 그 경우 목록에는 이미 전건이 들어 있다.
+   */
+  const loadMore = useCallback(async () => {
+    if (loadingMoreRef.current || !nextCursor) return;
+    loadingMoreRef.current = true;
+    try {
+      const page = await fetchBoardPageFromServer(nextCursor);
+      if (!page) return;
+      setNextCursor(page.nextCursor);
+      const more = await enrich(page.posts);
+      setPosts((prev) => {
+        const seen = new Set(prev.map((p) => String(p.id)));
+        const merged = [...prev, ...more.filter((p) => !seen.has(String(p.id)))];
+        boardPostsCache = { userId, company: companyKey, posts: merged };
+        return merged;
+      });
+    } catch (err) {
+      toast(`게시판 추가 조회 실패: ${(err as Error)?.message ?? '오류'}`, 'error');
+    } finally {
+      loadingMoreRef.current = false;
+    }
+  }, [nextCursor, userId, companyKey, enrich]);
+
   useEffect(() => {
     void fetchPosts();
   }, [fetchPosts]);
 
-  return { posts, loading, refetch: fetchPosts };
+  return { posts, loading, refetch: fetchPosts, loadMore, hasMore: Boolean(nextCursor) };
 }
 
 // ─────────────────────────────────────────────
@@ -596,4 +681,52 @@ function inferKind(nameOrUrl: string, explicitType: string): 'image' | 'video' |
   if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic', 'heif', 'avif'].includes(ext)) return 'image';
   if (['mp4', 'mov', 'avi', 'wmv', 'webm', 'mkv', 'm4v'].includes(ext)) return 'video';
   return 'file';
+}
+
+/**
+ * 달력이 보는 달의 일정 글만 조회한다.
+ *
+ * 목록을 100건 페이지로 끊으면서 달력이 그 배열을 더 쓸 수 없게 됐다.
+ * 서버가 [[SCHEDULE_META]] 를 해석한 뒤 달로 거르므로, schedule_date 컬럼이
+ * 비어 있고 날짜가 본문 안에만 있던 147건도 제 날짜에 뜬다.
+ *
+ * 실패하면 null 을 돌려 호출부가 부모의 목록으로 되돌아가게 한다 — 달력이
+ * 통째로 비는 것보다 낫다.
+ */
+export function useBoardScheduleMonth(month: string): {
+  posts: BoardListPost[] | null;
+  loading: boolean;
+} {
+  const [posts, setPosts] = useState<BoardListPost[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!/^\d{4}-\d{2}$/.test(month)) return;
+    let active = true;
+    setLoading(true);
+    (async () => {
+      try {
+        const res = await fetch('/api/board/list', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ mode: 'calendar', month }) });
+        if (!active) return;
+        if (!res.ok) { setPosts(null); return; }
+        const json = (await res.json().catch(() => null)) as
+          | { ok: true; posts: BoardListPost[] }
+          | { ok: false }
+          | null;
+        if (!active) return;
+        setPosts(json && json.ok === true && Array.isArray(json.posts) ? json.posts : null);
+      } catch {
+        if (active) setPosts(null);
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [month]);
+
+  return { posts, loading };
 }

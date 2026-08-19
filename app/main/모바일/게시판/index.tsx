@@ -133,7 +133,7 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
 
   // 항상 전체 보드 로드 → 칩 카운트 안정. 카테고리 전환은 클라이언트 필터.
   // company 필터로 타사 게시글 차단.
-  const { posts: fetched, loading, refetch: refetchPosts } = useBoardPosts(userId, userCompany);
+  const { posts: fetched, loading, refetch: refetchPosts, loadMore, hasMore } = useBoardPosts(userId, userCompany);
   const posts = useMemo(() => {
     const base = overridePosts ?? fetched;
     // 읽기 권한 없는 보드 타입 제거
@@ -330,6 +330,8 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
           userId={userId}
           onStarChanged={handleStarChanged}
           onRefresh={refetch}
+        onLoadMore={loadMore}
+        hasMore={hasMore}
           showHome={false}
           onOpenCategory={handleOpenCategory}
           company={userCompany ?? ''}
@@ -377,6 +379,8 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
         userId={userId}
         onStarChanged={handleStarChanged}
         onRefresh={refetch}
+        onLoadMore={loadMore}
+        hasMore={hasMore}
         showHome={false}
         onOpenCategory={handleOpenCategory}
         company={userCompany ?? ''}
