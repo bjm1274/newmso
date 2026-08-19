@@ -533,7 +533,7 @@ function defaultDirectName(
 ): string {
   // 1:1 방 이름은 "상대방 이름"만 저장한다. 과거 "생성자, 상대" 형식은 비생성자에게
   // 본인 이름이 섞여 보였다. 실제 표시는 getRoomDisplayName이 뷰어별로 동적 해석한다.
-  return staffs.find((s) => String(s.id) === String(peerId))?.name || '구성원';
+  return String(staffs.find((s) => String(s.id) === String(peerId))?.name || '').trim() || '구성원';
 }
 
 function defaultGroupName(
@@ -544,6 +544,14 @@ function defaultGroupName(
   const names = memberIds
     .map((id) => staffs.find((s) => String(s.id) === String(id))?.name)
     .filter((n): n is string => Boolean(n));
+  /*
+   * 이름을 하나도 못 찾으면 빈 문자열이 된다.
+   *
+   * 서버(/api/chat-rooms)는 name 을 z.string().min(1) 로 받으므로 빈 이름은
+   * 400 Invalid payload 로 떨어진다 — 사용자에게는 그냥 "생성 실패" 로만 보인다.
+   * 디렉터리가 아직 안 왔거나 id 체계가 어긋난 경우가 여기 해당한다.
+   */
+  if (names.length === 0) return `그룹 대화 (${memberIds.length}명)`;
   if (names.length <= 3) return names.join(', ');
   const head = names.slice(0, 3).join(', ');
   const remaining = memberIds.length - 3;

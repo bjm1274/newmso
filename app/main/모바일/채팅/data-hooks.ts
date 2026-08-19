@@ -84,12 +84,20 @@ async function loadChatStaffDirectory(): Promise<StaffDirectoryEntry[]> {
   if (staffDirectoryInflight) return staffDirectoryInflight;
 
   staffDirectoryInflight = (async () => {
+    /*
+     * permissions 를 다시 받는다.
+     *
+     * 크기(1인 2KB, 62명 127KB) 때문에 뺐었는데, 이 프로젝트는 프로필 사진 경로를
+     * permissions.profile_photo_path 안에 넣어 두고 있다 — 실측하면 photo_url 컬럼은
+     * 0명, permissions 안 경로가 56명이다. 빼는 순간 채팅 아바타가 56명분 사라졌다.
+     * normalizeProfileUser 가 그 값을 읽어 사진 URL 을 만든다.
+     *
+     * 전송량은 아래 5분 캐시로 잡는다 — 방을 열 때마다가 아니라 세션당 한 번이다.
+     * (D1 게이트웨이는 컬럼 화이트리스트만 허용해 json_extract 로 경로만 뽑을 수 없다.)
+     */
     const { data, error } = await db
       .from('staff_members')
-      // permissions 는 빼둔다. 직원 1명당 2.5KB 짜리 JSON 이라 62명이면 157KB —
-      // 방을 열 때마다 이걸 받고 있었는데 채팅 어디서도 읽지 않는다
-      // (채널 생성 권한은 세션 사용자 user.permissions 로 판정한다).
-      .select('id, name, department, position, photo_url, avatar_url, status, company');
+      .select('id, name, department, position, photo_url, avatar_url, status, permissions, company');
     if (error || !Array.isArray(data)) return [];
     return data.map((staff) => normalizeProfileUser(staff) as StaffDirectoryEntry);
   })();
