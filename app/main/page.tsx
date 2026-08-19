@@ -3,6 +3,7 @@ import { logger } from '@/lib/logger';
 import { useGlobalShortcuts } from './기능부품/마이페이지/useGlobalShortcuts';
 
 import { toast } from '@/lib/toast';
+import { installStaleBuildGuard } from '@/lib/stale-build-guard';
 import { Suspense, startTransition, useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '@/lib/db-client';
@@ -386,6 +387,11 @@ function MainPageContent() {
     } catch {
       // ignore
     }
+  }, []);
+
+  // 배포로 옛 청크가 사라졌을 때 조용히 실패하지 않도록 (모달이 안 열리는 증상)
+  useEffect(() => {
+    installStaleBuildGuard();
   }, []);
 
   useEffect(() => {
