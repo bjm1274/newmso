@@ -30,8 +30,8 @@ const SWIPE_THRESHOLD = 50;
 const SWIPE_MAX = 80;
 /** 세로로 이만큼 넘게 움직였으면 스크롤로 본다 */
 const SWIPE_VERTICAL_TOLERANCE = 30;
-/** 오른쪽 스와이프로 다는 기본 반응 */
-const DEFAULT_SWIPE_REACTION = '👍';
+/** 스와이프 힌트에 띄우는 대표 이모지 (실제로 다는 건 사용자가 고른다) */
+const SWIPE_REACTION_HINT = '😀';
 
 interface MessageActionsHostProps {
   /** 본인이 보낸 메시지인지(삭제 가능 여부) */
@@ -91,6 +91,14 @@ export default function MessageActionsHost({
   const [ctxMenu, setCtxMenu] = useState<Anchor | null>(null);
   const [picker, setPicker] = useState<Anchor | null>(null);
   const [quickRect, setQuickRect] = useState<DOMRect | null>(null);
+  /*
+   * 퀵 바 표시 모드.
+   *  - 'full'     : 길게 누르기 — 반응 줄 + 액션 줄
+   *  - 'reaction' : 오른쪽 스와이프 — 반응만 고르게
+   * 예전에는 오른쪽 스와이프가 👍 를 곧바로 달아버려서 다른 이모지를 고를
+   * 방법이 없었다. 스와이프는 '반응 고르기' 를 여는 동작으로 바꾼다.
+   */
+  const [quickMode, setQuickMode] = useState<'full' | 'reaction'>('full');
   const [swipeOffset, setSwipeOffset] = useState(0);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const touchMoveRef = useRef<{ x: number; y: number } | null>(null);
@@ -143,8 +151,12 @@ export default function MessageActionsHost({
             // 곧바로 바텀 시트를 올리면 화면 절반이 덮여 어느 메시지인지 안 보인다.
             // 말풍선 옆에 퀵 반응 바를 띄우고, 나머지는 거기 `⋯` 에서 연다.
             const node = localRef.current;
-            if (node) setQuickRect(node.getBoundingClientRect());
-            else setCtxMenu({ x: touch.clientX, y: touch.clientY });
+            if (node) {
+              setQuickMode('full');
+              setQuickRect(node.getBoundingClientRect());
+            } else {
+              setCtxMenu({ x: touch.clientX, y: touch.clientY });
+            }
             if (navigator.vibrate) {
               navigator.vibrate(40);
             }
@@ -185,12 +197,20 @@ export default function MessageActionsHost({
         const diffX = touchMoveRef.current.x - touchStartRef.current.x;
         const diffY = touchMoveRef.current.y - touchStartRef.current.y;
 
-        // 예전에는 좌우 어느 쪽으로 밀든 컨텍스트 메뉴가 열렸다 — 길게 누르기와
-        // 하는 일이 같아서 스와이프가 사실상 두 번째 롱프레스였다. 방향마다
-        // 다른 동작을 준다: 왼쪽 = 답장, 오른쪽 = 기본 반응.
+        // 왼쪽 = 답장, 오른쪽 = 반응 고르기.
+        // 예전에는 어느 쪽으로 밀든 컨텍스트 메뉴가 열려 롱프레스와 하는 일이
+        // 같았고, 그 뒤에는 오른쪽이 👍 를 곧바로 달아 다른 이모지를 고를 수
+        // 없었다. 이제 오른쪽은 반응 줄을 띄운다.
         if (Math.abs(diffX) > SWIPE_THRESHOLD && Math.abs(diffY) < SWIPE_VERTICAL_TOLERANCE) {
-          if (diffX < 0) swipeActionsRef.current.onReply();
-          else swipeActionsRef.current.onReact(DEFAULT_SWIPE_REACTION);
+          if (diffX < 0) {
+            swipeActionsRef.current.onReply();
+          } else {
+            const node = localRef.current;
+            if (node) {
+              setQuickMode('reaction');
+              setQuickRect(node.getBoundingClientRect());
+            }
+          }
           if (navigator.vibrate) navigator.vibrate(15);
         }
       }
@@ -291,7 +311,7 @@ export default function MessageActionsHost({
               <path d="M3 10h9a5 5 0 0 1 5 5" />
             </svg>
           ) : (
-            DEFAULT_SWIPE_REACTION
+            SWIPE_REACTION_HINT
           )}
         </span>
       )}
@@ -314,6 +334,7 @@ export default function MessageActionsHost({
           mine={mine}
           canDelete={canDelete ?? mine}
           canEdit={Boolean(onEdit) && (canDelete ?? mine)}
+          showActions={quickMode === 'full'}
           threadReplyCount={threadReplyCount}
           onReact={handleReactClose}
           onOpenPicker={(x, y) => {

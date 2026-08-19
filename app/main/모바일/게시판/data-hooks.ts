@@ -117,6 +117,16 @@ const BOARD_LIST_OPTIONAL_COLUMNS = BOARD_POST_OPTIONAL_COLUMNS.filter(
   (c) => !BOARD_LIST_UNUSED_COLUMNS.has(c),
 );
 
+/**
+ * 캐시에 남길 글 수.
+ *
+ * 전건(616)을 그대로 넣으면 IndexedDB 에 매 조회마다 600KB 를 구조화 복제로
+ * 써 넣게 되고, 그 비용이 메인 스레드에서 나온다 — 빠르게 하려고 넣은 캐시가
+ * 오히려 목록 진입을 붙잡았다. 캐시는 "첫 화면에 먼저 보여줄 그림" 이므로
+ * 최근 것만 남긴다(첫 렌더 30개 + 더 보기 두어 번 분량).
+ */
+const BOARD_LIST_CACHE_MAX = 100;
+
 /** 목록 캐시 스코프 (lib/view-cache) — 새로고침 후에도 즉시 그리기 위함 */
 const BOARD_LIST_CACHE_SCOPE = 'board:list';
 
@@ -332,7 +342,12 @@ export function useBoardPosts(
       const enriched = await boardPostsInflight;
       boardPostsCache = { userId, company: companyKey, posts: enriched };
       setPosts(enriched);
-      void writeViewCache(userId, BOARD_LIST_CACHE_SCOPE, companyKey ?? 'all', enriched);
+      void writeViewCache(
+        userId,
+        BOARD_LIST_CACHE_SCOPE,
+        companyKey ?? 'all',
+        enriched.slice(0, BOARD_LIST_CACHE_MAX),
+      );
     } catch (err) {
       toast(`게시판 조회 실패: ${(err as Error)?.message ?? '오류'}`, 'error');
       // 캐시가 있으면 빈 목록으로 지우지 않음 (숫자 깜빡임 방지)

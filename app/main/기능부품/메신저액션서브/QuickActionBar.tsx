@@ -37,6 +37,8 @@ export type QuickActionBarProps = {
   mine: boolean;
   canDelete: boolean;
   canEdit: boolean;
+  /** 액션 줄까지 보일지. 오른쪽 스와이프는 반응만 고르게 false 로 온다. */
+  showActions?: boolean;
   threadReplyCount?: number;
   onReact: (emoji: string) => void;
   onOpenPicker: (x: number, y: number) => void;
@@ -67,6 +69,7 @@ export default function QuickActionBar({
   mine,
   canDelete,
   canEdit,
+  showActions = true,
   threadReplyCount = 0,
   onReact,
   onOpenPicker,
@@ -95,8 +98,10 @@ export default function QuickActionBar({
   const flipped = spaceAbove < REACTION_BAR_HEIGHT + GAP + EDGE_MARGIN
     && spaceBelow > spaceAbove;
 
+  // 액션 줄을 안 그리면(스와이프) 그만큼 아래로 밀 필요도 없다.
+  const flippedReactionOffset = showActions ? ACTION_BAR_HEIGHT + GAP * 2 : GAP;
   const reactionTop = flipped
-    ? Math.min(viewportH - REACTION_BAR_HEIGHT - EDGE_MARGIN, rect.bottom + ACTION_BAR_HEIGHT + GAP * 2)
+    ? Math.min(viewportH - REACTION_BAR_HEIGHT - EDGE_MARGIN, rect.bottom + flippedReactionOffset)
     : Math.max(EDGE_MARGIN, rect.top - REACTION_BAR_HEIGHT - GAP);
   const actionTop = flipped
     ? Math.max(EDGE_MARGIN, rect.bottom + GAP)
@@ -207,6 +212,7 @@ export default function QuickActionBar({
       </div>
 
       {/* 액션 — 말풍선 바로 아래 가로 한 줄 */}
+      {showActions && (
       <div
         role="toolbar"
         aria-label="메시지 액션"
@@ -246,6 +252,7 @@ export default function QuickActionBar({
           </button>
         ))}
       </div>
+      )}
     </>,
     document.querySelector('.mso-mobile') || document.body,
   );

@@ -19,8 +19,8 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { readSessionFromRequest } from '@/lib/server-session';
-import { getD1Binding, getD1Drizzle } from '@/lib/db';
-import { canAccessChatRoom, loadChatRoomMembership } from '@/lib/chat-room-membership';
+import { getD1Binding } from '@/lib/db';
+import { canAccessChatRoom, parseMembersField } from '@/lib/chat-room-membership';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,12 +73,31 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const db = getD1Drizzle(d1);
-    const allowed: RoomRequest[] = [];
-    for (const room of rooms) {
-      const membership = await loadChatRoomMembership(db, room.roomId);
-      if (membership && canAccessChatRoom(membership, userId)) allowed.push(room);
+    /*
+     * 멤버십은 한 번에 확인한다.
+     *
+     * 처음에는 방마다 loadChatRoomMembership 을 await 했다. 방이 40개면 워커
+     * 안에서 D1 왕복이 40번, 그것도 방 목록 폴링마다 5초 간격으로 — 행을
+     * 내려받던 예전보다 오히려 느려졌다. IN 한 문장으로 받는다.
+     */
+    const roomIds = rooms.map((room) => room.roomId);
+    const placeholders = roomIds.map(() => '?').join(', ');
+    const membershipRows = await d1
+      .prepare(`SELECT id, type, members FROM chat_rooms WHERE id IN (${placeholders})`)
+      .bind(...roomIds)
+      .all<{ id: string; type: string | null; members: unknown }>();
+
+    const membershipById = new Map<string, { type: string | null; members: string[] }>();
+    for (const row of membershipRows.results ?? []) {
+      membershipById.set(String(row.id), {
+        type: row.type ?? null,
+        members: parseMembersField(row.members) });
     }
+
+    const allowed = rooms.filter((room) => {
+      const membership = membershipById.get(room.roomId);
+      return Boolean(membership) && canAccessChatRoom(membership!, userId);
+    });
     if (allowed.length === 0) {
       return NextResponse.json({ ok: true, counts: {} });
     }
