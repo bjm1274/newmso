@@ -55,13 +55,14 @@ const SELECT_COLUMNS = [
   ...BOARD_POST_OPTIONAL_COLUMNS,
 ].filter((c) => !UNUSED_COLUMNS.has(c));
 
-const DEFAULT_LIMIT = 100;
-const MAX_LIMIT = 300;
+/** 보드 타입 하나당 기본으로 받는 글 수. 5개 보드 × 30 ≈ 128건(137KB). */
+const DEFAULT_PER_BOARD = 30;
+const MAX_PER_BOARD = 200;
 
-function clampLimit(value: unknown): number {
+function clampPerBoard(value: unknown): number {
   const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) return DEFAULT_LIMIT;
-  return Math.min(MAX_LIMIT, Math.floor(n));
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_PER_BOARD;
+  return Math.min(MAX_PER_BOARD, Math.floor(n));
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -112,27 +113,36 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     // mode === 'list'
-    const limit = clampLimit(body.limit);
-    const cursor = typeof body.cursor === 'string' && body.cursor.trim() ? body.cursor.trim() : null;
-
-    // created_at DESC 페이징. 커서는 마지막 행의 created_at.
-    const where = cursor
-      ? `board_type IN (${typePlaceholders}) AND created_at < ?`
-      : `board_type IN (${typePlaceholders})`;
-    const binds = cursor ? [...LIST_BOARD_TYPES, cursor] : [...LIST_BOARD_TYPES];
-
+    /*
+     * 보드 타입마다 최신 N 건씩 가져온다.
+     *
+     * 처음에는 전체를 created_at DESC 로 100건 끊었는데, 최신 100건 중 77건이
+     * MRI·수술일정이라 공지사항이 0건이 됐다. 화면이 카테고리 탭 구조라
+     * 전역 최신순으로 끊으면 글이 적은 보드는 통째로 빈다. 보드별로 끊는다.
+     */
+    const perBoard = clampPerBoard(body.perBoard);
     const rows = await d1
-      .prepare(`SELECT ${cols} FROM board_posts WHERE ${where} ORDER BY created_at DESC LIMIT ?`)
-      .bind(...binds, limit + 1)
+      .prepare(
+        `SELECT ${cols} FROM (` +
+          `SELECT ${cols}, ROW_NUMBER() OVER (PARTITION BY board_type ORDER BY created_at DESC) rn` +
+          ` FROM board_posts WHERE board_type IN (${typePlaceholders})` +
+          `) WHERE rn <= ? ORDER BY created_at DESC`,
+      )
+      .bind(...LIST_BOARD_TYPES, perBoard)
       .all<Record<string, unknown>>();
 
     const raw = rows.results ?? [];
-    const hasMore = raw.length > limit;
-    const page = hasMore ? raw.slice(0, limit) : raw;
-    const posts = page.map((row) => normalizeBoardPost(row as Partial<BoardPost>));
-    const nextCursor = hasMore ? String(page[page.length - 1]?.created_at ?? '') || null : null;
+    const posts = raw.map((row) => normalizeBoardPost(row as Partial<BoardPost>));
 
-    return NextResponse.json({ ok: true, posts, nextCursor });
+    // 어느 보드든 정확히 perBoard 만큼 찼으면 그 보드엔 더 남아 있다는 뜻이다.
+    const countByType = new Map<string, number>();
+    for (const row of raw) {
+      const t = String(row.board_type ?? '');
+      countByType.set(t, (countByType.get(t) ?? 0) + 1);
+    }
+    const hasMore = [...countByType.values()].some((n) => n >= perBoard);
+
+    return NextResponse.json({ ok: true, posts, hasMore, perBoard });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal error';
     console.error('[board/list]', message);

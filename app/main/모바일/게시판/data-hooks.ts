@@ -198,10 +198,15 @@ export type UseBoardPostsResult = {
 let boardPostsCache: { userId: string | null; company: string | null; posts: BoardListPost[] } | null = null;
 let boardPostsInflight: Promise<BoardListPost[]> | null = null;
 
-/** 한 번에 받아오는 글 수. 카드는 30개만 그리므로 첫 페이지는 이 정도면 충분하다. */
-const BOARD_PAGE_SIZE = 100;
+/**
+ * 보드 타입 하나당 받아오는 글 수.
+ *
+ * 처음에는 전체를 최신순 100건으로 끊었는데, 최신 100건 중 77건이 MRI·수술이라
+ * 공지사항 탭이 통째로 비었다. 화면이 카테고리 탭 구조라 보드별로 끊어야 한다.
+ */
+const BOARD_PER_BOARD_STEP = 30;
 
-type BoardPageResult = { posts: BoardPost[]; nextCursor: string | null } | null;
+type BoardPageResult = { posts: BoardPost[]; hasMore: boolean } | null;
 
 /**
  * 서버 페이지 조회.
@@ -211,21 +216,21 @@ type BoardPageResult = { posts: BoardPost[]; nextCursor: string | null } | null;
  * SQL 로 거르면 달력에서 사라진다. 서버가 META 를 먼저 해석하고 끊어 준다.
  * 실패하면 null 을 돌려 호출부가 기존 전건 조회로 되돌아간다.
  */
-async function fetchBoardPageFromServer(cursor: string | null): Promise<BoardPageResult> {
+async function fetchBoardPageFromServer(perBoard: number): Promise<BoardPageResult> {
   if (typeof fetch !== 'function') return null;
   try {
     const res = await fetch('/api/board/list', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({ mode: 'list', limit: BOARD_PAGE_SIZE, cursor }) });
+      body: JSON.stringify({ mode: 'list', perBoard }) });
     if (!res.ok) return null;
     const json = (await res.json().catch(() => null)) as
-      | { ok: true; posts: BoardPost[]; nextCursor: string | null }
+      | { ok: true; posts: BoardPost[]; hasMore?: boolean }
       | { ok: false }
       | null;
     if (!json || json.ok !== true || !Array.isArray(json.posts)) return null;
-    return { posts: json.posts, nextCursor: json.nextCursor ?? null };
+    return { posts: json.posts, hasMore: Boolean(json.hasMore) };
   } catch {
     return null;
   }
@@ -250,7 +255,12 @@ export function useBoardPosts(
   const [posts, setPosts] = useState<BoardListPost[]>(() => cached ?? []);
   const [loading, setLoading] = useState(() => !cached);
   // 서버 페이징 커서. null 이면 더 없음(또는 폴백으로 전건을 받은 상태).
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  // 보드당 몇 건까지 받았는지. 더 보기를 누르면 이 깊이를 늘려 다시 받는다.
+  const [perBoard, setPerBoard] = useState(BOARD_PER_BOARD_STEP);
+  // fetchPosts 는 useCallback 안에서 최신 깊이를 봐야 한다(재생성 없이).
+  const perBoardRef = useRef(BOARD_PER_BOARD_STEP);
+  perBoardRef.current = perBoard;
+  const [serverHasMore, setServerHasMore] = useState(false);
   const loadingMoreRef = useRef(false);
 
   /**
@@ -325,12 +335,13 @@ export function useBoardPosts(
     const run = async (): Promise<BoardListPost[]> => {
       // 서버 페이지가 먼저다. 첫 진입에 617건(620KB)을 통째로 받던 것을
       // 100건(89KB)으로 끊는다. 라우트가 없거나 실패하면 아래 전건 조회로 간다.
-      const page = await fetchBoardPageFromServer(null);
+      const page = await fetchBoardPageFromServer(perBoardRef.current);
       if (page) {
-        setNextCursor(page.nextCursor);
+        setServerHasMore(page.hasMore);
         return enrich(page.posts);
       }
-      setNextCursor(null);
+      // 폴백(전건 조회)에서는 더 받을 것이 없다.
+      setServerHasMore(false);
 
       // ── 폴백: 예전 경로(전건 조회) ──
       // 보드 타입마다 따로 쿼리하던 것을 한 번으로 합쳐 둔 상태다.
@@ -427,32 +438,37 @@ export function useBoardPosts(
    * 폴백 경로(전건 조회)로 받았을 때는 커서가 없으므로 아무 일도 하지 않는다 —
    * 그 경우 목록에는 이미 전건이 들어 있다.
    */
+  /**
+   * 더 보기 — 보드당 깊이를 늘려 다시 받는다.
+   *
+   * 커서로 이어붙이지 않는 이유: 커서는 전역 최신순이라 보드별 균형이 깨진다
+   * (그래서 공지 탭이 통째로 비었다). 깊이를 늘리면 모든 탭이 함께 깊어진다.
+   */
   const loadMore = useCallback(async () => {
-    if (loadingMoreRef.current || !nextCursor) return;
+    if (loadingMoreRef.current || !serverHasMore) return;
     loadingMoreRef.current = true;
+    const nextDepth = perBoardRef.current + BOARD_PER_BOARD_STEP;
     try {
-      const page = await fetchBoardPageFromServer(nextCursor);
+      const page = await fetchBoardPageFromServer(nextDepth);
       if (!page) return;
-      setNextCursor(page.nextCursor);
-      const more = await enrich(page.posts);
-      setPosts((prev) => {
-        const seen = new Set(prev.map((p) => String(p.id)));
-        const merged = [...prev, ...more.filter((p) => !seen.has(String(p.id)))];
-        boardPostsCache = { userId, company: companyKey, posts: merged };
-        return merged;
-      });
+      perBoardRef.current = nextDepth;
+      setPerBoard(nextDepth);
+      setServerHasMore(page.hasMore);
+      const merged = await enrich(page.posts);
+      boardPostsCache = { userId, company: companyKey, posts: merged };
+      setPosts(merged);
     } catch (err) {
       toast(`게시판 추가 조회 실패: ${(err as Error)?.message ?? '오류'}`, 'error');
     } finally {
       loadingMoreRef.current = false;
     }
-  }, [nextCursor, userId, companyKey, enrich]);
+  }, [serverHasMore, userId, companyKey, enrich]);
 
   useEffect(() => {
     void fetchPosts();
   }, [fetchPosts]);
 
-  return { posts, loading, refetch: fetchPosts, loadMore, hasMore: Boolean(nextCursor) };
+  return { posts, loading, refetch: fetchPosts, loadMore, hasMore: serverHasMore };
 }
 
 // ─────────────────────────────────────────────
