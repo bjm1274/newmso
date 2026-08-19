@@ -23,15 +23,25 @@ export function ReadStatusModal({
   return (
     <div data-testid="chat-read-status-modal" className="fixed inset-0 bg-black/40 flex items-center justify-center z-[110] p-4">
       <div className="bg-[var(--card)] w-full max-w-md rounded-2xl p-4 space-y-4 shadow-sm border border-[var(--border)]" onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex items-start justify-between gap-3">
+          {/* min-w-0 이 없으면 제목이 길 때 flex 가 제목 쪽을 못 줄이고 버튼을
+              최소 폭까지 짜부라뜨려 '닫기' 두 글자가 세로로 쪼개져 보였다. */}
+          <div className="min-w-0 flex-1">
             <p className="text-[11px] font-semibold text-[var(--toss-gray-3)] uppercase tracking-widest">읽음 확인 상세</p>
             <p className="text-xs font-semibold text-[var(--foreground)] mt-0.5 line-clamp-1 opacity-60">
               {getMessageDisplayText(message.content, message.file_name, message.file_url, '첨부 파일 메시지')}
             </p>
           </div>
-          <button onClick={onClose} className="p-2 text-[var(--toss-gray-3)] hover:text-[var(--toss-gray-4)] rounded-[var(--radius-md)] hover:bg-[var(--muted)]">
-            닫기
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="닫기"
+            title="닫기"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] text-[var(--zinc-500)] transition-colors hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+          >
+            <svg aria-hidden="true" viewBox="0 0 20 20" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M5 5l10 10M15 5L5 15" />
+            </svg>
           </button>
         </div>
 

@@ -191,9 +191,35 @@ export default function MessageBubble({
         </span>
       )}
       {displayedReadCount > 0 && (
-        <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--m-accent)', whiteSpace: 'nowrap' }}>
-          읽음 {displayedReadCount}
-        </span>
+        // 내 메시지면 눌러서 누가 읽었는지 본다. 예전에는 그냥 <span> 이라
+        // 아무리 눌러도 반응이 없었고, 읽음 상세는 액션 메뉴 안에만 있었다.
+        onReadDetail && mine ? (
+          <button
+            type="button"
+            aria-label={`읽음 ${displayedReadCount}명 상세 보기`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onReadDetail(message);
+            }}
+            style={{
+              fontSize: 10.5,
+              fontWeight: 700,
+              color: 'var(--m-accent)',
+              whiteSpace: 'nowrap',
+              background: 'transparent',
+              border: 'none',
+              padding: '2px 0',
+              textDecoration: 'underline',
+              textUnderlineOffset: 2,
+              cursor: 'pointer' }}
+          >
+            읽음 {displayedReadCount}
+          </button>
+        ) : (
+          <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--m-accent)', whiteSpace: 'nowrap' }}>
+            읽음 {displayedReadCount}
+          </span>
+        )
       )}
       <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--z-400)', whiteSpace: 'nowrap' }}>
         {ts}

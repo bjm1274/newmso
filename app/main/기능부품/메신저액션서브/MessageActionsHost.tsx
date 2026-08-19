@@ -98,6 +98,13 @@ export default function MessageActionsHost({
   // 스와이프 콜백은 리스너 안에서 최신 값을 봐야 한다 (리스너는 재부착하지 않는다).
   const swipeActionsRef = useRef({ onReply, onReact });
   swipeActionsRef.current = { onReply, onReact };
+  /*
+   * 안드로이드 크롬은 길게 누르면 contextmenu 이벤트도 함께 쏜다.
+   * 그래서 롱프레스 타이머(퀵 반응 바)와 onContextMenu(바텀 시트)가 **둘 다**
+   * 열려 화면에 반응 줄이 두 벌, 액션 메뉴가 두 벌 겹쳐 보였다.
+   * 터치로 시작한 컨텍스트 메뉴는 퀵 바가 이미 담당하므로 무시한다.
+   */
+  const touchActiveRef = useRef(false);
 
   const localRef = useRef<HTMLDivElement | null>(null);
 
@@ -126,6 +133,7 @@ export default function MessageActionsHost({
       if (window.innerWidth > 768) return;
       const touch = e.touches[0];
       if (touch) {
+        touchActiveRef.current = true;
         touchStartRef.current = { x: touch.clientX, y: touch.clientY };
         touchMoveRef.current = null;
 
@@ -189,6 +197,8 @@ export default function MessageActionsHost({
 
       touchStartRef.current = null;
       touchMoveRef.current = null;
+      // contextmenu 는 touchend 뒤에 오기도 한다. 한 틱 늦게 내린다.
+      window.setTimeout(() => { touchActiveRef.current = false; }, 400);
     };
 
     const onTouchCancel = () => {
@@ -196,6 +206,7 @@ export default function MessageActionsHost({
       setSwipeOffset(0);
       touchStartRef.current = null;
       touchMoveRef.current = null;
+      window.setTimeout(() => { touchActiveRef.current = false; }, 400);
     };
 
     el.addEventListener('touchstart', onTouchStart, { passive: true });
@@ -217,6 +228,8 @@ export default function MessageActionsHost({
       if (!enableContextMenu) return;
       event.preventDefault();
       event.stopPropagation();
+      // 터치 롱프레스가 만든 contextmenu 는 퀵 바가 이미 처리했다.
+      if (touchActiveRef.current) return;
       setCtxMenu({ x: event.clientX, y: event.clientY });
     },
     [enableContextMenu],
@@ -290,10 +303,12 @@ export default function MessageActionsHost({
       >
         {children}
       </div>
-      {quickRect && (
+      {/* 퀵 바와 시트는 동시에 뜨지 않는다 — 하나를 열면 다른 하나는 닫힌 상태다. */}
+      {quickRect && !ctxMenu && (
         <QuickActionBar
           rect={quickRect}
           mine={mine}
+          canDelete={canDelete ?? mine}
           onReact={handleReactClose}
           onOpenPicker={(x, y) => {
             setQuickRect(null);
@@ -301,7 +316,9 @@ export default function MessageActionsHost({
           }}
           onReply={onReply}
           onForward={onForward}
+          onCopy={onCopy}
           onTask={onTask}
+          onDelete={onDelete}
           onMore={(x, y) => {
             setQuickRect(null);
             setCtxMenu({ x, y });
