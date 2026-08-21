@@ -174,11 +174,14 @@ export async function batchProcessExpiredLeaves(): Promise<{
   processed: number;
   results: ExpiryResult[];
   skippedNoPromotion: Array<{ staffId: string; staffName: string; expiryDate: string; remainingDays: number }>;
+  /** 처리 중 터진 건 — 크론 응답에 실어 알림으로 드러나게 한다 */
+  failures: Array<{ staffId: string; staffName: string; expiryDate: string; error: string }>;
 }> {
   const today = new Date();
   const todayStr = formatKoreanDateKey(today);
   const results: ExpiryResult[] = [];
   const skippedNoPromotion: Array<{ staffId: string; staffName: string; expiryDate: string; remainingDays: number }> = [];
+  const failures: Array<{ staffId: string; staffName: string; expiryDate: string; error: string }> = [];
 
   const d1 = await getD1Binding();
   if (!d1) throw new Error('[annual-leave-expiry] D1 binding not available (batchProcessExpiredLeaves)');
@@ -241,15 +244,30 @@ export async function batchProcessExpiredLeaves(): Promise<{
       continue;
     }
 
-    const result = await processStaffLeaveExpiry(
-      staffId,
-      staffName,
-      remaining,
-      new Date(`${expiryDateKey}T00:00:00`),
-      previousCycle.key,
-    );
-    if (result) results.push(result);
+    /*
+     * 한 명이 실패해도 나머지는 계속 처리한다.
+     *
+     * 예전에는 이 호출이 try 밖이라 예외가 루프 밖으로 나갔다. 실제로
+     * annual_leave_promotion_logs 의 CHECK 위반(step=3) 하나 때문에 크론이
+     * 500 으로 죽었고, **그 뒤 순번의 직원들은 소멸 처리가 아예 돌지 않았다.**
+     * 소멸은 사람마다 독립적인 처리라 한 건의 실패로 전체를 멈출 이유가 없다.
+     */
+    try {
+      const result = await processStaffLeaveExpiry(
+        staffId,
+        staffName,
+        remaining,
+        new Date(`${expiryDateKey}T00:00:00`),
+        previousCycle.key,
+      );
+      if (result) results.push(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[annual-leave-expiry] 소멸 처리 실패:', staffId, message);
+      failures.push({ staffId, staffName, expiryDate: expiryDateKey, error: message });
+    }
   }
 
-  return { processed: results.length, results, skippedNoPromotion };
+  // 실패는 숨기지 않는다 — 크론 응답에 실어 알림으로 드러나게 한다.
+  return { processed: results.length, results, skippedNoPromotion, failures };
 }
