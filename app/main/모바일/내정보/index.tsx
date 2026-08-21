@@ -83,7 +83,22 @@ export default function 내정보({ user, sub, onSub, onLogout, onSwitchTab }: �
       <div className="m-screen">
         <MobileHeader title="서류 제출" back={onBack} />
         <div className="m-scroll" style={{ padding: '12px 16px 24px' }}>
-          <MyDocuments user={user} />
+          {/*
+            onOpenContractSignature 를 넘겨야 '전자서명 진행' 버튼이 렌더된다.
+            (서류제출.tsx 는 `pendingContract && props.onOpenContractSignature` 로 건다)
+            이걸 안 넘겨서 모바일에는 버튼이 아예 없었고, 서명 모달을 한 번 닫으면
+            동의 항목·교부확인으로 다시 들어갈 방법이 없었다. 계약 상태·요청일은
+            컴포넌트가 스스로 조회하므로 그대로 보였고, 그래서 더 헷갈렸다.
+
+            모달은 MobileShell 이 갖고 있다. 셸이 이미 듣고 있는 이벤트를 쏘면
+            checkPendingContracts() 가 다시 돌아 모달이 열린다.
+          */}
+          <MyDocuments
+            user={user}
+            onOpenContractSignature={() => {
+              window.dispatchEvent(new CustomEvent('erp-mobile-trigger-signature'));
+            }}
+          />
         </div>
       </div>
     );
