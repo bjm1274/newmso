@@ -110,23 +110,9 @@ export default function ContractMain({
         .eq('contract_type', contractType);
       if (fetchErr) return { error: fetchErr, data: null };
 
-      // 이미 서명된 계약서는 **덮어쓰지 않는다.**
-      //
-      // 예전에는 같은 contract_type 의 기존 행을 그대로 UPDATE 하고 중복행은 hard delete 해서,
-      // signature_data 는 남은 채 금액·상태만 바뀌었다. 즉 직원이 서명한 계약이 소리 없이
-      // 다른 내용으로 둔갑했다. 계약서는 체결 시점 스냅샷이어야 하므로,
-      // 서명본은 건드리지 말고 새 계약서를 별도 행으로 만든다.
-      const isSigned = (row: Record<string, unknown>) =>
-        Boolean(row.signature_data) || String(row.status ?? '') === '서명완료';
-
       const existingMap = new Map<string, string[]>();
-      const signedStaffIds = new Set<string>();
       for (const row of (existing || [])) {
         const sid = String(row.staff_id);
-        if (isSigned(row as Record<string, unknown>)) {
-          signedStaffIds.add(sid);
-          continue;
-        }
         if (!existingMap.has(sid)) existingMap.set(sid, []);
         existingMap.get(sid)!.push(row.id);
       }
@@ -136,7 +122,16 @@ export default function ContractMain({
         const sid = String(req.staff_id);
         const existingIds = existingMap.get(sid);
         if (existingIds && existingIds.length > 0) {
-          const { error } = await d1.from('employment_contracts').update(req).eq('id', existingIds[0]);
+          // 기존 계약 레코드가 있으면 새 계약 조건으로 갱신하고 서명 필드를 초기화하여 재서명 대기 상태로 설정
+          const updatePayload = {
+            ...req,
+            status: '서명대기',
+            signature_data: null,
+            receipt_signature_data: null,
+            privacy_consent: null,
+            signed_at: null,
+          };
+          const { error } = await d1.from('employment_contracts').update(updatePayload).eq('id', existingIds[0]);
           if (error) return { error, data: null };
           if (existingIds.length > 1) {
             for (let i = 1; i < existingIds.length; i++) {
@@ -152,14 +147,7 @@ export default function ContractMain({
         const { error } = await d1.from('employment_contracts').insert(toInsert);
         if (error) return { error, data: null };
       }
-      // 서명본이 있어 덮어쓰지 않고 새 계약서를 만든 경우 사용자에게 알린다.
-      // (호출부가 여러 폴백 계층을 거쳐 값을 흘리기 어려워 여기서 직접 안내한다.)
-      if (signedStaffIds.size > 0) {
-        toast(
-          `이미 서명된 계약서 ${signedStaffIds.size}건은 보존하고 새 계약서를 발송했습니다.`,
-          'info',
-        );
-      }
+
       return { error: null, data: [] };
     } catch (err: any) {
       return { error: { message: err.message }, data: null };

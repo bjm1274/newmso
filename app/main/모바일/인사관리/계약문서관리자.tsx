@@ -147,7 +147,14 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
       const now = new Date().toISOString();
       const targetCompany = targetStaff.company || company || user.company || '전체';
 
-      // 1. employment_contracts 테이블에 서명대기 상태로 저장
+      // 1. 기존 계약서 레코드 확인 (staff_id, contract_type UNIQUE 제약 조건 대응)
+      const { data: existingContract } = await db
+        .from('employment_contracts')
+        .select('id')
+        .eq('staff_id', targetStaff.id)
+        .eq('contract_type', contractType)
+        .maybeSingle();
+
       const contractPayload = {
         staff_id: targetStaff.id,
         company_name: targetCompany,
@@ -156,16 +163,24 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
         start_date: startDate,
         status: '서명대기',
         requested_at: now,
-        created_at: now,
+        signature_data: null,
+        receipt_signature_data: null,
+        privacy_consent: null,
+        signed_at: null,
       };
 
-      const { data, error } = await db
-        .from('employment_contracts')
-        .insert([contractPayload])
-        .select()
-        .single();
-
-      if (error) throw error;
+      if (existingContract?.id) {
+        const { error } = await db
+          .from('employment_contracts')
+          .update(contractPayload)
+          .eq('id', existingContract.id);
+        if (error) throw error;
+      } else {
+        const { error } = await db
+          .from('employment_contracts')
+          .insert([{ ...contractPayload, created_at: now }]);
+        if (error) throw error;
+      }
 
       // 2. 알림 전송
       try {
