@@ -1172,32 +1172,27 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
 
     const avatarUpdate = await db
       .from('staff_members')
-      .update({ avatar_url: photoUrl, permissions: nextPermissions })
+      .update({
+        avatar_url: photoUrl,
+        photo_url: photoUrl,
+        profile_photo_path: filePath,
+        profile_photo_updated_at: uploadedAt,
+        permissions: nextPermissions,
+      })
       .eq('id', String(staffId));
 
     if (avatarUpdate.error) {
-      if (!isMissingColumnError(avatarUpdate.error, 'avatar_url')) {
+      if (!isMissingColumnError(avatarUpdate.error, 'avatar_url') && !isMissingColumnError(avatarUpdate.error, 'photo_url')) {
         throw avatarUpdate.error;
       }
 
-      const photoUpdate = await db
+      const permissionsUpdate = await db
         .from('staff_members')
-        .update({ photo_url: photoUrl, permissions: nextPermissions })
+        .update({ permissions: nextPermissions })
         .eq('id', String(staffId));
 
-      if (photoUpdate.error) {
-        if (!isMissingColumnError(photoUpdate.error, 'photo_url')) {
-          throw photoUpdate.error;
-        }
-
-        const permissionsUpdate = await db
-          .from('staff_members')
-          .update({ permissions: nextPermissions })
-          .eq('id', String(staffId));
-
-        if (permissionsUpdate.error) {
-          throw permissionsUpdate.error;
-        }
+      if (permissionsUpdate.error) {
+        throw permissionsUpdate.error;
       }
     }
 
@@ -1288,10 +1283,12 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         if (error) throw error;
         return null;
       }
-      // 신규 row: 면허 입력값이 하나라도 있을 때만 insert
+      // 신규 row: 면허 입력값이 하나라도 있을 때만 insert (UUID 생성 포함)
       if (!hasLicenseInput()) return null;
+      const licenseId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `lic_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
       const { error } = await db.from('staff_licenses').insert([
         {
+          id: licenseId,
           staff_id: String(staffId),
           ...payload,
           license_name: payload.license_name || '(이름 없음)' },

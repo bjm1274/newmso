@@ -49,13 +49,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'staffId가 누락되었습니다.' }, { status: 400 });
     }
 
-    // 요청자 본인이거나 관리자만 타인 사진 업로드 가능
+    // 요청자 본인이거나 관리자·인사담당자만 타인 사진 업로드 가능
     const requestorId = String(session.user.id || '');
-    // 존재하지 않는 is_admin 필드 대신 실제 판정 헬퍼를 쓴다(인사 권한은 별도로 허용).
-    const isAdmin =
+    const userPerms = (session.user as { permissions?: Record<string, unknown> })?.permissions || {};
+    const hasHrAccess =
       isAdminSession(session.user) ||
-      (session.user as { permissions?: Record<string, unknown> }).permissions?.hr === true;
-    if (requestorId !== staffId && !isAdmin) {
+      userPerms.hr === true ||
+      userPerms.hr_management === true ||
+      userPerms.hr_admin === true ||
+      userPerms.hr_직원등록 === true ||
+      userPerms.hr_구성원 === true ||
+      userPerms.menu_hr === true ||
+      Object.keys(userPerms).some((k) => userPerms[k] && (k.startsWith('hr_') || k.startsWith('hr:')));
+
+    if (requestorId !== staffId && !hasHrAccess) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

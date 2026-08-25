@@ -135,22 +135,40 @@ function hasFinancePermission(perms: Record<string, unknown>): boolean {
   return false;
 }
 
+/**
+ * 인사(HR) 권한 보유 여부.
+ *
+ * 실제 권한 객체에는 bare `hr` 키뿐 아니라 `hr_직원등록`·`hr_구성원`·`hr_면허자격증` 등
+ * 세부 키나 `hr_management`·`menu_hr` 등이 담길 수 있다.
+ * 인사 관련 권한이 하나라도 있으면 회사 관리(인사) 권한으로 인정한다.
+ */
+function hasHrPermission(perms: Record<string, unknown>): boolean {
+  if (perms.hr || perms.hr_management || perms.hr_admin || perms.menu_hr || perms['인사관리'] || perms['인사']) return true;
+  for (const [key, value] of Object.entries(perms)) {
+    if (value && (key.startsWith('hr_') || key.startsWith('hr:'))) return true;
+  }
+  return false;
+}
+
 export function buildClaimsFromSession(user: SessionUser | null | undefined): ErpClaims {
   if (!user) return {};
   const id = userId(user);
   const perms = (user.permissions ?? {}) as Record<string, unknown>;
+  const isMasterOrAdmin = Boolean(user.is_system_master || user.role === 'admin' || perms.admin || perms.mso || perms.system_master);
+  const canManageHr = Boolean(isMasterOrAdmin || hasHrPermission(perms));
+
   return {
     erp_staff_id: id,
     erp_company_id: (user.company_id as string | undefined) ?? null,
     erp_company_name: (user.company as string | undefined) ?? null,
     erp_department_name: (user.department as string | undefined) ?? null,
-    erp_is_admin: Boolean(user.is_system_master || user.role === 'admin' || perms.admin || perms.mso || perms.system_master),
-    erp_can_manage_company: Boolean(perms.admin || perms.mso || perms.hr),
-    erp_can_manage_finance: Boolean(perms.admin || perms.mso || hasFinancePermission(perms)),
+    erp_is_admin: isMasterOrAdmin,
+    erp_can_manage_company: canManageHr,
+    erp_can_manage_finance: Boolean(isMasterOrAdmin || hasFinancePermission(perms)),
     erp_can_view_all_inventory_companies: Boolean(perms.admin || perms.mso),
     erp_can_manage_all_inventory_companies: Boolean(perms.admin || perms.mso),
-    erp_can_view_all_department_inventory: Boolean(perms.admin || perms.mso || perms.hr),
-    erp_can_manage_department_inventory: Boolean(perms.admin || perms.mso || perms.hr) };
+    erp_can_view_all_department_inventory: Boolean(canManageHr),
+    erp_can_manage_department_inventory: Boolean(canManageHr) };
 }
 
 /**
