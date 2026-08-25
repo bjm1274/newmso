@@ -16,7 +16,8 @@ import MAvatar from '../공통/MAvatar';
 import MIcon from '../공통/MIcon';
 import type { MAvatarTone } from '../공통/MAvatar';
 import { getGroupChatRoomBadgeText } from '@/app/main/기능부품/메신저유틸';
-import { buildStorageInlineUrl, buildStorageDownloadUrl } from '@/lib/object-storage-url';
+import { buildStorageInlineUrl, buildStorageDownloadUrl, triggerManagedBrowserDownload } from '@/lib/object-storage-url';
+import { toast } from '@/lib/toast';
 import { pickAvatarTone, type StaffDirectoryEntry } from './data-hooks';
 import type { RoomNotice } from './공지훅';
 
@@ -338,7 +339,18 @@ export default function RoomInfoSheet({
                 {/\.(png|jpg|jpeg|gif|webp|bmp|heic|heif|avif)(\?|$)/i.test(att.file_url!) ? (
                   <img src={buildStorageInlineUrl(att.file_url!, att.file_name || '첨부')} alt="첨부" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onClick={() => window.open(buildStorageInlineUrl(att.file_url!, att.file_name || '첨부'), '_blank')} />
                 ) : (
-                  <div onClick={() => window.open(buildStorageDownloadUrl(att.file_url!, att.file_name || '파일'), '_blank')} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--m-accent)' }}>
+                  <div
+                    onClick={async () => {
+                      const name = att.file_name || '파일';
+                      const dlUrl = buildStorageDownloadUrl(att.file_url!, name);
+                      try {
+                        await triggerManagedBrowserDownload(dlUrl, name);
+                      } catch {
+                        window.open(dlUrl, '_blank');
+                      }
+                    }}
+                    style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--m-accent)', cursor: 'pointer' }}
+                  >
                     <MIcon name="file" size={24} />
                     <span style={{ fontSize: 9, marginTop: 4, width: '90%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>{att.file_name || '파일'}</span>
                   </div>

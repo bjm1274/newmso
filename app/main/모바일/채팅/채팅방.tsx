@@ -49,6 +49,7 @@ import {
   NOTICE_ROOM_ID,
   WARD_QUICK_REPLY_OPTIONS,
   extractWardMessageMeta } from '@/app/main/기능부품/메신저유틸';
+import { resolveAttachmentKind } from '@/app/main/기능부품/메신저첨부';
 import { useRoomNotificationSetting } from '@/app/main/기능부품/메신저구독훅';
 import { useChatPresenceMap } from '@/app/main/hooks/useChatPresenceMap';
 import { patchChatRoom } from '@/lib/chat-rooms-client';
@@ -811,14 +812,19 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
   const handleForwardSelectRoom = useCallback(async (targetRoom: MobileChatRoom) => {
     if (!forwardMessage || !userId) return;
     try {
+      const fileKind = forwardMessage.file_url
+        ? forwardMessage.file_kind || resolveAttachmentKind(forwardMessage.file_url, forwardMessage.file_kind)
+        : null;
+      const displayContent = forwardMessage.content || forwardMessage.file_name || (forwardMessage.file_url ? '첨부파일' : '');
+
       // 표준 messages 테이블 + 표준 writer 사용(비표준 chat_messages/message_type 제거).
       const { data, error } = await insertChatMessageWithFallback<Pick<ChatMessage, 'id' | 'room_id'>>(db, {
         room_id: String(targetRoom.id),
         sender_id: userId,
-        content: `[전달] ${forwardMessage.sender_name || '이름 없음'}: ${forwardMessage.content || '첨부파일'}`,
+        content: `[전달] ${forwardMessage.sender_name || '이름 없음'}: ${displayContent}`,
         file_url: forwardMessage.file_url || null,
         file_name: forwardMessage.file_name || null,
-        file_kind: forwardMessage.file_kind || null,
+        file_kind: fileKind,
         file_size_bytes: forwardMessage.file_size_bytes || null,
         reply_to_id: null,
         album_id: null,

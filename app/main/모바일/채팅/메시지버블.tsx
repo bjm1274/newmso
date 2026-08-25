@@ -13,6 +13,7 @@ import { useMemo, useRef, useState, useCallback, useEffect } from 'react';
 import type { ChatMessage } from '@/types';
 import { renderMessageContent } from '@/app/main/기능부품/메신저메시지렌더';
 import { buildStorageInlineUrl, buildStorageDownloadUrl } from '@/lib/object-storage-url';
+import { handleManagedDownloadClick } from '@/app/main/기능부품/공통/managed-download';
 import MIcon from '../공통/MIcon';
 import {
   formatBubbleTimestamp,
@@ -149,22 +150,31 @@ export default function MessageBubble({
 
   const isSystemMessage = useMemo(() => {
     const trimmed = text.trim();
-    return /^\[(초대|내보내기|퇴장|전달)\]/.test(trimmed);
+    return /^\[(초대|내보내기|퇴장)\]/.test(trimmed);
   }, [text]);
 
   /**
    * 시스템 안내를 말풍선 대신 중앙 pill 로 낸다.
    *
-   * 지금까지 `[초대] 박준호님이 참여했습니다.` 가 남의 말풍선과 똑같이 렌더돼
-   * 누가 한 말처럼 보였고, 대괄호 접두사도 그대로 노출됐다. 접두사는 종류를
-   * 고르는 데만 쓰고 화면에서는 뗀다.
+   * `[초대]`, `[퇴장]`, `[내보내기]`만 시스템 안내로 처리한다.
+   * `[전달]`은 사용자가 전달한 메시지(파일/텍스트)이므로 말풍선으로 온전히 렌더해야 한다.
    */
   const systemNotice = useMemo(() => {
-    const matched = /^\[(초대|내보내기|퇴장|전달)\]\s*(.*)$/s.exec(text.trim());
+    const matched = /^\[(초대|내보내기|퇴장)\]\s*(.*)$/s.exec(text.trim());
     if (!matched) return null;
     const kind = matched[1];
-    const icon = kind === '전달' ? 'share' : kind === '퇴장' || kind === '내보내기' ? 'out' : 'users';
+    const icon = kind === '퇴장' || kind === '내보내기' ? 'out' : 'users';
     return { icon, body: matched[2] || kind } as const;
+  }, [text]);
+
+  const forwardInfo = useMemo(() => {
+    const trimmed = text.trim();
+    if (!trimmed.startsWith('[전달]')) return null;
+    const matched = /^\[전달\]\s*([^:]+):\s*(.*)$/s.exec(trimmed);
+    if (matched) {
+      return { sender: matched[1].trim(), content: matched[2].trim() };
+    }
+    return { sender: '', content: trimmed.replace(/^\[전달\]\s*/, '') };
   }, [text]);
 
   const wasEdited = Boolean(message.edited_at);
@@ -349,6 +359,24 @@ export default function MessageBubble({
                 flexShrink: 1,
                 textWrap: 'pretty' }}
             >
+              {forwardInfo && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    color: mine ? 'rgba(255, 255, 255, 0.9)' : 'var(--m-accent)',
+                    marginBottom: (replyTarget || message.reply_to_id || hasFile || (forwardInfo.content && forwardInfo.content !== fileName)) ? 6 : 0,
+                    paddingBottom: (replyTarget || message.reply_to_id || hasFile || (forwardInfo.content && forwardInfo.content !== fileName)) ? 4 : 0,
+                    borderBottom: (replyTarget || message.reply_to_id || hasFile || (forwardInfo.content && forwardInfo.content !== fileName)) ? `1px solid ${mine ? 'rgba(255, 255, 255, 0.2)' : 'var(--m-border)'}` : 'none',
+                  }}
+                >
+                  <MIcon name="share" size={13} color={mine ? 'rgba(255, 255, 255, 0.9)' : 'var(--m-accent)'} />
+                  <span>{forwardInfo.sender ? `${forwardInfo.sender}님의 전달 메시지` : '전달된 메시지'}</span>
+                </div>
+              )}
               {(replyTarget || message.reply_to_id) && (
                 <div 
                   onClick={(e) => {
@@ -410,6 +438,8 @@ export default function MessageBubble({
               ) : hasFile ? (
                 <a
                   href={buildStorageDownloadUrl(String(message.file_url), fileName)}
+                  onClick={(e) => void handleManagedDownloadClick(e, String(message.file_url), fileName, { stopPropagation: true })}
+                  download={fileName}
                   target="_blank"
                   rel="noreferrer"
                   aria-label={`파일 다운로드 ${fileName}`}
@@ -448,7 +478,12 @@ export default function MessageBubble({
                   <MIcon name="chevR" size={18} />
                 </a>
               ) : (
-                text ? renderMessageContent(text, mine, '', onOpenBoardPost) : <span style={{ opacity: 0.7 }}>(빈 메시지)</span>
+                (() => {
+                  const displayContent = forwardInfo?.content ?? text;
+                  return displayContent
+                    ? renderMessageContent(displayContent, mine, '', onOpenBoardPost)
+                    : <span style={{ opacity: 0.7 }}>(빈 메시지)</span>;
+                })()
               )}
             </div>
 

@@ -332,7 +332,7 @@ function ContractTab({ staffId }: { staffId: string | null }) {
               className="m-list-row cursor-pointer"
               onClick={() => {
                 if (isPending) {
-                  window.dispatchEvent(new CustomEvent('erp-mobile-trigger-signature'));
+                  window.dispatchEvent(new CustomEvent('erp-mobile-trigger-signature', { detail: { contractId: r.id } }));
                 } else if (r.status === '서명완료') {
                   toast('이미 서명이 완료된 계약서입니다. 문서보관함에서 확인하실 수 있습니다.', 'info');
                 }

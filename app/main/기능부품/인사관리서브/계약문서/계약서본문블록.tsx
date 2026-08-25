@@ -289,7 +289,10 @@ export default function ContractBodyBlock({
                                         </div>
                                     );
                                 }
-                                if (t.includes('□ 동의') && t.includes('동의하지 않음')) {
+                                const isPrivacyConsentLine =
+                                    /(?:□|☑|\[\s*\]|\(\s*\))?\s*동의\s+(?:□|☑|\[\s*\]|\(\s*\))?\s*동의하지\s*않음/.test(t) ||
+                                    (t.includes('동의') && t.includes('동의하지 않음'));
+                                if (isPrivacyConsentLine) {
                                     if (isInteractive) {
                                         const consentOptions: { value: boolean; label: string }[] = [
                                             { value: true, label: '동의' },

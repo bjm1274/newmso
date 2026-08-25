@@ -129,17 +129,24 @@ export default function MobileShell({
   const [pendingContract, setPendingContract] = useState<any | null>(null);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
 
-  const checkPendingContracts = useCallback(async () => {
+  const checkPendingContracts = useCallback(async (targetContractId?: string) => {
     if (!resolvedStaffId) return;
     try {
-      const { data, error } = await db
+      let query = db
         .from('employment_contracts')
         .select('*')
-        .eq('staff_id', resolvedStaffId)
-        .eq('status', '서명대기')
-        .order('requested_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .eq('staff_id', resolvedStaffId);
+
+      if (targetContractId) {
+        query = query.eq('id', targetContractId);
+      } else {
+        query = query
+          .eq('status', '서명대기')
+          .order('requested_at', { ascending: false })
+          .limit(1);
+      }
+
+      const { data, error } = await query.maybeSingle();
 
       if (error) throw error;
 
@@ -160,8 +167,9 @@ export default function MobileShell({
   }, [checkPendingContracts]);
 
   useEffect(() => {
-    const handleTriggerSignature = () => {
-      void checkPendingContracts();
+    const handleTriggerSignature = (event?: Event) => {
+      const detail = (event as CustomEvent<{ contractId?: string }>)?.detail;
+      void checkPendingContracts(detail?.contractId);
     };
     window.addEventListener('erp-mobile-trigger-signature', handleTriggerSignature);
     return () => {

@@ -43,6 +43,19 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
   const [contractType, setContractType] = useState('근로계약서');
   const [salary, setSalary] = useState(3000000);
   const [workHours, setWorkHours] = useState('09:00 ~ 18:00');
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [generating, setGenerating] = useState(false);
+
+  const handleStaffChange = (staffId: string) => {
+    setSelectedStaffId(staffId);
+    if (!staffId) return;
+    const targetStaff = staffs.find((s) => String(s.id) === staffId);
+    if (targetStaff) {
+      if (targetStaff.base_salary && Number(targetStaff.base_salary) > 0) {
+        setSalary(Number(targetStaff.base_salary));
+      }
+    }
+  };
 
   const fetchContracts = async () => {
     setLoadingContracts(true);
@@ -117,13 +130,67 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
     }
   };
 
-  // 계약서 인쇄 생성 — 미구현: 가짜 성공 금지
-  const handleGenerateContract = () => {
+  // 계약서 생성 및 전자서명 요청 발송
+  const handleGenerateContract = async () => {
     if (!selectedStaffId) {
       toast('직원을 선택하세요.', 'warning');
       return;
     }
-    toast('모바일 PDF 생성은 준비 중입니다. PC 계약 관리에서 인쇄해 주세요.', 'info');
+    const targetStaff = staffs.find((s) => String(s.id) === selectedStaffId);
+    if (!targetStaff) {
+      toast('선택한 직원 정보를 찾을 수 없습니다.', 'error');
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      const now = new Date().toISOString();
+      const targetCompany = targetStaff.company || company || user.company || '전체';
+
+      // 1. employment_contracts 테이블에 서명대기 상태로 저장
+      const contractPayload = {
+        staff_id: targetStaff.id,
+        company_name: targetCompany,
+        contract_type: contractType,
+        base_salary: Number(salary) || 0,
+        start_date: startDate,
+        status: '서명대기',
+        requested_at: now,
+        created_at: now,
+      };
+
+      const { data, error } = await db
+        .from('employment_contracts')
+        .insert([contractPayload])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // 2. 알림 전송
+      try {
+        await db.from('notifications').insert([{
+          user_id: targetStaff.id,
+          title: '근로계약서 전자서명 요청',
+          body: `${targetCompany}에서 ${contractType} 작성을 요청했습니다. 서명을 완료해 주세요.`,
+          type: 'CONTRACT',
+          read_at: null,
+          created_at: now,
+        }]);
+      } catch (notifErr) {
+        console.warn('알림 전송 실패:', notifErr);
+      }
+
+      toast(`${targetStaff.name} 님에게 ${contractType} 전자서명 요청이 발송되었습니다.`, 'success');
+      setReloadKey((k) => k + 1);
+      setSubTab('contract');
+      setSelectedStaffId('');
+    } catch (e: unknown) {
+      console.error('[계약문서관리자] 계약서 생성 실패:', e);
+      toast((e as Error)?.message || '계약서 생성에 실패했습니다.', 'error');
+    } finally {
+      setGenerating(false);
+    }
   };
 
   // 문서보관함 파일 업로드 — R2 실업로드 후 DB 저장
@@ -258,73 +325,133 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
 
       {subTab === 'autogen' && (
         <div style={{ padding: '14px 16px 0' }}>
-          <div className="m-card macos-glass macos-squircle-sm" style={{ padding: 14, marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>인쇄용 수기 계약서 자동생성</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <select
-                value={selectedStaffId}
-                onChange={(e) => setSelectedStaffId(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: 10,
-                  border: '1px solid var(--m-border)',
-                  borderRadius: 8,
-                  fontSize: 13,
-                  background: 'white' }}
-              >
-                <option value="">직원을 선택하세요</option>
-                {staffs.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.department} · {s.position})
-                  </option>
-                ))}
-              </select>
+          <div className="m-card macos-glass macos-squircle-sm" style={{ padding: 16, marginBottom: 12 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 12, color: 'var(--z-800)' }}>
+              모바일 근로계약서 작성 및 서명 요청
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--z-600)', marginBottom: 4, display: 'block' }}>
+                  대상 직원 선택 *
+                </label>
+                <select
+                  value={selectedStaffId}
+                  onChange={(e) => handleStaffChange(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid var(--m-border)',
+                    borderRadius: 10,
+                    fontSize: 13,
+                    background: 'white',
+                    fontWeight: 600,
+                  }}
+                >
+                  <option value="">직원을 선택하세요</option>
+                  {staffs.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.department || s.company || '미지정'} · {s.position || '직원'})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-              <select
-                value={contractType}
-                onChange={(e) => setContractType(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: 10,
-                  border: '1px solid var(--m-border)',
-                  borderRadius: 8,
-                  fontSize: 13,
-                  background: 'white' }}
-              >
-                <option value="표준근로계약서">표준근로계약서</option>
-                <option value="연봉위임계약서">연봉위임계약서</option>
-                <option value="용역/프리랜서 계약서">용역/프리랜서 계약서</option>
-              </select>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--z-600)', marginBottom: 4, display: 'block' }}>
+                  계약서 종류 *
+                </label>
+                <select
+                  value={contractType}
+                  onChange={(e) => setContractType(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid var(--m-border)',
+                    borderRadius: 10,
+                    fontSize: 13,
+                    background: 'white',
+                    fontWeight: 600,
+                  }}
+                >
+                  <option value="표준근로계약서">표준근로계약서 (정규직/계약직)</option>
+                  <option value="연봉위임계약서">연봉위임계약서</option>
+                  <option value="용역/프리랜서 계약서">용역/프리랜서 계약서</option>
+                </select>
+              </div>
 
-              <input
-                type="number"
-                value={salary}
-                onChange={(e) => setSalary(Number(e.target.value))}
-                placeholder="월 기본급 입력"
-                style={{
-                  width: '100%',
-                  padding: 10,
-                  border: '1px solid var(--m-border)',
-                  borderRadius: 8,
-                  fontSize: 13 }}
-              />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--z-600)', marginBottom: 4, display: 'block' }}>
+                    계약 시작일 *
+                  </label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid var(--m-border)',
+                      borderRadius: 10,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      background: 'white',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--z-600)', marginBottom: 4, display: 'block' }}>
+                    월 기본급 (원) *
+                  </label>
+                  <input
+                    type="number"
+                    value={salary}
+                    onChange={(e) => setSalary(Number(e.target.value))}
+                    placeholder="월 기본급"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid var(--m-border)',
+                      borderRadius: 10,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      background: 'white',
+                    }}
+                  />
+                </div>
+              </div>
 
-              <input
-                type="text"
-                value={workHours}
-                onChange={(e) => setWorkHours(e.target.value)}
-                placeholder="소정근로시간 (예: 09:00 ~ 18:00)"
-                style={{
-                  width: '100%',
-                  padding: 10,
-                  border: '1px solid var(--m-border)',
-                  borderRadius: 8,
-                  fontSize: 13 }}
-              />
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--z-600)', marginBottom: 4, display: 'block' }}>
+                  소정근로시간
+                </label>
+                <input
+                  type="text"
+                  value={workHours}
+                  onChange={(e) => setWorkHours(e.target.value)}
+                  placeholder="예: 09:00 ~ 18:00 (휴게 1시간)"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid var(--m-border)',
+                    borderRadius: 10,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    background: 'white',
+                  }}
+                />
+              </div>
 
-              <MBtn variant="primary" block onClick={handleGenerateContract}>
-                인쇄용 계약서 PDF 생성
-              </MBtn>
+              <div style={{ marginTop: 6 }}>
+                <MBtn
+                  variant="primary"
+                  block
+                  disabled={generating || !selectedStaffId}
+                  onClick={() => void handleGenerateContract()}
+                >
+                  {generating ? '전자서명 요청 발송 중...' : '전자서명 요청 발송'}
+                </MBtn>
+              </div>
             </div>
           </div>
         </div>

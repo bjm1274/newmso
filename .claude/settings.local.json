@@ -48,7 +48,9 @@
       "Bash(find /c/Users/baek_/newmso/lib -name *.ts ! -path */node_modules/* -exec grep -l \"\\\\.query\\\\|\\\\.raw\\\\|sql\\\\`\" {})",
       "Bash(2)",
       "Bash(find /c/Users/baek_/newmso/app/api -name route.ts -type f ! -path */node_modules/* -exec sh -c \"echo \"\"=== {} ===\"\" && head -30 \"\"{}\"\"\")",
-      "Bash(node -e \"const crypto = require\\(''crypto''\\); console.log\\(crypto.randomBytes\\(32\\).toString\\(''hex''\\)\\);\")"
+      "Bash(node -e \"const crypto = require\\(''crypto''\\); console.log\\(crypto.randomBytes\\(32\\).toString\\(''hex''\\)\\);\")",
+      "PowerShell(npx.cmd wrangler d1 execute pchos-d1-v2 --remote --json --command \"SELECT id, file_name, status, total_tables, total_rows, started_at, finished_at, result_summary FROM backup_restore_runs ORDER BY started_at DESC LIMIT 3\")",
+      "PowerShell(npx.cmd wrangler d1 execute pchos-d1-v2 --remote --json --command \"SELECT action, target_id, created_at, details FROM audit_logs WHERE action LIKE 'cron%' AND created_at > datetime\\('now','-3 hours'\\) ORDER BY created_at DESC LIMIT 10\")"
     ]
   }
 }
