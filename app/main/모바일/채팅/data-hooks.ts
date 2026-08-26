@@ -365,7 +365,20 @@ export function useMobileChatReadCounts(
 ) {
   const [readCounts, setReadCounts] = useState<Record<string, number>>({});
 
+  // 5초 폴링마다 messages 배열 정체성이 바뀐다. 배열을 그대로 deps 에 넣으면
+  // effect 가 매번 해제·재구독되어 커서 조회가 5초마다 한 번씩 더 나가고,
+  // 30초 폴백 간격은 리셋만 되다 한 번도 도달하지 못한다.
+  // 실제 내용(메시지 id·시각, 멤버)이 바뀔 때만 다시 돌게 키로 좁힌다.
+  const messagesRef = useRef<ChatMessage[]>(messages);
+  messagesRef.current = messages;
+  const memberIdsRef = useRef<string[]>(memberIds);
+  memberIdsRef.current = memberIds;
+  const messagesKey = messages.map((m) => `${m.id}:${m.created_at}`).join('|');
+  const memberKey = memberIds.join(',');
+
   useEffect(() => {
+    const messages = messagesRef.current;
+    const memberIds = memberIdsRef.current;
     if (!roomId || !messages.length || !memberIds.length) {
       setReadCounts({});
       return;
@@ -375,23 +388,31 @@ export function useMobileChatReadCounts(
         .from('room_read_cursors')
         .select('user_id, last_read_at')
         .eq('room_id', roomId)
-        .in('user_id', memberIds);
+        .in('user_id', memberIdsRef.current);
 
       const counts: Record<string, number> = {};
       const cursors = (Array.isArray(data) ? data : []) as RoomReadCursorRow[];
 
-      messages.forEach((msg) => {
-        const msgTime = new Date(msg.created_at || 0).getTime();
-        
+      // messages.created_at 과 last_read_at 은 DB 에 두 형식이 섞여 있다
+      // ("2026-08-26 05:57:54" 공백형 / "...T05:57:54+00:00" T형).
+      // new Date() 는 공백형을 로컬(KST), T형을 UTC 로 파싱해 같은 시각인데도
+      // 9시간이 어긋난다 — 그래서 "다 읽었는데 읽음 1" 이 안 내려갔다.
+      // 양쪽을 UTC SQL 형식으로 정규화한 뒤 문자열로 비교한다(사전순 = 시간순).
+      const cursorByMember = new Map(
+        cursors.map((c) => [String(c.user_id), toUtcSqlTimestamp(c.last_read_at)] as const),
+      );
+
+      messagesRef.current.forEach((msg) => {
+        const msgTime = toUtcSqlTimestamp(msg.created_at);
+
         // 발신자 제외 수신자 목록
-        const recipientIds = memberIds.filter((mId) => mId !== String(msg.sender_id));
+        const recipientIds = memberIdsRef.current.filter((mId) => mId !== String(msg.sender_id));
         const totalRecipients = recipientIds.length;
 
         let readers = 0;
         recipientIds.forEach((mId) => {
-          const cursor = cursors.find((c) => String(c.user_id) === mId);
-          const cursorTime = cursor?.last_read_at ? new Date(cursor.last_read_at).getTime() : 0;
-          if (Number.isFinite(cursorTime) && cursorTime >= msgTime) {
+          const cursorTime = cursorByMember.get(mId);
+          if (cursorTime && cursorTime >= msgTime) {
             readers++;
           }
         });
@@ -418,9 +439,68 @@ export function useMobileChatReadCounts(
     );
 
     return unsubscribe;
-  }, [roomId, messages, memberIds]);
+    // messages/memberIds 는 ref 로 읽는다 — 배열 정체성이 아니라 내용 키로만 재실행.
+  }, [roomId, messagesKey, memberKey]);
 
   return readCounts;
+}
+
+/** 낙관적 전송 중인 임시 메시지 — 서버 응답 전이라 최신 페이지에 없다. */
+function isPendingMessage(message: ChatMessage): boolean {
+  return String(message.id || '').startsWith('temp-');
+}
+
+/**
+ * 목록이 실제로 달라졌는지 — 같으면 setState 를 건너뛰어 리렌더를 막는다.
+ * 반응(reactions)은 개수·이모지가 바뀌면 화면이 달라지므로 내용까지 포함한다.
+ */
+function messageListSignature(list: ChatMessage[]): string {
+  return list
+    .map((m) => {
+      const reactions = (m as { reactions?: unknown }).reactions;
+      let reactionKey = '';
+      if (reactions) {
+        try {
+          reactionKey = JSON.stringify(reactions);
+        } catch {
+          reactionKey = 'x';
+        }
+      }
+      return `${m.id}:${m.created_at}:${m.content ?? ''}:${reactionKey}`;
+    })
+    .join('|');
+}
+
+/**
+ * 최신 페이지(refresh 가 받아온 MESSAGES_LIMIT 건)를 기존 목록에 합친다.
+ *
+ * 그냥 교체하면 안 된다: 이 경로는 5초 폴링도 탄다. 사용자가 무한스크롤로 과거
+ * 메시지를 받아 놓고 위로 올려 보던 중이면, 다음 폴링이 최신 20건으로 통째로
+ * 덮어써 화면이 맨 아래로 튕긴다.
+ *
+ * 최신 페이지 구간은 서버 값이 정답이므로 그대로 덮고(삭제된 메시지도 이때
+ * 자연히 빠진다), 그보다 과거인 구간과 아직 전송 중인 임시 메시지만 보존한다.
+ */
+function mergeLatestMessagePage(
+  prev: ChatMessage[],
+  latest: ChatMessage[],
+): { list: ChatMessage[]; keptOlder: boolean } {
+  if (prev.length === 0 || latest.length === 0) {
+    return { list: latest, keptOlder: false };
+  }
+  const windowStart = toUtcSqlTimestamp(latest[0].created_at);
+  const latestIds = new Set(latest.map((m) => String(m.id || '')));
+  const olderKept = prev.filter(
+    (m) =>
+      !latestIds.has(String(m.id || '')) &&
+      !isPendingMessage(m) &&
+      toUtcSqlTimestamp(m.created_at) < windowStart,
+  );
+  const pending = prev.filter(isPendingMessage);
+  return {
+    list: [...olderKept, ...latest, ...pending],
+    keptOlder: olderKept.length > 0,
+  };
 }
 
 export function useChatMessagesForRoom(
@@ -502,18 +582,39 @@ export function useChatMessagesForRoom(
       } else {
         // 화면은 오래된 -> 최신 순으로 정렬. 메시지는 먼저 그리고, 반응은 2차 패스.
         const ordered = [...data].reverse();
-        setMessages(ordered);
-        setHasMore(data.length >= MESSAGES_LIMIT);
-        oldestRef.current = ordered.length > 0
-          ? (ordered[0].created_at as string | null) || null
+        const { list: merged, keptOlder } = mergeLatestMessagePage(messagesRef.current, ordered);
+        // 내용이 그대로면 새 배열로 갈아끼우지 않는다 — 5초 폴링마다 나던
+        // 무의미한 전체 리렌더를 막는다.
+        setMessages((prev) =>
+          messageListSignature(prev) === messageListSignature(merged) ? prev : merged,
+        );
+        // 무한스크롤로 받아 둔 과거분을 유지했다면 hasMore 를 되돌리지 않는다
+        // (이미 맨 처음까지 읽은 방이 폴링마다 again 으로 바뀌는 것 방지).
+        if (!keptOlder) {
+          setHasMore(data.length >= MESSAGES_LIMIT);
+        }
+        oldestRef.current = merged.length > 0
+          ? (merged[0].created_at as string | null) || null
           : null;
         if (!isStaleRoom(currentRoomId, gen)) {
           setLoading(false);
         }
         const withReactions = await fetchAndMergeReactions(ordered);
         if (isStaleRoom(currentRoomId, gen)) return;
-        setMessages(withReactions);
-        void writeViewCache(userId, MESSAGES_CACHE_SCOPE, currentRoomId, withReactions);
+        // 반응은 최신 페이지 구간에만 얹는다 — 과거 구간을 날리지 않도록 교체 대신 매핑.
+        const reactionById = new Map(
+          withReactions.map((message) => [String(message.id || ''), message] as const),
+        );
+        setMessages((prev) => {
+          const next = prev.map((message) => reactionById.get(String(message.id || '')) || message);
+          return messageListSignature(prev) === messageListSignature(next) ? prev : next;
+        });
+        void writeViewCache(
+          userId,
+          MESSAGES_CACHE_SCOPE,
+          currentRoomId,
+          merged.map((message) => reactionById.get(String(message.id || '')) || message),
+        );
       }
     } catch {
       if (isStaleRoom(currentRoomId, gen)) return;
@@ -641,13 +742,24 @@ export function useChatMessagesForRoom(
 
   // 읽음 cursor 업데이트 (조회만, 액션 X 정책상 P0에서도 안전)
   // 메시지가 실제로 로드된 뒤에만 갱신 — 빈 목록/다른 방 잔여로 인한 조기 poke 방지
+  //
+  // deps 를 messages.length 로 잡으면 안 된다: refresh() 가 항상 최신
+  // MESSAGES_LIMIT(20)건으로 배열을 교체하므로 20건 이상인 방에서는 길이가 20에
+  // 고정된다. 새 메시지가 와도 20 -> 20 이라 effect 가 다시 돌지 않고, 커서는
+  // 방에 들어온 시각에 멈춰 "다 읽었는데 읽음 1" 이 남았다(운영 실측: 걸린 건이
+  // 전부 정확히 1건, 커서가 마지막 메시지보다 수십 초 앞섬).
+  // 마지막 메시지의 id + 시각을 키로 잡아야 실제로 새 메시지가 올 때마다 돈다.
+  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+  const lastMessageId = lastMessage ? String(lastMessage.id || '') : '';
+  const lastMessageCreatedAt = lastMessage ? String(lastMessage.created_at || '') : '';
+  const lastMessageRoomId = lastMessage ? String(lastMessage.room_id || '') : '';
+
   useEffect(() => {
     if (!roomId || !userId) return;
     if (loading) return;
-    if (messages.length === 0) return;
+    if (!lastMessageId) return;
     // 현재 방 메시지만 신뢰 (레이스 잔여 방어)
-    const lastMsg = messages[messages.length - 1];
-    if (lastMsg && String(lastMsg.room_id || '') && String(lastMsg.room_id) !== String(roomId)) {
+    if (lastMessageRoomId && lastMessageRoomId !== String(roomId)) {
       return;
     }
     // 본인 마지막 메시지여도 커서 갱신 — 미읽음 배지 고착 방지
@@ -723,7 +835,7 @@ export function useChatMessagesForRoom(
     return () => {
       cancelled = true;
     };
-  }, [roomId, userId, messages.length, loading]);
+  }, [roomId, userId, lastMessageId, lastMessageCreatedAt, lastMessageRoomId, loading]);
 
   const [searchMessageId, setSearchMessageId] = useState<string | null>(null);
 
