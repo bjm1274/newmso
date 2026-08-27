@@ -44,7 +44,7 @@ export default function BoardScheduleCalendar({ posts, isMri, onOpen }: BoardSch
    * schedule_date 컬럼이 비어 있는 147건도 제 날짜에 뜬다.
    */
   const monthKey = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, '0')}`;
-  const { posts: monthPosts, loading: monthLoading } = useBoardScheduleMonth(monthKey);
+  const { posts: monthPosts, loading: monthLoading } = useBoardScheduleMonth(monthKey, isMri ? 'mri' : 'op');
   // 서버 조회가 실패하면(라우트 없음·오프라인) 부모가 준 목록으로 되돌아간다.
   const sourcePosts = monthPosts ?? posts;
   const [search, setSearch] = useState('');

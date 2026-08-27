@@ -220,17 +220,39 @@ export async function processLicenseExpiry(): Promise<LicenseExpiryJobResult> {
     });
   }
 
+  // 중복 방지 키에 **만료일**을 포함한다.
+  //
+  // 예전 키는 (직원|면허|마일스톤) 뿐이었다. 면허 갱신은 새 행을 만들지 않고
+  // 같은 행의 expiry_date 를 update 하므로(app/api/license-ce/[id]/route.ts),
+  // 한 번 알림이 나간 면허는 **갱신해서 새 만료일이 와도 같은 키에 걸려 다시
+  // 알림이 나가지 않았다**(9차 CRON-04). 바로 아래 보수교육 쪽은 이미
+  // ce_due_date 를 키에 넣고 있다 — 같은 규칙으로 맞춘다.
+  //
+  // legacyKeys 는 배포 직후 1회 중복 발송을 막는다. 만료일이 없던 구 알림이
+  // 새 4-part 키와 매칭되지 않아 그 조합이 한 번 더 나가는 것을 흡수한다.
   const sentKeys = new Set<string>();
+  const legacyKeys = new Set<string>();
   for (const row of existingRows) {
     const metadata = (row.metadata ?? {}) as Record<string, unknown>;
     const licenseId = String(metadata.license_id ?? '');
     const milestone = Number(metadata.milestone ?? 0);
     if (!licenseId || !milestone) continue;
-    sentKeys.add(`${row.user_id}|${licenseId}|${milestone}`);
+    const expiryDate = String(metadata.expiry_date ?? '').trim();
+    if (expiryDate) {
+      sentKeys.add(`${row.user_id}|${licenseId}|${expiryDate}|${milestone}`);
+    } else {
+      legacyKeys.add(`${row.user_id}|${licenseId}|${milestone}`);
+    }
   }
 
   const toInsert = candidates
-    .filter((c) => !sentKeys.has(`${c.license.staff_id}|${c.license.id}|${c.milestone}`))
+    .filter((c) => {
+      const expiryDate = String(c.license.expiry_date ?? '').trim();
+      if (sentKeys.has(`${c.license.staff_id}|${c.license.id}|${expiryDate}|${c.milestone}`)) {
+        return false;
+      }
+      return !legacyKeys.has(`${c.license.staff_id}|${c.license.id}|${c.milestone}`);
+    })
     .map((c) => buildNotification(c.license, c.daysLeft, c.milestone));
 
   if (toInsert.length === 0) {

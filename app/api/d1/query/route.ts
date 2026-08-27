@@ -338,11 +338,23 @@ export async function POST(request: Request) {
           : sql.raw('');
       const tableSql = sql.identifier(payload.table);
 
+      // select 에 asyncGuard 가 걸린 테이블은 "패턴만으로는 행 가시성을 판정할 수
+      // 없다" 는 선언이다(daily_closure_items = 부모 마감보고의 company_id 로 스코프).
+      //
+      // 그런데 count 경로는 selectPattern 만 보고 SQL COUNT(*) 로 직행해서
+      // filterByPolicy 안의 그 필터를 통째로 건너뛰었다. 행 본문은 막혀 있어도
+      // **타 회사 마감보고의 환자명 존재 여부와 건수, 수납금액 구간**을 count
+      // 응답으로 반복 질의해 알아낼 수 있었다(9차 P0-D01-D03 / D1-08).
+      //
+      // 관리자는 어차피 전부 보이므로 SQL COUNT 를 그대로 쓴다.
+      const hasRowLevelSelectGuard = Boolean(policy?.asyncGuards?.select);
+
       const canSqlCount =
-        selectPattern === 'PUBLIC' ||
-        selectPattern === 'AUTHENTICATED' ||
-        selectPattern === 'ADMIN_ONLY' ||
-        claims.erp_is_admin === true;
+        claims.erp_is_admin === true ||
+        (!hasRowLevelSelectGuard &&
+          (selectPattern === 'PUBLIC' ||
+            selectPattern === 'AUTHENTICATED' ||
+            selectPattern === 'ADMIN_ONLY'));
 
       if (canSqlCount) {
         if (selectPattern === 'AUTHENTICATED' && !claims.erp_staff_id && !claims.erp_is_admin) {

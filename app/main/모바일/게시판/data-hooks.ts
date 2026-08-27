@@ -709,7 +709,7 @@ function inferKind(nameOrUrl: string, explicitType: string): 'image' | 'video' |
  * 실패하면 null 을 돌려 호출부가 부모의 목록으로 되돌아가게 한다 — 달력이
  * 통째로 비는 것보다 낫다.
  */
-export function useBoardScheduleMonth(month: string): {
+export function useBoardScheduleMonth(month: string, category?: "op" | "mri"): {
   posts: BoardListPost[] | null;
   loading: boolean;
 } {
@@ -726,7 +726,9 @@ export function useBoardScheduleMonth(month: string): {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
-          body: JSON.stringify({ mode: 'calendar', month }) });
+          // category 를 함께 보낸다 — 서버가 그 보드만 돌려준다.
+          // 안 보내면 수술 달력에 MRI 환자명이 섞인다(9차 M01).
+          body: JSON.stringify({ mode: 'calendar', month, category }) });
         if (!active) return;
         if (!res.ok) { setPosts(null); return; }
         const json = (await res.json().catch(() => null)) as
@@ -742,7 +744,7 @@ export function useBoardScheduleMonth(month: string): {
       }
     })();
     return () => { active = false; };
-  }, [month]);
+  }, [month, category]);
 
   return { posts, loading };
 }

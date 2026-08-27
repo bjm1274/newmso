@@ -111,11 +111,46 @@ export default function ContractMain({
       if (fetchErr) return { error: fetchErr, data: null };
 
       const existingMap = new Map<string, string[]>();
+      const existingById = new Map<string, Record<string, unknown>>();
       for (const row of (existing || [])) {
         const sid = String(row.staff_id);
         if (!existingMap.has(sid)) existingMap.set(sid, []);
         existingMap.get(sid)!.push(row.id);
+        existingById.set(String(row.id), row as Record<string, unknown>);
       }
+
+      /**
+       * 서명완료된 계약을 덮어쓰기·삭제하기 전에 증적 스냅샷을 남긴다.
+       *
+       * 아래 update 는 signature_data · receipt_signature_data · privacy_consent ·
+       * signed_at 을 전부 null 로 되돌리고, 중복 행은 delete 까지 한다.
+       * UNIQUE(staff_id, contract_type) 때문에 이력 행을 새로 만들 수 없어 구조상
+       * 덮어쓸 수밖에 없지만, 근로계약서 서명 증적은 분쟁 시 근거라 사라지면 안 된다
+       * (9차 M07 — 모바일 계약문서관리자에도 같은 결함이 있어 함께 고쳤다).
+       *
+       * 스냅샷 저장이 실패하면 그 직원은 건너뛴다 — 증적 없이 덮어쓰지 않는다.
+       */
+      const archiveSignedContract = async (contractId: string): Promise<boolean> => {
+        const row = existingById.get(String(contractId));
+        if (!row) return true;
+        const signed =
+          String(row.status ?? '') === '서명완료' || Boolean(row.signature_data);
+        if (!signed) return true;
+        const stamp = new Date().toISOString();
+        const { error } = await d1.from('document_repository').insert([{
+          id: `contract-archive-${contractId}-${stamp}`,
+          title: `${contractType} 서명본 (재발송 전 보관)`,
+          category: '근로계약서',
+          content: JSON.stringify({
+            archived_at: stamp,
+            reason: '재발송으로 덮어쓰기 전 자동 보관',
+            contract_id: contractId,
+            ...row }),
+          company_name: String(row.company_name ?? '전체'),
+          created_by: String(row.staff_id ?? ''),
+          version: 1 }]);
+        return !error;
+      };
 
       const toInsert = [];
       for (const req of cleanReqs) {
@@ -131,6 +166,13 @@ export default function ContractMain({
             privacy_consent: null,
             signed_at: null,
           };
+          // 덮어쓰기·삭제 전에 서명 증적을 보관한다. 실패하면 이 직원은 건너뛴다.
+          const archived = await Promise.all(existingIds.map((id) => archiveSignedContract(id)));
+          if (archived.some((ok) => !ok)) {
+            return {
+              error: new Error('기존 서명본을 보관하지 못해 재발송을 중단했습니다.'),
+              data: null };
+          }
           const { error } = await d1.from('employment_contracts').update(updatePayload).eq('id', existingIds[0]);
           if (error) return { error, data: null };
           if (existingIds.length > 1) {

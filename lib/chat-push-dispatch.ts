@@ -1154,10 +1154,27 @@ export async function dispatchChatPushForMessage(params: {
       reason: 'web-push-disabled' } satisfies ChatPushDispatchResult;
   }
 
-  await updateChatPushJobByMessageId(params.messageId, {
-    processed_at: new Date().toISOString(),
-    processing_started_at: null,
-    last_error: pushDisabled && hasUndeliveredWebPushTargets ? 'web-push-disabled' : null });
+  // 전 대상 전송 실패는 '완료'가 아니다.
+  //
+  // 예전에는 무조건 processed_at 을 찍어 큐에서 종결했다. selectPendingChatPushJobsD1
+  // 가 `isNull(processed_at)` 으로 고르므로, 푸시 서비스가 한 번 흔들리면 그
+  // 메시지 알림은 **영구 미도달**이 됐다 — 재시도 컬럼이 이 경우에만 죽었다(9차 CRON-05).
+  //
+  // 만료된 구독(404/410)은 위에서 구독 자체를 지우므로 다음 시도에는 대상이
+  // 줄고, 전부 사라지면 targets 0 → failed 0 이 되어 정상 종결된다. 즉 수렴한다.
+  // 폭주는 큐 처리기의 attempt_count 증가 + CHAT_PUSH_MAX_ATTEMPTS 데드레터와
+  // 만료 시간이 막는다.
+  const allTargetsFailed = sent === 0 && failed > 0;
+  if (allTargetsFailed) {
+    await updateChatPushJobByMessageId(params.messageId, {
+      processing_started_at: null,
+      last_error: `all-targets-failed(${failed})` });
+  } else {
+    await updateChatPushJobByMessageId(params.messageId, {
+      processed_at: new Date().toISOString(),
+      processing_started_at: null,
+      last_error: pushDisabled && hasUndeliveredWebPushTargets ? 'web-push-disabled' : null });
+  }
 
   return {
     sent,

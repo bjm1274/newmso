@@ -262,6 +262,20 @@ async function callCronRoute(
     );
   }
 
+  // 200 인데 본문에 개별 실패가 담긴 경우도 실패로 본다.
+  //
+  // 연차 소멸 크론이 CHECK 위반으로 매일 죽던 것을 고치면서(bec2a511) 한 사람의
+  // 실패가 배치 전체를 멈추지 않도록 try/catch 로 격리했는데, 그때 **실패를
+  // 알려 주던 유일한 신호(500 -> 관리자 알림)도 같이 사라졌다.** 이후 개별 실패는
+  // 200 응답 본문의 배열에만 담겨 아무에게도 보이지 않았다(9차 CRON-02).
+  const softFailure = detectCronSoftFailure(bodyText);
+  if (softFailure) {
+    throw Object.assign(
+      new Error(`Cron route ${route} reported failures: ${softFailure}`),
+      { status: response.status, bodyPreview, durationMs },
+    );
+  }
+
   return {
     route,
     ok: true,
@@ -269,6 +283,41 @@ async function callCronRoute(
     durationMs,
     bodyPreview,
   };
+}
+
+/**
+ * 200 응답 본문에서 "개별 실패" 신호를 찾는다. 없으면 null.
+ *
+ * **개수 필드(failed / skipped)는 보지 않는다.** chat-push-dispatch 의 failed 는
+ * 만료된 푸시 구독 때문에 상시 0이 아니라서, 그걸 실패로 치면 5분마다 도는
+ * 크론이 매번 관리자 알림을 만든다. 에러 목록과 명시적 ok:false 만 본다.
+ */
+function detectCronSoftFailure(bodyText: string): string | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(bodyText);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const body = parsed as Record<string, unknown>;
+
+  if (body.ok === false) {
+    return String(body.error ?? 'ok:false');
+  }
+
+  const parts: string[] = [];
+  for (const key of ['errors', 'failures']) {
+    const value = body[key];
+    if (Array.isArray(value) && value.length > 0) {
+      const sample = value
+        .slice(0, 3)
+        .map((item) => (typeof item === 'string' ? item : JSON.stringify(item)))
+        .join(' | ');
+      parts.push(`${key}(${value.length}): ${sample}`);
+    }
+  }
+  return parts.length > 0 ? parts.join(' ;; ') : null;
 }
 
 const worker = {

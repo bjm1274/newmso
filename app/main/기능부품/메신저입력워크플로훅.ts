@@ -191,7 +191,13 @@ export function useChatWorkflowDrafts({
       setKickTargetId('');
       setShowPollModal(false);
     }
-  }, [effectiveChatUserId, isKickPoll, kickTargetId, pollDeadlineAt, pollOptions, pollQuestion, prizeEnabled, prizeName, prizeWinnerCount, selectedRoomId, user?.id]);
+    // pollAnonymous 가 deps 에 없어서, 익명 체크를 켠 직후 곧바로 '만들기' 를 누르면
+    // 옛 클로저의 false 가 그대로 저장돼 **기명 투표**가 만들어졌다. 모달에는
+    // "누가 무엇을 골랐는지 아무도 볼 수 없습니다" 라고 떠 있는데 투표자 이름이
+    // 선택지 아래 공개됐고, 익명 여부는 질문 텍스트에 심긴 메타가 정본이라
+    // 사후에 되돌릴 수도 없었다(9차 FB-01).
+    // (react-hooks/exhaustive-deps 가 이 저장소에서 off 라 린터가 못 잡는다.)
+  }, [effectiveChatUserId, isKickPoll, kickTargetId, pollAnonymous, pollDeadlineAt, pollOptions, pollQuestion, prizeEnabled, prizeName, prizeWinnerCount, selectedRoomId, user?.id]);
 
   const handlePollOptionChange = useCallback((index: number, value: string) => {
     setPollOptions((prev) => prev.map((option, optionIndex) => (optionIndex === index ? value : option)));

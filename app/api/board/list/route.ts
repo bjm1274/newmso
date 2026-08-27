@@ -47,6 +47,19 @@ const LIST_BOARD_TYPES = [
 
 const SCHEDULE_BOARD_TYPES = new Set(['수술일정', '수술', 'MRI일정', 'MRI일정표', 'mri']);
 
+/**
+ * 달력 카테고리 → 실제 DB 에 존재할 수 있는 board_type 별칭 전부.
+ *
+ * 달력 모드가 이 구분 없이 일정 글을 전부 돌려주고 클라이언트도 다시 거르지
+ * 않아서, **수술 달력에 MRI 환자명이(그 반대도) 그대로 떴다.** 이 라우트는
+ * 보드별 열람 권한을 보지 않고 화면단 canAccessBoard 에 맡기는데 달력 경로에는
+ * 그 필터가 없어, 한쪽 보드만 권한이 있는 직원도 반대쪽 환자 일정을 봤다(9차 M01).
+ */
+const SCHEDULE_TYPE_GROUPS: Record<string, string[]> = {
+  op: ['수술일정', '수술'],
+  mri: ['MRI일정', 'MRI일정표', 'mri'],
+};
+
 /** 목록·달력이 읽지 않는 컬럼은 애초에 조회하지 않는다. */
 const UNUSED_COLUMNS = new Set(['board_id', 'updated_at', 'company_id', 'tags', 'poll', 'poll_votes']);
 
@@ -95,9 +108,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ ok: false, error: 'month must be YYYY-MM' }, { status: 400 });
       }
 
+      // 요청한 카테고리만 돌려준다. 지정이 없으면(구 클라이언트) 종전대로 전부.
+      const category = String(body.category ?? '').trim();
+      const scheduleTypes = SCHEDULE_TYPE_GROUPS[category] ?? [...SCHEDULE_BOARD_TYPES];
+
       // 일정 글은 전부 읽어 정규화한 뒤 **해석된 날짜**로 거른다.
       // (SQL 의 schedule_date 로 먼저 거르면 META 안에만 날짜가 있는 147건이 사라진다.)
-      const scheduleTypes = [...SCHEDULE_BOARD_TYPES];
       const rows = await d1
         .prepare(
           `SELECT ${cols} FROM board_posts WHERE board_type IN (${scheduleTypes.map(() => '?').join(', ')})`,

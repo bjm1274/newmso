@@ -148,12 +148,61 @@ export default function 계약문서관리자({ staffs, company, user }: AdminDo
       const targetCompany = targetStaff.company || company || user.company || '전체';
 
       // 1. 기존 계약서 레코드 확인 (staff_id, contract_type UNIQUE 제약 조건 대응)
+      //    서명 증적 컬럼까지 함께 읽는다 — 재발송은 이 행을 덮어쓰므로 먼저 스냅샷을 떠야 한다.
       const { data: existingContract } = await db
         .from('employment_contracts')
-        .select('id')
+        .select(
+          'id, status, signature_data, receipt_signature_data, privacy_consent, signed_at, base_salary, start_date',
+        )
         .eq('staff_id', targetStaff.id)
         .eq('contract_type', contractType)
         .maybeSingle();
+
+      /**
+       * 이미 서명완료된 계약을 재발송하면 그 행을 덮어쓴다.
+       *
+       * UNIQUE(staff_id, contract_type) 때문에 이력 행을 새로 만들 수 없어
+       * update 로 갈 수밖에 없는데, contractPayload 가 signature_data ·
+       * receipt_signature_data · privacy_consent · signed_at 을 전부 null 로
+       * 되돌린다 — **전자서명 이미지와 서명일시, 개인정보 동의 기록이 사라진다**
+       * (9차 M07). 근로계약서 서명 증적은 분쟁 시 근거라 지우면 안 된다.
+       *
+       * 덮어쓰기 자체는 스키마 제약상 피할 수 없으므로, **문서보관함에 스냅샷을
+       * 먼저 남기고 그 저장이 성공한 뒤에만** 덮어쓴다.
+       */
+      const previouslySigned =
+        Boolean(existingContract?.id) &&
+        (String(existingContract?.status ?? '') === '서명완료' ||
+          Boolean(existingContract?.signature_data));
+
+      if (previouslySigned && existingContract) {
+        const snapshot = {
+          id: `contract-archive-${existingContract.id}-${now}`,
+          title: `${targetStaff.name} ${contractType} 서명본 (재발송 전 보관)`,
+          category: '근로계약서',
+          content: JSON.stringify({
+            archived_at: now,
+            archived_by: String(user?.id ?? ''),
+            reason: '재발송으로 덮어쓰기 전 자동 보관',
+            contract_id: existingContract.id,
+            status: existingContract.status,
+            signed_at: existingContract.signed_at,
+            base_salary: existingContract.base_salary,
+            start_date: existingContract.start_date,
+            privacy_consent: existingContract.privacy_consent,
+            signature_data: existingContract.signature_data,
+            receipt_signature_data: existingContract.receipt_signature_data }),
+          company_name: targetCompany,
+          created_by: String(user?.id ?? ''),
+          version: 1 };
+        const { error: snapshotError } = await db.from('document_repository').insert([snapshot]);
+        if (snapshotError) {
+          // 스냅샷 없이 덮어쓰면 증적이 영구히 사라진다 — 여기서 멈춘다.
+          throw new Error(
+            '기존 서명본을 보관하지 못해 재발송을 중단했습니다. 잠시 후 다시 시도해 주세요.',
+          );
+        }
+      }
 
       const contractPayload = {
         staff_id: targetStaff.id,
