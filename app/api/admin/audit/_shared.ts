@@ -16,6 +16,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { readSessionFromRequest, isAdminSession } from '@/lib/server-session';
 import { isNamedSystemMasterAccount } from '@/lib/system-master';
+import { parseDbTimestampMs } from '@/lib/date-formatter';
 import {
   getD1Drizzle,
   audit_logs as auditLogsTable,
@@ -126,7 +127,11 @@ function formatWhen(iso: string): string {
 
 // 최근 7일 audit_logs에서 행위자별 단시간(1시간 윈도) 다수 삭제/권한변경을 묶어 카드화.
 export async function detectAnomalies(db: D1Db): Promise<AnomalyRow[]> {
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  // created_at 은 공백형·T형이 섞여 있어 ISO 문자열로 TEXT 비교하면 같은 날짜의
+  // 공백형 행이 사전순에서 탈락한다(9차 TZ-04). 날짜 10자리로 넉넉히 잘라
+  // 두 형식 모두 통과시킨 뒤, 정확한 경계는 아래에서 정본 파서로 판정한다.
+  const sevenDaysAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const sevenDaysAgo = new Date(sevenDaysAgoMs - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const rows = (await db
     .select({
       id: auditLogsTable.id,
@@ -151,6 +156,9 @@ export async function detectAnomalies(db: D1Db): Promise<AnomalyRow[]> {
     const targetType = String(row.target_type || '');
     const at = String(row.created_at || '');
     if (!at) continue;
+    // SQL 은 하루 여유로 넓게 받았다 — 정확한 7일 경계는 여기서 본다.
+    const atMs = parseDbTimestampMs(at);
+    if (Number.isNaN(atMs) || atMs < sevenDaysAgoMs) continue;
     const key = actorKey(row);
     const who = actorLabel(row);
     if (isDestructiveAction(action)) {
@@ -171,7 +179,9 @@ export async function detectAnomalies(db: D1Db): Promise<AnomalyRow[]> {
   // 단시간 다수 삭제: 1시간 내 5건 이상
   function maxBurst(events: { at: string }[]): { count: number; latest: string } {
     const times = events
-      .map((e) => new Date(e.at).getTime())
+      // 공백형·T형 혼재를 아는 정본 파서로 읽는다 — raw new Date() 는 공백형을
+      // 로컬(KST)로 파싱해 같은 버스트 안에서도 9시간이 어긋난다.
+      .map((e) => parseDbTimestampMs(e.at))
       .filter((t) => Number.isFinite(t))
       .sort((a, b) => a - b);
     let best = 0;
@@ -223,10 +233,12 @@ export async function detectAnomalies(db: D1Db): Promise<AnomalyRow[]> {
   for (const row of rows) {
     const at = String(row.created_at || '');
     if (!at) continue;
-    const d = new Date(at);
-    if (!Number.isFinite(d.getTime())) continue;
+    const atMs = parseDbTimestampMs(at);
+    if (!Number.isFinite(atMs)) continue;
+    // SQL 을 하루 여유로 넓게 잡았으므로 여기서도 정확한 7일 경계를 본다.
+    if (atMs < sevenDaysAgoMs) continue;
     // KST(UTC+9) 기준 시각으로 보정 — 서버 TZ가 UTC라 getHours()는 KST가 아님.
-    const hour = new Date(d.getTime() + 9 * 60 * 60 * 1000).getUTCHours();
+    const hour = new Date(atMs + 9 * 60 * 60 * 1000).getUTCHours();
     if (hour >= 0 && hour < 5) {
       const key = actorKey(row);
       const entry = nightByActor.get(key) || { who: actorLabel(row), count: 0, latest: '' };

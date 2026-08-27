@@ -30,6 +30,7 @@ import {
   desc,
   gte } from '@/lib/db';
 import { detectAnomalies, detectPayrollOutliers, guardAuditAdmin } from '../_shared';
+import { parseDbTimestampMs } from '@/lib/date-formatter';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 
 export const dynamic = 'force-dynamic';
@@ -46,6 +47,34 @@ type AccessLogLite = { action: string | null; created_at: string | null };
  */
 function startOfTodayIso(): string {
   return new Date(`${getKoreanTodayString()}T00:00:00+09:00`).toISOString();
+}
+
+/**
+ * SQL 로는 **날짜 앞 10자리까지만** 넓게 자르고, 정확한 경계는 JS 에서 본다.
+ *
+ * audit_logs.created_at 은 운영에 두 형식이 섞여 있다(공백형 247 / T형 5,998).
+ * ISO 커트오프로 TEXT 비교하면 사전순에서 ' '(0x20) < 'T'(0x54) 이므로
+ * **같은 날짜의 공백형 행이 커트오프보다 항상 작게** 판정돼 '오늘' 집계에서
+ * 통째로 빠졌다(9차 TZ-04). 반대로 커트오프를 공백형으로 바꾸면 이번엔 T형이
+ * 항상 크게 나와 과다 포함된다 — 어느 한 형식으로도 정확할 수 없다.
+ *
+ * 그래서 SQL 은 하루 여유를 둔 날짜 문자열로 거르고(두 형식 모두 통과),
+ * 실제 경계 판정은 두 형식을 모두 아는 parseDbTimestampMs 로 한다.
+ */
+function sqlDateFloor(iso: string): string {
+  const ms = Date.parse(iso);
+  const safe = Number.isNaN(ms) ? Date.now() : ms - 24 * 60 * 60 * 1000;
+  return new Date(safe).toISOString().slice(0, 10);
+}
+
+/** 커트오프 이후 행만 남긴다 — 형식 혼재를 아는 정본 파서로 비교. */
+function keepSince<T extends { created_at?: unknown }>(rows: T[], iso: string): T[] {
+  const cutoffMs = Date.parse(iso);
+  if (Number.isNaN(cutoffMs)) return rows;
+  return rows.filter((row) => {
+    const ms = parseDbTimestampMs(row.created_at);
+    return !Number.isNaN(ms) && ms >= cutoffMs;
+  });
 }
 
 function isLoginAction(action: string): boolean {
@@ -87,17 +116,18 @@ export async function GET(request: NextRequest) {
     if (!d1) return NextResponse.json(fallback);
     const db = getD1Drizzle(d1);
     const todayIso = startOfTodayIso();
+    const todaySqlFloor = sqlDateFloor(todayIso);
 
-    const [auditTodayRows, accessTodayRows, backupRows, anomalies, outliers] = await Promise.all([
+    const [auditTodayRowsRaw, accessTodayRowsRaw, backupRows, anomalies, outliers] = await Promise.all([
       db
         .select({ action: auditLogsTable.action, created_at: auditLogsTable.created_at })
         .from(auditLogsTable)
-        .where(gte(auditLogsTable.created_at, todayIso))
+        .where(gte(auditLogsTable.created_at, todaySqlFloor))
         .limit(20000) as Promise<AuditLogLite[]>,
       db
         .select({ action: accessLogsTable.action, created_at: accessLogsTable.created_at })
         .from(accessLogsTable)
-        .where(gte(accessLogsTable.created_at, todayIso))
+        .where(gte(accessLogsTable.created_at, todaySqlFloor))
         .limit(20000) as Promise<AccessLogLite[]>,
       db
         .select({ started_at: backupRestoreRunsTable.started_at })
@@ -107,6 +137,10 @@ export async function GET(request: NextRequest) {
       detectAnomalies(db).catch(() => []),
       detectPayrollOutliers(db).catch(() => []),
     ]);
+
+    // SQL 은 하루 여유로 넓게 받았으므로 여기서 정확한 경계로 좁힌다.
+    const auditTodayRows = keepSince(auditTodayRowsRaw, todayIso);
+    const accessTodayRows = keepSince(accessTodayRowsRaw, todayIso);
 
     // 오늘 로그 수: audit + access 합산
     const todayLogs = auditTodayRows.length + accessTodayRows.length;

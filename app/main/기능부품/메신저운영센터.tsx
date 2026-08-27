@@ -3,6 +3,7 @@ import { toast } from '@/lib/toast';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getKoreanTodayString } from '@/lib/seoul-time';
+import { parseDbTimestamp, parseDbTimestampMs } from '@/lib/date-formatter';
 import type { StaffMember } from '@/types';
 import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
 import { db, d1 } from '@/lib/db-client';
@@ -47,13 +48,23 @@ function extractFileName(url: string) {
   return decodeURIComponent(url.split('/').pop() || '파일');
 }
 
+/**
+ * 공지 게시 후 경과 시간(시).
+ *
+ * raw `new Date()` 를 쓰면 안 된다. messages.created_at 은 운영에 두 형식이
+ * 섞여 있고(공백형 13,063 / T형 10,975), `new Date()` 는 공백형을 **로컬(KST)**
+ * 로 파싱해 실제(UTC)보다 9시간 늦은 것으로 본다. 그래서 경과시간에 +9시간이
+ * 얹혀 **공지를 올리자마자 "SLA 초과"(4시간 기준)** 가 떴다(9차 TZ-01).
+ */
 function formatHoursAgo(dateString: string) {
-  const diff = Date.now() - new Date(dateString).getTime();
-  return Math.max(0, Math.round(diff / (1000 * 60 * 60)));
+  const ms = parseDbTimestampMs(dateString);
+  if (Number.isNaN(ms)) return 0;
+  return Math.max(0, Math.round((Date.now() - ms) / (1000 * 60 * 60)));
 }
 
 function formatDateLabel(dateString: string) {
-  return new Date(dateString).toLocaleString('ko-KR', {
+  // 표시도 같은 정본 파서를 탄다 — 공백형이 9시간 밀려 보이던 것.
+  return parseDbTimestamp(dateString).toLocaleString('ko-KR', {
     timeZone: 'Asia/Seoul',
     month: 'short',
     day: 'numeric',

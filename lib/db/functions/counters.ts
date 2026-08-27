@@ -58,11 +58,23 @@ export async function incrementPostViews(
 export async function cleanupChatMessagesByRetention(
   db: D1Client,
 ): Promise<number> {
-  // 컷오프를 ISO 문자열로 계산 — messages.created_at은 text 컬럼
+  // 컷오프는 **공백형 UTC**("YYYY-MM-DD HH:MM:SS")로 계산한다.
+  //
+  // messages.created_at 은 text 컬럼이고 운영에 두 형식이 섞여 있다
+  // (2026-08-27 실측: 공백형 13,063 / T형 10,975). 예전에는 컷오프만
+  // toISOString() = T형으로 만들어 TEXT 로 비교했는데, 사전순에서
+  // ' '(0x20) < 'T'(0x54) 이므로 **같은 날짜의 공백형 메시지가 항상 컷오프보다
+  // 작게** 판정됐다. 즉 컷오프 당일치가 하루 일찍 지워졌다 — DELETE 라
+  // 되돌릴 수 없다(9차 TZ-05).
+  //
+  // 공백형으로 맞추면 지배적인 공백형과는 정확히 비교되고, T형 행은
+  // 사전순에서 항상 공백형 컷오프보다 크게 나와 **덜 지우는 쪽**으로 기운다.
+  // 보존 정책에서 덜 지우는 오차는 안전한 방향이다.
   const now = Date.now();
-  const cutoff5y = new Date(now - 5 * 365 * 24 * 60 * 60 * 1000).toISOString();
-  const cutoff1y = new Date(now - 365 * 24 * 60 * 60 * 1000).toISOString();
-  const cutoff3m = new Date(now - 90 * 24 * 60 * 60 * 1000).toISOString();
+  const toUtcSql = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
+  const cutoff5y = toUtcSql(now - 5 * 365 * 24 * 60 * 60 * 1000);
+  const cutoff1y = toUtcSql(now - 365 * 24 * 60 * 60 * 1000);
+  const cutoff3m = toUtcSql(now - 90 * 24 * 60 * 60 * 1000);
 
   const result = await db.run(sql`
     DELETE FROM messages

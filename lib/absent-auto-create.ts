@@ -238,15 +238,34 @@ function decideUncheckedOutStatus(
     return { legacyStatus: '결근', modernStatus: 'absent', workMinutes: 0 };
   }
 
-  // 종료 시간을 해당 일자의 근무유형 기준으로 계산할 수 없으므로,
-  // 보수적으로 체크인 시각부터 18:00까지를 근무 시간으로 산정
-  const workDayEnd = new Date(checkInDate);
-  workDayEnd.setHours(18, 0, 0, 0);
-  if (workDayEnd.getTime() <= checkInDate.getTime()) {
-    workDayEnd.setDate(workDayEnd.getDate() + 1);
-  }
+  // 종료 시각을 그날의 근무유형 기준으로 알 수 없으므로 추정한다.
+  // 이름 그대로 **보수적**이어야 한다 — 과다 산정은 급여로 번진다.
+  //
+  // 1) 경계를 KST 로 명시한다.
+  //    setHours() 는 런타임 로컬시각을 쓴다. Workers 런타임은 UTC 라 이 코드가
+  //    잡던 종료 경계는 KST 18:00 이 아니라 **KST 03:00(익일)** 이었다. 그래서
+  //    work_hours_minutes 가 약 9시간 부풀었고(운영 274건 평균 16.1시간),
+  //    그 값이 급여 화면의 미지급 연장수당 판정(workMins > 480)에 그대로 쓰여
+  //    하루 최대 10시간의 유령 연장근로가 잡혔다(9차 TZ-02).
+  //
+  // 2) 18시 이후 출근(야간 근무 등)은 다음날 18:00 으로 넘기지 않는다.
+  //    경계를 바로잡으면 이 롤오버가 훨씬 자주 걸리는데(운영 6월 이후 퇴근
+  //    미체크 274건 중 37건이 18시 이후 출근), 넘겨 버리면 23시간짜리 추정이
+  //    나와 오히려 더 부푼다. "18시까지" 모델이 성립하지 않는 경우이므로
+  //    소정근로 시간으로 대체한다.
+  //
+  // 3) 어떤 경우에도 상한을 둔다. 하루 근무로 설명되지 않는 추정치는 추정이
+  //    아니라 오류다.
+  const NOMINAL_SHIFT_MINUTES = 8 * 60;
+  const MAX_ESTIMATED_MINUTES = 12 * 60;
 
-  const workMinutes = Math.max(0, Math.round((workDayEnd.getTime() - checkInDate.getTime()) / 60000));
+  const workDayEnd = new Date(`${formatKoreanDateKey(checkInDate)}T18:00:00+09:00`);
+  const rawMinutes =
+    workDayEnd.getTime() > checkInDate.getTime()
+      ? Math.round((workDayEnd.getTime() - checkInDate.getTime()) / 60000)
+      : NOMINAL_SHIFT_MINUTES;
+
+  const workMinutes = Math.max(0, Math.min(rawMinutes, MAX_ESTIMATED_MINUTES));
 
   // 4시간(240분) 기준 판정
   if (workMinutes >= 240) {
