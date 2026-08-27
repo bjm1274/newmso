@@ -1,6 +1,7 @@
 import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push-cloudflare';
 import { sendFcmBatch } from '@/lib/fcm-http';
 import { isWithinPushQuietHours } from '@/lib/push-quiet-hours';
+import { parseDbTimestampMs } from '@/lib/date-formatter';
 import { NOTICE_ROOM_ID } from '@/lib/constants';
 import {
   toStringRecord,
@@ -181,8 +182,22 @@ export async function processUnreadNotificationRepushServer(
   }
 
   const nowIso = now.toISOString();
-  const minAgeCutoffIso = new Date(now.getTime() - REPUSH_MIN_AGE_HOURS * 60 * 60 * 1000).toISOString();
-  const maxAgeCutoffIso = new Date(now.getTime() - REPUSH_MAX_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const minAgeCutoffMs = now.getTime() - REPUSH_MIN_AGE_HOURS * 60 * 60 * 1000;
+  // SQL 은 하루 여유를 둔 날짜 문자열로 넓게 자른다.
+  //
+  // notifications.created_at 은 공백형·T형이 섞여 있어(운영 실측 1,186 / 7,232)
+  // ISO 커트오프로 TEXT 비교하면 같은 날짜의 공백형 행이 사전순에서 어긋난다.
+  // 정확한 경계는 아래에서 정본 파서(parseDbTimestampMs)로 본다.
+  // 상한은 이틀 뒤 날짜로 잡는다. 날짜만 있는 문자열('2026-08-27')은 사전순에서
+  // 같은 날의 타임스탬프('2026-08-27 05:00:00')보다 **작으므로**, 하루만 더하면
+  // 오늘 생성분이 통째로 빠진다.
+  const minAgeCutoffIso = new Date(minAgeCutoffMs + 2 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  const maxAgeCutoffMs = now.getTime() - REPUSH_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+  const maxAgeCutoffIso = new Date(maxAgeCutoffMs - 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
   const scopedUserIds = normalizeScopedUserIds(userIds);
 
   const d1 = await getD1Binding();
@@ -237,6 +252,28 @@ export async function processUnreadNotificationRepushServer(
 
     for (const row of page) {
       if (rawRows.length >= limit) break;
+
+      // SQL 을 날짜 단위로 넓게 받았으므로 정확한 나이 경계는 여기서 본다.
+      const createdMs = parseDbTimestampMs(row.created_at);
+      if (!Number.isFinite(createdMs)) continue;
+      if (createdMs < maxAgeCutoffMs) continue;
+
+      /**
+       * 12시간 최소 나이는 "너무 이른 재알림"을 막으려는 것인데, 방해금지
+       * 시간대(22~08 KST)에 만들어진 알림에는 그 취지가 맞지 않는다.
+       *
+       * 그 시간대에 만들어진 인앱 알림의 푸시는 '연기'가 아니라 **폐기**된다
+       * (notification-push-dispatch 가 quiet hours 면 그냥 skip 하고 끝이라
+       * 채팅 큐와 달리 재시도 시각을 예약하지 않는다 — 9차 CRON-06).
+       * 그러면 이 재알림 크론이 유일한 회수 경로인데, 여기서 12시간을 더
+       * 기다리게 하면 밤 11시 알림이 다음날 오전까지 34시간 넘게 밀린다.
+       *
+       * 방해금지 중 생성된 것은 최소 나이를 면제해 09:00 KST 크론에서 바로
+       * 회수한다(지연 34~35h → 최대 11h).
+       */
+      const createdDuringQuietHours = isWithinPushQuietHours(new Date(createdMs));
+      if (!createdDuringQuietHours && createdMs > minAgeCutoffMs) continue;
+
       // 아래 루프와 같은 판정을 여기서 미리 적용해, limit 을 '적격 항목' 기준으로 채운다.
       const candidate = toNotificationRow(row);
       if (isChatNotification(candidate)) continue;

@@ -346,6 +346,8 @@ export function useChatRoomsForMobile(
 // ─────────────────────────────────────────────
 
 const MESSAGES_LIMIT = 20;
+/** 보존한 과거 구간에서 삭제·수정 여부를 다시 확인할 최대 건수 (D1 바인딩 한도 대비). */
+const OLDER_RECHECK_LIMIT = 80;
 /** 방별 최근 메시지 캐시 스코프 (lib/view-cache) */
 const MESSAGES_CACHE_SCOPE = 'chat:messages';
 const ROOM_MESSAGE_POLL_INTERVAL_MS = 5000; // polling-bus 채팅 기본값(5초)과 정렬. 개별 방도 동일 간격 적용.
@@ -653,6 +655,54 @@ export function useChatMessagesForRoom(
         if (!isStaleRoom(currentRoomId, gen)) {
           setLoading(false);
         }
+        // 보존한 과거 구간의 삭제·수정 여부를 다시 확인한다.
+        //
+        // refresh 는 최신 MESSAGES_LIMIT 건만 받아오므로, 그 창 **바깥**에서
+        // 삭제(soft delete)되거나 수정된 메시지는 감지되지 않는다. 그대로 두면
+        // 원문이 목록에 계속 남고(삭제된 메시지입니다 로도 안 바뀐다) 그 상태가
+        // IndexedDB 뷰 캐시에 다시 기록돼 앱을 껐다 켜도 사라지지 않았다.
+        // 잘못 보낸 환자명·차트번호를 지워도 이미 스크롤해 본 단말에는 남는다(9차 M02).
+        if (keptOlder) {
+          const latestIds = new Set(ordered.map((m) => String(m.id || '')));
+          const keptIds = merged
+            .map((m) => String(m.id || ''))
+            .filter((id) => id && !latestIds.has(id) && !id.startsWith('temp-'))
+            .slice(-OLDER_RECHECK_LIMIT);
+          if (keptIds.length > 0) {
+            try {
+              const { data: liveRows } = await db
+                .from('messages')
+                .select('id, content, is_deleted')
+                .in('id', keptIds);
+              if (isStaleRoom(currentRoomId, gen)) return;
+              const liveById = new Map(
+                (Array.isArray(liveRows) ? liveRows : []).map(
+                  (row) => [String((row as { id?: unknown }).id || ''), row] as const,
+                ),
+              );
+              setMessages((prev) =>
+                prev.filter((message) => {
+                  const id = String(message.id || '');
+                  if (!keptIds.includes(id)) return true;
+                  const live = liveById.get(id) as { is_deleted?: unknown } | undefined;
+                  // 조회에 안 잡히면 하드 삭제된 것이다.
+                  if (!live) return false;
+                  return !live.is_deleted;
+                }).map((message) => {
+                  const live = liveById.get(String(message.id || '')) as
+                    | { content?: unknown }
+                    | undefined;
+                  if (!live || live.content === undefined) return message;
+                  if (String(live.content ?? '') === String(message.content ?? '')) return message;
+                  return { ...message, content: live.content as ChatMessage['content'] };
+                }),
+              );
+            } catch {
+              // 재확인 실패는 조용히 넘긴다 — 다음 폴링에서 다시 본다.
+            }
+          }
+        }
+
         const withReactions = await fetchAndMergeReactions(ordered);
         if (isStaleRoom(currentRoomId, gen)) return;
         // 반응은 최신 페이지 구간에만 얹는다 — 과거 구간을 날리지 않도록 교체 대신 매핑.
