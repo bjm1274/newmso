@@ -242,8 +242,18 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
 
         // 2) annual_leave_promotion_logs 테이블 로그 INSERT
         // D1 호환성을 위해 stage/step, remain_days/remaining_days_at_notice 두 컬럼 세트 모두 매핑
+        // id 를 (직원, 단계, 소멸일)에서 결정적으로 만든다.
+        //
+        // 예전에는 `{ onConflict: 'staff_id,stage,expiry_date' }` 를 썼는데
+        // **그 조합에 UNIQUE 제약이 없다.** 실제 인덱스는 전부 비유니크
+        // CREATE INDEX 이고 유니크는 PK(id) 하나뿐이라, SQLite 가
+        // "ON CONFLICT clause does not match any PRIMARY KEY or UNIQUE
+        // constraint" 로 거부한다 — 이 로그 기록은 실행될 때마다 실패했다(9차 D1-05).
+        // 데이터에 이미 중복이 있어(43행 중 (staff_id,stage,expiry_date) 1조합)
+        // UNIQUE 인덱스를 새로 걸 수도 없다. PK 를 자연키로 만들어 해결한다.
         await db.from('annual_leave_promotion_logs').upsert(
           {
+            id: `alp-${s.id}-${stepToday}-${formatKoreanDateKey(schedule.expiryDate)}`,
             staff_id: s.id,
             stage: stepToday,
             step: stepToday,
@@ -256,7 +266,6 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
             remain_days: remain,
             notification_id: notifData?.id ?? null,
             meta: { sent_by: user?.['id'] as string, today: todayYmd, expiry_date: expiryLabel } },
-          { onConflict: 'staff_id,stage,expiry_date', ignoreDuplicates: true },
         );
 
         // 3) 문서보관함(document_repository) 저장

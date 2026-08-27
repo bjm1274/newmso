@@ -214,10 +214,13 @@ export default function AnnualLeavePromotion({
       const nowIso = new Date().toISOString();
       await db.from('annual_leave_promotion_logs').upsert(
         {
-          id:
-            typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-              ? crypto.randomUUID()
-              : `alp-${staff.id}-${targetYear}-${step}`,
+          // (직원, 대상연도, 단계) 자연키를 그대로 PK 로 쓴다.
+          // 예전에는 무작위 UUID + `{ onConflict: 'staff_id,target_year,step' }` 였는데
+          // 그 조합에 UNIQUE 제약이 없어(실제 인덱스는 전부 비유니크, 유니크는 PK 뿐)
+          // SQLite 가 ON CONFLICT 자체를 거부했다 — 이 로그는 기록될 때마다
+          // 실패했다(9차 D1-05). 데이터에 이미 중복이 있어 UNIQUE 인덱스를 새로
+          // 걸 수도 없으므로 PK 를 자연키로 만들어 해결한다.
+          id: `alp-${staff.id}-${targetYear}-${step}`,
           staff_id: staff.id,
           company_name: staff.company || selectedCo || null,
           target_year: targetYear,
@@ -231,7 +234,6 @@ export default function AnnualLeavePromotion({
           notification_id: notifData?.id ?? null,
           meta: JSON.stringify({ action: 'promote', stage: step, auto: false, userConfirmed: true }),
           created_at: nowIso },
-        { onConflict: 'staff_id,target_year,step', ignoreDuplicates: true },
       );
 
       // 3) 문서보관함(document_repository) 저장

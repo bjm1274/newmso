@@ -30,7 +30,8 @@ import {
   employment_contracts as employmentContractsTable,
   staff_members as staffMembersTable,
   and,
-  eq } from '@/lib/db';
+  eq,
+  sql } from '@/lib/db';
 import { tryEncryptContract } from '@/lib/contract-crypto';
 import { userId } from '@/lib/d1-api-helpers';
 import { normalizeSessionUser, readSessionFromRequest } from '@/lib/server-session';
@@ -120,14 +121,28 @@ export async function POST(request: NextRequest) {
 
     // 보관함 저장이 먼저다 — 실패하면 계약 상태를 건드리지 않아
     // "서명됐다고 표시되는데 사본이 없는" 상태를 만들지 않는다.
-    await db.insert(documentRepositoryTable).values({
-      id: crypto.randomUUID(),
-      title: `${staffName} 근로계약서 (${dateLabel})`,
-      category: '근로계약서',
-      content: encryptAttempt.value,
-      company_name: companyName,
-      created_by: ownerId,
-      version: 1 });
+    // 보관함 id 를 계약 id 에서 결정적으로 만든다 — 같은 계약은 언제 몇 번을
+    // 호출해도 같은 행 하나다.
+    //
+    // 예전에는 crypto.randomUUID() 라 멱등성이 없었다. 재시도·더블클릭·모바일과
+    // PC 에서 각각 호출 같은 상황에서 같은 계약의 사본이 그만큼 늘어났다(9차 R06).
+    // approval-<id> 를 쓰는 lib/approval-document-archive.ts 와 같은 규약이다.
+    await db
+      .insert(documentRepositoryTable)
+      .values({
+        id: `contract-${contractId}`,
+        title: `${staffName} 근로계약서 (${dateLabel})`,
+        category: '근로계약서',
+        content: encryptAttempt.value,
+        company_name: companyName,
+        created_by: ownerId,
+        version: 1 })
+      .onConflictDoUpdate({
+        target: documentRepositoryTable.id,
+        set: {
+          title: sql`excluded.title`,
+          content: sql`excluded.content`,
+          company_name: sql`excluded.company_name` } });
 
     // 1단계: 서명 성립에 반드시 필요한 컬럼만.
     await db

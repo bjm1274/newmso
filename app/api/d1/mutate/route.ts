@@ -285,6 +285,28 @@ type PolicyRowLoadResult = {
   blocked?: string;
 };
 
+/**
+ * 이 insert 가 실제로는 기존 행을 **덮어쓰는** 요청인지 판정하고,
+ * 그렇다면 기존 행을 찾을 충돌 키 컬럼을 돌려준다.
+ *
+ * - `conflict.action === 'update'` → ON CONFLICT(...) DO UPDATE — 지정한 컬럼이 곧 충돌 키.
+ * - `onConflict === 'replace'`     → INSERT OR REPLACE — 유니크 제약 충돌 시 기존 행을
+ *   지우고 다시 넣는다. 실무상 PK(id)로 충돌하므로 id 로 본다.
+ * - `'ignore'` 계열은 기존 행을 건드리지 않으므로 null (추가 검사 불필요).
+ */
+function resolveUpsertConflictColumns(payload: {
+  onConflict?: 'ignore' | 'replace';
+  conflict?: { columns: string[]; action: 'update' | 'ignore' };
+}): string[] | null {
+  if (payload.conflict) {
+    if (payload.conflict.action !== 'update') return null;
+    const cols = payload.conflict.columns.filter((c) => COLUMN_RE.test(c));
+    return cols.length > 0 ? cols : null;
+  }
+  if (payload.onConflict === 'replace') return ['id'];
+  return null;
+}
+
 async function loadPolicyRowsForMutation(
   db: ReturnType<typeof getD1Drizzle>,
   table: string,
@@ -503,9 +525,55 @@ export async function POST(request: Request) {
     const claims = buildClaimsFromSession(session?.user);
 
     if (payload.op === 'insert') {
-      // 각 row에 정책 검사
+      // upsert 는 이 분기로 들어오지만 실제로는 **기존 행을 UPDATE** 한다.
+      // 그런데 예전에는 op='insert' 정책만 검사하고 onConflict/conflict 를
+      // 전혀 보지 않아, INSERT OR REPLACE / ON CONFLICT DO UPDATE 로 남의 행을
+      // 통째로 갈아치우면서 update 정책과 컬럼 가드를 건너뛸 수 있었다.
+      // (board_posts 는 select 가 PUBLIC 이라 id 가 그대로 노출된다 — 9차 D1-03.)
+      //
+      // chat_rooms 에만 같은 방어가 가드 안에 들어 있었는데, 그걸 라우트로 올려
+      // 모든 테이블에 적용한다.
+      const upsertColumns = resolveUpsertConflictColumns(payload);
+
       for (const row of payload.values) {
         await assertAccess({ db, claims, table: payload.table, op: 'insert', row });
+
+        if (!upsertColumns) continue;
+        // 충돌 키가 이 행에 전부 채워져 있어야 기존 행을 특정할 수 있다.
+        const conflictWhere = upsertColumns
+          .filter((col) => row[col] !== undefined && row[col] !== null)
+          .map((col) => ({ field: col, op: 'eq', value: row[col] }));
+        if (conflictWhere.length !== upsertColumns.length) continue;
+
+        const targets = await loadPolicyRowsForMutation(db, payload.table, 'update', conflictWhere);
+        if (targets.blocked) {
+          return NextResponse.json(
+            { ok: false, error: targets.blocked, code: 'POLICY_TARGET_UNRESOLVED' },
+            { status: 400 },
+          );
+        }
+        if (targets.tooMany) {
+          return NextResponse.json(
+            {
+              ok: false,
+              error: `한 번에 수정할 수 있는 행 수(${MAX_POLICY_ROWS_PER_MUTATION})를 초과했습니다. 전용 API 를 사용하세요.`,
+              code: 'TOO_MANY_ROWS' },
+            { status: 400 },
+          );
+        }
+        // 기존 행이 없으면 진짜 INSERT 다 — insert 정책만으로 충분하다.
+        const changedKeys = new Set(Object.keys(row));
+        for (const existing of targets.rows) {
+          await assertAccess({
+            db,
+            claims,
+            table: payload.table,
+            op: 'update',
+            // 패턴은 변경 전 정본으로, 가드는 변경 후 상태로 — update 분기와 같은 규칙.
+            row: existing,
+            guardRow: { ...existing, ...row },
+            changedKeys });
+        }
       }
       // text PK인 id가 누락된 행에 UUID 생성 — D1에는 id DEFAULT가 없다.
       const fillId = tableHasTextId(payload.table);
