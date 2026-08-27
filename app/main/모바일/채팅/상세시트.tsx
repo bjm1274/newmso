@@ -70,7 +70,7 @@ function resolveStaff(
     photo_url: null,
     avatar_url: null,
     status: null,
-    permissions: null } as StaffDirectoryEntry;
+    profile_photo_path: null } as StaffDirectoryEntry;
 }
 
 // ─────────────────────────────────────────────

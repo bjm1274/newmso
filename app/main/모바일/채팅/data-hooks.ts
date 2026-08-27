@@ -55,9 +55,19 @@ import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 // 직원 디렉터리 (이름/사진/직급)
 // ─────────────────────────────────────────────
 
+// permissions 는 더 이상 받지 않는다 — 게이트웨이가 비관리자에게 지워서 어차피
+// 비어 오고(9차 D1-07), 사진 경로는 profile_photo_path 컬럼으로 받는다.
 type StaffDirectoryEntry = Pick<
   StaffMember,
-  'id' | 'name' | 'company' | 'department' | 'position' | 'photo_url' | 'avatar_url' | 'status' | 'permissions'
+  | 'id'
+  | 'name'
+  | 'company'
+  | 'department'
+  | 'position'
+  | 'photo_url'
+  | 'avatar_url'
+  | 'profile_photo_path'
+  | 'status'
 >;
 
 /**
@@ -85,19 +95,24 @@ async function loadChatStaffDirectory(): Promise<StaffDirectoryEntry[]> {
 
   staffDirectoryInflight = (async () => {
     /*
-     * permissions 를 다시 받는다.
+     * 사진 경로는 permissions 가 아니라 **profile_photo_path 컬럼**으로 받는다.
      *
-     * 크기(1인 2KB, 62명 127KB) 때문에 뺐었는데, 이 프로젝트는 프로필 사진 경로를
-     * permissions.profile_photo_path 안에 넣어 두고 있다 — 실측하면 photo_url 컬럼은
-     * 0명, permissions 안 경로가 56명이다. 빼는 순간 채팅 아바타가 56명분 사라졌다.
-     * normalizeProfileUser 가 그 값을 읽어 사진 URL 을 만든다.
+     * 경위: 이 프로젝트는 사진 경로를 permissions.profile_photo_path 안에 넣어
+     * 왔다. 전송량(1인 2KB) 때문에 select 에서 permissions 를 뺐다가 아바타가
+     * 통째로 사라져 되살렸는데, **그 복구는 관리자에게만 통했다.**
+     * 게이트웨이의 stripStaffSecrets 가 permissions 를 관리자·본인이 아니면
+     * 무조건 지우기 때문이다(STAFF_ADMIN_ONLY_COLUMNS, 권한 값이라 인사에게도
+     * 안 연다). 그래서 일반 직원 화면에서는 여전히 타인 아바타가 없었다(9차 D1-07).
      *
-     * 전송량은 아래 5분 캐시로 잡는다 — 방을 열 때마다가 아니라 세션당 한 번이다.
-     * (D1 게이트웨이는 컬럼 화이트리스트만 허용해 json_extract 로 경로만 뽑을 수 없다.)
+     * profile_photo_path 는 마스킹 대상이 아니고, 업로드 경로가 이미 컬럼과
+     * permissions 양쪽에 쓰고 있다(구성원현황.tsx). 과거 데이터는 별도 백필했다.
+     * permissions 를 빼면서 전송량도 함께 줄어든다.
      */
     const { data, error } = await db
       .from('staff_members')
-      .select('id, name, department, position, photo_url, avatar_url, status, permissions, company');
+      .select(
+        'id, name, department, position, photo_url, avatar_url, profile_photo_path, profile_photo_updated_at, status, company',
+      );
     if (error || !Array.isArray(data)) return [];
     return data.map((staff) => normalizeProfileUser(staff) as StaffDirectoryEntry);
   })();
@@ -445,6 +460,30 @@ export function useMobileChatReadCounts(
   return readCounts;
 }
 
+/**
+ * 이 방과 "같은 대화" 인 방 id 전부 — 중복 생성된 1:1 방(형제 방)까지 펼친다.
+ *
+ * 같은 상대와의 1:1 방이 여러 개 만들어져 대화가 여러 방에 흩어져 있다
+ * (2026-08-27 운영 실측: 여분 방 159개, 그중 51개 방에 메시지 450건).
+ * 목록은 표시할 때 대표 방 하나로 합치고 안읽음 개수도 형제 방까지 합산하는데,
+ * **모바일만 메시지를 대표 방 하나에서만 읽었다** — PC 는 이미 형제 방을
+ * `.in('room_id', roomIdsToLoad)` 로 합쳐 읽는다(메신저방데이터훅.ts).
+ * 그래서 모바일에서만 450건이 사라져 보였고, "안읽음 배지는 뜨는데 열면
+ * 그 메시지가 없다" 가 됐다(9차 P-07).
+ *
+ * 형제가 없으면 `[roomId]` 한 개라 그룹방·일반 1:1 방에서는 동작이 동일하다.
+ */
+async function resolveConversationRoomIds(roomId: string): Promise<string[]> {
+  try {
+    const { data } = await fetchAllChatRooms();
+    const expanded = getConversationRoomIdsByRoomId(roomId, (data || []) as ChatRoom[]);
+    return expanded.length > 0 ? expanded : [roomId];
+  } catch {
+    // 방 목록 조회 실패 시에는 최소한 현재 방이라도 보여준다.
+    return [roomId];
+  }
+}
+
 /** 낙관적 전송 중인 임시 메시지 — 서버 응답 전이라 최신 페이지에 없다. */
 function isPendingMessage(message: ChatMessage): boolean {
   return String(message.id || '').startsWith('temp-');
@@ -518,6 +557,13 @@ export function useChatMessagesForRoom(
   roomIdRef.current = roomId;
   const oldestRef = useRef<string | null>(null);
   const loadingOlderRef = useRef(false);
+  /** refresh 가 확정한 "같은 대화" 방 id — loadOlder·커서 갱신이 같은 범위를 쓴다. */
+  const conversationRoomIdsRef = useRef<string[]>([]);
+  /**
+   * 폴링 구독은 방마다 필터를 걸어야 해서(형식이 `room_id=eq.X` 뿐이다) 상태로도 든다.
+   * 형제 방에 새 메시지가 들어와도 감지하려면 그 방들도 구독 대상이어야 한다.
+   */
+  const [conversationRoomKey, setConversationRoomKey] = useState('');
   // 방 전환 레이스: 이전 방 fetch 결과가 늦게 도착해 새 방을 덮지 않도록 generation 가드
   const fetchGenRef = useRef(0);
 
@@ -561,12 +607,20 @@ export function useChatMessagesForRoom(
     })();
 
     try {
+      const conversationRoomIds = await resolveConversationRoomIds(currentRoomId);
+      if (isStaleRoom(currentRoomId, gen)) return;
+      conversationRoomIdsRef.current = conversationRoomIds;
+      // 값이 실제로 바뀔 때만 상태를 건드린다 — 매 폴링마다 재구독하면 안 된다.
+      setConversationRoomKey((prev) => {
+        const next = conversationRoomIds.join(',');
+        return prev === next ? prev : next;
+      });
       const { data, error } = await selectChatMessagesWithFallback<ChatMessage[]>(
         ({ selectClause }) =>
           db
             .from('messages')
             .select(selectClause)
-            .eq('room_id', currentRoomId)
+            .in('room_id', conversationRoomIds)
             .eq('is_deleted', false)
             .order('created_at', { ascending: false })
             .limit(MESSAGES_LIMIT) as PromiseLike<{
@@ -641,12 +695,19 @@ export function useChatMessagesForRoom(
     try {
       // D1 created_at 과 동일 SQL UTC 포맷으로 비교 (ISO 변환 시 페이지네이션 공집합)
       const cursorSql = toUtcSqlTimestamp(cursor);
+      // 최신 페이지와 같은 범위를 봐야 한다 — 형제 방을 빼면 위로 올릴수록
+      // 대화가 반쪽만 나온다.
+      const conversationRoomIds =
+        conversationRoomIdsRef.current.length > 0
+          ? conversationRoomIdsRef.current
+          : await resolveConversationRoomIds(currentRoomId);
+      if (isStaleRoom(currentRoomId, gen)) return;
       const { data, error } = await selectChatMessagesWithFallback<ChatMessage[]>(
         ({ selectClause }) =>
           db
             .from('messages')
             .select(selectClause)
-            .eq('room_id', currentRoomId)
+            .in('room_id', conversationRoomIds)
             .eq('is_deleted', false)
             .lt('created_at', cursorSql)
             .order('created_at', { ascending: false })
@@ -702,6 +763,7 @@ export function useChatMessagesForRoom(
     setLoadingOlder(false);
     setHasMore(true);
     oldestRef.current = null;
+    conversationRoomIdsRef.current = [];
     void refresh();
   }, [roomId, refresh]);
 
@@ -709,10 +771,13 @@ export function useChatMessagesForRoom(
   useEffect(() => {
     if (!roomId) return;
     const channelKey = `mobile-chat-room-${roomId}`;
-    const tables: TableFilter[] = [
-      { table: 'messages', event: 'INSERT', filter: `room_id=eq.${roomId}` },
-      { table: 'messages', event: 'UPDATE', filter: `room_id=eq.${roomId}` },
-    ];
+    // 형제 방에 들어온 메시지도 감지해야 한다. 필터 형식이 `room_id=eq.X` 하나뿐이라
+    // (app/api/realtime/tail) 방마다 필터를 건다. 형제가 없으면 현재 방 하나뿐이다.
+    const watchedRoomIds = conversationRoomKey ? conversationRoomKey.split(',') : [roomId];
+    const tables: TableFilter[] = watchedRoomIds.flatMap((watchedRoomId) => [
+      { table: 'messages', event: 'INSERT' as const, filter: `room_id=eq.${watchedRoomId}` },
+      { table: 'messages', event: 'UPDATE' as const, filter: `room_id=eq.${watchedRoomId}` },
+    ]);
     const unsubscribe = subscribeRealtime(
       channelKey,
       tables,
@@ -723,7 +788,7 @@ export function useChatMessagesForRoom(
     );
     return unsubscribe;
     // userId는 송신자 표시 등에 영향이 없어 deps에 안 넣음 — refresh가 안정 ref라 OK
-  }, [roomId, refresh]);
+  }, [roomId, refresh, conversationRoomKey]);
 
   // E2E 모의 실시간 메시지 추가 이벤트 바인딩
   useEffect(() => {
@@ -759,7 +824,14 @@ export function useChatMessagesForRoom(
     if (loading) return;
     if (!lastMessageId) return;
     // 현재 방 메시지만 신뢰 (레이스 잔여 방어)
-    if (lastMessageRoomId && lastMessageRoomId !== String(roomId)) {
+    // 형제 방을 합쳐 읽으므로 마지막 메시지가 대표 방이 아닐 수 있다.
+    // 같은 대화에 속한 방이면 정상이다 — 그것까지 막으면 형제 방에 마지막
+    // 메시지가 있는 대화에서 읽음 커서가 영영 안 올라간다.
+    const conversationRoomIds = conversationRoomIdsRef.current;
+    const belongsToConversation =
+      lastMessageRoomId === String(roomId) ||
+      (conversationRoomIds.length > 0 && conversationRoomIds.includes(lastMessageRoomId));
+    if (lastMessageRoomId && !belongsToConversation) {
       return;
     }
     // 본인 마지막 메시지여도 커서 갱신 — 미읽음 배지 고착 방지
@@ -859,13 +931,18 @@ export function useChatMessagesForRoom(
       if (!targetMessage || !targetMessage.created_at) return;
 
       const targetTime = targetMessage.created_at;
+      // 목록과 같은 범위를 봐야 점프한 자리의 앞뒤 맥락이 맞는다.
+      const jumpRoomIds =
+        conversationRoomIdsRef.current.length > 0
+          ? conversationRoomIdsRef.current
+          : [currentRoomId];
 
       const { data: beforeRows } = await selectChatMessagesWithFallback<ChatMessage[]>(
         ({ selectClause }) =>
           db
             .from('messages')
             .select(selectClause)
-            .eq('room_id', currentRoomId)
+            .in('room_id', jumpRoomIds)
             .eq('is_deleted', false)
             .lte('created_at', targetTime)
             .order('created_at', { ascending: false })
@@ -877,7 +954,7 @@ export function useChatMessagesForRoom(
           db
             .from('messages')
             .select(selectClause)
-            .eq('room_id', currentRoomId)
+            .in('room_id', jumpRoomIds)
             .eq('is_deleted', false)
             .gt('created_at', targetTime)
             .order('created_at', { ascending: true })

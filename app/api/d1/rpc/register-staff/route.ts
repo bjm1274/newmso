@@ -139,6 +139,34 @@ const SYSTEM_MASTER_ROLES = new Set(['system_master', 'master']);
  *
  * @returns 위반 사유. 문제가 없으면 null.
  */
+/** 이 키들은 값이 truthy 이기만 하면 그 계정이 관리자로 취급된다. */
+function isPrivilegedPermissionKey(key: string): boolean {
+  return key === 'system_master' || ADMIN_ONLY_PERMISSION_KEYS.has(key);
+}
+
+/**
+ * 권한 상승 키만 boolean 으로 못 박는다.
+ *
+ * 저장된 permissions 는 그대로 세션 권한이 되는데(lib/server-session.ts 가
+ * staff_members.permissions 를 실어 온다) 읽는 쪽 판정이 전부 truthy 라
+ * `admin: 1` 도 관리자로 인정된다. 검사를 통과한 값이라도 형태를 맞춰 둔다.
+ *
+ * **전체 키를 Boolean() 하면 안 된다.** permissions 에는 권한 플래그만
+ * 있는 게 아니라 profile_photo_path(문자열)·probation_months(숫자)·
+ * payroll_allowances(객체) 같은 데이터가 함께 들어 있다(운영 실측 2026-08-27).
+ * 일괄 변환하면 사진 경로와 급여 데이터가 통째로 파괴된다.
+ */
+function normalizePrivilegeFlags(
+  permissions: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null | undefined {
+  if (!permissions || typeof permissions !== 'object') return permissions;
+  const next: Record<string, unknown> = { ...permissions };
+  for (const key of Object.keys(next)) {
+    if (isPrivilegedPermissionKey(key)) next[key] = Boolean(next[key]);
+  }
+  return next;
+}
+
 function findPrivilegeEscalation(
   staff: z.infer<typeof StaffRowSchema>,
   actor: SessionUser,
@@ -160,16 +188,33 @@ function findPrivilegeEscalation(
   }
 
   for (const [key, value] of Object.entries(staff.permissions ?? {})) {
-    if (value !== true) continue; // false·미지정은 아무것도 부여하지 않는다
-    if (key === 'system_master') {
-      if (!actorIsSystemMaster) return `권한 '${key}' 은 시스템마스터만 부여할 수 있습니다.`;
-      continue;
-    }
-    if (ADMIN_ONLY_PERMISSION_KEYS.has(key)) {
+    // 권한 상승 키(system_master·admin·mso·hr)는 **truthy 면 전부** 잡는다.
+    //
+    // 예전에는 루프 첫 줄이 `if (value !== true) continue;` 였다. 그래서
+    // `{admin: 1}` 처럼 true 가 아닌 truthy 값이 아래 검사에 도달조차 못 했고,
+    // 저장은 JSON.stringify 로 정제 없이 들어가는데 읽는 쪽은 전부 truthy
+    // 판정(`perms.admin || perms.mso || ...`)이라 그대로 관리자가 됐다.
+    // 인사담당자가 요청 한 번으로 관리자 계정을 만들 수 있었다(9차 P0-D01-003).
+    if (isPrivilegedPermissionKey(key)) {
+      if (!value) continue; // 명시적으로 끈 것은 부여가 아니다
+      if (key === 'system_master') {
+        if (!actorIsSystemMaster) return `권한 '${key}' 은 시스템마스터만 부여할 수 있습니다.`;
+        continue;
+      }
       if (!actorIsAdmin) return `권한 '${key}' 은 관리자만 부여할 수 있습니다.`;
       continue;
     }
-    // 나머지 일반 권한은 등록자가 실제로 가진 것만 넘겨줄 수 있다.
+
+    // 나머지 키는 `=== true` 판정을 유지한다.
+    //
+    // permissions 는 권한 플래그만 담긴 객체가 아니다 — 운영 실측(2026-08-27):
+    // boolean 2,405개(권한 150종) 외에 string 540개(profile_photo_path·bank_name 등),
+    // object 196개(insurance·payroll_allowances), number 112개(probation_months·
+    // probation_percent·is_group_account)가 같은 객체에 섞여 있다.
+    // 여기서 truthy 로 넓히면 `probation_months: 3` 같은 **데이터 값**이 권한
+    // 부여로 오인돼, 수습기간이 있는 직원 등록이 통째로 403 이 된다.
+    if (value !== true) continue;
+    // 일반 권한은 등록자가 실제로 가진 것만 넘겨줄 수 있다.
     if (!actorIsAdmin && actorPerms[key] !== true) {
       return `본인에게 없는 권한 '${key}' 은 부여할 수 없습니다.`;
     }
@@ -211,7 +256,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const escalation = findPrivilegeEscalation(parsed.data.p_staff, actor);
+    // 검사와 저장이 같은 값을 보게 한다 — 권한 상승 키만 boolean 으로 못 박고
+    // 나머지(사진 경로·수습개월수 등 데이터)는 그대로 둔다.
+    const staffPayload = {
+      ...parsed.data.p_staff,
+      permissions: normalizePrivilegeFlags(parsed.data.p_staff.permissions),
+    };
+
+    const escalation = findPrivilegeEscalation(staffPayload, actor);
     if (escalation) {
       return NextResponse.json({ ok: false, error: escalation }, { status: 403 });
     }
@@ -229,7 +281,7 @@ export async function POST(request: Request) {
     const staffId = crypto.randomUUID();
 
     const data = await registerStaffFull(db, staffId, {
-      staff: parsed.data.p_staff,
+      staff: staffPayload,
       licenses: parsed.data.p_licenses,
       job_categories: parsed.data.p_job_cats,
       shift_assignments: parsed.data.p_shift_asgns,

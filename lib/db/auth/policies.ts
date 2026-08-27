@@ -144,7 +144,17 @@ export interface TablePolicy {
    * 사용. true=허용, false=거부. 동기 guards와 함께 정의되면 둘 다 통과해야 한다.
    */
   asyncGuards?: Partial<
-    Record<Op, (db: D1Client, claims: ErpClaims, row: Record<string, unknown>) => Promise<boolean>>
+    Record<
+      Op,
+      (
+        db: D1Client,
+        claims: ErpClaims,
+        row: Record<string, unknown>,
+        // 실제로 바뀌는 컬럼. 동기 guards 와 같은 값을 받는다 — 소유자가 아니어도
+        // 특정 컬럼(조회수·좋아요·투표)만은 쓸 수 있게 하려면 이 정보가 필요하다.
+        changedKeys?: ReadonlySet<string>,
+      ) => Promise<boolean>
+    >
   >;
 }
 
@@ -309,7 +319,47 @@ function approvalsUpdateGuard(
   row: Record<string, unknown>,
   changedKeys?: ReadonlySet<string>,
 ): boolean {
+  // 관리자·인사는 예외다. 이 가드가 생기면서 게이트웨이로 status 를 쓰던 유일한
+  // 화면(모바일 인사관리 증명서 승인)이 **관리자에게도 항상 실패**했다 —
+  // 버튼을 누르면 매번 '처리에 실패했습니다.' 만 떴다(9차 D1-02).
+  // 위조를 막으려던 것이지 정상 승인을 막으려던 게 아니다.
+  //
+  // 인사(erpCanManageCompany)까지 여는 이유: 그 화면의 접근 조건이
+  // menu_인사관리 계열이라 인사만 가진 계정도 들어올 수 있다(운영 현재는 8명 전원
+  // 관리자지만 권한 배치가 바뀌면 같은 증상이 재발한다). 인사는 base_salary 를
+  // 직접 쓸 수 있는 등급이라 여기서 열어도 새로 얻는 권한이 없다 —
+  // employmentContractUpdateGuard 도 같은 등급으로 열려 있다.
+  if (erpIsAdmin(claims) || erpCanManageCompany(claims)) return true;
   return !APPROVAL_TRANSITION_COLUMNS.some((col) => touchesColumn(row, changedKeys, col));
+}
+
+/**
+ * 신규 결재 문서가 가질 수 있는 status.
+ *
+ * 비어 있는 경우도 허용한다 — 스키마 기본값이 '대기' 라 명시하지 않는 호출부가 있다.
+ * 운영 코드의 insert 는 전부 '대기' 를 쓴다(2026-08-27 전수 확인).
+ */
+const APPROVAL_INSERT_ALLOWED_STATUS = new Set(['', '대기', '진행중', '임시저장', 'pending', 'draft']);
+
+/**
+ * approvals insert: **이미 승인된 상태의 문서를 처음부터 만들 수 없게** 한다.
+ *
+ * 8차에서 status 위조를 막았지만 `guards.update` 에만 걸었다. insert 에는
+ * 가드가 없고 정책이 SELF_OR_SAME_COMPANY 라 sender_id 를 자기 id 로 넣으면
+ * 통과한다. 그래서 일반 직원이
+ *   ① mutate insert → status:'승인', current_approver_id:본인,
+ *                     type:'급여인상평가서', meta_data:{targetStaffId, newSalary}
+ *   ② /api/approvals/process-final
+ * 두 번의 요청으로 자기 기본급을 임의 금액으로 올릴 수 있었다(9차 P0-D05-001).
+ * process-final 이 결재 이력 대신 DB 의 status·current_approver_id 만 보는데
+ * 둘 다 ①에서 공격자가 채운 값이기 때문이다.
+ *
+ * 관리자에게도 적용한다 — 결재 문서는 어떤 역할이든 '대기' 로 시작해서
+ * 전이 경로(/api/approvals/transition)를 거쳐야 이력이 남는다.
+ */
+function approvalsInsertGuard(claims: ErpClaims, row: Record<string, unknown>): boolean {
+  const status = String(getField<string>(row, 'status') ?? '').trim();
+  return APPROVAL_INSERT_ALLOWED_STATUS.has(status);
 }
 
 /** employment_contracts: 본인 서명 필드만 허용, 급여/본문 등은 관리자·매니저 */
@@ -446,13 +496,41 @@ async function dailyClosureItemsScopeGuard(
  * 수정·삭제할 수 있었다. 클라이언트가 보낸 author_id 는 위조 가능하므로
  * 항상 DB 의 작성자만 신뢰한다.
  */
+/**
+ * 작성자가 아니어도 쓸 수 있는 컬럼.
+ *
+ * 게시글 본문·제목이 아니라 "다른 사람이 남기는 반응" 이다. 게시판 투표,
+ * 좋아요 수, 조회수가 여기 해당한다. 이 가드를 작성자 전용으로 좁히면서
+ * 이 쓰기까지 403 이 됐다 — 투표를 누르면 '투표 실패' 토스트가 뜨고,
+ * 좋아요는 fire-and-forget 이라 에러조차 안 보인 채 likes_count 가
+ * 영원히 갱신되지 않았다(9차 D1-01).
+ *
+ * updated_at 은 위 컬럼과 함께 실려 오는 동반 컬럼이라 같이 허용한다.
+ */
+const BOARD_POST_REACTION_COLUMNS = new Set([
+  'poll',
+  'poll_votes',
+  'likes_count',
+  'views',
+  'updated_at',
+]);
+
 async function boardPostsOwnerGuard(
   db: D1Client,
   claims: ErpClaims,
   row: Record<string, unknown>,
+  changedKeys?: ReadonlySet<string>,
 ): Promise<boolean> {
   if (erpIsAdmin(claims)) return true;
   if (erpCanManageCompany(claims)) return true;
+
+  // 반응 컬럼만 건드리는 쓰기는 작성자 확인 없이 통과시킨다.
+  // changedKeys 를 못 받은 호출(폴백)에서는 이 완화를 적용하지 않는다 —
+  // 무엇이 바뀌는지 모르는 채로 열어 주면 본문 위조를 막을 수 없다.
+  if (changedKeys && changedKeys.size > 0) {
+    const onlyReactions = [...changedKeys].every((key) => BOARD_POST_REACTION_COLUMNS.has(key));
+    if (onlyReactions) return true;
+  }
 
   const me = claimsStaffIdRaw(claims);
   if (me === null) return false;
@@ -949,7 +1027,7 @@ export const POLICY_REGISTRY: Registry = {
     delete: 'SELF_ONLY',
     staffIdField: 'sender_id',
     approvalFields: { sender: 'sender_id', approver: 'current_approver_id' },
-    guards: { update: approvalsUpdateGuard } },
+    guards: { insert: approvalsInsertGuard, update: approvalsUpdateGuard } },
 
   // ── INVENTORY_SCOPE
   inventory: {
@@ -1938,7 +2016,9 @@ export async function canAccess(args: PolicyCheckArgs): Promise<boolean> {
   if (guard && !guard(args.claims, guardRow, args.changedKeys)) return false;
   // 비동기 행 단위 가드 (예: messages soft-delete 소유자 확인 — DB 조회 필요)
   const asyncGuard = cfg.asyncGuards?.[args.op];
-  if (asyncGuard && !(await asyncGuard(args.db, args.claims, guardRow))) return false;
+  if (asyncGuard && !(await asyncGuard(args.db, args.claims, guardRow, args.changedKeys))) {
+    return false;
+  }
   return true;
 }
 

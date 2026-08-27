@@ -20,6 +20,45 @@ function formatICSDateOnly(date: Date): string {
 }
 
 /**
+ * 구독 캘린더에 내보낼 연차 상태.
+ * 운영 실측(2026-08-27) leave_requests.status 는 승인 46 · 반려 3 · 회수 2 · 대기 1 이다.
+ * 영문 표기는 과거 데이터 호환용으로만 둔다.
+ */
+const CALENDAR_VISIBLE_LEAVE_STATUS = new Set(['승인', '완료', 'approved', 'APPROVED']);
+
+/**
+ * 'YYYY-MM-DD' 를 UTC 자정 Date 로. 형식이 어긋나면 **null 을 돌려준다.**
+ *
+ * 예전에는 각 루프가 `value.split('-').map(Number)` 결과를 검증 없이
+ * `new Date(Date.UTC(...))` 에 넣었다. 운영 데이터에 `holiday_date = "5/1"`
+ * (근로자의날, company_name='전체') 한 행이 있었는데:
+ *
+ *   "5/1".split('-')  ->  ["5/1"]  ->  map(Number)  ->  [NaN]
+ *   new Date(Date.UTC(NaN, NaN, undefined))  ->  Invalid Date
+ *   Invalid Date.toISOString()  ->  RangeError 를 **던진다**
+ *
+ * 이 예외가 company_holidays 조회를 감싼 try/catch 밖에서 터져 최상위 catch 로
+ * 떨어졌고, `/api/calendar/feed` 가 **구독한 전 직원에게 500** 을 냈다.
+ * 캘린더 앱은 조용히 동기화를 멈추므로 "일정이 안 올라온다" 로만 보였다(9차 P-01).
+ *
+ * 한 행이 피드 전체를 죽이지 않도록, 잘못된 행은 그 이벤트만 건너뛴다.
+ */
+function parseDateKeyToUtc(value: unknown): Date | null {
+  const raw = String(value ?? '').trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(date.getTime())) return null;
+  // 2026-02-31 처럼 존재하지 않는 날짜는 굴러가 버리므로 되돌려 확인한다.
+  if (date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return date;
+}
+
+/**
  * GET /api/calendar/feed?token=<signed>
  * 서명 토큰 필수 (createCalendarFeedToken). 평문 staff_id 는 거부.
  * 근무표(nurse_schedules), 연차/휴가(leave_requests), 회사행사/공휴일(company_holidays) 통합 내보내기.
@@ -154,9 +193,14 @@ export async function GET(request: NextRequest) {
       if (!sched.year_month || !sched.day || !sched.shift_code) continue;
       if (sched.shift_code === 'OFF') continue;
 
-      const [year, month] = sched.year_month.split('-').map(Number);
       const day = Number(sched.day);
-      const eventDate = new Date(Date.UTC(year, month - 1, day));
+      const eventDate = parseDateKeyToUtc(
+        `${sched.year_month}-${String(day).padStart(2, '0')}`,
+      );
+      if (!eventDate) {
+        console.warn('[calendar/feed] 잘못된 근무표 날짜, 건너뜀:', sched.year_month, sched.day);
+        continue;
+      }
       const dtStart = formatICSDateOnly(eventDate);
       const nextDate = new Date(eventDate);
       nextDate.setDate(nextDate.getDate() + 1);
@@ -182,13 +226,21 @@ export async function GET(request: NextRequest) {
 
     // 2) 연차/휴가 이벤트
     for (const lv of leaves) {
-      if (!lv.start_date || lv.status === '반려') continue;
+      // 승인된 연차만 내보낸다.
+      //
+      // 예전에는 `status === '반려'` 만 걸러서, 아직 결재가 끝나지 않은 '대기'
+      // 건과 결재 회수로 무효가 된 '회수' 건까지 구독 캘린더에 나갔다(9차 R04).
+      // 신청만 해 두고 승인 안 난 휴가가 남의 캘린더에 확정 일정처럼 보였다.
+      if (!lv.start_date || !CALENDAR_VISIBLE_LEAVE_STATUS.has(String(lv.status ?? '').trim())) {
+        continue;
+      }
 
-      const [sYear, sMonth, sDay] = lv.start_date.split('-').map(Number);
-      const [eYear, eMonth, eDay] = (lv.end_date || lv.start_date).split('-').map(Number);
-
-      const startDate = new Date(Date.UTC(sYear, sMonth - 1, sDay));
-      const endDate = new Date(Date.UTC(eYear, eMonth - 1, eDay));
+      const startDate = parseDateKeyToUtc(lv.start_date);
+      const endDate = parseDateKeyToUtc(lv.end_date || lv.start_date);
+      if (!startDate || !endDate) {
+        console.warn('[calendar/feed] 잘못된 연차 날짜, 건너뜀:', lv.start_date, lv.end_date);
+        continue;
+      }
       endDate.setDate(endDate.getDate() + 1); // ICS 종일 일정은 다음날 자정까지
 
       const dtStart = formatICSDateOnly(startDate);
@@ -212,8 +264,13 @@ export async function GET(request: NextRequest) {
     // 3) 회사 행사 및 공휴일 이벤트
     for (const h of holidays) {
       if (!h.holiday_date) continue;
-      const [hYear, hMonth, hDay] = h.holiday_date.split('-').map(Number);
-      const hDate = new Date(Date.UTC(hYear, hMonth - 1, hDay));
+      const hDate = parseDateKeyToUtc(h.holiday_date);
+      if (!hDate) {
+        // 운영에 "5/1"(근로자의날) 같은 값이 실재한다. 이 한 행 때문에 피드
+        // 전체가 500 이 되던 것을 막는다 — 이 이벤트만 빠지고 나머지는 나간다.
+        console.warn('[calendar/feed] 잘못된 holiday_date, 건너뜀:', h.id, h.holiday_date);
+        continue;
+      }
       const nextDate = new Date(hDate);
       nextDate.setDate(nextDate.getDate() + 1);
 
