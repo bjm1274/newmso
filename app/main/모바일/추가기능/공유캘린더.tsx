@@ -133,9 +133,6 @@ export default function 공유캘린더({
 
         const { data: leaveData } = await leaveQuery;
         if (Array.isArray(leaveData)) {
-          const startDateObj = new Date(year, month - 1, 1);
-          const endDateObj = new Date(year, month, 0);
-
           for (const r of leaveData) {
             if (r.status === '반려') continue;
             const sId = String(r.staff_id || '');
@@ -144,13 +141,20 @@ export default function 공유캘린더({
               continue;
             }
 
-            const reqStart = new Date(r.start_date);
-            const reqEnd = new Date(r.end_date || r.start_date);
-            const loopStart = new Date(Math.max(reqStart.getTime(), startDateObj.getTime()));
-            const loopEnd = new Date(Math.min(reqEnd.getTime(), endDateObj.getTime()));
+            // 날짜 경계는 'YYYY-MM-DD' 문자열로 자른다 — PC 와 동일(9차 M03).
+            // Date 산술은 날짜 문자열을 UTC 자정으로, 달 경계를 로컬 자정으로
+            // 파싱해 9시간이 어긋났고, 그 탓에 말일 연차가 통째로 사라졌다.
+            const reqStartKey = String(r.start_date).slice(0, 10);
+            const reqEndKey = String(r.end_date || r.start_date).slice(0, 10);
+            const loopStartKey = reqStartKey > monthStart ? reqStartKey : monthStart;
+            const loopEndKey = reqEndKey < monthEnd ? reqEndKey : monthEnd;
+            if (loopStartKey > loopEndKey) continue;
 
-            for (let d = new Date(loopStart); d <= loopEnd; d.setDate(d.getDate() + 1)) {
-              const dayNum = d.getDate();
+            const firstDayNum = Number(loopStartKey.slice(8, 10));
+            const lastLoopDayNum = Number(loopEndKey.slice(8, 10));
+            if (!Number.isFinite(firstDayNum) || !Number.isFinite(lastLoopDayNum)) continue;
+
+            for (let dayNum = firstDayNum; dayNum <= lastLoopDayNum; dayNum += 1) {
               loaded.push({
                 id: `leave-${r.id}-${dayNum}`,
                 kind: 'leave',

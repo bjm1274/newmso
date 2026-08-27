@@ -197,13 +197,26 @@ export default function SharedCalendar() {
               // 반려된 건은 표시 제외
               if (r.status === '반려') continue;
 
-              const reqStart = new Date(r.start_date);
-              const reqEnd = new Date(r.end_date || r.start_date);
-              const loopStart = new Date(Math.max(reqStart.getTime(), startDate.getTime()));
-              const loopEnd = new Date(Math.min(reqEnd.getTime(), endDate.getTime()));
+              // 날짜 경계는 Date 산술이 아니라 'YYYY-MM-DD' 문자열로 자른다.
+              //
+              // 예전에는 reqStart/reqEnd 가 `new Date('YYYY-MM-DD')` = UTC 자정
+              // (= KST 09:00)인데 클램프 대상 startDate/endDate 는
+              // `new Date(y, m, 1)` = 로컬 자정(KST 00:00)이라 기준이 9시간
+              // 어긋났다. loopEnd 가 말일 00:00 KST 로 잘리는데 루프 변수는
+              // 09:00 KST 라 **말일이 항상 탈락**했다 — 말일 하루짜리 연차는
+              // 통째로 사라지고, 말일까지 이어지는 연차도 마지막 날이 빠졌다.
+              // 말일은 월 마감과 겹쳐 연차가 몰리는 날이라 인력 배치를 오판하게 했다(9차 FB-02).
+              const reqStartKey = String(r.start_date).slice(0, 10);
+              const reqEndKey = String(r.end_date || r.start_date).slice(0, 10);
+              const loopStartKey = reqStartKey > monthStart ? reqStartKey : monthStart;
+              const loopEndKey = reqEndKey < monthEnd ? reqEndKey : monthEnd;
+              if (loopStartKey > loopEndKey) continue;
 
-              for (let d = new Date(loopStart); d <= loopEnd; d.setDate(d.getDate() + 1)) {
-                const dayNum = d.getDate();
+              const firstDayNum = Number(loopStartKey.slice(8, 10));
+              const lastLoopDayNum = Number(loopEndKey.slice(8, 10));
+              if (!Number.isFinite(firstDayNum) || !Number.isFinite(lastLoopDayNum)) continue;
+
+              for (let dayNum = firstDayNum; dayNum <= lastLoopDayNum; dayNum += 1) {
                 loadedEvents.push({
                   id: `leave-${r.id}-${dayNum}`,
                   kind: 'leave',
