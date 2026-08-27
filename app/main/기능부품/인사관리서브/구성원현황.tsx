@@ -1273,27 +1273,80 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const saveStaffLicense = async (staffId: string): Promise<string | null> => {
     try {
       const payload = buildLicensePayload();
-      if (편집중면허ID) {
-        // 입력값을 전부 비웠으면 기존 row를 건드리지 않는다(삭제·공란화 방지 — 자격안전센터에서 관리).
-        if (!hasLicenseInput()) return null;
+      const hasInput = hasLicenseInput();
+
+      // 입력값이 전부 비어 있으면 무의미한 row를 생성하지 않음
+      if (!hasInput) {
+        return null;
+      }
+
+      let savedLicenseId: string | null = 편집중면허ID;
+
+      if (savedLicenseId) {
+        // 1. 이미 편집 중인 면허 ID가 있는 경우 update
         const { error } = await db
           .from('staff_licenses')
           .update(payload)
-          .eq('id', 편집중면허ID);
+          .eq('id', savedLicenseId);
         if (error) throw error;
-        return null;
+      } else {
+        // 2. 편집중면허ID가 없더라도, DB에 이미 해당 staff_id의 면허 row가 있는지 실시간 조회
+        const { data: existingLicenses, error: searchError } = await db
+          .from('staff_licenses')
+          .select('id')
+          .eq('staff_id', String(staffId))
+          .order('id', { ascending: true });
+
+        if (!searchError && Array.isArray(existingLicenses) && existingLicenses.length > 0) {
+          // 기존 면허 row가 이미 있으면 첫 번째 row를 UPDATE (중복 증식 방지)
+          savedLicenseId = String(existingLicenses[0].id);
+          const { error: updateError } = await db
+            .from('staff_licenses')
+            .update(payload)
+            .eq('id', savedLicenseId);
+          if (updateError) throw updateError;
+          편집중면허ID설정(savedLicenseId);
+        } else {
+          // 전혀 없을 때만 신규 INSERT
+          savedLicenseId =
+            typeof crypto !== 'undefined' && crypto.randomUUID
+              ? crypto.randomUUID()
+              : `lic_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+          const { error: insertError } = await db.from('staff_licenses').insert([
+            {
+              id: savedLicenseId,
+              staff_id: String(staffId),
+              ...payload,
+              license_name: payload.license_name || '(이름 없음)',
+            },
+          ]);
+          if (insertError) throw insertError;
+          편집중면허ID설정(savedLicenseId);
+        }
       }
-      // 신규 row: 면허 입력값이 하나라도 있을 때만 insert (UUID 생성 포함)
-      if (!hasLicenseInput()) return null;
-      const licenseId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `lic_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-      const { error } = await db.from('staff_licenses').insert([
-        {
-          id: licenseId,
-          staff_id: String(staffId),
-          ...payload,
-          license_name: payload.license_name || '(이름 없음)' },
-      ]);
-      if (error) throw error;
+
+      // staff_members.license 컬럼에도 미러링 동기화
+      if (payload.license_name) {
+        try {
+          await db
+            .from('staff_members')
+            .update({ license: payload.license_name })
+            .eq('id', String(staffId));
+        } catch {
+          // ignore
+        }
+      }
+
+      // licensesByStaff 캐시 즉시 동기화
+      const cleanStaffId = String(staffId).toLowerCase().trim();
+      const refreshedGrouped = await fetchStaffLicensesGrouped([staffId]);
+      if (refreshedGrouped[cleanStaffId]) {
+        licensesByStaff설정((prev) => ({
+          ...prev,
+          [cleanStaffId]: refreshedGrouped[cleanStaffId],
+        }));
+      }
+
       return null;
     } catch (error) {
       console.error('staff_licenses 저장 실패:', error);
@@ -1435,6 +1488,13 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           ...commonData,
           annual_leave_total: afterStaff.annual_leave_total,
           annual_leave_used: afterStaff.annual_leave_used };
+
+        // ── 기존 프로필 사진 정보 보존 (사진 미선택 시 덮어쓰기 방지) ─────────────
+        if (beforeStaff?.avatar_url) updatePayload.avatar_url = beforeStaff.avatar_url;
+        if (beforeStaff?.photo_url) updatePayload.photo_url = beforeStaff.photo_url;
+        if (beforeStaff?.profile_photo_path) updatePayload.profile_photo_path = beforeStaff.profile_photo_path;
+        if (beforeStaff?.profile_photo_updated_at) updatePayload.profile_photo_updated_at = beforeStaff.profile_photo_updated_at;
+
         // ── 주민번호 안전 가드(JM5) ───────────────────────────────────
         // 폼의 주민번호가 비어 있으면 DB 기존 값을 덮어쓰지 않음.
         const residentDigits = String(신규직원.주민번호 ?? '').replace(/[^0-9]/g, '');
@@ -1529,31 +1589,35 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
             .filter(Boolean)
         );
 
-        const lastNo = (employeeNos || []).reduce((maxNo: number, row: { employee_no?: unknown }) => {
-          const parsed = Number.parseInt(String(row?.employee_no || ''), 10);
-          if (!Number.isFinite(parsed) || parsed < 1) {
-            return maxNo;
+        let maxNumericEmpNo = 0;
+        for (const empNo of Array.from(existingEmployeeNos)) {
+          const empStr = String(empNo);
+          if (/^\d+$/.test(empStr)) {
+            const num = parseInt(empStr, 10);
+            if (num > maxNumericEmpNo) maxNumericEmpNo = num;
           }
-          return Math.max(maxNo, parsed);
-        }, 0);
-
-        let nextNo = Math.max(1, lastNo + 1);
-        while (existingEmployeeNos.has(String(nextNo))) {
-          nextNo += 1;
         }
-        newEmployeeNo = String(nextNo);
 
-        const insertPayload = {
+        let candidateNum = maxNumericEmpNo > 0 ? maxNumericEmpNo + 1 : 1;
+        let padLength = maxNumericEmpNo > 0 ? String(maxNumericEmpNo).length : 4;
+        if (padLength < 4) padLength = 4;
+
+        while (existingEmployeeNos.has(String(candidateNum).padStart(padLength, '0'))) {
+          candidateNum++;
+        }
+        newEmployeeNo = String(candidateNum).padStart(padLength, '0');
+
+        const insertPayload: Record<string, unknown> = {
           ...commonData,
           employee_no: newEmployeeNo,
-          role: 'staff',
-          password: '',
-          join_date: dateOrNull(신규직원.입사일),
-          password_reset_required: 1 };
+          annual_leave_total: 신규직원.연차총개수,
+          annual_leave_used: 신규직원.연차사용개수
+        };
+
         const forcedInsertOmittedColumns = hasFractionalValue(insertPayload.working_hours_per_week)
           ? ['working_hours_per_week']
           : [];
-        const { error: insertErr, data: insertedStaff } = await withMissingColumnsFallback(
+        const { data: insertResult, error: insertErr } = await withMissingColumnsFallback(
           (omittedColumns) => {
             const allOmittedColumns = new Set<string>([
               ...omittedColumns,
@@ -1571,6 +1635,8 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
         if (insertErr) {
           return toast('직원 등록 실패: ' + (insertErr.message || 'DB 오류'), 'error');
         }
+
+        const insertedStaff = (Array.isArray(insertResult) ? insertResult[0] : insertResult) as Record<string, any> | null;
 
         let onboardingChecklistInitFailed = false;
         if (insertedStaff?.id) {
@@ -1651,9 +1717,11 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     프로필사진파일설정(null);
     setTargetSalaryInput('');
     setTargetNightHoursInput('');
+
+    // 1차 사진 미리보기
     프로필사진미리보기설정(getProfilePhotoUrl(직원));
+
     const extensionValue = getStaffExtension(직원);
-    // staff_licenses 첫 번째 row를 폼에 로드 (없으면 빈 값 + null)
     const cleanStaffId = String(직원.id || '').toLowerCase().trim();
     const 직원면허목록 = licensesByStaff[cleanStaffId] || [];
     const 첫면허 = 직원면허목록[0] ?? null;
@@ -1666,7 +1734,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       팀: 직원.department ?? '', 직함: 직원.position || '', 입사일: (직원.joined_at as string) || (직원.join_date as string) || '',
       퇴사일: (직원.resigned_at as string) || '', 주민번호: (직원.resident_no as string) || '', 이메일: 직원.email || '',
       주소: 직원.address || '',
-      면허사항: 첫면허?.license_name || '',
+      면허사항: 첫면허?.license_name || (직원.license as string) || '',
       면허번호: 첫면허?.license_number || '',
       취득일자: 첫면허?.issued_date || '',
       면허기타내용: 첫면허?.memo || '',
@@ -1710,27 +1778,59 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
     });
     편집모드설정(true);
 
-    // ── 주민번호 보정 fetch (JM5) ────────────────────────────────────
-    // 직원 부트스트랩 select(STAFF_BOOTSTRAP_COLUMNS)에 resident_no가 빠져 있어
-    // 편집 진입 시 빈 값으로 시작 → 그대로 저장하면 빈 문자열로 덮어쓰는 버그가 있었음.
-    // 주민번호는 전역 메모리에 띄우지 않고 편집 시점에만 별도 select.
     const staffId = String(직원.id);
+
+    // ── 직원 최신 정보 및 사진/주민번호 DB 직접 fetch ────────────────────────
     db
       .from('staff_members')
-      .select('resident_no')
+      .select('resident_no, avatar_url, photo_url, profile_photo_path, profile_photo_updated_at, license, permissions')
       .eq('id', staffId)
       .maybeSingle()
       .then(({ data, error }) => {
         if (error || !data) return;
-        const fetched = String((data as { resident_no?: string | null }).resident_no ?? '');
-        if (!fetched) return;
-        신규직원설정((prev) => {
-          const current = String(prev.주민번호 ?? '');
-          if (current.replace(/[^0-9]/g, '').length > 0) return prev;
-          const raw = fetched.replace(/[^0-9]/g, '').slice(0, 13);
-          const formatted = raw.length > 6 ? `${raw.slice(0, 6)}-${raw.slice(6)}` : raw;
-          return { ...prev, 주민번호: formatted };
-        });
+        const record = data as Record<string, unknown>;
+        const fetchedResident = String(record.resident_no ?? '');
+        if (fetchedResident) {
+          신규직원설정((prev) => {
+            const current = String(prev.주민번호 ?? '');
+            if (current.replace(/[^0-9]/g, '').length > 0) return prev;
+            const raw = fetchedResident.replace(/[^0-9]/g, '').slice(0, 13);
+            const formatted = raw.length > 6 ? `${raw.slice(0, 6)}-${raw.slice(6)}` : raw;
+            return { ...prev, 주민번호: formatted };
+          });
+        }
+        const freshPhotoUrl = getProfilePhotoUrl(record);
+        if (freshPhotoUrl) {
+          프로필사진미리보기설정(freshPhotoUrl);
+        }
+        if (record.license && typeof record.license === 'string') {
+          신규직원설정((prev) => (prev.면허사항 ? prev : { ...prev, 면허사항: record.license as string }));
+        }
+      });
+
+    // ── staff_licenses 단건 실시간 직접 fetch (면허 중복 생성 및 공란 로드 방지) ──
+    db
+      .from('staff_licenses')
+      .select('id, staff_id, license_type, license_name, license_number, issued_date, expiry_date, renewed_date, issuing_body, memo')
+      .eq('staff_id', staffId)
+      .then(({ data, error }) => {
+        if (error || !Array.isArray(data) || data.length === 0) return;
+        const licenses = data as StaffLicenseRow[];
+        const primaryLic = licenses[0];
+        if (primaryLic) {
+          편집중면허ID설정(primaryLic.id);
+          신규직원설정((prev) => ({
+            ...prev,
+            면허사항: primaryLic.license_name || prev.면허사항 || '',
+            면허번호: primaryLic.license_number || '',
+            취득일자: primaryLic.issued_date || '',
+            면허기타내용: primaryLic.memo || '',
+          }));
+          licensesByStaff설정((prev) => ({
+            ...prev,
+            [cleanStaffId]: licenses,
+          }));
+        }
       });
   };
 

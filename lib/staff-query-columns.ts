@@ -58,10 +58,16 @@ const STAFF_BOOTSTRAP_COLUMNS = [
   // work conditions
   'working_hours_per_week',
   'working_days_per_week',
-  // identity
+  // identity & profile
   'resident_no',
   'presence_status',
   'permissions',
+  'avatar_url',
+  'photo_url',
+  'profile_photo_path',
+  'profile_photo_updated_at',
+  'license',
+  'extension',
   'bank_account',
   'bank_name',
   'shift_id',
@@ -118,6 +124,7 @@ export const STAFF_BOOTSTRAP_OPTIONAL_COLUMNS = [
   'photo_url',
   'profile_photo_path',
   'profile_photo_updated_at',
+  'license',
   'extension',
   'bank_name',
   'bank_account',
