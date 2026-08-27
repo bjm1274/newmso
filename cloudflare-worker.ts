@@ -253,7 +253,10 @@ async function callCronRoute(
 
   const durationMs = Date.now() - startTime;
   const bodyText = await response.text().catch(() => '');
-  const bodyPreview = bodyText.slice(0, 800);
+  // 800자로 자르면 push-subscription-cleanup 응답이 licenseJobs 중간에서 끊겨
+  // contractJobs·retention·inappNotifications 결과가 audit_logs 에 한 글자도 안 남는다
+  // (10차 X10-04). 사후에 사람이 눈으로 확인할 수 있는 길이로 늘린다.
+  const bodyPreview = bodyText.slice(0, 2000);
 
   if (!response.ok) {
     throw Object.assign(
@@ -285,12 +288,23 @@ async function callCronRoute(
   };
 }
 
+/** 실패 신호 탐색 깊이 상한 — 크론 응답 본문은 깊어야 3단계다. */
+const CRON_FAILURE_SCAN_MAX_DEPTH = 4;
+
 /**
  * 200 응답 본문에서 "개별 실패" 신호를 찾는다. 없으면 null.
  *
  * **개수 필드(failed / skipped)는 보지 않는다.** chat-push-dispatch 의 failed 는
  * 만료된 푸시 구독 때문에 상시 0이 아니라서, 그걸 실패로 치면 5분마다 도는
  * 크론이 매번 관리자 알림을 만든다. 에러 목록과 명시적 ok:false 만 본다.
+ *
+ * **최상위만 보면 안 된다(10차 CR10-03 / X10-04).** KST 12:00 슬롯의
+ * push-subscription-cleanup 은 서브잡 4종(면허·계약만료·보관정리·인앱알림)을 각각
+ * try/catch 로 격리한 뒤 **항상 ok:true** 로 응답하고, 실패는
+ *   (a) `licenseJobs.ce.errors` 같은 **중첩 배열**
+ *   (b) `licenseError` / `retentionError` 같은 **`…Error` 문자열 키**
+ * 에만 담는다. 예전 구현은 최상위 `errors`/`failures` 만 봐서 보수교육 알림이
+ * 29일 연속 죽는 동안 매일 `cron_success` 로 기록됐다. 두 형태 모두 탐지한다.
  */
 function detectCronSoftFailure(bodyText: string): string | null {
   let parsed: unknown;
@@ -307,17 +321,48 @@ function detectCronSoftFailure(bodyText: string): string | null {
   }
 
   const parts: string[] = [];
-  for (const key of ['errors', 'failures']) {
-    const value = body[key];
-    if (Array.isArray(value) && value.length > 0) {
-      const sample = value
-        .slice(0, 3)
-        .map((item) => (typeof item === 'string' ? item : JSON.stringify(item)))
-        .join(' | ');
-      parts.push(`${key}(${value.length}): ${sample}`);
+  collectCronFailureSignals(body, '', 0, parts);
+  return parts.length > 0 ? parts.join(' ;; ') : null;
+}
+
+function summarizeFailureArray(value: unknown[]): string {
+  // drizzle 의 `Failed query: insert into … (?,?,…)` 는 수천 자가 나온다 — 잘라 담는다.
+  return value
+    .slice(0, 3)
+    .map((item) => (typeof item === 'string' ? item : JSON.stringify(item)).slice(0, 300))
+    .join(' | ');
+}
+
+/** 중첩 객체를 훑어 errors/failures 배열과 `…Error` 문자열 키를 모은다. */
+function collectCronFailureSignals(
+  node: Record<string, unknown>,
+  path: string,
+  depth: number,
+  parts: string[],
+): void {
+  if (depth > CRON_FAILURE_SCAN_MAX_DEPTH) return;
+  for (const [key, value] of Object.entries(node)) {
+    const label = path ? `${path}.${key}` : key;
+
+    // `errors` · `failures` · `balanceErrors` 처럼 실패 목록을 담는 배열.
+    if (/(^|[a-z])(errors|failures|Errors|Failures)$/.test(key) && Array.isArray(value)) {
+      if (value.length > 0) {
+        parts.push(`${label}(${value.length}): ${summarizeFailureArray(value)}`);
+      }
+      continue;
+    }
+
+    // `licenseError` · `retentionError` 처럼 잡이 통째로 throw 했을 때 생기는 문자열 키.
+    // 소문자 `error` 하나는 제외한다 — 그건 ok:false 와 짝이고 위에서 이미 본다.
+    if (key !== 'error' && /Error$/.test(key) && typeof value === 'string' && value.trim()) {
+      parts.push(`${label}: ${value.slice(0, 300)}`);
+      continue;
+    }
+
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      collectCronFailureSignals(value as Record<string, unknown>, label, depth + 1, parts);
     }
   }
-  return parts.length > 0 ? parts.join(' ;; ') : null;
 }
 
 const worker = {

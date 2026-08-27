@@ -20,6 +20,7 @@ import {
   buildTemplatePreviewSpec,
   readRuntimeCompanyLabel } from './전자결재양식관리/preview-builder';
 import {
+  classifyWriteFailure,
   createEmptyDesignStore,
   getDesignsForCompany,
   isMissingTableError,
@@ -31,6 +32,38 @@ import {
   slugFromName,
   writeLocalDesignsStore,
   writeLocalRowsForCompany } from './전자결재양식관리/store-utils';
+
+/**
+ * approval_form_types 쓰기 실패를 사용자에게 보여 준다.
+ * 예전에는 console.warn 으로만 삼켰고, 그나마 컬럼 누락 오류는 isMissingTableError 에 걸려
+ * 그 warn 조차 남지 않아 "저장된 것처럼 보이는데 이 브라우저에만 남는" 상태가 됐다(10차 TB5).
+ * 목록은 여전히 localStorage 에 남기지만(이 화면의 원래 설계), 서버에 안 갔다는 사실은 알린다.
+ */
+function reportFormTypeWriteFailure(action: string, error: any) {
+  const kind = classifyWriteFailure(error, 'approval_form_types');
+  const detail = String(error?.message || error?.details || error || '').trim();
+
+  // 공통 꼬리말: 어느 경우든 "서버에는 안 갔고 이 브라우저에만 적용됐다" 가 사실이다.
+  const tail = '서버에 반영되지 않았습니다. 이 브라우저에만 적용된 상태라 다른 직원·다른 PC 에서는 보이지 않습니다.';
+
+  if (kind === 'missing-table') {
+    console.warn(`approval_form_types ${action} failed (missing table):`, error);
+    toast(`${action} — ${tail}\n(서버에 approval_form_types 테이블이 없습니다)`, 'warning');
+    return;
+  }
+
+  if (kind === 'missing-column') {
+    console.error(`approval_form_types ${action} failed (missing column):`, error);
+    toast(
+      `${action} — ${tail}\n서버 테이블에 필요한 컬럼이 없습니다(스키마 미적용). 관리자에게 문의해 주세요.\n${detail}`,
+      'error',
+    );
+    return;
+  }
+
+  console.error(`approval_form_types ${action} failed:`, error);
+  toast(`${action} — ${tail}\n${detail || '알 수 없는 오류'}`, 'error');
+}
 
 export default function ApprovalFormTypesManager({ user }: { user?: any }) {
   const { dialog, openConfirm } = useActionDialog();
@@ -364,11 +397,11 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
 
       if (!error && data) {
         newRow = data as FormTypeRow;
-      } else if (error && !isMissingTableError(error, 'approval_form_types')) {
-        console.warn('approval_form_types insert failed:', error);
+      } else if (error) {
+        reportFormTypeWriteFailure('추가 양식 등록', error);
       }
     } catch (error) {
-      console.warn('approval_form_types insert failed:', error);
+      reportFormTypeWriteFailure('추가 양식 등록', error);
     }
 
     const nextRows = [...list, newRow];
@@ -422,11 +455,11 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
         .update({ name, slug, company_name: currentCompanyLabel, updated_at: new Date().toISOString() })
         .eq('id', editingId);
 
-      if (error && !isMissingTableError(error, 'approval_form_types')) {
-        console.warn('approval_form_types update failed:', error);
+      if (error) {
+        reportFormTypeWriteFailure('양식 이름·코드 수정', error);
       }
     } catch (error) {
-      console.warn('approval_form_types update failed:', error);
+      reportFormTypeWriteFailure('양식 이름·코드 수정', error);
     }
     syncListState(nextRows);
     setEditingId(null);
@@ -447,11 +480,11 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
         .update({ is_active: !row.is_active, updated_at: new Date().toISOString() })
         .eq('id', row.id);
 
-      if (error && !isMissingTableError(error, 'approval_form_types')) {
-        console.warn('approval_form_types active toggle failed:', error);
+      if (error) {
+        reportFormTypeWriteFailure('양식 사용여부 변경', error);
       }
     } catch (error) {
-      console.warn('approval_form_types active toggle failed:', error);
+      reportFormTypeWriteFailure('양식 사용여부 변경', error);
     }
     syncListState(nextRows);
   };
@@ -479,11 +512,11 @@ export default function ApprovalFormTypesManager({ user }: { user?: any }) {
     try {
       const { error } = await db.from('approval_form_types').delete().eq('id', row.id);
 
-      if (error && !isMissingTableError(error, 'approval_form_types')) {
-        console.warn('approval_form_types delete failed:', error);
+      if (error) {
+        reportFormTypeWriteFailure('추가 양식 삭제', error);
       }
     } catch (error) {
-      console.warn('approval_form_types delete failed:', error);
+      reportFormTypeWriteFailure('추가 양식 삭제', error);
     }
 
     syncListState(list.filter((item) => item.id !== row.id));

@@ -6,7 +6,10 @@
  *  - 2차 촉진일(만료 2개월 전) 도래 후 미발송 → 2차 통보
  * 당일 크론 실패로 놓친 경우에도 만료 전까지 소급 발송한다.
  *
- * 멱등성: annual_leave_promotion_logs (staff_id + stage/step + expiry_date)
+ * 멱등성: annual_leave_promotion_logs 의 **PK(id) 를 (staff_id, stage, expiry_date)
+ *   자연키로 만들어** 보장한다 — `buildPromotionLogId()` 참고. 그 조합에 UNIQUE
+ *   인덱스는 없고(기존 데이터에 중복이 있어 새로 걸 수도 없다) 유니크는 PK 뿐이라,
+ *   PK 자체를 자연키로 쓰는 것이 유일한 수단이다.
  * 제외: 퇴사, 입사일 없음, 잔여 0, 연차계획서 제출(반려 제외), 이미 동일 차수 발송
  */
 
@@ -61,6 +64,31 @@ type StaffRow = {
 };
 
 const PLAN_TYPES = ['연차계획서', '연차사용계획서'];
+
+/**
+ * 촉진 로그의 결정적 PK — `alp-{staff_id}-{stage}-{expiry_date}`.
+ *
+ * 예전에는 크론이 `crypto.randomUUID()` + **타깃 없는** `onConflictDoNothing()` 이었다.
+ * 무작위 id 는 절대 충돌하지 않으므로 그 절 자체가 무의미했고, 같은 촉진이 두 번
+ * 기록되는 것을 아무것도 막지 못했다(운영 43행 중 (staff,step,expiry) 완전 중복 1쌍).
+ *
+ * 키 구성은 **`알림자동화설정.tsx` 의 수동 발송과 동일**하게 맞춘다. 같은 촉진을
+ * 사람이 눌러 보내든 크론이 보내든 같은 행이 되어야 하기 때문이다.
+ * `연차촉진시스템.tsx` 는 `alp-{staff}-{target_year}-{step}` 을 쓰지만 그 형태는
+ * 쓰지 않는다 — 운영에 **같은 해에 만료일이 서로 다른 step1 로그**가 실제로 있다
+ * (백정민: 2026-08-01 / 2026-11-01 / 2026-12-31). 연도로 뭉치면 그 셋이 한 id 로
+ * 충돌해 뒤엣것이 DO NOTHING 으로 버려지고, 그러면
+ * `hasCompletedBothPromotions(staffId, expiryKey)` 가 만료일을 정확히 대조하므로
+ * **촉진 이행이 미이행으로 뒤집혀 연차 소멸 판정이 달라진다.** 만료일을 키에 그대로
+ * 넣어야 sentSet·이행판정과 같은 식별자가 된다.
+ */
+export function buildPromotionLogId(
+  staffId: string,
+  stage: 1 | 2 | number,
+  expiryDateKey: string,
+): string {
+  return `alp-${String(staffId)}-${Number(stage)}-${String(expiryDateKey || '').slice(0, 10)}`;
+}
 
 function isActiveEmploymentStatus(status: string | null | undefined): boolean {
   const s = String(status || '재직').trim();
@@ -334,7 +362,7 @@ export async function dispatchAnnualLeavePromotions(
       await db
         .insert(promotionLogsTable)
         .values({
-          id: crypto.randomUUID(),
+          id: buildPromotionLogId(s.id, stage, expiryKey),
           staff_id: s.id,
           company_name: s.company,
           target_year: schedule.targetYear,
@@ -356,7 +384,10 @@ export async function dispatchAnnualLeavePromotions(
           }),
           created_at: nowIso,
         })
-        .onConflictDoNothing();
+        // 충돌 타깃을 PK 로 명시한다. 위 id 가 자연키라 같은 (직원, 차수, 만료일)
+        // 재실행은 여기서 조용히 무시된다 — 통보는 sentSet 가 이미 막고 있으므로
+        // 여기 도달 자체가 재시도·동시실행 같은 예외 경로다.
+        .onConflictDoNothing({ target: promotionLogsTable.id });
 
       const docTitle = `연차유급휴가 사용촉진 통보서 (${stageLabel}) - ${s.name}`;
       const docContent = buildPromotionDocument({

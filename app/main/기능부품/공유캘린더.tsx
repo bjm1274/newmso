@@ -137,9 +137,12 @@ export default function SharedCalendar() {
         // 1. 근무표 — 세부 권한 calendar_근무표조회
         if (canViewShifts) {
           try {
+            // 운영 nurse_schedules 는 id/staff_id/year_month/day/shift_code/created_at 뿐이다.
+            // staff_name 을 같이 select 하면 SQLITE_ERROR 로 쿼리 전체가 죽어 근무표가 통째로 비었다.
+            // 이름은 위에서 만든 staffMap(staff_members) 으로 staff_id 를 조회해 얻는다.
             let query = db
               .from('nurse_schedules')
-              .select('staff_id, day, shift_code, staff_name')
+              .select('staff_id, day, shift_code')
               .eq('year_month', ym);
             if (!canViewAllStaff && selfStaffId) {
               query = query.eq('staff_id', selfStaffId);
@@ -158,7 +161,7 @@ export default function SharedCalendar() {
                     kind: 'shift',
                     day: dayNum,
                     staff_id: sId,
-                    staff_name: sInfo?.name || row.staff_name || `직원(${sId.slice(0, 4)})`,
+                    staff_name: sInfo?.name || `직원(${sId.slice(0, 4)})`,
                     shift_code: String(row.shift_code),
                   });
                 }
@@ -272,12 +275,15 @@ export default function SharedCalendar() {
         // 4. 게시판 일정 — 세부 권한 calendar_게시판일정
         if (canViewBoard) {
           try {
+            // M04(PC): 월 범위 WHERE 가 이미 있는데 limit(200) 을 더 걸면, 월 게시글이 200건을
+            // 넘는 순간 ORDER BY 없는 인덱스 순서로 앞 200건만 들어와 그 달 뒷부분이 통째로
+            // 사라진다(모바일은 limit(100) 이라 2026-07 에 실제로 28건이 빠졌다).
+            // 모바일은 1차에서 상한을 없앴고 PC 만 남아 있었다 — 여기서도 상한을 없앤다.
             const boardRes = await db
               .from('board_posts')
               .select('id, title, board_type, schedule_date, schedule_time')
               .gte('schedule_date', monthStart)
-              .lte('schedule_date', monthEnd)
-              .limit(200);
+              .lte('schedule_date', monthEnd);
 
             if (boardRes.error) {
               console.warn('[공유캘린더] board_posts:', boardRes.error);

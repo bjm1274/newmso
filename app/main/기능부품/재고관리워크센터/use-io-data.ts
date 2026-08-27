@@ -10,8 +10,15 @@ import { useEffect, useState } from 'react';
 import { db } from '@/lib/db-client';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 import type { PurchaseOrderRow, StockMoveRow, Tone, VendorCard } from './stock-types';
-import { asString, pickNumber, pickString, toMonthString, toTimeString, type Row } from './data-helpers';
-import { mapOrderStatus } from './order-status-map';
+import {
+  asString,
+  fetchAllRowsPaged,
+  pickNumber,
+  pickString,
+  toMonthString,
+  toTimeString,
+  type Row } from './data-helpers';
+import { mapOrderStatus, normalizeRawOrderStatus } from './order-status-map';
 
 const MOVE_KIND_TONE: Record<StockMoveRow['kind'], Tone> = {
   입고: 'success',
@@ -140,26 +147,31 @@ export function useIOData(userCompany?: string): IOWorkcenterData & { refresh: (
           .select('id, name, category, contact_name, phone')
           .order('name')
           .limit(30);
-        let invQ = db.from('inventory').select('id, item_name, name').limit(2000);
+        // limit(2000) 은 /api/d1/query 의 limit 상한(MAX_LIMIT=1000)을 넘어 payload 검증에서
+        // 400 이 났고, 아래가 error 를 안 봐서 nameMap 이 늘 비어 이동 목록의 품목명이 사라졌다.
+        // 품목은 1,032건이라 1000 으로 낮추면 또 잘린다 — 전량을 range 페이징으로 받는다.
+        const buildInvQ = () => {
+          const q = db.from('inventory').select('id, item_name, name').order('id');
+          return companyFilter ? q.eq('company', companyFilter) : q;
+        };
         if (companyFilter) {
           // schema: inventory/inventory_logs.company, purchase_orders.requester_company
           // suppliers 테이블에는 company 컬럼 없음 → 필터 금지
           logsQ = logsQ.eq('company', companyFilter);
           ordersQ = ordersQ.eq('requester_company', companyFilter);
-          invQ = invQ.eq('company', companyFilter);
         }
 
         const [logsRes, ordersRes, suppliersRes, invRes] = await Promise.all([
           logsQ,
           ordersQ,
           suppliersQ,
-          invQ,
+          fetchAllRowsPaged(buildInvQ),
         ]);
 
         if (cancelled) return;
 
         const nameMap = new Map<string, string>();
-        for (const row of (Array.isArray(invRes.data) ? invRes.data : []) as Row[]) {
+        for (const row of invRes.rows) {
           const id = pickString(row, ['id'], '');
           const nm = pickString(row, ['item_name', 'name'], '');
           if (id && nm) nameMap.set(id, nm);
@@ -198,13 +210,15 @@ export function useIOData(userCompany?: string): IOWorkcenterData & { refresh: (
           );
         });
 
+        // INV-02: 원문 status 를 그대로 보면 앱 밖에서 들어온 'draft' 31건이
+        // 이 KPI 에서만 빠져 "KPI 0건 / 목록 31건"으로 갈렸다. 목록과 같은 정규화를 쓴다.
         const pendingOrders = orderRows.filter((o) => {
-          const s = asString(o['status']);
+          const s = normalizeRawOrderStatus(o['status']);
           return s === '대기' || s === '발주 대기';
         }).length;
 
         const shippingOrders = orderRows.filter((o) => {
-          const s = asString(o['status']);
+          const s = normalizeRawOrderStatus(o['status']);
           return s === '배송' || s === '배송 중';
         }).length;
 

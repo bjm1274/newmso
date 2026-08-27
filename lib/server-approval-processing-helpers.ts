@@ -82,6 +82,79 @@ export function isFinalApprovalEffectsDone(metaData: unknown): {
 }
 
 /**
+ * 후속처리 멱등 마커를 approval_history 한 행으로도 남기는 이유.
+ *
+ * 마커가 `meta_data.server_processing` 안에만 있어서, **meta_data 를 통째로 새로
+ * 쓰면 마커가 사라지고 이미 집행된 문서가 재집행**됐다(10차 DLT-01 ②).
+ * meta_data 는 게이트웨이(/api/d1/mutate)로 비관리자도 쓸 수 있는 컬럼이지만
+ * approval_history 는 UNCLASSIFIED_ADMIN_ONLY_TABLES 라 게이트웨이로는
+ * 관리자만 쓸 수 있다(lib/db/auth/policies.ts). 그래서 지울 수 없는 자리에
+ * 마커를 하나 더 둔다 — meta_data 마커는 기존 화면·이력 표시가 쓰므로 그대로 둔다.
+ *
+ * 운영에 별도 컬럼을 새로 만들지 않은 이유: approvals 에 쓸 수 있는 여분 컬럼이
+ * 없고(2026-08-27 PRAGMA 확인), 운영 DDL 변경은 이번 범위 밖이다.
+ * approval_history 테이블은 운영에 이미 존재한다(행 0개).
+ */
+export const SERVER_PROCESSING_HISTORY_ACTION_DONE = 'server_processing_completed';
+export const SERVER_PROCESSING_HISTORY_ACTION_PARTIAL = 'server_processing_partial';
+
+/** 결재 1건당 마커 1행. 결정적 id 라 재실행해도 행이 늘지 않는다. */
+export function buildServerProcessingHistoryId(approvalId: unknown): string {
+  return `srvproc-${String(approvalId ?? '').trim()}`;
+}
+
+export type ServerProcessingHistoryRow = {
+  action?: unknown;
+  comment?: unknown;
+  created_at?: unknown;
+};
+
+/**
+ * approval_history 마커 행 해석.
+ * - action 이 completed 면 재집행 금지(done)
+ * - partial 이면 재시도 허용하되 이미 성공한 단계는 건너뛴다
+ */
+export function parseServerProcessingHistoryRow(row: ServerProcessingHistoryRow | null | undefined): {
+  done: boolean;
+  processedAt: string | null;
+  steps: string[];
+} {
+  if (!row) return { done: false, processedAt: null, steps: [] };
+
+  const action = String(row.action ?? '').trim();
+  let steps: string[] = [];
+  let processedAt: string | null = null;
+
+  if (typeof row.comment === 'string' && row.comment.length > 0) {
+    try {
+      const parsed = JSON.parse(row.comment) as Record<string, unknown> | null;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        if (Array.isArray(parsed.steps)) {
+          steps = Array.from(
+            new Set(parsed.steps.map((step) => String(step ?? '').trim()).filter(Boolean)),
+          );
+        }
+        if (parsed.processed_at != null && String(parsed.processed_at).trim()) {
+          processedAt = String(parsed.processed_at);
+        }
+      }
+    } catch {
+      // 손상된 comment 는 무시 — 마커 존재 여부(action)만으로 판정한다.
+    }
+  }
+
+  if (!processedAt && row.created_at != null && String(row.created_at).trim()) {
+    processedAt = String(row.created_at);
+  }
+
+  return {
+    done: action === SERVER_PROCESSING_HISTORY_ACTION_DONE,
+    processedAt: action === SERVER_PROCESSING_HISTORY_ACTION_DONE ? processedAt : null,
+    steps,
+  };
+}
+
+/**
  * 직전 시도에서 이미 성공한 후속 처리 단계 목록.
  * 부분 실패 재시도 시 성공한 단계를 다시 실행해 중복 부작용을 내지 않기 위해 쓴다.
  */

@@ -37,9 +37,12 @@ import {
   DATE_JUMP_CONTEXT_AFTER,
   DATE_JUMP_CONTEXT_BEFORE,
   MESSAGE_PAGE_SIZE } from './메신저방데이터-types';
-import { defaultLegacySelectChatMessagesWithFallback, describeQueryError, normalizeMessageCursorTime } from './메신저방데이터-utils';
+import { defaultLegacySelectChatMessagesWithFallback, describeQueryError } from './메신저방데이터-utils';
 import { shouldApplyRoomSummary } from '@/lib/chat-room-summary';
 import { selectMessageBookmarkRows, selectMessageReactionRows } from './메신저방데이터-queries';
+
+/** 최신 페이지 창 바깥에 보존된 과거 구간에서 한 번에 재확인할 최대 건수(모바일과 동일). */
+const OLDER_RECHECK_LIMIT = 80;
 
 export function useChatRoomDataSync({
   selectedRoomId,
@@ -189,7 +192,23 @@ export function useChatRoomDataSync({
   const applyChatRoomsState = useCallback(
     async (rooms: ChatRoom[]) => {
       const prev = chatRoomsRef.current || [];
-      const mergedRooms = (rooms || []).map(dbRoom => {
+      // 같은 id 가 두 번 들어오는 것을 먼저 걷어낸다.
+      //
+      // ensureSelfChatRoom(메신저.tsx)이 POST /api/chat-rooms 응답 방을 보정 없이
+      // append 하는데, 서버가 reused:true 로 **이미 목록에 있는 방**을 돌려주면
+      // 같은 id 가 두 줄이 된다(사이드바에 같은 방 2줄 + React duplicate key 경고).
+      // 먼저 온 행이 목록 조회로 받은 완전한 행이므로 그것을 남긴다 — 뒤에 붙은
+      // 것은 같은 방이라 버려도 잃는 정보가 없다.
+      // id 가 빈 행은 서로 다른 방일 수 있으므로 묶지 않고 그대로 통과시킨다.
+      const seenRoomIds = new Set<string>();
+      const uniqueRooms = (rooms || []).filter((room: ChatRoom) => {
+        const roomId = String(room?.id || '').trim();
+        if (!roomId) return true;
+        if (seenRoomIds.has(roomId)) return false;
+        seenRoomIds.add(roomId);
+        return true;
+      });
+      const mergedRooms = uniqueRooms.map(dbRoom => {
         const localRoom = prev.find((p: ChatRoom) => p.id === dbRoom.id);
         if (localRoom && localRoom.last_message_at && dbRoom.last_message_at) {
           const localTime = toChatDate(localRoom.last_message_at).getTime();
@@ -690,11 +709,22 @@ export function useChatRoomDataSync({
             .in('room_id', roomIdsToLoad);
 
           if (beforeMessage?.createdAt) {
-            // D1 저장 포맷(SQL UTC)으로 비교. ISO 커서는 같은 시각도 누락/공집합 유발.
-            const normalizedCursorTime = normalizeMessageCursorTime(beforeMessage.createdAt);
-            if (normalizedCursorTime) {
+            // 커서는 DB 원문 created_at 을 그대로 쓴다.
+            //
+            // 예전에는 normalizeMessageCursorTime(→toUtcSqlTimestamp)으로 공백형
+            // ('YYYY-MM-DD HH:MM:SS')으로 바꿔 넘겼는데, 비교 대상 컬럼은 정규화되지
+            // 않은 원문이고 운영 messages.created_at 에는 T형
+            // ('...T11:53:25.917617+00:00')이 절반 가까이 섞여 있다. 10번째 문자가
+            // 'T'(0x54) > ' '(0x20) 이라 **같은 날짜의 T형 행은 시각과 무관하게 항상
+            // 커서보다 크고**, 아래 `.lt` 에서 전부 탈락해 그 날짜가 통째로 건너뛰어졌다.
+            // (운영 실측: 21건 이상 방 102개 중 81개에서 2,821건이 스크롤로 도달 불가)
+            //
+            // ORDER BY 도 원문 컬럼 기준이므로, 원문 커서로 비교해야 "정렬상 이 행 다음"
+            // 이라는 keyset 페이지네이션이 성립한다 — 누락도 중복도 생기지 않는다.
+            const cursorTime = String(beforeMessage.createdAt || '').trim();
+            if (cursorTime) {
               // 복합 or() 타임스탬프 파싱 이슈 회피 — created_at 단독 lt 로 페이지네이션
-              query = query.lt('created_at', normalizedCursorTime);
+              query = query.lt('created_at', cursorTime);
             }
           }
 
@@ -718,6 +748,87 @@ export function useChatRoomDataSync({
       return { messages: pageRows, hasOlder, error: null as unknown };
     },
     [selectChatMessagesWithFallback],
+  );
+
+  /**
+   * 보존한 과거 구간의 삭제·수정 여부를 다시 확인한다.
+   *
+   * fetchData 는 최근 MESSAGE_PAGE_SIZE(20)건만 다시 받아오므로, 그 창 **바깥**에서
+   * 삭제(soft delete)되거나 수정된 메시지는 감지되지 않는다. 그대로 두면 위로 스크롤해
+   * 과거를 불러온 사람의 화면에 삭제 전 원문(환자명·차트번호 등)이 계속 남고
+   * 「삭제된 메시지입니다.」로도 바뀌지 않는다 — 지운 사람은 자기 화면만 보고
+   * 끝났다고 믿는다(10차 M02-P1-04, 모바일 M02 의 PC 쪽).
+   */
+  const recheckPreservedOlderMessages = useCallback(
+    async (keptIds: string[], isCurrentRequest: () => boolean) => {
+      if (keptIds.length === 0) return;
+      try {
+        // room_id 를 반드시 함께 뽑아야 한다. messages 의 select 정책은
+        // CHAT_ROOM_MEMBER 라 게이트웨이가 응답 행의 r.room_id 로 방 멤버십을
+        // 판정하는데(lib/db/auth/policies.ts), 컬럼이 없으면 모든 행의 키가 ''
+        // 이라 비관리자에게는 항상 빈 배열이 돌아온다. 그러면 아래 "조회에 안
+        // 잡히면 하드 삭제" 분기가 보존 구간을 통째로 지운다.
+        // 관리자는 그 필터를 우회하므로 관리자 계정으로는 재현되지 않는다.
+        const { data: liveRows, error: liveError } = await db
+          .from('messages')
+          .select('id, room_id, content, is_deleted')
+          .in('id', keptIds);
+        if (!isCurrentRequest()) return;
+        // "조회 결과 없음"과 "조회 실패"를 구분한다. D1 클라이언트는 실패를 throw 하지
+        // 않고 { data: null, error } 로 돌려주므로(lib/d1-compat), error 를 안 보면
+        // 429/5xx 한 번에 보존 구간 전체를 하드 삭제로 오판한다. 실패한 tick 에서는
+        // 아무것도 제거·수정하지 않고 다음 폴링에서 다시 본다.
+        if (liveError || !Array.isArray(liveRows)) return;
+
+        const liveById = new Map(
+          liveRows.map(
+            (row) => [String((row as { id?: unknown }).id || ''), row] as const,
+          ),
+        );
+        const keptIdSet = new Set(keptIds);
+        setMessages((prev: ChatMessage[]) => {
+          let changed = false;
+          const next: ChatMessage[] = [];
+          prev.forEach((message: ChatMessage) => {
+            const messageId = String(message.id || '');
+            if (!keptIdSet.has(messageId)) {
+              next.push(message);
+              return;
+            }
+            const live = liveById.get(messageId) as
+              | { content?: unknown; is_deleted?: unknown }
+              | undefined;
+            // 조회에 안 잡히면 하드 삭제된 것이다.
+            if (!live) {
+              changed = true;
+              return;
+            }
+            // PC 타임라인은 소프트 삭제된 메시지를 목록에서 빼지 않고
+            // is_deleted 로 「삭제된 메시지입니다.」를 그린다(메신저타임라인.tsx:884).
+            // 그래서 여기서도 제거하지 않고 서버 값으로 맞춰만 준다.
+            const liveDeleted = Boolean(live.is_deleted);
+            const deletedChanged = liveDeleted !== Boolean(message.is_deleted);
+            const contentChanged =
+              live.content !== undefined &&
+              String(live.content ?? '') !== String(message.content ?? '');
+            if (!deletedChanged && !contentChanged) {
+              next.push(message);
+              return;
+            }
+            changed = true;
+            next.push({
+              ...message,
+              ...(contentChanged ? { content: live.content as ChatMessage['content'] } : {}),
+              ...(deletedChanged ? { is_deleted: liveDeleted } : {}),
+            });
+          });
+          return changed ? next : prev;
+        });
+      } catch {
+        // 재확인 실패는 조용히 넘긴다 — 다음 폴링에서 다시 본다.
+      }
+    },
+    [setMessages],
   );
 
   const syncVisibleMessageMetadata = useCallback(
@@ -1169,7 +1280,11 @@ export function useChatRoomDataSync({
         if (beforeResult.error) throw beforeResult.error;
         if (!isCurrentRequest()) return { ok: false, reason: 'failed' };
 
-        const targetCreatedAt = normalizeMessageCursorTime(targetMessage.created_at);
+        // 위 fetchMessagePage(before 구간)와 같은 기준이어야 한다 — 원문 created_at.
+        // 정규화(공백형)해서 gt 하면 T형 대상 메시지의 **같은 날짜 이전 T형 행들**이
+        // after 구간으로 들어와 DATE_JUMP_CONTEXT_AFTER 정원을 잡아먹고,
+        // 정작 뒤쪽 메시지가 잘린다(DLT-05 와 같은 사전순 비교 결함).
+        const targetCreatedAt = String(targetMessage.created_at || '').trim();
         const { data: afterRows, error: afterError } = await selectChatMessagesWithFallback<ChatMessage[]>(
           (selectClause) => {
             let afterQuery = db
@@ -1370,6 +1485,19 @@ export function useChatRoomDataSync({
       setHasOlderMessages(true);
     }
 
+    // 아래 병합에서 최신 페이지 창 **바깥**이라 그대로 보존될 과거 구간의 id.
+    // 이 구간은 다시 조회되지 않으므로 삭제·수정 여부를 따로 재확인해야 한다.
+    const latestPageIds = new Set(
+      loadedMessages.map((message: ChatMessage) => String(message.id || '')),
+    );
+    const preservedOlderIds = isRoomSwitch
+      ? []
+      : messagesRef.current
+          .filter((message: ChatMessage) => roomIdsToLoad.includes(String(message.room_id || '')))
+          .map((message: ChatMessage) => String(message.id || ''))
+          .filter((messageId) => messageId && !messageId.startsWith('temp-') && !latestPageIds.has(messageId))
+          .slice(-OLDER_RECHECK_LIMIT);
+
     setMessages((prev) => {
       const localOnly = prev.filter((message: ChatMessage) => {
         const messageId = String(message.id || '');
@@ -1400,6 +1528,9 @@ export function useChatRoomDataSync({
     });
     setTimelineRoomId?.(roomIdForFetch);
     setLoadingRoomId?.(null);
+
+    // 보존 구간 재확인. void = 첫 페인트를 막지 않는다.
+    void recheckPreservedOlderMessages(preservedOlderIds, isCurrentRequest);
 
     // Clear open-room unread badge immediately (do not wait for deferred meta).
     const targetRoomIds = roomIdsToLoad.length > 0 ? roomIdsToLoad : [roomIdForFetch];
@@ -1434,7 +1565,9 @@ export function useChatRoomDataSync({
     fetchDataRequestSeqRef,
     fetchMessagePage,
     isRoomAccessibleToCurrentUser,
+    messagesRef,
     pendingBottomAlignRoomIdRef,
+    recheckPreservedOlderMessages,
     requestBottomAlignmentHold,
     repairDirectRooms,
     resolveStaffProfile,

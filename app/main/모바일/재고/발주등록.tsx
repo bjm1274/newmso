@@ -109,23 +109,30 @@ export default function 발주등록({ user, onBack }: 발주등록Props) {
   const loadPickers = useCallback(async () => {
     setCatalogLoading(true);
     try {
+      // SD-A03: 운영 inventory 28컬럼에 `unit` 은 없다(unit_price 는 있다).
+      // 없는 컬럼을 select 하면 SQLITE_ERROR 로 쿼리가 통째로 죽어 품목 목록이 늘 비어 있었다.
+      // limit(300) 도 없앤다 — 이 목록은 클라이언트에서 검색·필터하므로 상한이 있으면
+      // 운영 1,032건 중 앞 300건만 검색된다. 월/일 범위가 아니라 전건이 필요한 조회다.
       let invQ = db
         .from('inventory')
-        .select('id, name, unit, quantity, unit_price, price, company')
-        .order('name')
-        .limit(300);
+        .select('id, name, item_name, quantity, unit_price, price, company')
+        .order('name');
       if (company && company !== '전체') invQ = invQ.eq('company', company);
       const [invRes, supRes] = await Promise.all([
         invQ,
         // suppliers 스키마에 company 컬럼 없음 — id/name만 조회
         db.from('suppliers').select('id, name').order('name').limit(100),
       ]);
+      // error 를 안 보면 빈 목록과 조회 실패를 구분할 수 없다 — 위 catch 로 올린다.
+      if (invRes.error) throw invRes.error;
       const invRows = Array.isArray(invRes.data) ? invRes.data : [];
       setCatalog(
         invRows.map((r: Record<string, unknown>) => ({
           id: String(r.id ?? ''),
-          name: String(r.name ?? '').trim() || '(미명칭)',
-          unit: String(r.unit ?? '개').trim() || '개',
+          // name 이 비어 있는 운영 행이 2건 있어 item_name 으로 보충한다.
+          name: String(r.name ?? '').trim() || String(r.item_name ?? '').trim() || '(미명칭)',
+          // 단위 컬럼이 운영에 없다 — 표시는 '개' 로 통일한다.
+          unit: '개',
           price: Number(r.unit_price ?? r.price ?? 0) || 0,
           stock: Number(r.quantity ?? 0) || 0,
         })),

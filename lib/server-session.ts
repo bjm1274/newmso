@@ -556,24 +556,65 @@ export async function verifySessionTokenWithSecret(token: string | null | undefi
   }
 }
 
+/** 조회가 던졌을 때 다시 시도하는 횟수 (총 시도 = 1 + 이 값). */
+const FORCE_LOGOUT_CHECK_RETRIES = 2;
+/** 재시도 간 대기(ms). attempt 마다 배수로 늘어난다 — 60ms, 120ms. */
+const FORCE_LOGOUT_CHECK_RETRY_DELAY_MS = 60;
+
 /**
  * DB의 최신 force_logout_at과 비교하여 무효화 여부 검증 (민감 API용)
+ *
+ * 조회 실패 시 fail-closed(= 무효화된 토큰으로 간주)다. 예전에는 catch 가 false 를
+ * 돌려줘서, D1 조회가 실패하는 동안 강제 로그아웃·퇴사 세션 회수가 통째로 무력화됐다.
+ * 이 판정이 저장소 유일한 세션 무효화 수단이라(토큰 안 force_logout_at 은 발급 시점
+ * 스냅샷이라 재발급되면 사라진다) 여기가 열리면 무효화 자체가 없는 것과 같다.
+ *
+ * 다만 그냥 닫으면 안 되는 이유가 있어서 재시도를 먼저 둔다.
+ *  - 이 함수는 readSessionFromRequest 안에서 불리고, 그 함수는 API 라우트 140여 곳이
+ *    **요청마다** 부른다. 즉 실패 판정 한 번의 영향 범위가 전 직원 × 전 요청이다.
+ *  - 게다가 GET /api/auth/session 은 세션이 null 이면 쿠키를 지운다
+ *    (app/api/auth/session/route.ts:14-19 clearSessionCookie). 클라이언트는 30분 주기 +
+ *    포그라운드 복귀마다 이 GET 을 치므로(app/main/page.tsx:657-712), 순간 오류 한 번이
+ *    "잠깐 401" 이 아니라 **비밀번호 재입력이 필요한 진짜 로그아웃**이 된다.
+ * 그래서 PK 단건 조회를 세 번까지 시도하고, 세 번 다 실패했을 때만 닫는다. 순간 오류는
+ * 대개 첫 재시도에서 풀리고, 세 번 연속 실패는 D1 장애 — 그때는 ERP 자체가 못 쓰는
+ * 상태이므로 세션을 살려 두는 쪽의 이득이 없다.
+ *
+ * 행이 없을 때(row == null)는 그대로 통과시킨다. 사번 없는 특권 로그인처럼
+ * staff_members 에 대응 행이 없는 정상 세션이 있어서, 여기까지 닫으면 정상 사용자가 막힌다.
  */
 export async function isStaffForceLoggedOutInDb(d1: unknown, staffId: string, tokenIat?: number): Promise<boolean> {
+  // 판정에 필요한 입력이 없으면 '조회 실패' 가 아니라 '판정 대상 아님' 이다 → 통과.
+  // (binding 부재는 호출부 readSessionFromRequest 가 이미 앞에서 걸러낸다.)
   if (!staffId || !tokenIat || !d1) return false;
-  try {
-    const bind = d1 as { prepare: (sql: string) => { bind: (...args: unknown[]) => { first: <T>() => Promise<T | null> } } };
-    const row = await bind.prepare('SELECT force_logout_at FROM staff_members WHERE id = ? LIMIT 1').bind(staffId).first<{ force_logout_at?: string | null }>();
-    if (row?.force_logout_at) {
-      const dbLogoutTime = new Date(String(row.force_logout_at)).getTime() / 1000;
-      if (Number.isFinite(dbLogoutTime) && dbLogoutTime > tokenIat) {
-        return true; // 무효화된 토큰
+
+  const bind = d1 as { prepare: (sql: string) => { bind: (...args: unknown[]) => { first: <T>() => Promise<T | null> } } };
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt <= FORCE_LOGOUT_CHECK_RETRIES; attempt += 1) {
+    try {
+      const row = await bind.prepare('SELECT force_logout_at FROM staff_members WHERE id = ? LIMIT 1').bind(staffId).first<{ force_logout_at?: string | null }>();
+      if (row?.force_logout_at) {
+        const dbLogoutTime = new Date(String(row.force_logout_at)).getTime() / 1000;
+        if (Number.isFinite(dbLogoutTime) && dbLogoutTime > tokenIat) {
+          return true; // 무효화된 토큰
+        }
+      }
+      return false; // 조회 성공 — 무효화 기록 없음
+    } catch (err) {
+      lastError = err;
+      if (attempt < FORCE_LOGOUT_CHECK_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, FORCE_LOGOUT_CHECK_RETRY_DELAY_MS * (attempt + 1)));
       }
     }
-  } catch (err) {
-    console.warn('[isStaffForceLoggedOutInDb] check failed', err);
   }
-  return false;
+
+  // 여기까지 왔으면 재시도까지 전부 실패 — 무효화 여부를 알 수 없다. 모른 채로 통과시키지 않는다.
+  console.error(
+    `[isStaffForceLoggedOutInDb] ${FORCE_LOGOUT_CHECK_RETRIES + 1}회 모두 실패 — 세션을 무효 처리합니다(fail-closed). staffId=${staffId}`,
+    lastError,
+  );
+  return true;
 }
 
 export async function verifySessionToken(token?: string | null) {

@@ -8,6 +8,9 @@ import {
   hasBlockedUploadExtension,
   normalizeUploadFileName,
   normalizeUploadMimeType } from '@/lib/upload-mime';
+import {
+  ACTIVE_CONTENT_UPLOAD_ERROR,
+  isActiveContentUpload } from '@/app/api/storage/object/content-policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -95,6 +98,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
     const mimeType = normalizeUploadMimeType(rawFileName, file.type ?? '');
+    // 짝 라우트(/api/approval/upload)와 같은 이유 — `'text/'`·`'image/'` 프리픽스가
+    // text/html·image/svg+xml 을 통과시켜 저장형 XSS 경로가 열려 있었다.
+    if (isActiveContentUpload(rawFileName, mimeType)) {
+      return NextResponse.json({ error: ACTIVE_CONTENT_UPLOAD_ERROR }, { status: 415 });
+    }
     if (!isAllowedMime(mimeType)) {
       return NextResponse.json(
         { error: `허용되지 않는 파일 형식입니다: ${mimeType}` },

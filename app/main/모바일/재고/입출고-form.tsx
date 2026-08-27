@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from '@/lib/toast';
 import { db } from '@/lib/db-client';
 import { formatStockApiError, postStockMovement } from '@/lib/inventory-stock-client';
+import { fetchAllRowsPaged } from '@/app/main/기능부품/재고관리워크센터/data-helpers';
 import {
   MFormHeader,
   MField,
@@ -52,10 +53,19 @@ export function IORecordForm({
     void (async () => {
       const u = user as unknown as Record<string, unknown> | null;
       const company = typeof u?.company === 'string' ? u.company : null;
-      let q = db.from('inventory').select('id, name, item_name, quantity, stock, company, department, location, unit_price').order('item_name').limit(500);
-      if (company) q = q.eq('company', company);
-      const { data } = await q;
-      if (!cancelled && data) setItems(data as InvItem[]);
+      // INV-01: limit(500) 이면 운영 품목 1,032건 중 532건이 이 선택 목록에 아예 안 떠
+      // 그 품목은 모바일에서 입출고를 걸 수 없다. 전량을 range 페이징으로 받는다.
+      // item_name 은 동값이 있어 페이지 경계가 흔들리므로 id 를 2차 정렬로 둔다.
+      const buildQ = () => {
+        const q = db
+          .from('inventory')
+          .select('id, name, item_name, quantity, stock, company, department, location, unit_price')
+          .order('item_name')
+          .order('id');
+        return company ? q.eq('company', company) : q;
+      };
+      const { rows } = await fetchAllRowsPaged(buildQ);
+      if (!cancelled) setItems(rows as unknown as InvItem[]);
     })();
     return () => {
       cancelled = true;

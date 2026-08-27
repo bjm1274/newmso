@@ -26,6 +26,9 @@ import {
   isRawUploadRequest,
   readRawUpload,
   readRawUploadMeta } from '@/lib/upload-raw-request';
+import {
+  ACTIVE_CONTENT_UPLOAD_ERROR,
+  isActiveContentUpload } from '@/app/api/storage/object/content-policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,6 +79,16 @@ function detectAttachmentType(fileName: string, mimeType: string): string {
 function validateUploadTarget(fileName: string, mimeType: string, fileSize: number): void {
   if (!fileName.trim()) {
     throw new Error('업로드할 파일 이름이 없습니다.');
+  }
+
+  // 예전에는 이 라우트에 MIME·확장자 검사가 **하나도** 없었다. 그래서 `공지.html`
+  // (text/html)·`로고.svg`(image/svg+xml)가 신고 그대로 R2 에 저장되고,
+  // /api/storage/object 가 그 Content-Type 을 앱 오리진에서 inline 으로 내보내
+  // 모바일 '열기'(window.open)·PC 이미지 첨부 앵커가 그것을 최상위 탭으로 열었다
+  // — 저장형 XSS. 서빙 쪽은 이미 막았고 여기서 받는 것 자체를 거절해 2중으로 막는다.
+  // 세 경로(플랜·raw·formData)가 모두 이 함수를 거치므로 여기 한 곳이면 된다.
+  if (isActiveContentUpload(fileName, mimeType)) {
+    throw new Error(ACTIVE_CONTENT_UPLOAD_ERROR);
   }
 
   // 예전에는 여기서 이미지가 무조건 early return 이었다. 그래서 image/* 로만 신고하면

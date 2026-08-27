@@ -195,7 +195,9 @@ function MobileProfileEditBase({ user, onBack }: 정보수정Props) {
         toast(payload?.error || '비밀번호 변경에 실패했습니다.', 'error');
         return;
       }
-      toast('비밀번호가 변경되었습니다. 다음 로그인부터 새 비밀번호를 사용해 주세요.', 'success');
+      // PC 마이페이지와 같은 문구 — 변경과 동시에 다른 기기 세션이 실제로 끊긴다
+      // (app/api/auth/change-password). 이 기기만 새 토큰으로 이어진다.
+      toast('비밀번호가 변경되었습니다. 다음 로그인부터 새 비밀번호를 사용해 주세요. 이 기기를 제외한 다른 기기는 모두 로그아웃됩니다.', 'success');
     } catch {
       toast('비밀번호 변경 중 오류가 발생했습니다.', 'error');
     }

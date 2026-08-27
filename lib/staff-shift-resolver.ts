@@ -5,9 +5,13 @@
  * DB 스키마 변경(staff_members.shift_id 단일 → staff_shift_assignments 다중)에 대응한다.
  *
  * 폴백 우선순위:
- *  1. 근태기록(attendances/attendance)의 shift_id (날짜 특정 시)
+ *  1. shift_assignments(날짜별 근무표 배정)의 shift_id (날짜 특정 시)
  *  2. staff_shift_assignments WHERE is_primary = TRUE
  *  3. staff_members.shift_id (legacy 호환)
+ *
+ * NOTE: 예전에는 1번을 근태기록(attendances/attendance)의 shift_id 로 읽었으나
+ *       두 테이블 어디에도 shift_id 컬럼이 없다(PRAGMA 실측). 날짜별 배정을 담는
+ *       실테이블은 shift_assignments(staff_id, work_date, shift_id, shift_name)다.
  */
 
 import { z } from 'zod';
@@ -29,10 +33,10 @@ const StaffShiftAssignmentSchema = z.object({
 
 export type StaffShiftAssignment = z.infer<typeof StaffShiftAssignmentSchema>;
 
-const AttendanceShiftRowSchema = z.object({
+/** shift_assignments — 날짜별 근무표 배정 (운영 실컬럼: id, staff_id, work_date, shift_id, company_name, shift_name) */
+const DateShiftAssignmentRowSchema = z.object({
   staff_id: z.string(),
   work_date: z.string().optional().nullable(),
-  date: z.string().optional().nullable(),
   shift_id: z.string().optional().nullable() });
 
 const StaffLegacyRowSchema = z.object({
@@ -43,7 +47,9 @@ const StaffLegacyRowSchema = z.object({
 // 반환 타입
 // ---------------------------------------------------------------------------
 
-export type ShiftResolutionSource = 'attendance' | 'primary' | 'legacy' | 'none';
+// 'attendance' 는 근태기록에서 shift_id 를 읽던 시절의 값. 근태 테이블에는 그 컬럼이
+// 없어 실제로는 한 번도 반환된 적이 없다. 날짜별 배정은 'assignment' 로 구분한다.
+export type ShiftResolutionSource = 'assignment' | 'attendance' | 'primary' | 'legacy' | 'none';
 
 export type ResolvedShift = {
   shiftId: string | null;
@@ -212,30 +218,23 @@ export async function resolveShiftForDate(
   const safeId = z.string().min(1).parse(staffId);
   const safeDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).parse(date);
 
-  // 1. 근태기록(attendances 테이블) shift_id
-  const { data: attData } = await db
-    .from('attendances')
+  // 1. 날짜별 근무표 배정(shift_assignments)
+  //    예전 코드는 attendances/attendance 의 shift_id 를 읽었지만 두 테이블 모두
+  //    그런 컬럼이 없어 이 단계가 항상 헛돌았다. 날짜별 배정의 실테이블은 여기다.
+  const { data: assignData, error: assignError } = await db
+    .from('shift_assignments')
     .select('staff_id, work_date, shift_id')
     .eq('staff_id', safeId)
     .eq('work_date', safeDate)
-    .maybeSingle();
+    .order('created_at', { ascending: false })
+    .limit(1);
 
-  const attParsed = AttendanceShiftRowSchema.safeParse(attData);
-  if (attParsed.success && attParsed.data.shift_id) {
-    return { shiftId: attParsed.data.shift_id, isPrimary: false, source: 'attendance' };
-  }
-
-  // attendance 테이블도 확인 (일부 환경에서 혼용)
-  const { data: attLegacyData } = await db
-    .from('attendance')
-    .select('staff_id, date, shift_id')
-    .eq('staff_id', safeId)
-    .eq('date', safeDate)
-    .maybeSingle();
-
-  const attLegacyParsed = AttendanceShiftRowSchema.safeParse(attLegacyData);
-  if (attLegacyParsed.success && attLegacyParsed.data.shift_id) {
-    return { shiftId: attLegacyParsed.data.shift_id, isPrimary: false, source: 'attendance' };
+  if (!assignError) {
+    const assignRow = (assignData as unknown[] | null | undefined)?.[0];
+    const assignParsed = DateShiftAssignmentRowSchema.safeParse(assignRow);
+    if (assignParsed.success && assignParsed.data.shift_id) {
+      return { shiftId: assignParsed.data.shift_id, isPrimary: false, source: 'assignment' };
+    }
   }
 
   // 2. staff_shift_assignments is_primary=TRUE

@@ -210,6 +210,12 @@ export async function fetchPayrollWorkcenterData({
   }
 
   let staffs: StaffMember[] = [];
+  // P10-01: payroll_records 에는 회사 컬럼 자체가 없다(운영 33컬럼 중 0개).
+  // 회사 선택을 반영하려면 그 회사 소속 staff_id 집합으로 걸러야 한다.
+  // - 아래 staffs 필터(재직/중도퇴사/그룹계정)를 거치기 **전**의 원본 행에서 만든다.
+  //   그래야 기존 '전체' 합계에서 빠지던 사람이 회사 선택 때만 추가로 빠지는 비대칭이 안 생긴다.
+  // - '전체' 선택이거나 직원 마스터 조회가 실패하면 null 로 두어 기존 동작(무필터)을 유지한다.
+  let selectedCoStaffIds: Set<string> | null = null;
   try {
     const { data, error } = await db
       .from('staff_members')
@@ -223,6 +229,15 @@ export async function fetchPayrollWorkcenterData({
       );
     if (error) throw new Error(error.message);
     const rows = Array.isArray(data) ? data : [];
+    if (selectedCo && selectedCo !== '전체') {
+      selectedCoStaffIds = new Set(
+        rows
+          .filter((row): row is NonNullable<typeof row> => row != null && typeof row === 'object')
+          .filter((row) => str((row as unknown as Record<string, unknown>).company) === selectedCo)
+          .map((row) => str((row as unknown as Record<string, unknown>).id))
+          .filter(Boolean),
+      );
+    }
     staffs = rows
       .filter((row): row is NonNullable<typeof row> => row != null && typeof row === 'object')
       .map((raw) => {
@@ -329,8 +344,17 @@ export async function fetchPayrollWorkcenterData({
 
   if (signal?.aborted) throw new DOMException('aborted', 'AbortError');
 
-  const records = extractRecords(curRes, errors, `payroll_records ${yearMonth}`);
-  const recordsPrev = extractRecords(prevRes, errors, `payroll_records ${yearMonthPrev}`);
+  // 회사 선택을 KPI·4대보험 합계에 반영한다(P10-01).
+  // 이 필터가 없어서 '수연의원'(4명)을 골라도 3개 회사 38명분 금액이 그대로 떴고,
+  // 그 합계에 선택 회사의 산재요율·사업주부담률을 곱해 신고액 자릿수가 틀어졌다.
+  const scopeIds = selectedCoStaffIds; // let 은 콜백 안에서 좁혀지지 않으므로 const 로 고정
+  const scopeRecords = (list: PayrollRecordNormalized[]): PayrollRecordNormalized[] =>
+    scopeIds ? list.filter((r) => scopeIds.has(r.staff_id)) : list;
+
+  const records = scopeRecords(extractRecords(curRes, errors, `payroll_records ${yearMonth}`));
+  const recordsPrev = scopeRecords(
+    extractRecords(prevRes, errors, `payroll_records ${yearMonthPrev}`),
+  );
 
   return {
     policy,

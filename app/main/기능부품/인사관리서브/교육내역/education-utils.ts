@@ -189,17 +189,28 @@ export async function upsertEducationCompletionWithFallback(
   db: SupabaseLike,
   payload: EducationCompletionLikeRow,
 ) {
-  let upsertResult = await db.from('education_completions').upsert([
-    {
-      staff_id: payload.staff_id,
-      education_name: payload.education_name,
-      certificate_url: payload.certificate_url ?? null },
-  ]);
+  // 충돌 기준을 반드시 넘긴다. 안 넘기면 db-client 가 INSERT OR REPLACE 로 폴백하는데,
+  // 이 테이블의 유니크는 PK(id)가 아니라 UNIQUE INDEX (staff_id, education_name) 이다 —
+  // 그러면 기존 이수 행이 DELETE 후 재삽입되어 id·created_at 과, 두 번째(폴백) 호출에서는
+  // certificate_url 까지 날아갔다. 게다가 id 없는 replace 는 게이트웨이의 update 정책
+  // 검사를 통째로 건너뛴다.
+  const EDUCATION_COMPLETION_CONFLICT = 'staff_id,education_name';
+
+  let upsertResult = await db.from('education_completions').upsert(
+    [
+      {
+        staff_id: payload.staff_id,
+        education_name: payload.education_name,
+        certificate_url: payload.certificate_url ?? null },
+    ],
+    { onConflict: EDUCATION_COMPLETION_CONFLICT },
+  );
 
   if (isMissingColumnError(upsertResult.error, 'certificate_url')) {
-    upsertResult = await db.from('education_completions').upsert([
-      { staff_id: payload.staff_id, education_name: payload.education_name },
-    ]);
+    upsertResult = await db.from('education_completions').upsert(
+      [{ staff_id: payload.staff_id, education_name: payload.education_name }],
+      { onConflict: EDUCATION_COMPLETION_CONFLICT },
+    );
   }
 
   if (!upsertResult.error) return { error: null, source: 'education_completions' as const };

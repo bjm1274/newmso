@@ -1,21 +1,33 @@
 /**
  * absent-auto-create.ts
  *
- * 매일 자정 이후(새벽) 전날 근태 기록이 없는 재직 직원에 대해
- * attendance / attendances 양 테이블에 '결근(absent)' 행을 자동 생성한다.
+ * 매일 새벽(KST 02:00) 크론으로 전날 근태를 마감한다.
  *
- * 단, **전날이 그 직원의 소정근로일일 때만** 생성한다.
- *   - 교대 근무자: 그날 근무 배정이 있어야 결근이다. 배정이 없으면 오프다.
- *   - 배정표 미사용 직원: 평일이고 공휴일이 아닐 때만 결근이다.
+ * ── 1단계: 결근 자동 생성 ──
+ * **근무표(shift_assignments)에 실근무가 배정됐는데 근태 기록이 없는 직원**만 결근이다.
  *
- * 또한 출근 체크인만 하고 퇴근 체크아웃을 하지 않은 직원도 자동으로 처리한다:
- *   - 출근 후 4시간 이상 근무한 경우 → '조퇴(early_leave)' 처리
- *   - 출근 후 4시간 미만 근무한 경우 → '결근(absent)' 처리
+ * 예전에는 판정이 반대였다 — "근태 기록이 없으면 결근"이라, 배정표가 없는 직원은
+ * 평일이라는 이유만으로 결근이 됐다. 그래서 출퇴근 체크 기능을 쓴 적이 없는 급여직원
+ * (병원장·원장 등)에게 매 평일 유령 결근이 찍혔고, 그 결근 하나하나가
+ * absent_use_daily_rate=1 로 일급 전액 공제 + 월 만근 연차 박탈로 이어졌다(10차 LV-01).
+ *
+ * 결근이 아닌 것:
+ *   - 그날 배정 행이 아예 없음 (= 오프)
+ *   - 배정 셀을 비운 행 (shift_id·shift_name 둘 다 NULL — 근무표 UI 가 배정을 지우면
+ *     행을 지우지 않고 shift_id 를 NULL 로 덮어쓴다. RosterWorkspace.tsx:254 참조)
+ *   - 휴무·휴가·외근·재택 성격의 배정
+ *   - 비교대(상근) 배정이 주말·공휴일·회사지정휴일에 남아 있는 경우 (10차 LV-04)
+ *
+ * ── 2단계: 출근 체크인만 하고 퇴근 체크아웃을 하지 않은 행 마감 ──
+ * 근무시간 추정의 종료 경계를 **근무표의 퇴근 예정시각(work_shifts.end_time)** 으로 잡는다.
+ * 고정 18:00 KST 경계는 오후 출근자를 4시간 미만으로 떨어뜨려 '결근'(일급 전액 공제)으로
+ * 만들고, 18시 이후 출근자는 480분 폴백으로 '조퇴'(시급 1/6)가 되는 역전을 낳았다(10차 DLT-01).
  *
  * - attendance (단수): date, check_in/out, status
  * - attendances (복수): work_date, check_in_time/out, status
  *
- * 크론 호출: /api/cron/absent-auto-create (KST 00:30 매일)
+ * 크론 호출: /api/cron/absent-auto-create
+ * (cloudflare-worker.ts 의 '0 17 * * *' 슬롯 = KST 02:00 매일)
  */
 
 import { getD1Binding } from '@/lib/db';
@@ -24,27 +36,74 @@ import { syncAttendanceToAttendances, LEGACY_STATUS_TO_MODERN } from '@/lib/atte
 import { getKoreanTodayString, formatKoreanDateKey } from '@/lib/seoul-time';
 import { isKoreanPublicHoliday } from '@/lib/korean-public-holidays';
 
-/** 전날 날짜(YYYY-MM-DD)를 KST 기준으로 반환 */
-function getYesterdayKST(now: Date = new Date()): string {
-  const d = new Date(now);
-  d.setDate(d.getDate() - 1);
-  return formatKoreanDateKey(d);
-}
-
-/** YYYY-MM-DD 에 일수를 더한 날짜 키 */
+/** YYYY-MM-DD 에 일수를 더한 날짜 키 (UTC 산술 — 런타임 로컬 TZ 를 타지 않는다) */
 function shiftDateKey(dateKey: string, days: number): string {
   const [year, month, day] = dateKey.split('-').map(Number);
   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
 
 /**
- * 휴무/오프 성격의 근무유형. 배정이 있어도 소정근로일이 아니다.
- * (급여정산 화면의 소정근로일수 집계와 같은 판정 기준을 쓴다.)
+ * 전날 날짜(YYYY-MM-DD)를 KST 기준으로 반환.
+ *
+ * setDate/getDate 는 런타임 로컬 TZ 를 쓴다. Workers 는 UTC 라 KST 자정 전후에
+ * 하루가 어긋날 수 있어, KST 날짜 키를 먼저 만든 뒤 키 위에서 -1 한다.
  */
-const OFF_LIKE_SHIFT_NAME = /off|휴무|휴일|연차|leave/i;
+function getYesterdayKST(now: Date = new Date()): string {
+  return shiftDateKey(formatKoreanDateKey(now), -1);
+}
 
-/** 교대 근무자 판정에 쓸 배정표 조회 범위(전날 기준 ±일) */
-const SHIFT_LOOKUP_WINDOW_DAYS = 30;
+/**
+ * 결근 판정에서 제외할 배정(오프·휴가·예외 근무형태).
+ *
+ * **운영 D1 실측값으로 만들었다.** 코드가 가정하던 값과 실제 값이 달랐다.
+ *  - work_shifts.shift_type 실측: 상근 / 비상근 / 2교대 / 3교대 / 나이트전담 / 야간전담 /
+ *    데이전담 / 데이이브전담 / 1일근무1일휴무 / 2일근무 1일휴무 / 휴무
+ *  - work_shifts.name 에 `1on1off`(08:00~20:00, 실근무 교대)가 있다. 예전 정규식
+ *    `/off|휴무|.../i` 는 이 이름을 '오프'로 오분류해 1on1off 배정자를 결근 판정에서
+ *    통째로 빼고 있었다. 그래서 `off`·`오프` 는 **단독 토큰일 때만** 오프로 본다.
+ *  - `1일근무1일휴무`·`2일근무 1일휴무` 는 '휴무' 를 포함하지만 실근무 유형이다.
+ *    그래서 shift_type 은 부분일치가 아니라 **정확일치** 로만 본다.
+ *  - 외근·재택·교육·출장·파견은 현재 운영 work_shifts 에 **존재하지 않는다**(실측).
+ *    출퇴근 체크로 관리되는 근무형태가 아니므로 생길 때를 대비해 미리 제외해 둔다.
+ */
+const OFF_LIKE_SHIFT_TYPES = new Set(['휴무', '휴일', '오프', '연차', 'off']);
+const OFF_LIKE_SHIFT_NAME =
+  /휴무|휴일|연차|반차|휴가|외근|재택|교육|출장|파견|^\s*(off|오프)\s*$/i;
+
+/** 근무유형 이름/유형이 '그날 출근하지 않는 배정'인가 */
+function isOffLikeShift(shiftName: string, shiftType: string): boolean {
+  if (OFF_LIKE_SHIFT_TYPES.has(shiftType.trim().toLowerCase())) return true;
+  if (OFF_LIKE_SHIFT_TYPES.has(shiftType.trim())) return true;
+  return OFF_LIKE_SHIFT_NAME.test(shiftName);
+}
+
+/**
+ * 'HH:mm' / 'HH:mm:ss' 를 그 날짜의 KST 순간으로 만든다.
+ * Workers 는 UTC 라 Date 생성에 로컬 시각 API 를 쓰면 9시간 어긋난다 — 오프셋을 명시한다.
+ */
+function toKstInstant(dateKey: string, clock: string): Date | null {
+  const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(String(clock || '').trim());
+  if (!m) return null;
+  const hh = String(Number(m[1])).padStart(2, '0');
+  const at = new Date(`${dateKey}T${hh}:${m[2]}:${m[3] ?? '00'}+09:00`);
+  return Number.isNaN(at.getTime()) ? null : at;
+}
+
+/**
+ * DB 타임스탬프를 Date 로 파싱한다.
+ *
+ * 운영 attendance.check_in 은 전부 T형이고 오프셋(`Z` 또는 `+00:00`)을 달고 있다(실측 3,133건).
+ * 다만 오프셋 없는 값이 섞여 들어오면 ES 규격상 **로컬 시각**으로 해석되므로,
+ * lib/date-formatter 의 parseDbTimestamp 규약과 같게 UTC 로 고정한다.
+ */
+function parseDbInstant(value: string): Date | null {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(raw);
+  const normalized = hasZone ? raw : `${raw.replace(' ', 'T')}Z`;
+  const at = new Date(normalized);
+  return Number.isNaN(at.getTime()) ? null : at;
+}
 
 interface StaffMember {
   id: string;
@@ -113,72 +172,143 @@ async function fetchStaffsWithoutYesterdayAttendance(yesterday: string): Promise
   return rows as unknown as StaffMember[];
 }
 
+/** 전날 근무표에 배정된 실근무 시프트 1건 */
+export interface ScheduledShift {
+  /** 배정 행의 회사(직원 소속). 회사 지정 휴일 판정에 쓴다. */
+  companyName: string;
+  shiftName: string;
+  shiftType: string;
+  /** 근무표의 출근/퇴근 예정시각 'HH:mm[:ss]'. 레거시 배정(shift_name 만 있는 행)은 빈 문자열 */
+  startTime: string;
+  endTime: string;
+  /** work_shifts.is_shift — 교대·주말근무 유형인가 */
+  isShiftWork: boolean;
+}
+
 export interface ScheduleContext {
-  /** 전날 실제 근무가 배정된 직원 (오프·휴무 배정은 제외) */
-  scheduledYesterday: Set<string>;
-  /** 배정표로 근무일이 정해지는 직원 (= 교대 근무자) */
-  shiftWorkers: Set<string>;
-  /** 전날이 주말이거나 공휴일인가 — 배정표를 쓰지 않는 직원의 판정 기준 */
-  yesterdayIsNonWorkingDay: boolean;
+  yesterday: string;
+  /** 전날 실근무가 배정된 직원 → 그 배정 (오프·휴무·빈 배정은 애초에 안 들어온다) */
+  scheduledYesterday: Map<string, ScheduledShift>;
+  /** 전날이 토·일인가 */
+  yesterdayIsWeekend: boolean;
+  /** 전날이 법정공휴일인가 */
+  yesterdayIsPublicHoliday: boolean;
+  /** 전날을 휴일로 지정한 회사 이름 집합. '전체' 가 들어 있으면 전 회사 휴일이다. */
+  holidayCompanies: Set<string>;
 }
 
 /**
  * 전날이 **누구의 소정근로일이었는지** 판정하기 위한 자료를 모은다.
  *
- * 예전에는 이 판정이 아예 없어서, 근태 행이 없는 재직자를 전부 결근으로 만들었다.
- * 토·일요일마다 전 직원에게 결근이 찍히고 공휴일도 마찬가지였으며, 교대 근무자의
- * 오프도 결근이 됐다. `absent_use_daily_rate` 가 켜져 있으면 그 결근 하나하나가
- * 일급만큼 급여에서 빠지므로, 한 달이면 존재하지 않는 결근 8~10건이 쌓인다.
+ * 조회 범위는 전날 하루다. 예전에는 ±30일 창을 읽어 "창 안에 배정이 하나라도 있으면
+ * 교대 근무자"라는 간접 판정을 했는데, 창 밖의 직원이 폴백으로 떨어져 평일마다
+ * 결근이 됐다(10차 LV-01). 지금은 그날 배정 자체가 유일한 판정 근거다.
  */
 async function loadScheduleContext(yesterday: string): Promise<ScheduleContext> {
   const rows = await queryD1(
-    `SELECT sa.staff_id, sa.work_date, sa.shift_name AS assigned_shift_name, ws.name AS shift_name
+    `SELECT sa.staff_id,
+            sa.company_name,
+            sa.shift_id,
+            sa.shift_name AS assigned_shift_name,
+            ws.name       AS shift_name,
+            ws.shift_type AS shift_type,
+            ws.start_time AS start_time,
+            ws.end_time   AS end_time,
+            ws.is_shift   AS is_shift
        FROM shift_assignments sa
        LEFT JOIN work_shifts ws ON ws.id = sa.shift_id
-      WHERE sa.work_date >= ? AND sa.work_date <= ?`,
-    [
-      shiftDateKey(yesterday, -SHIFT_LOOKUP_WINDOW_DAYS),
-      shiftDateKey(yesterday, SHIFT_LOOKUP_WINDOW_DAYS),
-    ],
+      WHERE sa.work_date = ?`,
+    [yesterday],
   );
 
-  const scheduledYesterday = new Set<string>();
-  const shiftWorkers = new Set<string>();
+  const scheduledYesterday = new Map<string, ScheduledShift>();
 
   for (const row of rows) {
     const staffId = String(row.staff_id || '').trim();
     if (!staffId) continue;
-    // 전날 전후로 배정이 하나라도 있으면 배정표로 근무일이 정해지는 직원이다.
-    shiftWorkers.add(staffId);
 
-    if (String(row.work_date || '').slice(0, 10) !== yesterday) continue;
-    const shiftName = String(row.shift_name || row.assigned_shift_name || '');
-    if (OFF_LIKE_SHIFT_NAME.test(shiftName)) continue;
-    scheduledYesterday.add(staffId);
+    const shiftName = String(row.shift_name || row.assigned_shift_name || '').trim();
+    // 배정 셀을 비운 행 — 근무표 UI 는 배정을 지울 때 행을 삭제하지 않고 shift_id 를
+    // NULL 로 덮어쓴다(RosterWorkspace.tsx:254 upsert). 이 행을 '배정'으로 세면
+    // 배정을 지운 날이 결근이 된다(10차 LV-01, 지민수 4건의 실제 경로).
+    if (!shiftName) continue;
+
+    const shiftType = String(row.shift_type || '').trim();
+    if (isOffLikeShift(shiftName, shiftType)) continue;
+
+    scheduledYesterday.set(staffId, {
+      companyName: String(row.company_name || '').trim(),
+      shiftName,
+      shiftType,
+      startTime: String(row.start_time || '').trim(),
+      endTime: String(row.end_time || '').trim(),
+      isShiftWork: Number(row.is_shift ?? 0) === 1,
+    });
+  }
+
+  // 회사 지정 휴일(company_holidays). company_name='전체' 행과 회사별 행이 섞여 있다.
+  // 급여·휴일 계열 크론(lib/substitute-holiday.ts:77-87)과 같은 자료를 본다.
+  const holidayCompanies = new Set<string>();
+  try {
+    const holidayRows = await queryD1(
+      `SELECT company_name FROM company_holidays WHERE holiday_date = ?`,
+      [yesterday],
+    );
+    for (const row of holidayRows) {
+      holidayCompanies.add(String(row.company_name || '전체').trim());
+    }
+  } catch (err) {
+    // 휴일 조회 실패는 결근 생성을 막을 이유가 아니다 — 배정 기반 판정이 이미 좁다.
+    logger.warn('[absent-auto-create] company_holidays 조회 실패 — 회사 휴일 제외 없이 진행:', err);
   }
 
   const [year, month, day] = yesterday.split('-').map(Number);
   const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
 
   return {
+    yesterday,
     scheduledYesterday,
-    shiftWorkers,
-    yesterdayIsNonWorkingDay: weekday === 0 || weekday === 6 || isKoreanPublicHoliday(yesterday),
+    yesterdayIsWeekend: weekday === 0 || weekday === 6,
+    yesterdayIsPublicHoliday: isKoreanPublicHoliday(yesterday),
+    holidayCompanies,
   };
 }
 
-/** 전날이 이 직원의 소정근로일이었는가 (판정 규칙 단위 테스트 대상) */
+/** 전날이 이 배정의 회사에서 지정 휴일이었는가 */
+function isCompanyHoliday(companyName: string, ctx: ScheduleContext): boolean {
+  if (ctx.holidayCompanies.has('전체')) return true;
+  return companyName ? ctx.holidayCompanies.has(companyName) : false;
+}
+
+/**
+ * 전날이 이 직원의 소정근로일이었는가 (판정 규칙 단위 테스트 대상)
+ *
+ * 배정이 유일한 근거다. 배정이 없으면 결근이 아니다.
+ *
+ * 주말·공휴일 제외를 **교대(is_shift=1) 배정에는 적용하지 않는다.** 이 병원은 주말·공휴일에도
+ * 병동이 돈다 — 운영 실측(2026-06~08)에서 토·일·공휴일 배정 220여 건 중 대부분이 실제
+ * 체크인으로 이어졌고(예: 2026-08-15 광복절 배정 12건 중 10건 체크인), 주말을 통째로
+ * 빼면 **정말 결근인 교대 근무자가 빠진다**. 같은 실측에서 주말·공휴일에 잡힌
+ * 비교대(is_shift=0, 상근·비상근) 배정은 **0건**이라, 아래 분기는 지금 데이터에서
+ * 동작을 바꾸지 않으면서 LV-04 시나리오(회사가 휴일을 선포했는데 상근 배정이 근무표에
+ * 남아 있는 경우)만 막는다.
+ */
 export function wasScheduledToWork(staffId: string, ctx: ScheduleContext): boolean {
-  if (ctx.scheduledYesterday.has(staffId)) return true;
-  // 교대 근무자는 근무 일정이 없으면 오프다 — 결근이 아니다.
-  if (ctx.shiftWorkers.has(staffId)) return false;
-  // 배정표를 쓰지 않는 직원은 평일·비공휴일만 소정근로일로 본다.
-  return !ctx.yesterdayIsNonWorkingDay;
+  const shift = ctx.scheduledYesterday.get(staffId);
+  if (!shift) return false;
+  if (shift.isShiftWork) return true;
+  if (ctx.yesterdayIsWeekend) return false;
+  if (ctx.yesterdayIsPublicHoliday) return false;
+  if (isCompanyHoliday(shift.companyName, ctx)) return false;
+  return true;
 }
 
 /**
  * 전날 출근 체크인은 했지만 퇴근 체크아웃을 하지 않은 attendance 행 목록을 조회.
  * (check_in IS NOT NULL AND check_out IS NULL)
+ *
+ * 휴가 계열 상태는 제외한다. 반차를 쓰고 반나절 근무한 뒤 퇴근 체크를 잊으면
+ * 이 루프가 '조퇴'로 덮어써 반차 기록이 사라진다(운영 실측: 반차휴가 2건이 대상에 들어 있다).
  */
 async function fetchUncheckedOutAttendanceRows(yesterday: string): Promise<Record<string, unknown>[]> {
   const rows = await queryD1(
@@ -187,7 +317,8 @@ async function fetchUncheckedOutAttendanceRows(yesterday: string): Promise<Recor
      INNER JOIN staff_members sm ON sm.id = a.staff_id AND sm.status NOT IN ('퇴사', '퇴직')
      WHERE a.date = ?
        AND a.check_in IS NOT NULL
-       AND a.check_out IS NULL`,
+       AND a.check_out IS NULL
+       AND COALESCE(a.status, '') NOT IN ('연차휴가', '반차휴가', '휴가')`,
     [yesterday],
   );
   return rows;
@@ -218,60 +349,85 @@ async function insertAbsentAttendances(staffId: string, workDate: string): Promi
   );
 }
 
+/** 근무표를 모를 때 쓰는 소정근로 추정치 */
+const NOMINAL_SHIFT_MINUTES = 8 * 60;
+/** 어떤 경우에도 넘지 못하는 상한. 하루 근무로 설명되지 않는 추정치는 추정이 아니라 오류다. */
+const MAX_ESTIMATED_MINUTES = 12 * 60;
+
 /**
- * check_in, check_out, status를 받아 근무 시간 기준으로 최종 상태를 판정한다.
+ * 근무표의 퇴근 예정시각까지의 분을 구한다. 판정 불가면 null.
  *
- * 규칙:
- *  - 근무 시간이 4시간(240분) 미만 → '결근(absent)' (반차 미만 수준)
- *  - 근무 시간이 4시간 이상 → '조퇴(early_leave)'
+ * `end_time <= start_time` 이면 야간 교대(예: 병동3교대/N 22:00~07:00)라 다음날로 넘긴다.
+ * 실측 근무유형에 22:00~07:00 / 21:00~08:00 / 23:00~07:00 이 실재한다.
+ */
+function estimateMinutesFromRoster(
+  workDate: string,
+  checkInDate: Date,
+  shift: ScheduledShift | undefined,
+): number | null {
+  if (!shift?.endTime) return null;
+
+  const start = toKstInstant(workDate, shift.startTime);
+  let end = toKstInstant(workDate, shift.endTime);
+  if (!end) return null;
+  if (start && end.getTime() <= start.getTime()) {
+    end = toKstInstant(shiftDateKey(workDate, 1), shift.endTime);
+    if (!end) return null;
+  }
+
+  // 출근 예정시각보다 일찍 찍은 체크인은 예정시각부터 센다.
+  // 조기 체크인을 그대로 근무시간으로 잡으면 급여 화면의 미지급 연장수당 판정
+  // (workMins > 480)에 유령 연장근로가 잡힌다 — 추정은 과다보다 과소가 안전하다.
+  const effectiveStart =
+    start && start.getTime() > checkInDate.getTime() ? start : checkInDate;
+
+  if (end.getTime() > effectiveStart.getTime()) {
+    return Math.round((end.getTime() - effectiveStart.getTime()) / 60000);
+  }
+
+  // 퇴근 예정시각을 이미 지나서 찍힌 체크인.
+  // 남은 시간이 아니라 **그 근무유형의 소정근로 길이**로 대체한다.
+  if (start) {
+    return Math.round((end.getTime() - start.getTime()) / 60000);
+  }
+  return NOMINAL_SHIFT_MINUTES;
+}
+
+/**
+ * 퇴근 체크를 잊은 행의 최종 상태와 추정 근무시간을 판정한다.
+ *
+ * ── 종료 경계 (10차 DLT-01) ──
+ * 고정 18:00 KST 경계를 쓰면 KST 14:00 초과~18:00 출근자는 240분 미만이 돼 '결근'
+ * (일급 전액 공제)이 되고, 18:00 이후 출근자는 480분 폴백을 받아 '조퇴'(시급 1/6)가 된다.
+ * 늦게 온 쪽이 유리한 역전이다. 그래서 경계를 **근무표의 퇴근 예정시각**으로 바꾼다.
+ *
+ * ── 체크인이 있으면 '결근'으로 내리지 않는다 ──
+ * 체크인이 있다는 것은 출근한 사람이라는 뜻이다. 추정 근무시간이 짧다는 이유로
+ * 일급 전액 공제(absent_use_daily_rate=1)가 되는 '결근'으로 바꾸면 **추정 오차를 그대로
+ * 급여 손실로 바꾸는 것**이다. 이 경로에는 소정근로일 게이트도 없어 오프·휴일에도 돈다.
+ * 배포되어 있던 판정(9차 이전 UTC setHours 버그)도 사실상 전부 '조퇴'였으므로,
+ * 이 규칙은 운영에서 돌던 결과와 같고 db16022a 가 새로 만든 결근 절벽만 없앤다.
+ * 실제 결근은 1단계(근무표 배정 + 근태 기록 없음)가 판정한다.
+ *
+ * @returns 판정 불가(체크인 파싱 실패)면 null — 이 경우 그 행은 건드리지 않는다.
  */
 function decideUncheckedOutStatus(
+  workDate: string,
   checkIn: string | null | undefined,
-): { legacyStatus: string; modernStatus: string; workMinutes: number } {
+  shift: ScheduledShift | undefined,
+): { legacyStatus: string; modernStatus: string; workMinutes: number } | null {
   if (!checkIn) {
     return { legacyStatus: '결근', modernStatus: 'absent', workMinutes: 0 };
   }
 
-  // 체크인 시각부터 자정까지의 근무 시간 계산
-  const checkInDate = new Date(checkIn);
-  if (Number.isNaN(checkInDate.getTime())) {
-    return { legacyStatus: '결근', modernStatus: 'absent', workMinutes: 0 };
-  }
+  const checkInDate = parseDbInstant(checkIn);
+  if (!checkInDate) return null;
 
-  // 종료 시각을 그날의 근무유형 기준으로 알 수 없으므로 추정한다.
-  // 이름 그대로 **보수적**이어야 한다 — 과다 산정은 급여로 번진다.
-  //
-  // 1) 경계를 KST 로 명시한다.
-  //    setHours() 는 런타임 로컬시각을 쓴다. Workers 런타임은 UTC 라 이 코드가
-  //    잡던 종료 경계는 KST 18:00 이 아니라 **KST 03:00(익일)** 이었다. 그래서
-  //    work_hours_minutes 가 약 9시간 부풀었고(운영 274건 평균 16.1시간),
-  //    그 값이 급여 화면의 미지급 연장수당 판정(workMins > 480)에 그대로 쓰여
-  //    하루 최대 10시간의 유령 연장근로가 잡혔다(9차 TZ-02).
-  //
-  // 2) 18시 이후 출근(야간 근무 등)은 다음날 18:00 으로 넘기지 않는다.
-  //    경계를 바로잡으면 이 롤오버가 훨씬 자주 걸리는데(운영 6월 이후 퇴근
-  //    미체크 274건 중 37건이 18시 이후 출근), 넘겨 버리면 23시간짜리 추정이
-  //    나와 오히려 더 부푼다. "18시까지" 모델이 성립하지 않는 경우이므로
-  //    소정근로 시간으로 대체한다.
-  //
-  // 3) 어떤 경우에도 상한을 둔다. 하루 근무로 설명되지 않는 추정치는 추정이
-  //    아니라 오류다.
-  const NOMINAL_SHIFT_MINUTES = 8 * 60;
-  const MAX_ESTIMATED_MINUTES = 12 * 60;
-
-  const workDayEnd = new Date(`${formatKoreanDateKey(checkInDate)}T18:00:00+09:00`);
-  const rawMinutes =
-    workDayEnd.getTime() > checkInDate.getTime()
-      ? Math.round((workDayEnd.getTime() - checkInDate.getTime()) / 60000)
-      : NOMINAL_SHIFT_MINUTES;
-
+  const rosterMinutes = estimateMinutesFromRoster(workDate, checkInDate, shift);
+  const rawMinutes = rosterMinutes ?? NOMINAL_SHIFT_MINUTES;
   const workMinutes = Math.max(0, Math.min(rawMinutes, MAX_ESTIMATED_MINUTES));
 
-  // 4시간(240분) 기준 판정
-  if (workMinutes >= 240) {
-    return { legacyStatus: '조퇴', modernStatus: 'early_leave', workMinutes };
-  }
-  return { legacyStatus: '결근', modernStatus: 'absent', workMinutes };
+  return { legacyStatus: '조퇴', modernStatus: 'early_leave', workMinutes };
 }
 
 /**
@@ -304,17 +460,31 @@ async function updateUncheckedOutRow(
   );
 }
 
+/** dry-run 대조용 대상자 1건 */
+export interface AbsentCandidate {
+  staffId: string;
+  name: string;
+  /** 결근 대상이면 배정된 근무유형, 제외 대상이면 제외 사유 */
+  reason: string;
+}
+
 export interface AbsentAutoCreateResult {
   ok: boolean;
   yesterday: string;
+  /** 쓰기 없이 판정만 했는가 */
+  dryRun: boolean;
   /** attendance 행이 아예 없는 직원 수 */
   absentTotal: number;
-  /** 결근 처리된 직원 수 */
+  /** 결근 처리된 직원 수 (dry-run 이면 처리됐을 직원 수) */
   absentCreated: number;
   /** 결근 처리 건너뜀 */
   absentSkipped: number;
-  /** 전날이 소정근로일이 아니어서 건너뜀 (주말·공휴일·교대 오프) */
+  /** 전날이 소정근로일이 아니어서 건너뜀 (배정 없음·오프·휴일) */
   absentSkippedNotScheduled: number;
+  /** 결근 대상 명단 — 수정 전후 대조용 */
+  absentTargets: AbsentCandidate[];
+  /** 소정근로일이 아니어서 빠진 명단 — 수정 전후 대조용 */
+  notScheduled: AbsentCandidate[];
   /** 퇴근 미체크 직원 수 */
   uncheckedTotal: number;
   /** 퇴근 미체크 처리된 직원 수 (조퇴/결근) */
@@ -328,33 +498,51 @@ export interface AbsentAutoCreateResult {
   details?: string;
 }
 
+export interface AbsentAutoCreateOptions {
+  /**
+   * 쓰기 없이 판정만 한다. 대상자 명단(absentTargets·notScheduled)이 그대로 나오므로
+   * 판정 규칙을 바꾼 뒤 변경 전후를 대조할 수 있다.
+   */
+  dryRun?: boolean;
+}
+
 /**
- * 전날 근태 기록이 없는 재직 직원 전체에 대해 결근 행을 자동 생성하고,
- * 퇴근 미체크 직원도 자동 처리한다.
+ * 전날 근무표에 배정됐는데 근태 기록이 없는 직원에게 결근 행을 생성하고,
+ * 퇴근 미체크 직원의 상태를 마감한다.
  *
  * @param now 기준 시각 (테스트용, 기본값 현재)
- * @returns 처리 결과 요약
+ * @param options dry-run 여부
+ * @returns 처리 결과 요약 + 대상자 명단
  */
 export async function runAbsentAutoCreate(
   now: Date = new Date(),
+  options: AbsentAutoCreateOptions = {},
 ): Promise<AbsentAutoCreateResult> {
+  const dryRun = options.dryRun === true;
   const yesterday = getYesterdayKST(now);
   const today = getKoreanTodayString(now);
 
-  logger.info(`[absent-auto-create] 시작: ${yesterday} 기준 (실행일: ${today})`);
+  logger.info(
+    `[absent-auto-create] 시작: ${yesterday} 기준 (실행일: ${today})${dryRun ? ' [dry-run]' : ''}`,
+  );
 
   let errors = 0;
 
-  // ── 1단계: attendance 행이 아예 없는 직원 → 결근 처리 ──
+  // ── 1단계: 근무표에 배정됐는데 attendance 행이 없는 직원 → 결근 처리 ──
   let absentTotal = 0;
   let absentCreated = 0;
   let absentSkipped = 0;
   let absentSkippedNotScheduled = 0;
+  const absentTargets: AbsentCandidate[] = [];
+  const notScheduled: AbsentCandidate[] = [];
+  // 2단계(퇴근 미체크)도 같은 배정 자료로 퇴근 예정시각을 잡으므로 밖에서 들고 있는다.
+  let schedule: ScheduleContext | null = null;
 
   try {
     // 근무 일정을 먼저 읽는다. 이게 실패하면 결근 생성을 통째로 건너뛴다 —
-    // 일정을 모르는 채로 만들면 주말·오프에 없는 결근을 찍고, 그건 곧 급여 공제다.
-    const schedule = await loadScheduleContext(yesterday);
+    // 일정을 모르는 채로 만들면 배정도 없는 날에 결근을 찍고, 그건 곧 급여 공제다.
+    const ctx = await loadScheduleContext(yesterday);
+    schedule = ctx;
 
     const staffsWithoutAttendance = await fetchStaffsWithoutYesterdayAttendance(yesterday);
     absentTotal = staffsWithoutAttendance.length;
@@ -365,20 +553,31 @@ export async function runAbsentAutoCreate(
         absentSkipped++;
         continue;
       }
-      if (!wasScheduledToWork(String(staff.id), schedule)) {
+      const staffId = String(staff.id);
+      const staffName = staff.name || '이름없음';
+      if (!wasScheduledToWork(staffId, ctx)) {
         absentSkippedNotScheduled++;
+        const shift = ctx.scheduledYesterday.get(staffId);
+        notScheduled.push({
+          staffId,
+          name: staffName,
+          reason: shift ? `휴일 제외(${shift.shiftName})` : '근무표 배정 없음',
+        });
+        continue;
+      }
+      const shiftName = ctx.scheduledYesterday.get(staffId)?.shiftName || '';
+      absentTargets.push({ staffId, name: staffName, reason: shiftName });
+      if (dryRun) {
+        absentCreated++;
         continue;
       }
       try {
-        await insertAbsentAttendance(staff.id, yesterday);
-        await insertAbsentAttendances(staff.id, yesterday);
+        await insertAbsentAttendance(staffId, yesterday);
+        await insertAbsentAttendances(staffId, yesterday);
         absentCreated++;
       } catch (err) {
         errors++;
-        logger.warn(
-          `[absent-auto-create] ${staff.id} (${staff.name || '이름없음'}) 결근 생성 실패:`,
-          err,
-        );
+        logger.warn(`[absent-auto-create] ${staffId} (${staffName}) 결근 생성 실패:`, err);
       }
     }
   } catch (err) {
@@ -406,7 +605,24 @@ export async function runAbsentAutoCreate(
       }
 
       try {
-        const { legacyStatus, modernStatus, workMinutes } = decideUncheckedOutStatus(checkIn);
+        // 퇴근 예정시각은 그날 근무표 배정에서 가져온다(없으면 소정근로 8시간 추정).
+        const decided = decideUncheckedOutStatus(
+          yesterday,
+          checkIn,
+          schedule?.scheduledYesterday.get(staffId),
+        );
+        if (!decided) {
+          // check_in 을 해석하지 못했다 — 추측으로 상태를 덮어쓰지 않고 그대로 둔다.
+          logger.warn(`[absent-auto-create] ${staffId} check_in 파싱 실패 — 건드리지 않음: ${checkIn}`);
+          continue;
+        }
+        const { legacyStatus, modernStatus, workMinutes } = decided;
+        if (dryRun) {
+          uncheckedProcessed++;
+          if (modernStatus === 'early_leave') uncheckedEarlyLeave++;
+          else uncheckedAbsent++;
+          continue;
+        }
         await updateUncheckedOutRow(staffId, yesterday, checkIn, legacyStatus, modernStatus, workMinutes);
         uncheckedProcessed++;
         if (modernStatus === 'early_leave') {
@@ -428,8 +644,12 @@ export async function runAbsentAutoCreate(
   }
 
   const details = [
+    dryRun ? '[dry-run · 쓰기 없음]' : null,
     `결근 자동 생성: 전체 ${absentTotal}명 중 ${absentCreated}명 생성, ` +
       `${absentSkippedNotScheduled}명 소정근로일 아님, ${absentSkipped}명 건너뜀`,
+    absentTargets.length
+      ? `결근 대상: ${absentTargets.map((t) => `${t.name}(${t.reason || '배정'})`).join(', ')}`
+      : null,
     `퇴근 미체크 처리: 전체 ${uncheckedTotal}명 중 ${uncheckedProcessed}명 처리 (조퇴 ${uncheckedEarlyLeave} / 결근 ${uncheckedAbsent})`,
     errors > 0 ? `오류: ${errors}건` : null,
   ]
@@ -439,10 +659,13 @@ export async function runAbsentAutoCreate(
   const result: AbsentAutoCreateResult = {
     ok: errors === 0,
     yesterday,
+    dryRun,
     absentTotal,
     absentCreated,
     absentSkipped,
     absentSkippedNotScheduled,
+    absentTargets,
+    notScheduled,
     uncheckedTotal,
     uncheckedProcessed,
     uncheckedEarlyLeave,

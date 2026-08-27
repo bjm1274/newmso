@@ -80,6 +80,34 @@ export function buildInternalStorageDownloadUrl(url: string, fileName: string): 
   return `${parsed.pathname}${parsed.search}`;
 }
 
+/**
+ * 내부 프록시 URL 에 `name` 만 실어 준다(inline 용 — `download=1` 은 붙이지 않는다).
+ *
+ * `/api/storage/object` 는 `name` 을 Content-Disposition 의 filename 으로 쓴다.
+ * 이걸 안 실어 보내면 브라우저는 URL 마지막 경로 조각인 `object` 를 파일명으로 삼는다
+ * (모바일에서 첨부를 저장하면 확장자 없는 `object` 로 떨어졌다 — PC 는 다운로드 경로를
+ *  쓰기 때문에 같은 첨부가 원래 이름으로 내려와, 기기별로 결과가 갈렸다).
+ *
+ * **확장자가 있는 이름일 때만** 붙인다. 라우트는 name 이 없으면 객체 키의 마지막
+ * 조각을 폴백으로 쓰므로 최소한 확장자가 살아 있는데, 호출부 중에는 파일명이 아니라
+ * 표시용 라벨을 넘기는 곳이 있다(이미지 컴포넌트의 `alt`, 채팅 첨부의 `file_name || '첨부'`).
+ * 그런 값을 그대로 실어 보내면 폴백을 덮어써 **확장자 없는 파일**로 저장된다 —
+ * 고치려던 증상과 같은 결과다. 확장자가 없으면 라우트 폴백에 맡긴다.
+ */
+const FILE_NAME_WITH_EXTENSION_RE = /\.[A-Za-z0-9]{1,8}$/;
+
+function withInternalObjectFileName(url: string, fileName: string): string {
+  const name = String(fileName || '').trim();
+  if (!name || !FILE_NAME_WITH_EXTENSION_RE.test(name)) return url;
+  try {
+    const parsed = new URL(url, 'https://local-storage-proxy.test');
+    parsed.searchParams.set('name', name);
+    return `${parsed.pathname}${parsed.search}`;
+  } catch {
+    return url;
+  }
+}
+
 export function buildStorageDownloadUrl(url: string, fileName: string): string {
   const normalizedUrl = String(url || '').trim();
   const normalizedFileName = String(fileName || '').trim() || 'download';
@@ -112,17 +140,20 @@ export function buildStorageDownloadUrl(url: string, fileName: string): string {
 
 export function buildStorageInlineUrl(url: string, fileName: string): string {
   const normalizedUrl = String(url || '').trim();
-  const normalizedFileName = String(fileName || '').trim() || 'preview';
+  const rawFileName = String(fileName || '').trim();
+  const normalizedFileName = rawFileName || 'preview';
   if (!normalizedUrl) return '';
   if (/^(blob|data):/i.test(normalizedUrl)) return normalizedUrl;
 
+  // 원래 파일명을 URL 에 실어 준다. 인자로 받아 놓고 내부 프록시 경로에서는
+  // 쓰지 않아, 모바일에서 첨부를 저장하면 파일명이 `object` 가 됐다.
   const rewritten = rewritePublicR2UrlToInternal(normalizedUrl);
   if (rewritten) {
-    return rewritten;
+    return withInternalObjectFileName(rewritten, rawFileName);
   }
 
   if (isInternalStorageObjectUrl(normalizedUrl)) {
-    return normalizedUrl;
+    return withInternalObjectFileName(normalizedUrl, rawFileName);
   }
 
   if (normalizedUrl.startsWith('/')) {

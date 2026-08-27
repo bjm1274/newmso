@@ -20,6 +20,9 @@ import {
   DEFAULT_CONTENT_TYPE,
   normalizeUploadFileName,
   normalizeUploadMimeType } from '@/lib/upload-mime';
+import {
+  ACTIVE_CONTENT_UPLOAD_ERROR,
+  isActiveContentUpload } from '@/app/api/storage/object/content-policy';
 import { getD1Binding, getD1Drizzle } from '@/lib/db';
 import { assertChatRoomMember } from '@/lib/chat-room-membership';
 
@@ -63,6 +66,13 @@ function buildSafeFilePath(fileName: string, mimeType: string): string {
 function validateUploadTarget(fileName: string, mimeType: string, fileSize: number): void {
   if (!fileName.trim()) {
     throw new Error('업로드할 파일 이름이 없습니다.');
+  }
+
+  // 이 라우트에도 MIME 검사가 아예 없었다(크기·방 멤버십만 봤다). 채팅 첨부도
+  // 게시판과 같은 /api/storage/object 로 열리므로 같은 저장형 XSS 경로다.
+  // 세 경로(플랜·raw·formData)가 모두 이 함수를 거친다.
+  if (isActiveContentUpload(fileName, mimeType)) {
+    throw new Error(ACTIVE_CONTENT_UPLOAD_ERROR);
   }
 
   if (mimeType.startsWith('image/')) {

@@ -11,12 +11,19 @@ import MIcon from '../공통/MIcon';
 import type { SafeAttachment } from './data-hooks';
 import { buildStorageInlineUrl } from '@/lib/object-storage-url';
 
+/**
+ * 비이미지 첨부 카드.
+ *
+ * 카드 본체는 **다운로드 경로**로 간다. 예전에는 본체가 인라인 URL 을 새 탭으로
+ * 여는 '열기'였는데, PC(BoardDetailPanel)와 모바일 결재는 같은 첨부를 다운로드
+ * 경로로 내려받는다 — 같은 파일을 어디서 눌렀느냐에 따라 결과가 갈렸다.
+ * (인라인 새 탭은 파일명도 잃는다. 오른쪽 아이콘은 이제 장식이라 button 이 아니라
+ *  span 이다 — 같은 동작을 하는 버튼이 둘이면 스크린리더에 중복으로 읽힌다.)
+ */
 export function AttachmentRow({
   attachment,
-  onOpen,
   onDownload }: {
   attachment: SafeAttachment;
-  onOpen: () => void;
   onDownload: () => void;
 }) {
   const ext = (attachment.name.split('.').pop() || '').toUpperCase();
@@ -36,8 +43,8 @@ export function AttachmentRow({
     >
       <button
         type="button"
-        onClick={onOpen}
-        aria-label={`${attachment.name} 열기`}
+        onClick={onDownload}
+        aria-label={`${attachment.name} 다운로드`}
         style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' }}
       >
         <span
@@ -71,14 +78,9 @@ export function AttachmentRow({
             </span>
           )}
         </span>
-      </button>
-      <button
-        type="button"
-        onClick={onDownload}
-        aria-label={`${attachment.name} 다운로드`}
-        style={{ padding: 6, color: 'var(--z-500)' }}
-      >
-        <MIcon name="download" size={18} />
+        <span aria-hidden="true" style={{ padding: 6, color: 'var(--z-500)', flexShrink: 0 }}>
+          <MIcon name="download" size={18} />
+        </span>
       </button>
     </div>
   );

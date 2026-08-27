@@ -224,7 +224,8 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
         void Promise.resolve(
           db
             .from('work_shifts')
-            .select('id, company_id, name')
+            // work_shifts 에는 company_id 가 없다(운영·저장소 모두). 여기선 id→name 만 쓴다.
+            .select('id, name')
             .in('id', shiftIds)
         ).then(({ data: shiftRows }) => {
           if (Array.isArray(shiftRows)) {
@@ -382,7 +383,39 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       .eq('date', targetDate)
       .order('created_at', { ascending: false })
       .limit(1);
-    setTodayLog(data?.[0] || null);
+    const base = (data?.[0] as Record<string, unknown> | undefined) || null;
+    if (!base) {
+      setTodayLog(null);
+      return;
+    }
+
+    // 근무상태(current_status/current_status_at)는 attendance(단수)에 없는 컬럼이다.
+    // 실컬럼은 dual-write 짝인 attendances(복수) 쪽에만 있으므로(lib/attendance-sync.ts)
+    // 그 한 쌍만 따로 읽어 합친다. 쓰기(handleStatusChange)도 같은 테이블로 맞춰 둔다.
+    let statusPatch: Record<string, unknown> = {};
+    try {
+      const { data: statusRows, error: statusError } = await db
+        .from('attendances')
+        // staff_id 를 반드시 포함해야 한다 — attendances 는 SAME_COMPANY_TEAM_VISIBLE 이라
+        // 게이트웨이의 행 필터가 staff_id 없는 행을 본인 것이어도 통째로 버린다.
+        .select('staff_id, current_status, current_status_at')
+        .eq('staff_id', userId)
+        .eq('work_date', targetDate)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      const statusRow = (statusRows?.[0] as Record<string, unknown> | undefined) || null;
+      if (!statusError && statusRow) {
+        statusPatch = {
+          current_status: statusRow.current_status ?? null,
+          current_status_at: statusRow.current_status_at ?? null,
+        };
+      }
+    } catch (statusErr) {
+      // 근무상태는 부가 정보다 — 실패해도 오늘 카드(출근/퇴근)는 그대로 보여준다.
+      logger.warn('근무상태 조회 실패:', statusErr);
+    }
+
+    setTodayLog({ ...base, ...statusPatch });
   };
 
   const fetchMonthlyLogs = async () => {
@@ -457,14 +490,20 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       )
     );
 
+    // work_shifts 실컬럼에는 company_id 가 없다(회사 구분은 company_name 하나뿐).
+    // 게이트웨이가 컬럼명을 큰따옴표로 인용하는 탓에 SQLite 가 이를 에러 대신
+    // 문자열 리터럴로 돌려줘서, 지금까지 `"company_id"` 라는 쓰레기 키가 섞여 왔다.
+    // ShiftLookupRecord 도 company_name 만 쓰므로 실컬럼만 남긴다.
+    const WORK_SHIFT_LOOKUP_SELECT =
+      'id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work';
     const shiftRows: ShiftLookupRecord[] = [];
     if (shiftIds.length > 0 || shiftNames.length > 0) {
       const [shiftIdsResult, shiftNamesResult] = await Promise.all([
         shiftIds.length > 0
-          ? db.from('work_shifts').select('id, company_id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work').in('id', shiftIds)
+          ? db.from('work_shifts').select(WORK_SHIFT_LOOKUP_SELECT).in('id', shiftIds)
           : Promise.resolve({ data: [], error: null }),
         shiftNames.length > 0
-          ? db.from('work_shifts').select('id, company_id, name, company_name, start_time, end_time, description, weekly_work_days, is_weekend_work').in('name', shiftNames)
+          ? db.from('work_shifts').select(WORK_SHIFT_LOOKUP_SELECT).in('name', shiftNames)
           : Promise.resolve({ data: [], error: null }),
       ]);
 
@@ -756,16 +795,19 @@ export default function CommuteRecord({ user, onRequestCorrection }: CommuteReco
       const now = new Date().toISOString();
 
       try {
-        // 근무상태 복원은 fetchTodayLog 가 읽는 `attendance` 테이블(date 컬럼)의
-        // current_status 를 기준으로 하므로, 쓰기도 동일 테이블로 일치시킨다.
-        // (이전에는 `attendances`/work_date 에 써서 새로고침 시 항상 '근무중'으로 리셋됐음)
+        // current_status / current_status_at 은 `attendance`(단수)에 없는 컬럼이라
+        // 그쪽에 쓰면 UPDATE 가 매번 실패했다("상태 기능은 곧 활성화됩니다" 토스트만 떴다).
+        // 실컬럼은 `attendances`(복수)에만 있으므로 쓰기를 그쪽으로 되돌린다.
+        // 읽기(fetchTodayLog)도 같은 테이블·같은 키(work_date)에서 합쳐 오도록 맞췄으므로
+        // 예전처럼 새로고침 시 '근무중'으로 리셋되지 않는다.
+        // attendances 행은 출근 시 dual-write(lib/attendance-sync.ts)로 항상 함께 만들어진다.
         const { error } = await db
-          .from('attendance')
+          .from('attendances')
           .update({
             current_status: newCode,
             current_status_at: now })
           .eq('staff_id', userId)
-          .eq('date', workDate);
+          .eq('work_date', workDate);
 
         if (error) {
           if (isMissingColumnError(error, 'current_status')) {

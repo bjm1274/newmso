@@ -9,7 +9,13 @@ import { useEffect, useState } from 'react';
 import { db } from '@/lib/db-client';
 import { INVENTORY_SELECT_COLUMNS } from '@/app/main/inventory-utils';
 import type { AssetRow, CatalogRow, CategoryCard, Tone, UdiRow } from './stock-types';
-import { asString, pickNumber, pickString, toMonthString, type Row } from './data-helpers';
+import {
+  asString,
+  fetchAllRowsPaged,
+  pickNumber,
+  pickString,
+  toMonthString,
+  type Row } from './data-helpers';
 
 function mapCatalogRow(r: Row): CatalogRow {
   return {
@@ -100,20 +106,25 @@ export function useItemData(userCompany?: string): ItemWorkcenterData {
 
     const load = async () => {
       try {
-        let invQ = db
-          .from('inventory')
-          .select(INVENTORY_SELECT_COLUMNS)
-          .order('last_updated', { ascending: false })
-          .limit(200);
-        if (companyFilter) invQ = invQ.eq('company', companyFilter);
+        // INV-01: limit(200) 이면 품목 1,032건 중 832건이 '품목' 수·자산·UDI 집계에서 빠진다
+        // (모바일 물품·자산 헤더가 이 totalCount 를 그대로 쓴다).
+        // last_updated 만으로는 동값이 많아 OFFSET 페이징 경계가 흔들리므로 id 를 2차 정렬로 둔다.
+        const buildInvQ = () => {
+          const q = db
+            .from('inventory')
+            .select(INVENTORY_SELECT_COLUMNS)
+            .order('last_updated', { ascending: false })
+            .order('id');
+          return companyFilter ? q.eq('company', companyFilter) : q;
+        };
         const [invRes, catRes] = await Promise.all([
-          invQ,
+          fetchAllRowsPaged(buildInvQ),
           db.from('inventory_categories').select('id, name, parent_id').order('name').limit(100),
         ]);
 
         if (cancelled) return;
 
-        const invRows: Row[] = Array.isArray(invRes.data) ? (invRes.data as Row[]) : [];
+        const invRows: Row[] = invRes.rows;
         const catRows: Row[] = Array.isArray(catRes.data) ? (catRes.data as Row[]) : [];
 
         const catalog = invRows.slice(0, 20).map(mapCatalogRow);

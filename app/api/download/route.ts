@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildResponseContentDisposition, isAllowedPublicStorageUrl } from '@/lib/object-storage';
 import { readSessionFromRequest } from '@/lib/server-session';
+import { isInlineSafeContentType } from '@/app/api/storage/object/content-policy';
 
 
 export const dynamic = 'force-dynamic';
@@ -46,9 +47,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '파일을 찾을 수 없습니다.' }, { status: 404 });
     }
 
+    // 이 응답도 **앱 오리진**에서 나간다. inline=1 은 buildStorageInlineUrl 의
+    // 폴백 경로가 쓰는데, 상류가 신고한 Content-Type 을 그대로 inline 으로 내보내면
+    // text/html·image/svg+xml 첨부가 앱 오리진에서 실행된다 —
+    // /api/storage/object 와 같은 저장형 XSS 다. 판정은 같은 정본을 쓴다.
+    const upstreamContentType = upstream.headers.get('content-type') || 'application/octet-stream';
+    const inlineSafe = isInlineSafeContentType(upstreamContentType);
+
     const headers = new Headers();
-    headers.set('Content-Type', upstream.headers.get('content-type') || 'application/octet-stream');
-    headers.set('Content-Disposition', buildContentDisposition(fileName, inline));
+    headers.set('Content-Type', inlineSafe ? upstreamContentType : 'application/octet-stream');
+    headers.set('Content-Disposition', buildContentDisposition(fileName, inline && inlineSafe));
     headers.set('Cache-Control', 'private, max-age=3600');
     headers.set('X-Content-Type-Options', 'nosniff');
 

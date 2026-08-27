@@ -214,13 +214,22 @@ export default function AnnualLeavePromotion({
       const nowIso = new Date().toISOString();
       await db.from('annual_leave_promotion_logs').upsert(
         {
-          // (직원, 대상연도, 단계) 자연키를 그대로 PK 로 쓴다.
+          // (직원, 차수, 만료일) 자연키를 그대로 PK 로 쓴다.
           // 예전에는 무작위 UUID + `{ onConflict: 'staff_id,target_year,step' }` 였는데
           // 그 조합에 UNIQUE 제약이 없어(실제 인덱스는 전부 비유니크, 유니크는 PK 뿐)
           // SQLite 가 ON CONFLICT 자체를 거부했다 — 이 로그는 기록될 때마다
           // 실패했다(9차 D1-05). 데이터에 이미 중복이 있어 UNIQUE 인덱스를 새로
           // 걸 수도 없으므로 PK 를 자연키로 만들어 해결한다.
-          id: `alp-${staff.id}-${targetYear}-${step}`,
+          //
+          // 자연키에 **대상연도가 아니라 만료일**을 쓴다. 크론
+          // (lib/annual-leave-promotion-dispatch 의 buildPromotionLogId)·수동발송
+          // (알림자동화설정.tsx)이 모두 `alp-{staff}-{step}-{expiry}` 라 형식이
+          // 어긋나면 같은 촉진이 두 행으로 남아 멱등이 깨진다. 게다가 운영에는
+          // **같은 해에 만료일이 서로 다른 step1 로그**가 실제로 있어(백정민:
+          // 2026-08-01 / 2026-11-01 / 2026-12-31) 연도로 뭉치면 서로 다른 촉진이
+          // 한 id 로 덮어써진다 — sentKeys·hasCompletedBothPromotions 는 만료일을
+          // 정확히 대조하므로 그러면 촉진 이행이 미이행으로 뒤집힌다.
+          id: `alp-${staff.id}-${step}-${String(staff.expiryDateStr || '').slice(0, 10)}`,
           staff_id: staff.id,
           company_name: staff.company || selectedCo || null,
           target_year: targetYear,

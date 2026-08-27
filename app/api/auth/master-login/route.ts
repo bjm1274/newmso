@@ -64,7 +64,34 @@ type StaffLoginRow = StaffCredentialRow & {
   auth_user_id?: string | null;
   is_system_master?: number | boolean | null;
   password_reset_required?: number | boolean | null;
+  resigned_at?: string | null;
+  resign_date?: string | null;
+  created_at?: string | null;
+  force_logout_at?: string | null;
 };
+
+/**
+ * 관리자가 초기화(또는 신규 등록)한 계정이 '입력한 값을 새 비밀번호로 확정' 할 수 있는 기간.
+ * 이 창을 유한하게 두는 것이 핵심이다 — 예전에는 만료가 없어 무기한 열려 있었다.
+ * 7일로 잡은 이유: 입사 등록은 첫 출근 며칠 전에 미리 하는 일이 많아 24~72시간으로 좁히면
+ * 정상 입사자가 잠긴다. 창이 닫혀도 관리자가 초기화를 한 번 더 누르면 다시 열린다.
+ */
+const PASSWORD_RESET_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * D1 타임스탬프를 ms 로 읽는다.
+ * staff_members.created_at 은 CURRENT_TIMESTAMP 기본값이라 'YYYY-MM-DD HH:MM:SS'(UTC) 형태와
+ * ISO 문자열이 섞여 있다. 앞 형태를 그대로 Date 에 넣으면 런타임에 따라 로컬시각으로 읽혀
+ * 최대 9시간이 어긋나므로 UTC 로 못박는다.
+ */
+function parseDbTimestampMs(value: unknown): number {
+  const raw = String(value ?? '').trim();
+  if (!raw) return 0;
+  const spaceForm = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d+)?)$/.exec(raw);
+  const normalized = spaceForm ? `${spaceForm[1]}T${spaceForm[2]}Z` : raw;
+  const ms = new Date(normalized).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
 
 function parseLoginRowPermissions(raw: unknown): Record<string, unknown> {
   if (typeof raw === 'string' && raw.length > 0) {
@@ -245,13 +272,28 @@ export async function POST(request: NextRequest) {
         }
         if (activeNameMatches.length === 1) {
           userRow = activeNameMatches[0];
-        } else if (byNameRows.length === 1) {
-          userRow = byNameRows[0];
         }
+        // 예전에는 여기에 `else if (byNameRows.length === 1) { userRow = byNameRows[0]; }` 폴백이 있었다.
+        // 재직 매칭이 0건일 때 퇴사자 단일 행을 그대로 통과시키는 경로라, 재직 검사가
+        // 사실상 동명이인 판별용으로만 남아 있었다. 퇴사자는 이름으로도 들어올 수 없어야 한다.
       }
     } catch (d1Err) {
       console.error('[master-login] D1 staff_members 조회 실패:', d1Err instanceof Error ? d1Err.message : String(d1Err));
       return authDataUnavailableResponse(d1Err);
+    }
+
+    // 재직 게이트 — 사번 경로와 이름 경로가 합류한 직후 한 곳에서 양쪽을 모두 막는다.
+    // 사번 조회(fetchStaffLoginRowByEmployeeNoD1)에는 status/resigned_at 필터가 아예 없었고,
+    // 비밀번호 검증~세션 발급 사이에도 재직 확인이 한 번도 없어서, 퇴사자가 알던 사번과
+    // 옛 비밀번호로 재직 시절과 동일한 권한 세션을 그대로 다시 받았다.
+    // (force_logout_at 은 `force_logout_at > 토큰 iat` 판정이라 '기존 세션 무효화'일 뿐
+    //  재로그인 차단이 아니다 — 새 토큰은 iat 가 항상 더 뒤라 통과한다.)
+    //
+    // 응답은 비밀번호 불일치와 같은 문구로 통일한다. 여기서만 다른 문구를 주면
+    // 로그인 화면이 '이 사번은 퇴사자' 를 알려주는 조회창이 된다.
+    if (userRow && !isActiveStaffForLogin(userRow)) {
+      await recordFailedAttempt(loginId, WINDOW_MS);
+      return failureResponse('아이디 또는 비밀번호가 일치하지 않습니다.');
     }
 
     if (!userRow) {
@@ -342,6 +384,26 @@ export async function POST(request: NextRequest) {
         await recordFailedAttempt(loginId, WINDOW_MS);
         return failureResponse(
           '비밀번호가 설정되지 않은 계정입니다. 관리자에게 초기 비밀번호 설정을 요청해 주세요.'
+        );
+      }
+
+      // 이 분기는 '입력한 값을 그대로 새 비밀번호로 확정' 한다. 즉 플래그가 서 있는 동안은
+      // 사번(또는 이름)만 아는 제3자가 먼저 로그인해 계정을 선점할 수 있다 — 사번·이름은
+      // 조직도·결재선에 전사 공개다. 플래그에 만료가 없어 그 창이 무기한이었다.
+      //
+      // 창의 시작점은 이 상태를 만드는 두 진입점을 모두 덮어야 한다.
+      //  - 관리자 '비밀번호 초기화' → 초기화와 같은 UPDATE 에서 force_logout_at 을 찍는다.
+      //  - 신규 입사자 등록(lib/db/functions/staff.ts, 구성원현황.tsx 가 플래그만 1 로 박는다)
+      //    → force_logout_at 이 없으므로 행 생성시각(created_at) 을 쓴다.
+      // 둘 중 늦은 쪽이 기준이다. 둘 다 못 읽으면 통과가 아니라 차단이다(fail-closed).
+      const resetIssuedAtMs = Math.max(
+        parseDbTimestampMs(userRow.force_logout_at),
+        parseDbTimestampMs(userRow.created_at)
+      );
+      if (!resetIssuedAtMs || Date.now() - resetIssuedAtMs > PASSWORD_RESET_WINDOW_MS) {
+        await recordFailedAttempt(loginId, WINDOW_MS);
+        return failureResponse(
+          '초기 비밀번호 설정 기간이 지났습니다. 관리자에게 비밀번호 초기화를 다시 요청해 주세요.'
         );
       }
 

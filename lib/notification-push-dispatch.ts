@@ -33,6 +33,12 @@ import {
 import type { D1Database } from '@cloudflare/workers-types';
 
 export type NotificationPushRow = {
+  /**
+   * notifications.id. 있으면 푸시 tag 를 알림 단위로 갈라 주고(NB-02),
+   * 페이로드의 notification_id 로 실려 푸시 탭 → 인앱 읽음처리가 동작한다(NB-04).
+   * 호출부가 아직 안 넘기는 경로가 있어 optional 로 둔다.
+   */
+  id?: string | null;
   user_id: string;
   type: string;
   title: string;
@@ -74,19 +80,67 @@ function emptyResult(): DispatchPushResult {
     errors: [] };
 }
 
+function readStringField(meta: Record<string, unknown>, key: string): string {
+  const value = meta[key];
+  return typeof value === 'string' && value ? value : '';
+}
+
+/**
+ * 같은 내용의 알림이 두 번 디스패치될 때만 같은 값이 나오는 결정적 해시.
+ * (같은 알림의 FCM/WebPush 이중 도달은 서비스워커가 tag 로 합쳐야 하므로
+ *  랜덤값을 쓰면 안 된다 — 결정적이어야 한다.)
+ */
+function stableContentSuffix(row: NotificationPushRow): string {
+  const source = `${row.user_id}|${row.title}|${row.body}|${JSON.stringify(row.metadata ?? null)}`;
+  let hash = 0;
+  for (let i = 0; i < source.length; i += 1) {
+    hash = ((hash << 5) - hash + source.charCodeAt(i)) | 0;
+  }
+  return (hash >>> 0).toString(36);
+}
+
+/**
+ * 푸시 tag — OS 알림 트레이의 교체 키이자 FCM `collapse_key`(lib/fcm-http.ts:139) 다.
+ * 즉 같은 tag 는 트레이에서 서로를 대체하고, 단말이 오프라인이면 **FCM 서버 단계에서
+ * 앞 건이 폐기**된다.
+ *
+ * 무엇을 합치고 무엇을 가르는가 (10차 NB-02):
+ *  - `dedupe_key` 가 있으면 그 키로 합친다. 이건 **의도적으로 합쳐야 하는 채널**이다 —
+ *    결재 지연 리마인더(`approval-delay:…`)처럼 같은 사안을 반복 알리는 종류는
+ *    최신 1건만 트레이에 남는 것이 맞다.
+ *  - 채팅은 `message_id`(메시지 단위) 로 이미 갈라져 있다. 방 단위 합치기는
+ *    채팅 전용 경로(lib/chat-push-dispatch.ts)가 자기 tag 로 따로 한다.
+ *  - 그 밖(결재 요청·재고·게시판·계약만료·system_alert 등)은 **건마다 별개 사안**이라
+ *    합치면 안 된다. 예전 폴백 `erp-{type}-{user_id}` 는 사용자·타입당 하나뿐이라
+ *    결재 요청 3건이 트레이에 1건으로 남았다. 알림 id 로 가른다.
+ *  - id 를 못 받은 호출부(app/api/d1/mutate, lib/notification-utils)는 내용 해시로
+ *    가른다 — 서로 다른 알림은 갈리고, 같은 알림의 재디스패치는 여전히 합쳐진다.
+ */
 function buildTagFor(row: NotificationPushRow): string {
   const meta = row.metadata ?? {};
-  const dedupeKey =
-    typeof meta.dedupe_key === 'string' && meta.dedupe_key
-      ? meta.dedupe_key
-      : '';
+  const dedupeKey = readStringField(meta, 'dedupe_key');
   if (dedupeKey) return `erp-${row.type}-${dedupeKey}`;
-  const messageId =
-    typeof meta.message_id === 'string' && meta.message_id
-      ? meta.message_id
-      : '';
+  const messageId = readStringField(meta, 'message_id');
   if (messageId) return `erp-${row.type}-${messageId}`;
-  return `erp-${row.type}-${row.user_id}`;
+  const notificationId = resolveNotificationId(row);
+  if (notificationId) return `erp-${row.type}-${notificationId}`;
+  // 알림 행 id 를 못 받은 호출부용 폴백.
+  // metadata.id 는 **결재 문서 id** 라 같은 문서의 '결재 차례'와 '결재 승인'이 한 값으로 묶인다
+  // — 그래서 내용 해시를 함께 붙여 단계까지 갈라 준다. 반대로 같은 알림이 두 번 디스패치되면
+  // 두 조각 모두 같아 여전히 하나로 합쳐진다.
+  const metaKey =
+    readStringField(meta, 'id') || readStringField(meta, 'approval_id') || row.user_id;
+  return `erp-${row.type}-${metaKey}-${stableContentSuffix(row)}`;
+}
+
+/**
+ * 인앱 읽음처리(NB-04)에 쓸 **notifications.id**. 없으면 빈 문자열.
+ * metadata.id 는 결재 문서 id 라 여기 쓰면 안 된다 — 엉뚱한 행을 읽음 처리하려 든다.
+ */
+function resolveNotificationId(row: NotificationPushRow): string {
+  const explicit = String(row.id ?? '').trim();
+  if (explicit) return explicit;
+  return readStringField(row.metadata ?? {}, 'notification_id');
 }
 
 async function loadSubscriptionsForUsers(
@@ -143,9 +197,13 @@ async function dispatchSingleUser(
 
   const fcmTokens = collectUniqueFcmTokens(userSubs);
   const tag = buildTagFor(row);
+  // NB-04 — 서비스워커 erpMarkNotificationAsRead 는 data.notification_id 가 없으면
+  // 즉시 return 한다. 푸시를 탭해도 인앱 알림함이 안 읽음으로 남던 원인이다.
+  const notificationId = resolveNotificationId(row);
   const data = toStringRecord({
     ...(row.metadata ?? {}),
     notification_type: row.type,
+    ...(notificationId ? { notification_id: notificationId } : {}),
     tag });
 
   const undeliveredFcmTokens = new Set<string>();
@@ -178,7 +236,11 @@ async function dispatchSingleUser(
     title: row.title,
     body: row.body,
     tag,
-    data: { ...(row.metadata ?? {}), notification_type: row.type, tag } });
+    data: {
+      ...(row.metadata ?? {}),
+      notification_type: row.type,
+      ...(notificationId ? { notification_id: notificationId } : {}),
+      tag } });
 
   // WebPush 전용 기기 + FCM 미전달 기기의 같은 행 WebPush 폴백
   const webPushCandidates = userSubs.filter((sub) => {

@@ -492,6 +492,27 @@ function DataBackupDesktop({ user }: Props) {
         latestLogs = [...nextLogs];
         setRestoreLogs(latestLogs);
 
+        // 충돌 기준을 **명시**한다.
+        //
+        // 옵션 없는 upsert 는 /api/d1/mutate 에서 INSERT OR REPLACE 로 나간다. REPLACE 는
+        // PK 만이 아니라 그 행이 걸리는 **모든 유니크 제약**으로 충돌하므로, 백업에 없는
+        // 컬럼이 DEFAULT 로 초기화되거나 엉뚱한 기존 행이 DELETE 후 재삽입될 수 있다.
+        // `onConflict: 'id'` 를 주면 `ON CONFLICT(id) DO UPDATE` 로 나가 대상이 id 하나로
+        // 고정되고, DELETE 가 아니라 UPDATE 라 자식 행 CASCADE 도 타지 않는다.
+        //
+        // 단, **id 컬럼이 없는 테이블**은 `ON CONFLICT(id)` 자체가 SQL 오류가 된다.
+        // 현재 BACKUP_EXCLUDED_TABLES 덕에 id 없는 테이블(chat_typing_status·
+        // rate_limit_attempts·system_settings 계열)은 백업 파일에 담기지 않지만,
+        // 복원은 **업로드된 파일에 들어 있는 테이블**을 그대로 도는 경로라
+        // 예전 백업본이 들어와도 죽지 않게 행 자체를 보고 판정한다. 옵션 없는 형태로
+        // 두면 mutate 라우트도 id 컬럼이 없는 테이블은 거부하지 않고 기존 동작
+        // (INSERT OR REPLACE)을 유지한다 — 복원이 막히는 일이 없다.
+        // (백업은 SELECT * 라 한 테이블의 행들은 키 구성이 같다. 첫 행으로 판정한다.)
+        const restoreConflictOption =
+          rows[0] && typeof rows[0] === 'object' && 'id' in (rows[0] as Record<string, unknown>)
+            ? ({ onConflict: 'id' } as const)
+            : undefined;
+
         let failed = false;
         for (const batch of chunkRows(rows, RESTORE_BATCH_SIZE)) {
           // /api/d1/mutate 는 사용자당 분당 100회로 제한된다. 복원은 배치를 연속으로
@@ -499,7 +520,7 @@ function DataBackupDesktop({ user }: Props) {
           // 일반 오류로 보고 테이블 복원을 통째로 포기했다 — 재시도하면 되는 상황인데도.
           let error: { message?: string; details?: string } | null = null;
           for (let attempt = 0; attempt < RESTORE_MAX_RETRIES; attempt += 1) {
-            ({ error } = await db.from(table).upsert(batch as any[]));
+            ({ error } = await db.from(table).upsert(batch as any[], restoreConflictOption));
             if (!error) break;
 
             const message = String(error.message || error.details || '');

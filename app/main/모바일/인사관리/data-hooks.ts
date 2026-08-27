@@ -311,6 +311,8 @@ export type FamilyEventRow = {
   status: string | null;
 };
 
+// 화면용 형태다. DB 컬럼명과 다르다 —
+// checkup_date ← health_checkups.scheduled_date(없으면 completed_date), vendor ← hospital.
 export type HealthCheckupRow = {
   id: string;
   staff_id: string | null;
@@ -369,10 +371,13 @@ export function useWelfareBundle(company: string | undefined, reloadKey?: number
           .limit(30);
         if (useCompany) familyQ = familyQ.eq('company', company!);
 
+        // 운영 health_checkups 의 실컬럼은 scheduled_date / completed_date / hospital 이다.
+        // checkup_date·vendor 로 조회하던 예전 코드는 SQLITE_ERROR 로 죽어 건강검진 탭이 늘 비어 있었다.
+        // (화면쪽 HealthCheckupRow 의 필드명은 그대로 두고 여기서 실컬럼을 매핑한다.)
         let checkupQ = db
           .from('health_checkups')
-          .select('id, staff_id, staff_name, checkup_date, status, vendor, company')
-          .order('checkup_date', { ascending: false })
+          .select('id, staff_id, staff_name, scheduled_date, completed_date, status, hospital, company')
+          .order('scheduled_date', { ascending: false })
           .limit(30);
         if (useCompany) checkupQ = checkupQ.eq('company', company!);
 
@@ -411,9 +416,15 @@ export function useWelfareBundle(company: string | undefined, reloadKey?: number
             id: String(r.id ?? ''),
             staff_id: typeof r.staff_id === 'string' ? r.staff_id : null,
             staff_name: typeof r.staff_name === 'string' ? r.staff_name : null,
-            checkup_date: typeof r.checkup_date === 'string' ? r.checkup_date : null,
+            // 예정일이 없으면 완료일로 채운다 — 검진일 칸이 빈 채로 뜨는 것을 막는다.
+            checkup_date:
+              typeof r.scheduled_date === 'string' && r.scheduled_date
+                ? r.scheduled_date
+                : typeof r.completed_date === 'string' && r.completed_date
+                  ? r.completed_date
+                  : null,
             status: typeof r.status === 'string' ? r.status : null,
-            vendor: typeof r.vendor === 'string' ? r.vendor : null })),
+            vendor: typeof r.hospital === 'string' ? r.hospital : null })),
           license: ((licenseRes.data ?? []) as Record<string, unknown>[]).map((r) => ({
             id: String(r.id ?? ''),
             staff_id: typeof r.staff_id === 'string' ? r.staff_id : null,

@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { db } from '@/lib/db-client';
+import { toast } from '@/lib/toast';
 import { Card, Chip, ProgressBar, SmBtn } from '../admin-workcenter-common';
 import { FALLBACK_CARDS } from './fallback-data';
 import type { CorpCardRow } from './types';
@@ -190,19 +191,11 @@ export default function CompanyCardTab() {
       setNewLimit('5');
       setNewUsed('0');
     } catch (e) {
-      console.warn('[CompanyCardTab] Insert failed, fallback locally:', e);
-      const limitM = Number(newLimit) || 5;
-      const usedM = Number(newUsed) || 0;
-      const pct = Math.round((usedM / limitM) * 100);
-      const newCardRow: CorpCardRow = {
-        card: `${newIssuer} ${newNickname} (****${newLastFour})`,
-        user: newHolder,
-        usedM,
-        limitM,
-        pct,
-        status: pct >= 90 ? '정지' : (pct >= 70 ? '한도 임박' : '정상') };
-      setRows(prev => [...prev, newCardRow]);
-      setShowAddModal(false);
+      // 예전에는 실패해도 목록에 카드를 끼워 넣어 등록된 것처럼 보였다.
+      // 새로고침하면 사라지는 화면 전용 행이었다. → 넣지 않고 실패를 알린다.
+      console.error('[CompanyCardTab] insert failed:', e);
+      const reason = String((e as { message?: unknown } | null)?.message ?? e ?? '').trim();
+      toast(`법인카드 등록 실패 — 등록되지 않았습니다.\n${reason || '알 수 없는 오류'}`, 'error');
     }
   };
 

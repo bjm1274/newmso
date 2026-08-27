@@ -196,7 +196,11 @@ function StaffPermissionManagerDesktop({ onRefresh }: { onRefresh?: () => void }
       actor.userId,
       actor.userName
     );
-    toast('비밀번호가 지정되지 않은 상태로 초기화되었습니다.');
+    // 초기화된 계정은 '첫 로그인에서 입력한 값이 새 비밀번호로 확정' 되는 상태가 되는데,
+    // 그 창이 초기화 시점부터 7일이다(app/api/auth/master-login — PASSWORD_RESET_WINDOW_MS).
+    // 지나면 본인도 '초기 비밀번호 설정 기간이 지났습니다' 로 막히고 관리자가 다시 초기화해야 한다.
+    // 초기화를 누른 관리자에게 그 기한을 알려 주지 않으면 며칠 뒤 '로그인이 안 된다' 로만 돌아온다.
+    toast('비밀번호가 지정되지 않은 상태로 초기화되었습니다. 본인이 7일 안에 첫 로그인해 새 비밀번호를 정해야 하며, 기간이 지나면 다시 초기화해 주셔야 합니다.');
   };
 
   const [roleChanging, setRoleChanging] = useState(false);

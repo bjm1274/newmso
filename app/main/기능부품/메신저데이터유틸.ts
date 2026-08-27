@@ -145,18 +145,22 @@ export async function fetchUnreadCountsForRoomIds(
     let offset = 0;
 
     for (;;) {
+      // `.neq('sender_id', me)` 는 SQL 로 `sender_id != ?` 가 되어(app/api/d1/query/route.ts:103)
+      // sender_id 가 NULL 인 공지방 자동공지를 3값 논리로 통째로 버린다(10차 CHAT-01).
+      // 서버 라우트 쪽과 같은 판정을 하도록, 발신자 필터는 SQL 이 아니라 여기서 한다.
       const { data, error } = await client
         .from('messages')
-        .select('room_id')
-        .neq('sender_id', normalizedUserId)
+        .select('room_id, sender_id')
         .eq('is_deleted', false)
         .or(filterString)
         .range(offset, offset + UNREAD_COUNT_PAGE_SIZE - 1);
 
       if (error) throw error;
 
-      const page = (data || []) as { room_id?: string | null }[];
+      const page = (data || []) as { room_id?: string | null; sender_id?: string | null }[];
       page.forEach((row) => {
+        // sender_id 가 NULL/공백이면 공지봇 발신 → 내가 보낸 것이 아니므로 센다.
+        if (String(row.sender_id || '').trim() === normalizedUserId) return;
         const roomId = String(row.room_id || '').trim();
         if (roomId && counts[roomId] !== undefined) {
           counts[roomId] += 1;

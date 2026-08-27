@@ -79,6 +79,19 @@ function normalizeNotificationForD1(row: NotificationRow): NotificationsD1Row {
     created_at: row.created_at ?? new Date().toISOString() };
 }
 
+// D1 은 **쿼리 1건당 bound parameter 100개**가 한도다. 예전 chunkSize=100 은 SQLite 의
+// SQLITE_MAX_VARIABLE_NUMBER(999)를 D1 한도로 착각한 값으로, notifications 가 8컬럼이라
+// 100행 = 800 bind → 13행째부터 INSERT 가 통째로 실패한다.
+// license-expiry-jobs 의 CE 알림에서 실제로 터진 결함과 같은 것이며(10차 CR10-01),
+// 계약/수습 만료는 지금 배치가 8행(대상 소수 × 관리자 소수)이라 잠복해 있을 뿐이다.
+// 행이 아니라 **bind 단위**로 나눈다.
+const D1_MAX_BIND_PARAMS = 100;
+// normalizeNotificationForD1 이 만드는 컬럼 수(id·user_id·type·title·body·metadata·read_at·created_at).
+const NOTIFICATION_INSERT_COLUMNS = 8;
+const NOTIFICATION_INSERT_CHUNK_ROWS = Math.floor(
+  D1_MAX_BIND_PARAMS / NOTIFICATION_INSERT_COLUMNS,
+); // = 12행 (96 bind)
+
 async function requireD1ForContractJobs(label: string) {
   const d1 = await getD1Binding();
   if (!d1) {
@@ -397,7 +410,7 @@ export async function processContractExpiry(): Promise<ContractExpiryJobResult> 
   const errors: string[] = [];
   let sent = 0;
   const db = await requireD1ForContractJobs('processContractExpiry');
-  const chunkSize = 100;
+  const chunkSize = NOTIFICATION_INSERT_CHUNK_ROWS;
   for (let i = 0; i < toInsert.length; i += chunkSize) {
     const chunk = toInsert.slice(i, i + chunkSize);
     try {

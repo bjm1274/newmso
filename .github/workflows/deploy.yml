@@ -11,6 +11,10 @@ name: Deploy (Cloudflare)
 #   - CLOUDFLARE_ACCOUNT_ID: (선택) 토큰이 여러 계정에 걸쳐 있을 때만 필요
 #
 # Secret 이 아직 없으면 워크플로는 실패하지 않고 안내 메시지와 함께 스킵된다.
+#
+# 선택 저장소 Variable (Settings → Secrets and variables → Actions → Variables):
+#   - D1_MIGRATIONS_ENABLED : 'true' 일 때만 배포 전에 `d1 migrations apply` 를 돌린다.
+#                             기본값(미설정)은 꺼짐. 아래 quality/migrations 주석 참조.
 
 on:
   push:
@@ -22,14 +26,54 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # 품질 게이트 — 8차부터 열려 있던 구멍을 닫는다.
+  #
+  # quality.yml 이 이미 main 푸시에서 같은 검사를 돌지만, GitHub Actions 는
+  # 워크플로를 가로질러 `needs:` 를 걸 수 없다. 그래서 deploy 가 실제로 기다릴 수
+  # 있는 형태로 같은 워크플로 안에 한 벌 더 둔다. 중복 실행 비용(약 3~5분)을 치르는
+  # 대신, "테스트가 깨져도 배포되는" 상태를 끝낸다.
+  #
+  # 검사 항목은 quality.yml 의 job 과 동일하게 유지할 것. 한쪽만 바꾸면
+  # "PR 은 통과하는데 배포에서 막힌다" 는 혼란이 생긴다.
+  quality:
+    name: Gate - Typecheck · Lint · Cron wiring
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # --incremental false: tsconfig.tsbuildinfo 캐시에 기대지 않고 매번 전체 검사한다.
+      - name: Typecheck
+        run: npx tsc --noEmit --incremental false
+
+      - name: Lint
+        run: npm run lint
+
+      # 크론 3자 배선 대조 — wrangler.toml ↔ cloudflare-worker.ts ↔ app/api/cron/*.
+      - name: Verify cron wiring
+        run: npm run verify:cron
+
   deploy:
     name: Build & Deploy to Cloudflare
+    # 품질 게이트가 통과해야만 배포한다. 실패하면 이 job 은 아예 실행되지 않는다.
+    needs: quality
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       DOTENV_LOCAL: ${{ secrets.DOTENV_LOCAL }}
+      D1_DATABASE_NAME: pchos-d1-v2
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,6 +102,49 @@ jobs:
       - name: Restore .env.local (build-time NEXT_PUBLIC_* 주입)
         if: steps.guard.outputs.skip == 'false'
         run: printf '%s\n' "$DOTENV_LOCAL" > .env.local
+
+      # ---------------------------------------------------------------
+      # D1 마이그레이션 — 기본 꺼짐. baseline 정렬이 끝난 뒤에만 켠다.
+      #
+      # 10차 전수조사 실측(2026-08-27): 운영 d1_migrations 가 0행이다. 지금까지
+      # 마이그레이션은 파이프라인이 아니라 손으로 적용돼 왔고, 그 결과 0007·0011·0016
+      # 이 통째로 누락돼 기능 9종이 조용히 죽어 있었다.
+      #
+      # 이 스텝을 지금 그대로 켜면 wrangler 가 0000 부터 전부 미적용으로 보고 재적용을
+      # 시도한다. 0012(IF NOT EXISTS 없는 CREATE TABLE)·0021·0022·0023(ALTER ADD COLUMN)
+      # 이 즉시 실패하고, 그 전에 0026(테이블 재생성)이 먼저 돌면 운영 데이터가 위험하다.
+      #
+      # 켜기 전 반드시 끝나 있어야 하는 것 (순서대로):
+      #   1) 운영 D1 백업 (`npx wrangler d1 export pchos-d1-v2 --remote --output=...`
+      #      또는 /api/cron/backup 이 만드는 R2 백업 확인)
+      #   2) d1_migrations baseline 정렬 — 0000 ~ 0026 을 "적용됨"으로 기록한다.
+      #      0026 까지의 효과는 이미 전부 운영에 반영돼 있음이 실측으로 확인됐다
+      #      (누락분은 0027·0028 로 새로 표현했다).
+      #   3) 0027·0028 을 수동으로 한 번 적용해 검증하거나, 이 스텝으로 처음 적용되게 둔다.
+      #   4) 저장소 Variable 에 D1_MIGRATIONS_ENABLED=true 를 추가한다.
+      #
+      # baseline 결정은 운영 판단 사항이라 코드가 대신하지 않는다 (99_수정계획 §4-3).
+      # ---------------------------------------------------------------
+      - name: Apply D1 migrations (D1_MIGRATIONS_ENABLED=true 일 때만)
+        if: steps.guard.outputs.skip == 'false' && vars.D1_MIGRATIONS_ENABLED == 'true'
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            CLOUDFLARE_API_TOKEN=$(grep -m1 '^CLOUDFLARE_API_TOKEN=' .env.local | cut -d= -f2- | tr -d '\r' | sed 's/^"//; s/"$//')
+            export CLOUDFLARE_API_TOKEN
+          fi
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::.env.local 에서 CLOUDFLARE_API_TOKEN 을 찾지 못했습니다."
+            exit 1
+          fi
+          echo "--- 적용 대기 중인 마이그레이션 ---"
+          npx wrangler d1 migrations list "$D1_DATABASE_NAME" --remote
+          echo "--- 적용 ---"
+          npx wrangler d1 migrations apply "$D1_DATABASE_NAME" --remote
+
+      - name: Notice - D1 마이그레이션 스텝이 꺼져 있음
+        if: steps.guard.outputs.skip == 'false' && vars.D1_MIGRATIONS_ENABLED != 'true'
+        run: |
+          echo "::warning::D1 마이그레이션 적용 스텝이 꺼져 있습니다(D1_MIGRATIONS_ENABLED != true). 스키마 변경은 여전히 손으로 적용해야 하며, 저장소와 운영 스키마가 다시 갈라질 수 있습니다. 켜는 조건은 deploy.yml 의 해당 스텝 주석 참조."
 
       - name: Build (OpenNext → Cloudflare)
         if: steps.guard.outputs.skip == 'false'

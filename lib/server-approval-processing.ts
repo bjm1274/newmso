@@ -20,6 +20,7 @@ import {
   salary_change_history as salaryChangeHistoryTable,
   certificate_issuances as certificateIssuancesTable,
   approvals as approvalsTable,
+  approval_history as approvalHistoryTable,
   staff_members as staffMembersTable,
   eq,
   getD1Binding,
@@ -27,11 +28,15 @@ import {
   type SalaryChangeType } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 import {
+  buildServerProcessingHistoryId,
   getCompletedProcessingSteps,
   isFinalApprovalEffectsDone,
   normalizeLeaveAttendanceStatus,
+  parseServerProcessingHistoryRow,
   PARTIAL_FAILURE_SERVER_PROCESSING_STATUS,
-  resolveAttendanceCorrectionStatusPair } from '@/lib/server-approval-processing-helpers';
+  resolveAttendanceCorrectionStatusPair,
+  SERVER_PROCESSING_HISTORY_ACTION_DONE,
+  SERVER_PROCESSING_HISTORY_ACTION_PARTIAL } from '@/lib/server-approval-processing-helpers';
 
 // D1 binding 필수 — Workers env 가 없으면 throw. (서버 라우트 안에서만 호출)
 //
@@ -61,6 +66,38 @@ type ApprovalFinalizeResult = {
   warnings: string[];
   supplySummary?: ReturnType<typeof summarizeSupplyRequestWorkflow> | null;
 };
+
+/**
+ * approval_history 에 남긴 후속처리 멱등 마커를 읽는다.
+ *
+ * meta_data 마커와 달리 이 자리는 게이트웨이로 비관리자가 지울 수 없다.
+ * 조회 실패는 "마커 없음" 으로 폴백한다 — 마커를 못 읽었다고 정상 집행을
+ * 막아 버리면 결재 승인이 통째로 멈춘다.
+ */
+export async function readServerProcessingHistoryMarker(approvalId: unknown): Promise<{
+  done: boolean;
+  processedAt: string | null;
+  steps: string[];
+}> {
+  const markerId = buildServerProcessingHistoryId(approvalId);
+  try {
+    const d1 = await getD1Binding();
+    if (!d1) return { done: false, processedAt: null, steps: [] };
+    const db = getD1Drizzle(d1);
+    const rows = await db
+      .select({
+        action: approvalHistoryTable.action,
+        comment: approvalHistoryTable.comment,
+        created_at: approvalHistoryTable.created_at })
+      .from(approvalHistoryTable)
+      .where(eq(approvalHistoryTable.id, markerId))
+      .limit(1);
+    return parseServerProcessingHistoryRow(rows[0] ?? null);
+  } catch (err) {
+    console.error('[server-approval-processing] Failed to read processing marker:', err);
+    return { done: false, processedAt: null, steps: [] };
+  }
+}
 
 /** 이미 후처리 완료된 경우의 공통 성공 응답 (side effect 없음). */
 function alreadyProcessedResult(processedAt: string | null): ApprovalFinalizeResult {
@@ -217,6 +254,17 @@ export async function processFinalApprovalEffects(
     return alreadyProcessedResult(prior.processedAt);
   }
 
+  /**
+   * meta_data 마커가 지워졌어도 approval_history 마커가 남아 있으면 재집행하지 않는다.
+   *
+   * meta_data 는 게이트웨이 update 로 덮어쓸 수 있는 컬럼이라, 그것만 믿으면
+   * "마커를 지우고 다시 호출" 로 기본급 갱신·인사발령이 두 번 집행된다(10차 DLT-01 ②).
+   */
+  const historyMarker = await readServerProcessingHistoryMarker(item.id);
+  if (historyMarker.done) {
+    return alreadyProcessedResult(historyMarker.processedAt);
+  }
+
   const startedAt = new Date().toISOString();
   const baseMetaData = {
     ...(metaData || {}),
@@ -247,7 +295,11 @@ export async function processFinalApprovalEffects(
    * 내지 않도록 단계별 멱등을 둔다. 각 단계 자체는 조건 없는 INSERT 라
    * 이 스킵이 유일한 방어선이다.
    */
-  const completedSteps = getCompletedProcessingSteps(metaData);
+  // meta_data 가 덮어써져 steps 가 사라졌어도 approval_history 마커에 남은 단계는
+  // 건너뛴다 — 단계별 멱등이 유일한 방어선이라 여기서 잃으면 중복 집행이 된다.
+  const completedSteps = Array.from(
+    new Set([...getCompletedProcessingSteps(metaData), ...historyMarker.steps]),
+  );
   const isStepDone = (step: string) => completedSteps.includes(step);
   const steps: string[] = [...completedSteps];
   const warnings: string[] = [];
@@ -559,7 +611,21 @@ export async function processFinalApprovalEffects(
     }
   }
 
-  if (item.type === '양식요청' && itemMetaData?.form_type && itemMetaData?.target_staff && itemMetaData?.auto_issue && !isStepDone('certificate_issue')) {
+  // ── 증명서 발급 신청 최종 승인 시 발급 대장(certificate_issuances) 자동 기록 ──
+  /**
+   * 예전에는 `item.type === '양식요청'` 이었다. 그 문자열은 상신부에도, 운영 D1 에도
+   * 존재한 적이 없어서(오타 — '요청' vs '신청') 이 분기는 도입 이래 한 번도 참이 된 적이 없다.
+   * 승인은 났는데 대장에는 안 남아 인사담당이 수동으로 다시 발급해야 했다.
+   *
+   * 운영 실측(2026-08-27, approvals 710건 GROUP BY type):
+   *   '증명서발급' 5건(승인 4 / 회수 1) · '양식신청' 1건(승인) · '양식요청' 0건.
+   * 현행 상신부는 '증명서발급'(전자결재서브/양식신청.tsx:92)이고 '양식신청' 은 개명 전
+   * 레거시라 운영에 승인 1건이 남아 있다 → 두 값을 모두 받는다.
+   * 6건 전부 form_type·target_staff·auto_issue 를 갖고 있어 나머지 조건에서 새로 빠지는 건은 없다.
+   */
+  const isCertificateIssueForm = item.type === '증명서발급' || item.type === '양식신청';
+
+  if (isCertificateIssueForm && itemMetaData?.form_type && itemMetaData?.target_staff && itemMetaData?.auto_issue && !isStepDone('certificate_issue')) {
     try {
       // 증명서 일련번호의 연·월은 KST 기준 (서버 UTC면 월말/연말 자정 부근 어긋남)
       const certYearMonth = getKoreanTodayString().slice(0, 7).replace('-', '');
@@ -631,12 +697,25 @@ export async function processFinalApprovalEffects(
   }
 
   // ── 급여인상평가서 최종 승인 시 직원 기본급(base_salary) 자동 연동 ──
+  /**
+   * meta_data 쪽 표식은 **type 이 비어 있을 때만** 인정한다.
+   *
+   * 다른 종류로 확정된 문서(예: 물품신청)의 meta_data 에 form_type='급여인상평가서'
+   * 를 끼워 넣으면 그 문서로 기본급이 갱신됐다 — meta_data 는 승인 후에도
+   * 게이트웨이로 쓸 수 있는 유일한 컬럼이라 실제 도달 가능한 경로였다(10차 DLT-01).
+   * type 이 비어 있는 경우(양식이 type 을 안 담는 구형/모바일 경로)는 그대로 인정한다.
+   * 운영 실측(2026-08-27): meta_data 에 급여인상 표식이 있는 18건은 **전부**
+   * type='급여인상평가서' 라 이 좁힘으로 빠지는 문서가 없다.
+   */
+  const approvalDocType = String(item.type || '').trim();
   const isSalaryIncreaseForm =
-    String(item.type || '').trim() === '급여인상평가서' ||
-    String(itemMetaData?.form_type || '').trim() === '급여인상평가서' ||
-    String(itemMetaData?.form_slug || '').trim() === 'salary_increase_evaluation' ||
-    String(itemMetaData?.request_category || '').trim() === 'salary_increase_evaluation' ||
-    itemMetaData?.evaluationType === 'salary_increase';
+    approvalDocType === '급여인상평가서' ||
+    (approvalDocType === '' && (
+      String(itemMetaData?.form_type || '').trim() === '급여인상평가서' ||
+      String(itemMetaData?.form_slug || '').trim() === 'salary_increase_evaluation' ||
+      String(itemMetaData?.request_category || '').trim() === 'salary_increase_evaluation' ||
+      itemMetaData?.evaluationType === 'salary_increase'
+    ));
 
   if (isSalaryIncreaseForm && !isStepDone('salary_increase_applied')) {
     try {
@@ -829,6 +908,48 @@ export async function processFinalApprovalEffects(
         .where(eq(approvalsTable.id, String(item.id)));
     }
     // d1 binding 없으면 silently skip — 완료 마커 실패가 결과를 바꾸지 않도록
+  }
+
+  /**
+   * 같은 마커를 approval_history 에도 남긴다 — meta_data 로는 지울 수 있기 때문.
+   *
+   * 결재 1건당 결정적 id 한 행이라 재실행해도 이력이 늘지 않는다.
+   * 부분 실패는 partial 로 남겨 재시도를 계속 허용하되, 이미 성공한 단계는
+   * steps 로 넘겨 두 번 집행되지 않게 한다.
+   */
+  try {
+    const d1 = await getD1Binding();
+    if (d1) {
+      const db = getD1Drizzle(d1);
+      const markerAction = failedSteps.length > 0
+        ? SERVER_PROCESSING_HISTORY_ACTION_PARTIAL
+        : SERVER_PROCESSING_HISTORY_ACTION_DONE;
+      const markerComment = JSON.stringify({
+        processed_at: processedAt,
+        started_at: startedAt,
+        steps: Array.from(new Set(steps)),
+        failed_steps: failedSteps });
+      await db
+        .insert(approvalHistoryTable)
+        .values({
+          id: buildServerProcessingHistoryId(item.id),
+          approval_id: String(item.id),
+          approver_id: actorId || null,
+          approver_name: null,
+          action: markerAction,
+          comment: markerComment,
+          created_at: processedAt })
+        .onConflictDoUpdate({
+          target: approvalHistoryTable.id,
+          set: {
+            approver_id: actorId || null,
+            action: markerAction,
+            comment: markerComment,
+            created_at: processedAt } });
+    }
+  } catch (err) {
+    // 마커 기록 실패가 집행 결과를 되돌리지는 않는다(meta_data 마커는 이미 기록됨).
+    console.error('[server-approval-processing] Failed to write processing marker:', err);
   }
 
   return {

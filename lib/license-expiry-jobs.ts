@@ -33,6 +33,27 @@ function normalizeNotificationForD1(row: NotificationRow): NotificationsD1Row {
     created_at: row.created_at ?? new Date().toISOString() };
 }
 
+// D1 은 **쿼리 1건당 bound parameter 100개**가 한도다(lib/db/auth/claims.ts:237 과 같은 값).
+// 예전 주석은 SQLite 의 SQLITE_MAX_VARIABLE_NUMBER(999)를 D1 한도로 착각해 chunkSize=100(행)
+// 으로 두었는데, notifications 는 컬럼이 8개라 100행 = 800 bind 로 **13행부터 통째로 실패**했다.
+// 실제 운영에서 보수교육(CE) 알림 36행(=288 bind)이 29일 연속 전량 실패했다(10차 CR10-01).
+// 행 단위가 아니라 **bind 단위**로 나눠야 한다.
+const D1_MAX_BIND_PARAMS = 100;
+// normalizeNotificationForD1 이 만드는 컬럼 수(id·user_id·type·title·body·metadata·read_at·created_at).
+const NOTIFICATION_INSERT_COLUMNS = 8;
+const NOTIFICATION_INSERT_CHUNK_ROWS = Math.floor(
+  D1_MAX_BIND_PARAMS / NOTIFICATION_INSERT_COLUMNS,
+); // = 12행 (96 bind)
+
+// inArray 는 값 1개당 bind 1개다. 같은 WHERE 에 붙는 고정 조건(eq/lte 등) 몫을 빼고 여유를 둔다.
+const IN_ARRAY_CHUNK = 90;
+
+function chunkList<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
 async function requireD1ForLicenseJobs(label: string) {
   const d1 = await getD1Binding();
   if (!d1) {
@@ -194,15 +215,20 @@ export async function processLicenseExpiry(): Promise<LicenseExpiryJobResult> {
     const d1 = await getD1Binding();
     if (!d1) throw new Error('[license-expiry-jobs] D1 binding not available (processLicenseExpiry:notifications)');
     const db = getD1Drizzle(d1);
-    const rows = await db
-      .select({ id: notificationsTable.id, user_id: notificationsTable.user_id, metadata: notificationsTable.metadata })
-      .from(notificationsTable)
-      .where(
-        and(
-          eq(notificationsTable.type, 'license_expiry'),
-          inArray(notificationsTable.user_id, userIds),
-        )
-      );
+    // inArray 도 bind 한도를 먹는다 — 직원 수가 늘면 SELECT 자체가 죽는다(CR10-01).
+    const rows: { id: string | null; user_id: string | null; metadata: unknown }[] = [];
+    for (const idChunk of chunkList(userIds, IN_ARRAY_CHUNK)) {
+      const part = await db
+        .select({ id: notificationsTable.id, user_id: notificationsTable.user_id, metadata: notificationsTable.metadata })
+        .from(notificationsTable)
+        .where(
+          and(
+            eq(notificationsTable.type, 'license_expiry'),
+            inArray(notificationsTable.user_id, idChunk),
+          )
+        );
+      rows.push(...(part as { id: string | null; user_id: string | null; metadata: unknown }[]));
+    }
     // D1에서 metadata는 TEXT → JSON.parse
     existingRows = rows.map((row) => {
       let metadata: Record<string, unknown> | null = null;
@@ -261,10 +287,9 @@ export async function processLicenseExpiry(): Promise<LicenseExpiryJobResult> {
 
   const errors: string[] = [];
   let sent = 0;
-  // Phase 8-G — D1 직접 INSERT. D1 max bind 100 한도 고려해 chunkSize=100 유지.
-  // notifications 컬럼이 ~8개라 100*8=800 bind로 한 statement 한도(약 999) 이내.
+  // Phase 8-G — D1 직접 INSERT. bind 한도(100/쿼리) 기준으로 12행씩 나눈다.
   const db = await requireD1ForLicenseJobs('processLicenseExpiry');
-  const chunkSize = 100;
+  const chunkSize = NOTIFICATION_INSERT_CHUNK_ROWS;
   for (let i = 0; i < toInsert.length; i += chunkSize) {
     const chunk = toInsert.slice(i, i + chunkSize);
     try {
@@ -362,22 +387,27 @@ export async function processCEDue(): Promise<LicenseExpiryJobResult> {
     const d1 = await getD1Binding();
     if (!d1) throw new Error('[license-expiry-jobs] D1 binding not available (processCEDue:ce)');
     const db = getD1Drizzle(d1);
-    const rows = await db
-      .select({
-        license_id: licenseCETable.license_id,
-        staff_id: licenseCETable.staff_id,
-        education_date: licenseCETable.education_date,
-        status: licenseCETable.status })
-      .from(licenseCETable)
-      .where(
-        and(
-          inArray(licenseCETable.license_id, licenseIds),
-          eq(licenseCETable.status, 'approved'),
-          isNotNull(licenseCETable.education_date),
+    // 면허가 100건을 넘으면 inArray 가 bind 한도를 넘겨 SELECT 자체가 죽는다(CR10-01).
+    const rows: unknown[] = [];
+    for (const idChunk of chunkList(licenseIds, IN_ARRAY_CHUNK)) {
+      const part = await db
+        .select({
+          license_id: licenseCETable.license_id,
+          staff_id: licenseCETable.staff_id,
+          education_date: licenseCETable.education_date,
+          status: licenseCETable.status })
+        .from(licenseCETable)
+        .where(
+          and(
+            inArray(licenseCETable.license_id, idChunk),
+            eq(licenseCETable.status, 'approved'),
+            isNotNull(licenseCETable.education_date),
+          )
         )
-      )
-      .orderBy(desc(licenseCETable.education_date));
-    ceRawRows = (rows ?? []) as CERow[];
+        .orderBy(desc(licenseCETable.education_date));
+      rows.push(...(part ?? []));
+    }
+    ceRawRows = rows as CERow[];
   }
 
   const lastCEByLicense = new Map<string, string>();
@@ -416,15 +446,19 @@ export async function processCEDue(): Promise<LicenseExpiryJobResult> {
     const d1 = await getD1Binding();
     if (!d1) throw new Error('[license-expiry-jobs] D1 binding not available (processCEDue:notifications)');
     const db = getD1Drizzle(d1);
-    const rows = await db
-      .select({ user_id: notificationsTable.user_id, metadata: notificationsTable.metadata })
-      .from(notificationsTable)
-      .where(
-        and(
-          eq(notificationsTable.type, 'license_ce_due'),
-          inArray(notificationsTable.user_id, userIds),
-        )
-      );
+    const rows: { user_id: string | null; metadata: unknown }[] = [];
+    for (const idChunk of chunkList(userIds, IN_ARRAY_CHUNK)) {
+      const part = await db
+        .select({ user_id: notificationsTable.user_id, metadata: notificationsTable.metadata })
+        .from(notificationsTable)
+        .where(
+          and(
+            eq(notificationsTable.type, 'license_ce_due'),
+            inArray(notificationsTable.user_id, idChunk),
+          )
+        );
+      rows.push(...(part as { user_id: string | null; metadata: unknown }[]));
+    }
     existingCERows = rows.map((row) => {
       let metadata: Record<string, unknown> | null = null;
       if (typeof row.metadata === 'string' && row.metadata.length > 0) {
@@ -461,9 +495,9 @@ export async function processCEDue(): Promise<LicenseExpiryJobResult> {
 
   const errors: string[] = [];
   let sent = 0;
-  // Phase 8-G — D1 직접 INSERT, chunkSize 100 유지 (bind 한도 가드)
+  // Phase 8-G — D1 직접 INSERT, bind 한도(100/쿼리) 기준 12행씩 (CR10-01)
   const db = await requireD1ForLicenseJobs('processCEDue');
-  const chunkSize = 100;
+  const chunkSize = NOTIFICATION_INSERT_CHUNK_ROWS;
   for (let i = 0; i < toInsert.length; i += chunkSize) {
     const chunk = toInsert.slice(i, i + chunkSize);
     try {

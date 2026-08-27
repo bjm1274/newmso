@@ -291,8 +291,11 @@ export default function MessageTemplatesTab() {
           send_count: editingTemplate.sendCount ?? 0,
           last_sent_label: editingTemplate.lastSentLabel ?? null,
           updated_at: new Date().toISOString() };
-        // upsert: seed 모드에서도 D1에 실저장
-        const { error } = await db.from('message_templates').upsert([payload]);
+        // upsert: seed 모드에서도 D1에 실저장.
+        // 충돌 기준을 id 로 명시한다 — 옵션을 안 주면 INSERT OR REPLACE 로 나가고,
+        // 그건 PK 가 아니라 그 행이 걸리는 모든 유니크 제약으로 충돌해 엉뚱한 기존 행을
+        // 지울 수 있다. payload 는 항상 id(=editingTemplate.id)를 담는다.
+        const { error } = await db.from('message_templates').upsert([payload], { onConflict: 'id' });
         if (error) throw new Error(error.message);
         setSource('d1');
         toast('메시지 템플릿이 D1에 저장되었습니다.', 'success');

@@ -146,6 +146,19 @@ export async function registerStaffFull(
 ): Promise<RegisterStaffResult> {
   const s = input.staff;
   const expiry = defaultExpiryDate(s.joined_at, input.leave_year);
+  /**
+   * 신규 등록 시각. `password_reset_required=1` 이 여는 '초기 비밀번호 설정 창'의 시작점이다.
+   *
+   * master-login 은 그 창의 시작점을 `max(force_logout_at, created_at)` 으로 잡는다
+   * (app/api/auth/master-login/route.ts). created_at 은 스키마 default(CURRENT_TIMESTAMP)로
+   * 채워지므로 폴백으로도 동작하지만, 형식이 'YYYY-MM-DD HH:MM:SS'(UTC)라 파싱 규약에
+   * 의존한다. 등록 시각을 force_logout_at 에 ISO 로 직접 찍어 기준을 명시적으로 만든다.
+   * 값 형식은 lib/offboarding-transition.ts:132 와 동일한 `new Date().toISOString()`.
+   *
+   * 새로 만든 행이라 무효화할 기존 세션이 없으므로 세션 판정에는 영향이 없다
+   * (`force_logout_at > 토큰 iat` 인데 이 행의 토큰은 앞으로만 발급된다).
+   */
+  const registeredAtIso = new Date().toISOString();
 
   // 빈 license row (모든 필드 비어 있음) 제외
   const licenses = (input.licenses ?? []).filter((row) => {
@@ -197,7 +210,8 @@ export async function registerStaffFull(
     annual_leave_total: 0,
     annual_leave_used: 0,
     role: s.role ?? 'staff',
-    password_reset_required: 1 });
+    password_reset_required: 1,
+    force_logout_at: registeredAtIso });
 
   // ─── 2) staff_licenses INSERT (여러 row, ON CONFLICT DO NOTHING)
   const licenseStmts = licenses.map((row) =>

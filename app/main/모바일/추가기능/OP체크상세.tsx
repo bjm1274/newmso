@@ -157,7 +157,13 @@ export default function OP체크상세({
           prep_items: prepItems as unknown as Record<string, unknown>[],
           updated_by: user.id,
           updated_by_name: user.name ?? null,
-          updated_at: new Date().toISOString() } });
+          updated_at: new Date().toISOString() },
+        // 충돌 기준을 반드시 넘긴다. 안 넘기면 db-client 가 INSERT OR REPLACE 로 폴백하는데,
+        // 이 테이블은 UNIQUE(schedule_post_id) 라 id 가 아니라 그 컬럼으로 충돌한다 —
+        // 기존 행이 DELETE 후 재삽입되어 PC 에서 입력한 환자명·수술명·마취종류·상태·
+        // company_id 가 전부 컬럼 DEFAULT 로 초기화되고 행 id 까지 바뀌었다.
+        // 데스크톱 OP체크.tsx 의 형제 경로 3곳도 모두 'schedule_post_id' 를 넘긴다.
+        onConflict: 'schedule_post_id' });
       if (error) {
         const err = new Error(error);
         logger.warn('[mobile-addon] checklist save', err);

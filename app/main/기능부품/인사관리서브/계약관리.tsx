@@ -103,9 +103,14 @@ export default function ContractMain({
       const contractType = cleanReqs[0]?.contract_type as string;
       if (!contractType || staffIds.length === 0) return { error: null, data: [] };
 
+      // 서명 증적 컬럼까지 함께 읽는다 — 아래 update 가 null 로 되돌리는 값은
+      // **여기서 읽은 것만** 스냅샷에 담긴다. select 에서 빠지면 스냅샷에도 없다.
+      // (모바일 계약문서관리자.tsx 는 이미 이 8개를 읽는다 — PC 만 4개였다: 10차 D10-C01)
       const { data: existing, error: fetchErr } = await d1
         .from('employment_contracts')
-        .select('id, staff_id, signature_data, status')
+        .select(
+          'id, staff_id, status, signature_data, receipt_signature_data, privacy_consent, signed_at, base_salary, start_date',
+        )
         .in('staff_id', staffIds)
         .eq('contract_type', contractType);
       if (fetchErr) return { error: fetchErr, data: null };

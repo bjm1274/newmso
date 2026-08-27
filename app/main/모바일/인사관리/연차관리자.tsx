@@ -5,6 +5,14 @@ import { db } from '@/lib/db-client';
 import type { StaffMember, ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
 import { calculateLeaveDays } from '@/lib/annual-leave-ledger';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
+// 잔여 집계는 PC 워크센터·/api/annual-leave/summary 와 **같은 함수**를 쓴다.
+import {
+  aggregateLedgerEntries,
+  getLeaveCycle,
+  resolveHireDateKey,
+  type LedgerRowLike,
+} from '@/lib/leave-cycle';
 import { logAudit, readClientAuditActor } from '@/lib/audit';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
@@ -71,7 +79,7 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
       new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul', year: 'numeric' }),
     ) || new Date().getFullYear();
     try {
-      const [reqRes, balRes, legRes] = await Promise.all([
+      const [reqRes, balRes, legRes, hireRes] = await Promise.all([
         db.from('leave_requests').select('*').order('start_date', { ascending: false }),
         db
           .from('leave_balances')
@@ -79,34 +87,67 @@ export default function 연차관리자({ staffs, company, user }: AdminLeavePro
           .eq('year', year),
         db
           .from('leave_ledger')
-          .select('staff_id, entry_type, days'),
+          .select('id, staff_id, entry_type, days, occurred_on, period_key, source_id, note'),
+        // 주기 판정에 입사일이 필요하다. staffs prop 에 실려 오지 않는 호출부가
+        // 있을 수 있어 원본에서 직접 읽는다(PC 워크센터와 동일).
+        db.from('staff_members').select('id, hire_date, join_date, joined_at'),
       ]);
       if (reqRes.error) throw reqRes.error;
       if (balRes.error) throw balRes.error;
       setRequests((reqRes.data || []) as LeaveRequestRow[]);
       const map: typeof balancesByStaff = {};
 
-      if (legRes.data && legRes.data.length > 0) {
-        for (const row of legRes.data) {
-          const sid = String((row as { staff_id?: string }).staff_id ?? '');
-          if (!sid) continue;
-          const entryType = String((row as { entry_type?: string }).entry_type ?? '');
-          const days = Number((row as { days?: number }).days) || 0;
+      // 원장(leave_ledger)은 **생애 전체** 기록이고 잔여는 **현재 주기**(입사기념일
+      // 단위) 값이어야 한다. 예전에는 `select('staff_id, entry_type, days')` 로
+      // occurred_on·period_key 를 아예 받지 않아 주기 판정이 물리적으로 불가능했고,
+      // 전 이력을 그대로 더했다 — 직전 주기의 auto_annual(+15)과 expire(-15)가 함께
+      // 남아 같은 직원이 '내 연차' 탭에서는 9일, 이 '전사 관리' 탭에서는 40일로
+      // 갈렸다. 주기 판정·집계는 다시 짜지 않고 PC 워크센터·서버 요약과 같은
+      // 함수(getLeaveCycle / aggregateLedgerEntries)를 그대로 쓴다.
+      const ledgerRows = Array.isArray(legRes.data) ? legRes.data : [];
+      if (ledgerRows.length > 0) {
+        const todayKey = formatKoreanDateKey(new Date());
+        const hireKeyByStaff = new Map<string, string>();
+        for (const raw of Array.isArray(hireRes.data) ? hireRes.data : []) {
+          if (!raw || typeof raw !== 'object') continue;
+          const row = raw as Record<string, unknown>;
+          const sid = String(row.id ?? '').trim();
+          const hireKey = resolveHireDateKey(row);
+          if (sid && hireKey) hireKeyByStaff.set(sid, hireKey);
+        }
 
-          if (!map[sid]) {
-            map[sid] = { total: 0, used: 0, remaining: 0, expired: 0, compensated: 0 };
-          }
-          const current = map[sid];
-          current.remaining += days;
-          if (entryType === 'use' || entryType === 'manual_used_adjustment') {
-            current.used += -days;
-          } else if (entryType === 'expire' || entryType === 'manual_expire_adjustment') {
-            current.expired += -days;
-          } else if (entryType === 'compensate' || entryType === 'manual_compensate_adjustment') {
-            current.compensated += -days;
-          } else {
-            current.total += days;
-          }
+        const rowsByStaff = new Map<string, LedgerRowLike[]>();
+        for (const raw of ledgerRows) {
+          if (!raw || typeof raw !== 'object') continue;
+          const row = raw as Record<string, unknown>;
+          const sid = String(row.staff_id ?? '').trim();
+          if (!sid) continue;
+          const entry: LedgerRowLike = {
+            id: row.id,
+            entry_type: row.entry_type,
+            days: row.days,
+            occurred_on: typeof row.occurred_on === 'string' ? row.occurred_on : null,
+            period_key: row.period_key,
+            source_id: typeof row.source_id === 'string' ? row.source_id : null,
+            note: typeof row.note === 'string' ? row.note : null };
+          const list = rowsByStaff.get(sid);
+          if (list) list.push(entry);
+          else rowsByStaff.set(sid, [entry]);
+        }
+
+        for (const [sid, rows] of rowsByStaff) {
+          const hireKey = hireKeyByStaff.get(sid);
+          const cycle = hireKey ? getLeaveCycle(hireKey, todayKey) : null;
+          // 입사일이 없어 주기를 못 잡는 직원은 원장 합산을 건너뛴다.
+          // (전 이력 합산으로 되돌아가면 이 결함이 그대로 살아난다)
+          if (!cycle) continue;
+          const agg = aggregateLedgerEntries(rows, cycle);
+          map[sid] = {
+            total: agg.total,
+            used: agg.used,
+            remaining: agg.remaining,
+            expired: agg.expired,
+            compensated: agg.compensated };
         }
       } else {
         for (const row of balRes.data || []) {

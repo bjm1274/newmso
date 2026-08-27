@@ -171,7 +171,6 @@ export default function BoardDetailHeader({
                 <AttachmentRow
                   key={att.url}
                   attachment={att}
-                  onOpen={() => onOpenAttachment(att)}
                   onDownload={() => onDownloadAttachment(att)}
                 />
               ))}

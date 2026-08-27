@@ -37,6 +37,43 @@ function isSeparationOrder(orderType: string | null | undefined): boolean {
   return text.includes('퇴직') || text.includes('면직') || text.includes('퇴사');
 }
 
+/**
+ * 퇴직·면직 발령이 즉시 반영될 때 그 직원의 기존 세션을 끊는다.
+ *
+ * 왜 여기서 직접 못 쓰는가 — `force_logout_at` 은 PRIVILEGED_STAFF_COLUMNS 라
+ * (lib/db/auth/policies.ts:185) 범용 /api/d1/mutate 에서 admin 에게만 열려 있다.
+ * staffUpdates 에 그냥 얹으면 인사담당자(perms.hr)의 발령이 통째로 거부된다 —
+ * 아래에서 변하지 않는 role 을 payload 에서 빼는 이유와 정확히 같은 제약이다.
+ *
+ * 그래서 값을 서버가 정하는 오프보딩 전용 라우트를 호출한다. 그 경로는
+ * hasStaffRecordScope(admin·mso·hr)로 열려 있고, 찍는 값은
+ * lib/offboarding-transition.ts:132 finalize 와 **동일한** `new Date().toISOString()` 이다.
+ * (finalize 는 resigned_at 을 기존 행 값에서 그대로 가져가므로, 발령이 먼저 써 둔
+ *  resigned_at=발령일 이 덮이지 않는다. 그래서 반드시 staff_members 반영 **뒤에** 부른다.)
+ *
+ * 실패해도 발령 자체는 되돌리지 않는다(구성원 반영은 이미 커밋됐다). 대신 조용히
+ * 넘기지 않고 호출부가 경고로 드러낸다 — 세션이 남았다는 사실이 화면에 안 보이면
+ * 지금까지와 똑같이 "퇴사자인데 세션이 살아 있는" 상태가 무음으로 쌓인다.
+ *
+ * @returns 성공이면 null, 실패면 사용자에게 보일 사유
+ */
+async function revokeSessionsForSeparation(staffId: string): Promise<string | null> {
+  try {
+    const response = await fetch('/api/staff/offboarding', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ action: 'finalize', staffId }) });
+
+    if (response.ok) return null;
+
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    return payload?.error?.trim() || `HTTP ${response.status}`;
+  } catch (error) {
+    return error instanceof Error ? error.message : '알 수 없는 오류';
+  }
+}
+
 /** 발령일(YYYY-MM-DD)이 KST 오늘 이후인지 — 미래 발령은 즉시 반영하지 않는다. */
 function isFutureEffectiveDate(effectiveDate: string): boolean {
   const value = effectiveDate.trim();
@@ -325,7 +362,9 @@ export default function PersonnelAppointment({
       //     같이 보내면 인사담당자(perms.hr)의 발령이 통째로 거부된다.
       //   - 퇴직·면직 발령은 status/resigned_at 까지 반영. 값은 구성원현황의 퇴사 처리
       //     (구성원현황.tsx 직원삭제)와 동일하게 status='퇴사', resigned_at=발령일.
-      //     role='inactive' / 세션 회수 등 계정 정리는 오프보딩 완료 플로우의 책임이라 제외.
+      //   - role='inactive' / 세션 회수(force_logout_at)는 이 payload 에 담을 수 없다.
+      //     둘 다 PRIVILEGED_STAFF_COLUMNS 라 인사담당자의 발령이 통째로 거부되기 때문.
+      //     반영이 끝난 뒤 revokeSessionsForSeparation() 이 오프보딩 라우트로 처리한다.
       const pickChanged = (next: string, prev: string): string | null => {
         const trimmed = next.trim();
         if (!trimmed || trimmed === prev.trim()) return null;
@@ -358,6 +397,16 @@ export default function PersonnelAppointment({
         }
       }
 
+      // 퇴사가 실제로 반영된 발령만 세션을 회수한다(예약 발령은 아직 재직 중).
+      // 실패는 발령을 되돌리지 않고 아래 토스트로 드러낸다.
+      let sessionRevokeError: string | null = null;
+      if (separation && !isReserved) {
+        sessionRevokeError = await revokeSessionsForSeparation(String(staff.id));
+        if (sessionRevokeError) {
+          console.error('퇴직 발령 세션 회수 실패:', sessionRevokeError);
+        }
+      }
+
       // 반영이 끝난 뒤에만 '발령완료'로 승격 (예약 발령은 '대기' 유지)
       if (!isReserved) {
         const { error: statusError } = await db
@@ -381,6 +430,9 @@ export default function PersonnelAppointment({
           // 미래 발령은 이력만 저장된 상태 — 감사로그에서도 반영 여부를 구분할 수 있어야 한다.
           applied_to_staff: !isReserved,
           separation,
+          // 퇴사 반영 발령만 세션 회수 결과를 남긴다(예약·비퇴사 발령은 null).
+          session_revoked: separation && !isReserved ? !sessionRevokeError : null,
+          session_revoke_error: sessionRevokeError,
           ...buildAuditDiff(
             {
               department: form.before_dept || null,
@@ -402,12 +454,21 @@ export default function PersonnelAppointment({
         { ...(data as AppointmentRecord), status: isReserved ? PENDING_STATUS : APPLIED_STATUS },
         ...prev,
       ]);
-      toast(
-        isReserved
-          ? `인사발령이 저장되었습니다. ${form.effective_date}에 반영 예정입니다.`
-          : '인사발령이 저장되고 구성원 정보에 반영되었습니다.',
-        'success',
-      );
+      if (sessionRevokeError) {
+        // 발령·구성원 반영은 성공했고 세션 회수만 실패한 상태 — 남은 할 일을 문구로 지목한다.
+        toast(
+          `인사발령은 반영되었지만 기존 세션 회수에 실패했습니다(${sessionRevokeError}). `
+          + '오프보딩 탭에서 퇴사 확정을 다시 실행해 주세요.',
+          'warning',
+        );
+      } else {
+        toast(
+          isReserved
+            ? `인사발령이 저장되었습니다. ${form.effective_date}에 반영 예정입니다.`
+            : '인사발령이 저장되고 구성원 정보에 반영되었습니다.',
+          'success',
+        );
+      }
       setShowForm(false);
       resetForm();
       fetchRecords();

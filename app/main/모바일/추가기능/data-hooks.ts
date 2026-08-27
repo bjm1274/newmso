@@ -299,18 +299,32 @@ export function useWorkNow(opts: { company?: string; pollMs?: number }) {
 
       const today = todayISO();
       // PC 근무현황과 동일: attendance + attendances 병합
+      // M02: 예전에는 두 select 에 운영에 없는 컬럼을 넣어 **두 쿼리가 모두 SQLITE_ERROR** 로 죽었다.
+      //   attendance  = id, staff_id, date, check_in, check_out, status, notes, created_at, company_id
+      //                 → current_status 도 location 도 없다.
+      //   attendances = …, status, work_hours_minutes, notes, created_at, current_status, current_status_at
+      //                 → current_status 는 있고 location 은 없다.
+      // 아래에서 error 를 보지 않은 탓에 그대로 빈 배열이 흘러 전 직원이 늘 '미출근', KPI 는 늘 0 이었다.
+      // 실시간 근무상태를 담는 운영 컬럼은 attendances.current_status 하나뿐이라 그것만 쓴다.
       const [attendanceRes, attendancesRes] = await Promise.all([
         db
           .from('attendance')
-          .select('staff_id, date, check_in, check_out, status, current_status, location')
+          .select('staff_id, date, check_in, check_out, status')
           .eq('date', today)
           .limit(500),
         db
           .from('attendances')
-          .select('staff_id, work_date, check_in_time, check_out_time, status, current_status, location')
+          .select('staff_id, work_date, check_in_time, check_out_time, status, current_status')
           .eq('work_date', today)
           .limit(500),
       ]);
+
+      // 근태를 한 건도 못 읽었으면 '전원 미출근'은 사실이 아니라 조회 실패다 — 조용히 넘기지 않는다.
+      if (attendanceRes.error) console.error('[mobile-addon] attendance 조회 실패', attendanceRes.error);
+      if (attendancesRes.error) console.error('[mobile-addon] attendances 조회 실패', attendancesRes.error);
+      if (attendanceRes.error && attendancesRes.error) {
+        throw attendancesRes.error;
+      }
 
       const byStaff = new Map<string, Record<string, unknown>>();
       for (const row of (attendanceRes.data ?? []) as Record<string, unknown>[]) {
@@ -333,14 +347,14 @@ export function useWorkNow(opts: { company?: string; pollMs?: number }) {
               ? row.current_status
               : existing.current_status ?? null,
           status: row.status ?? existing.status ?? null,
-          location: pickText(row as Record<string, unknown>, 'location') || pickText(existing, 'location') || '',
         });
       }
 
       const list: WorkNowMember[] = active.map((s) => {
         const att = byStaff.get(s.id);
         let state: WorkNowState = 'unknown';
-        let location = s.department ?? '본사';
+        // 근무 위치를 담는 컬럼은 attendance/attendances 어디에도 없다 — 소속 부서로 표시한다.
+        const location = s.department ?? '본사';
         let since = '-';
         if (att) {
           const checkIn = pickText(att, 'check_in', 'check_in_time', 'started_at', 'checkin_at');
@@ -359,7 +373,6 @@ export function useWorkNow(opts: { company?: string; pollMs?: number }) {
             );
             state = derived === 'unknown' ? 'working' : derived;
           }
-          location = pickText(att, 'location', '위치') || location;
           since = formatSinceLabel(checkIn || '-');
         }
         // 미출근/퇴근은 unknown 유지 — 전원 working 강제 금지
@@ -378,7 +391,8 @@ export function useWorkNow(opts: { company?: string; pollMs?: number }) {
       setMembers(list);
       setLastSync(new Date());
     } catch (err) {
-      console.warn('[mobile-addon] worknow load failed', err);
+      // 삼키면 '전원 미출근 · KPI 0' 이라는 그럴듯한 오답이 화면에 남는다 — error 로 올린다.
+      console.error('[mobile-addon] worknow load failed', err);
     } finally {
       setLoading(false);
     }
@@ -902,8 +916,13 @@ export function useOpBoard(opts: { company?: string; date?: string; pollMs?: num
           ),
         )
         .eq('board_type', '수술일정')
-        .order('created_at', { ascending: true })
-        .limit(100);
+        // M01: 예전에는 created_at **오름차순 100건**(=가장 오래된 100건)만 읽고 날짜를
+        // 클라이언트에서 걸렀다. 운영 수술일정 182건 기준 그 창의 끝이 2026-06-12 이라
+        // 오늘 수술은 창 밖이라 조회조차 안 됐고, 창 안의 schedule_date 가 빈 옛 글 49건이
+        // 아래 필터의 fail-open(`!sd`)을 통과해 오늘 카드로 떴다.
+        // 날짜를 SQL 로 내려 창 자체를 없앤다 — 하루치라 상한도 필요 없다.
+        .eq('schedule_date', date)
+        .order('schedule_time', { ascending: true });
       if (company) scheduleQuery = scheduleQuery.eq('company', company);
       const [{ data: scheduleData, error: schedErr }, { data: checkData }] = await Promise.all([
         scheduleQuery,
@@ -922,11 +941,10 @@ export function useOpBoard(opts: { company?: string; date?: string; pollMs?: num
         const key = pickText(c, 'schedule_post_id', 'schedule_id');
         if (key) checkByScheduleId.set(key, c);
       }
+      // schedule_date 는 이미 SQL 로 걸렀다. 예전 클라이언트 필터의 `!sd` 통과 분기는
+      // '날짜 없는 글 = 오늘 수술'로 취급해 3~6월 옛 카드를 오늘 보드에 올리던 원인이라 되살리지 않는다.
+      // (그 글들의 실제 날짜는 본문 [[SCHEDULE_META]] 안에 있고 전부 2026-03~05 이다.)
       const list: OpCheckCard[] = ((scheduleData ?? []) as Record<string, unknown>[])
-        .filter((r) => {
-          const sd = pickText(r, 'schedule_date');
-          return !sd || sd === date;
-        })
         .map((r) => {
           const id = pickText(r, 'id');
           const check = checkByScheduleId.get(id) ?? null;

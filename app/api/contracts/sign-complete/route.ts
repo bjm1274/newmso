@@ -55,6 +55,32 @@ export type SignCompleteResponse = {
   signedAt: string;
 };
 
+/**
+ * 이 **서명 행위**를 식별하는 짧은 지문.
+ *
+ * 보관함 id 를 `contract-<계약id>` 로만 만들면 재시도와 재서명이 구분되지 않는다.
+ * `employment_contracts` 는 UNIQUE(staff_id, contract_type) 라 재발송이 같은 행을
+ * 갱신하므로 계약 id 가 그대로다 → 정당한 재서명이 **직전 서명본 원문을 덮어쓴다**
+ * (10차 D10-C02 · FB7-01).
+ *
+ * 요청에는 '몇 회차 서명인가' 를 알려 주는 값이 없다. 클라이언트는
+ * (lib/contract-sign-complete.ts) 계약 id · 본문 · 서명 이미지만 보낸다.
+ * 그래서 그 요청 자체에서 회차를 뽑는다 —
+ *   - 재시도·더블클릭·PC/모바일 동시 호출은 **같은 본문·같은 서명 이미지**를
+ *     다시 보내므로 지문이 같다 → 멱등(같은 행 갱신).
+ *   - 재발송 후의 재서명은 계약 조건이 바뀌었거나 서명을 다시 그렸으므로
+ *     지문이 갈린다 → 새 사본이 생기고 직전 서명본이 남는다.
+ * (contract_type 별 요청 시각 `requested_at` 은 날짜만 담기는 값이라
+ *  같은 날 두 번 재발송하면 회차가 겹친다 — 회차 키로 쓸 수 없다.)
+ */
+async function signingFingerprint(contractText: string, signatureDataUrl: string): Promise<string> {
+  const encoded = new TextEncoder().encode(`${contractText}::${signatureDataUrl}`);
+  const digest = await crypto.subtle.digest('SHA-256', encoded);
+  return Array.from(new Uint8Array(digest).slice(0, 8))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await readSessionFromRequest(request);
@@ -121,16 +147,22 @@ export async function POST(request: NextRequest) {
 
     // 보관함 저장이 먼저다 — 실패하면 계약 상태를 건드리지 않아
     // "서명됐다고 표시되는데 사본이 없는" 상태를 만들지 않는다.
-    // 보관함 id 를 계약 id 에서 결정적으로 만든다 — 같은 계약은 언제 몇 번을
-    // 호출해도 같은 행 하나다.
+    // 보관함 id 를 계약 id + **이번 서명 행위의 지문**에서 결정적으로 만든다 —
+    // 같은 서명 행위는 언제 몇 번을 호출해도 같은 행 하나이고,
+    // 재발송 후의 재서명은 **다른 행**이 되어 직전 서명본 원문이 남는다.
     //
     // 예전에는 crypto.randomUUID() 라 멱등성이 없었다. 재시도·더블클릭·모바일과
     // PC 에서 각각 호출 같은 상황에서 같은 계약의 사본이 그만큼 늘어났다(9차 R06).
-    // approval-<id> 를 쓰는 lib/approval-document-archive.ts 와 같은 규약이다.
+    // 그 다음에는 `contract-<계약id>` 로만 만들었는데, 계약 id 가 재발송에도
+    // 바뀌지 않아 이번에는 정당한 재서명이 직전 서명본을 덮어썼다(10차 D10-C02).
+    // approval-<id> 를 쓰는 lib/approval-document-archive.ts 와 규약은 같지만,
+    // 그쪽 id 는 기안 건마다 새로 생기고 계약 id 는 재사용된다 — 그 차이 때문에
+    // 여기서는 회차를 구분하는 지문이 한 칸 더 필요하다.
+    const signingKey = await signingFingerprint(contractText, signatureDataUrl);
     await db
       .insert(documentRepositoryTable)
       .values({
-        id: `contract-${contractId}`,
+        id: `contract-${contractId}-${signingKey}`,
         title: `${staffName} 근로계약서 (${dateLabel})`,
         category: '근로계약서',
         content: encryptAttempt.value,

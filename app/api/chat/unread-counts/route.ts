@@ -117,9 +117,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // sender_id 는 공지방 자동공지(휴가·생일·게시판 브로드캐스트)에서 NULL 이다.
+    // SQL 3값 논리로 `NULL <> 'uid'` 는 참이 아니라 UNKNOWN 이라, 그냥 `sender_id <> ?`
+    // 로 두면 자동공지가 안읽음 집계에서 통째로 빠진다(10차 CHAT-01 — 공지방 커서 보유
+    // 45명 전원에서 누적 1,225건 누락). 내가 보낸 것이 아닌 것을 세는 것이 원래 의도이므로
+    // NULL 발신자는 포함해야 한다.
     const sql =
       'SELECT room_id, COUNT(*) AS n FROM messages' +
-      ' WHERE is_deleted = 0 AND sender_id <> ?' +
+      ' WHERE is_deleted = 0 AND (sender_id IS NULL OR sender_id <> ?)' +
       ` AND (${clauses.join(' OR ')})` +
       ' GROUP BY room_id';
 

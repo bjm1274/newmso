@@ -94,6 +94,13 @@ class FromBuilder {
         columns,
         action: options.ignoreDuplicates ? 'ignore' : 'update' };
     } else {
+      // 충돌 기준을 안 준 upsert → INSERT OR REPLACE 폴백.
+      //
+      // 이건 "PK 로 덮어쓴다"가 아니다 — 그 행이 걸리는 **모든 유니크 제약**에 대해
+      // 기존 행을 DELETE 후 재삽입하므로, 넘기지 않은 컬럼이 전부 DEFAULT 로 초기화된다.
+      // 그래서 이 폴백은 payload 에 **id 가 있을 때만** 안전하다(= 자기 행을 통째로 교체).
+      // id 없이 이 경로로 오면 /api/d1/mutate 가
+      // UPSERT_CONFLICT_TARGET_UNKNOWN 으로 거부한다 — 호출부에서 onConflict 를 넘겨라.
       state.onConflict = 'replace';
     }
     return new InsertBuilder<T>(state);

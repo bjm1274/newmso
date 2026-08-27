@@ -15,6 +15,7 @@ import {
   inspectPurchaseOrder,
   receivePurchaseOrder } from '@/lib/inventory-stock-client';
 import { OrderStatusStepper } from './InventoryComponents';
+import { normalizeRawOrderStatus } from '../재고관리워크센터/order-status-map';
 
 type OrderRecord = {
   id: string;
@@ -104,7 +105,10 @@ function normalizePurchaseOrderRecord(order: any): OrderRecord {
     created_at: order?.created_at || new Date().toISOString(),
     supplier_name: String(order?.supplier_name || '미정'),
     items,
-    status: String(order?.status || '대기'),
+    // INV-02: `String(order?.status || '대기')` 는 'draft' 가 falsy 가 아니라 그대로 통과시켜,
+    // 배지에 영문이 찍히고 '발주 확인'(:'대기')·'입고 처리'(canReceivePurchaseOrder) 두 분기가
+    // 모두 불성립해 운영 31건이 화면에서 손댈 수 없는 상태로 남았다.
+    status: normalizeRawOrderStatus(order?.status),
     total_amount: Number(order?.total_amount || 0),
     notes: typeof order?.notes === 'string' ? order.notes : null,
     expected_delivery_date: typeof order?.expected_delivery_date === 'string' ? order.expected_delivery_date : null,

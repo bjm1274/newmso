@@ -38,6 +38,7 @@ import {
   sendMobileTextMessage,
   useChatMessagesForRoom,
   useMobileChatReadCounts,
+  resolveConversationRoomIds,
   useChatStaffDirectory,
   type MobileChatRoom,
   type StaffDirectoryEntry } from './data-hooks';
@@ -181,10 +182,16 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
     if (!roomId) return;
     setAttachmentsLoading(true);
     try {
+      // 대화창은 형제 방(중복 생성된 1:1 방)까지 합쳐 읽는데 이 조회만 대표 방
+      // 하나였다 — 화면에는 보이는 첨부가 '사진·파일' 목록에서만 빠졌다
+      // (운영 실측: 비대표 방 첨부 54건). 게다가 대표 방에 첨부가 1건이라도 있으면
+      // 위 폴백(로드된 창 기준)이 통째로 버려져 형제 첨부가 아예 안 보였다.
+      // 형제가 없으면 [roomId] 한 개라 일반 방에서는 동작이 같다.
+      const conversationRoomIds = await resolveConversationRoomIds(roomId);
       const { data, error } = await db
         .from('messages')
         .select('id, room_id, sender_id, sender_name, content, file_url, file_name, file_kind, created_at')
-        .eq('room_id', roomId)
+        .in('room_id', conversationRoomIds)
         .not('file_url', 'is', null)
         .order('created_at', { ascending: false })
         .limit(ROOM_ATTACHMENTS_LIMIT);

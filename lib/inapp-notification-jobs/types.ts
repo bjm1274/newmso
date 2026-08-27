@@ -29,6 +29,16 @@ export type NotificationInsertRow = {
 const DEDUPE_LOOKBACK_DAYS = 7;
 const DEDUPE_LOOKBACK_MS = DEDUPE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
 
+// D1 은 **쿼리 1건당 bound parameter 100개**가 한도다. 행 수가 아니라 bind 수가 기준이다.
+// notifications 는 INSERT 컬럼이 8개라 100행 = 800 bind 로 13행부터 통째로 실패한다
+// (같은 착각으로 보수교육 알림이 29일 연속 전량 실패했다 — 10차 CR10-01).
+const D1_MAX_BIND_PARAMS = 100;
+const NOTIFICATION_INSERT_COLUMNS = 8; // id·user_id·type·title·body·metadata·read_at·created_at
+const NOTIFICATION_INSERT_CHUNK_ROWS = Math.floor(
+  D1_MAX_BIND_PARAMS / NOTIFICATION_INSERT_COLUMNS,
+); // = 12행 (96 bind)
+const IN_ARRAY_CHUNK = 90;
+
 export function dedupeCutoffIso(): string {
   return new Date(Date.now() - DEDUPE_LOOKBACK_MS).toISOString();
 }
@@ -62,7 +72,8 @@ export async function loadExistingDedupeKeys(
   const d1 = await getD1Binding();
   if (!d1) throw new Error('[inapp-notification-jobs/types] D1 binding not available (loadExistingDedupeKeys)');
   const db = getD1Drizzle(d1);
-  const chunkSize = 100;
+  // eq(type) + gte(cutoff) 로 이미 bind 2개를 쓴다 — inArray 는 100이 아니라 여유를 둔 90.
+  const chunkSize = IN_ARRAY_CHUNK;
   for (let i = 0; i < userIds.length; i += chunkSize) {
     const chunk = userIds.slice(i, i + chunkSize);
     const rowsD1 = await db
@@ -95,7 +106,7 @@ export async function insertNotificationsChunked(
 ): Promise<{ created: number; errors: string[] }> {
   const errors: string[] = [];
   let created = 0;
-  const chunkSize = 100;
+  const chunkSize = NOTIFICATION_INSERT_CHUNK_ROWS;
 
   const d1 = await getD1Binding();
   if (!d1) throw new Error('[inapp-notification-jobs/types] D1 binding not available (insertNotificationsChunked)');
@@ -103,12 +114,15 @@ export async function insertNotificationsChunked(
 
   // 성공적으로 INSERT된 row만 모아 chunk 단위로 푸시 발송.
   // (chunk insert 실패 시 해당 chunk는 push 대상에서 제외 → 중복 발송 차단)
-  const successfullyInserted: NotificationInsertRow[] = [];
+  // NB-02/NB-04 — 푸시 tag 와 읽음처리에 쓰려면 **실제로 INSERT 된 알림 id** 가 필요하다.
+  // 그래서 여기서 만든 id 를 push 단계까지 들고 간다.
+  const successfullyInserted: (NotificationInsertRow & { id: string })[] = [];
 
   for (let i = 0; i < rows.length; i += chunkSize) {
     const chunk = rows.slice(i, i + chunkSize);
-    const d1Rows = chunk.map((row) => ({
-      id: crypto.randomUUID(),
+    const chunkWithIds = chunk.map((row) => ({ ...row, id: crypto.randomUUID() }));
+    const d1Rows = chunkWithIds.map((row) => ({
+      id: row.id,
       user_id: row.user_id,
       type: row.type,
       title: row.title,
@@ -122,7 +136,7 @@ export async function insertNotificationsChunked(
     try {
       await db.insert(notificationsTable).values(d1Rows).onConflictDoNothing();
       created += chunk.length;
-      successfullyInserted.push(...chunk);
+      successfullyInserted.push(...chunkWithIds);
     } catch (err) {
       errors.push(err instanceof Error ? err.message : String(err));
     }
@@ -136,6 +150,7 @@ export async function insertNotificationsChunked(
         '../notification-push-dispatch'
       );
       const pushRows = successfullyInserted.map((row) => ({
+        id: row.id,
         user_id: row.user_id,
         type: row.type,
         title: row.title,

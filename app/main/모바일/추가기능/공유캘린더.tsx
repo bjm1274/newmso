@@ -205,18 +205,26 @@ export default function 공유캘린더({
       // 3. 근무표 (nurse_schedules)
       if (canViewShifts) {
         try {
+          // limit(2000) 은 /api/d1/query 의 limit 상한(1000)을 넘어 payload 검증에서 400 이 났고,
+          // 여기서 error 를 보지 않아 근무표가 조용히 통째로 비어 있었다.
+          // 한 달치로 이미 한정된 조회라 PC 공유캘린더(app/main/기능부품/공유캘린더.tsx:141)처럼 상한을 두지 않는다.
+          // 운영 nurse_schedules 는 id/staff_id/year_month/day/shift_code/created_at 뿐이라
+          // staff_name 을 같이 select 하면 SQLITE_ERROR 로 쿼리 전체가 죽는다.
+          // 이름은 staffMap(staff_members) 으로 staff_id 를 조회해 얻는다 — PC 와 동일.
           let shiftQuery = db
             .from('nurse_schedules')
-            .select('staff_id, staff_name, day, shift_code')
-            .eq('year_month', ym)
-            .limit(2000);
+            .select('staff_id, day, shift_code')
+            .eq('year_month', ym);
 
           if (!canViewAll && selfId) {
             shiftQuery = shiftQuery.eq('staff_id', selfId);
           }
 
-          const { data: shiftData } = await shiftQuery;
-          if (Array.isArray(shiftData)) {
+          // error 를 보지 않던 것이 이 결함을 오래 숨긴 원인이다 — PC 와 같이 명시적으로 남긴다.
+          const { data: shiftData, error: shiftErr } = await shiftQuery;
+          if (shiftErr) {
+            console.warn('[모바일-공유캘린더] nurse_schedules:', shiftErr);
+          } else if (Array.isArray(shiftData)) {
             for (const r of shiftData) {
               const dayNum = Number(r.day);
               if (Number.isFinite(dayNum) && dayNum >= 1 && dayNum <= 31 && r.shift_code) {
@@ -227,7 +235,7 @@ export default function 공유캘린더({
                   kind: 'shift',
                   day: dayNum,
                   staff_id: sId,
-                  staff_name: sInfo?.name || r.staff_name || `직원(${sId.slice(0, 4)})`,
+                  staff_name: sInfo?.name || `직원(${sId.slice(0, 4)})`,
                   shift_code: String(r.shift_code),
                 });
               }
@@ -241,12 +249,15 @@ export default function 공유캘린더({
       // 4. 게시판 일정 (board_posts)
       if (canViewBoard) {
         try {
+          // M04: limit(100) + ORDER BY 없음 → schedule_date 인덱스 순서로 앞 100건만 들어와
+          // 월말 한 주가 통째로 빠졌다(2026-07 은 128건 중 28건 누락, 7/25~7/31 이 전부 비었다).
+          // 이미 한 달 범위로 좁힌 조회(운영 최대 128건/월)이므로 상한 자체를 없애 그 달 전건을 받는다.
+          // PC(app/main/기능부품/공유캘린더.tsx)도 같은 이유로 limit(200) 을 없앴다 — 2차에서 처리.
           const { data: boardData } = await db
             .from('board_posts')
             .select('id, title, board_type, schedule_date, schedule_time')
             .gte('schedule_date', monthStart)
-            .lte('schedule_date', monthEnd)
-            .limit(100);
+            .lte('schedule_date', monthEnd);
 
           if (Array.isArray(boardData)) {
             for (const b of boardData) {

@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/db-client';
+import { toast } from '@/lib/toast';
 import { Card, Chip, SmBtn } from '../admin-workcenter-common';
 import { FALLBACK_HOLIDAYS, FALLBACK_LEAVE_RULES } from './fallback-data';
 import type { HolidayItem, RuleRow } from './types';
@@ -297,16 +298,12 @@ export default function CompanyLeaveTab() {
       setShowAddHolidayModal(false);
       setNewHoliName('');
     } catch (e) {
-      console.warn('[CompanyLeaveTab] Holiday insert failed, fallback locally:', e);
-      const newHoli: HolidayItem = {
-        date: newHoliDate,
-        name: newHoliName,
-        kind: newHoliKind };
-      setHolidays(prev => {
-        const filtered = prev.filter(h => h.date !== newHoliDate);
-        return [...filtered, newHoli];
-      });
-      setShowAddHolidayModal(false);
+      // 예전에는 실패해도 공휴일을 목록에 끼워 넣고 모달을 닫아 등록된 것처럼 보였다.
+      // 이 파일에는 로컬 저장소가 없어 새로고침하면 그대로 증발했다(handleSaveWelfare 와 같은 이유).
+      // → 넣지 않고, 모달을 열어 둔 채 실패를 알린다.
+      console.error('[CompanyLeaveTab] holiday insert failed:', e);
+      const reason = String((e as { message?: unknown } | null)?.message ?? e ?? '').trim();
+      toast(`공휴일 등록 실패 — 등록되지 않았습니다.\n${reason || '알 수 없는 오류'}`, 'error');
     }
   };
 

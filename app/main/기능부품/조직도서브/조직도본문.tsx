@@ -5,6 +5,19 @@ import { useEffect, useState } from 'react';
 import { normalizeMainMenuForUser } from '@/lib/access-control';
 import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
+// 잔여 집계는 PC 워크센터·모바일 연차관리자·/api/annual-leave/summary 와 **같은 함수**를 쓴다.
+import {
+  aggregateLedgerEntries,
+  getLeaveCycle,
+  resolveHireDateKey,
+  type LedgerRowLike,
+} from '@/lib/leave-cycle';
+// 촉진 만료일은 크론(lib/annual-leave-promotion-dispatch)과 **같은 계산**을 쓴다.
+import {
+  getStaffPromotionSchedule,
+  resolveHireDateFromStaff,
+} from '@/lib/annual-leave-promotion';
 import type { ErpUser, ERPData, StaffMember } from '@/types';
 
 const prefetchedMainMenuModules = new Set<string>();
@@ -255,7 +268,7 @@ export default function MainContent({
 
         if (existingLogs && existingLogs.length > 0) return;
 
-        const [{ data: balanceData }, { data: ledgerRows }] = await Promise.all([
+        const [{ data: balanceData }, { data: ledgerRows }, { data: hireRow }] = await Promise.all([
           db
             .from('leave_balances')
             .select('total_days, used_days, remaining_days, expired_days, compensated_days')
@@ -264,27 +277,45 @@ export default function MainContent({
             .maybeSingle(),
           db
             .from('leave_ledger')
-            .select('entry_type, days')
+            .select('id, staff_id, entry_type, days, occurred_on, period_key, source_id, note')
             .eq('staff_id', user.id),
+          // 주기 판정에 입사일이 필요하다. user 객체에는 실려 오지 않으므로 원본에서 읽는다.
+          db
+            .from('staff_members')
+            .select('id, hire_date, join_date, joined_at')
+            .eq('id', user.id)
+            .maybeSingle(),
         ]);
 
         let remaining = 0;
         let total = 0;
 
-        if (ledgerRows && ledgerRows.length > 0) {
-          let rem = 0;
-          let tot = 0;
-          (ledgerRows as any[]).forEach((row) => {
-            const entryType = String(row.entry_type || '');
-            const days = Number(row.days) || 0;
-            rem += days;
-            if (entryType !== 'use' && entryType !== 'manual_used_adjustment' && entryType !== 'expire' && entryType !== 'manual_expire_adjustment' && entryType !== 'compensate' && entryType !== 'manual_compensate_adjustment') {
-              tot += days;
-            }
-          });
-          total = tot;
-          remaining = Math.max(0, rem);
+        // 원장(leave_ledger)은 **생애 전체** 기록이고 잔여는 **현재 주기**(입사기념일
+        // 단위) 값이어야 한다. 예전에는 `select('entry_type, days')` 로 주기 정보 없이
+        // 전 이력을 더했다 — 직전 주기의 auto_annual(+15)과 expire(-15)가 함께 남아
+        // 잔여가 최대 31일까지 부풀었고, 그 값이 아래 `remaining > 0` 게이트를 통과해
+        // **연차가 남지 않은 직원에게도 촉진 안내가 떴다.** 집계는 다시 짜지 않고
+        // 워크센터·모바일·서버 요약과 같은 함수를 쓴다.
+        const hireKey = hireRow ? resolveHireDateKey(hireRow as Record<string, unknown>) : null;
+        const cycle = hireKey ? getLeaveCycle(hireKey, formatKoreanDateKey(new Date())) : null;
+
+        if (ledgerRows && ledgerRows.length > 0 && cycle) {
+          const entries: LedgerRowLike[] = (ledgerRows as any[])
+            .filter((row) => row && typeof row === 'object')
+            .map((row) => ({
+              id: row.id,
+              entry_type: row.entry_type,
+              days: row.days,
+              occurred_on: typeof row.occurred_on === 'string' ? row.occurred_on : null,
+              period_key: row.period_key,
+              source_id: typeof row.source_id === 'string' ? row.source_id : null,
+              note: typeof row.note === 'string' ? row.note : null }));
+          const agg = aggregateLedgerEntries(entries, cycle);
+          total = agg.total;
+          remaining = Math.max(0, agg.remaining);
         } else if (balanceData) {
+          // 입사일이 없어 주기를 못 잡는 직원은 원장 합산을 포기하고
+          // leave_balances 미러 값으로 내려간다(전 이력 합산보다 낫다).
           total = Number(balanceData.total_days) || 0;
           const used = Number(balanceData.used_days) || 0;
           const expired = Number(balanceData.expired_days) || 0;
@@ -317,7 +348,8 @@ export default function MainContent({
       // 1) 직원 상세 정보 조회
       const { data: staff, error: staffError } = await db
         .from('staff_members')
-        .select('name, company, department, position')
+        // 촉진 만료일은 입사기념일 기준이라 입사일 후보 3종이 함께 필요하다.
+        .select('name, company, department, position, hire_date, join_date, joined_at')
         .eq('id', user.id)
         .single();
 
@@ -365,11 +397,29 @@ MSO 주식회사 대표이사 (직인생략)`;
       if (docError) throw docError;
 
       // 3) 연차촉진 로그 저장
+      //
+      // 만료일은 **입사기념일 기준**이다. 예전에는 `${targetYear}-12-31` 을 그대로
+      // 박았는데, 12/31 입사자는 운영에 한 명도 없어 이 행은 어느 직원의 실제
+      // 만료일과도 일치하지 않았다 — `hasCompletedBothPromotions(staffId, expiryKey)`
+      // 가 만료일을 정확히 대조하므로 **이 화면에서 이행한 1차 촉진이 소멸 판정에서
+      // 통째로 무시됐다**(운영 로그 4행: 백정민·김지오·김이지, 전부 2026-12-31).
+      // 크론(lib/annual-leave-promotion-dispatch)과 같은 함수로 만료일을 구한다.
+      const promotionSchedule = getStaffPromotionSchedule(
+        resolveHireDateFromStaff(
+          staff as { hire_date?: string | null; join_date?: string | null; joined_at?: string | null },
+        ),
+        new Date(),
+      );
+      // 입사일이 없어 만료일을 못 구하면 **날짜를 지어내지 않는다.** 빈 만료일 로그는
+      // hasCompletedBothPromotions 가 이미 "인정하지 않음" 으로 처리한다(오판 방지).
+      const expiryDateStr = promotionSchedule
+        ? formatKoreanDateKey(promotionSchedule.expiryDate)
+        : null;
+
       const logId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
         ? crypto.randomUUID()
-        : `alp-${user.id}-${targetYear}-1`;
-
-      const expiryDateStr = `${targetYear}-12-31`;
+        // 크론·수동발송과 같은 자연키 규약: `alp-{staff}-{step}-{expiry}`
+        : `alp-${user.id}-1-${expiryDateStr ?? ''}`;
 
       await db.from('annual_leave_promotion_logs').insert({
         id: logId,

@@ -8,6 +8,7 @@ import { assertChatRoomMember } from '@/lib/chat-room-membership';
 import { getD1Binding, getD1Drizzle } from '@/lib/db';
 import { sql } from 'drizzle-orm';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
+import { buildObjectResponseHeaders } from './content-policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,16 @@ function getPublicBaseUrlInternal(): string {
 
 function encodeObjectKey(objectKey: string): string {
   return objectKey.split('/').map(encodeURIComponent).join('/');
+}
+
+/**
+ * messages.file_url 에 저장되는 **내부 프록시 형태** 문자열.
+ * lib/object-storage.ts buildR2AccessUrl 의 공개 베이스 미설정 분기와 같은 형태여야
+ * 정확 일치 역추적이 걸린다(URLSearchParams 라 키의 `/` 가 `%2F` 로 인코딩된다).
+ */
+function buildInternalObjectUrl(bucket: string, objectKey: string): string {
+  const params = new URLSearchParams({ provider: 'r2', bucket, key: objectKey });
+  return `/api/storage/object?${params.toString()}`;
 }
 
 /**
@@ -69,7 +80,13 @@ export async function GET(request: NextRequest) {
     const objectKey = String(request.nextUrl.searchParams.get('key') || '').trim().split('?')[0];
     const download = request.nextUrl.searchParams.get('download') === '1';
     const proxy = request.nextUrl.searchParams.get('proxy') === '1';
-    const fileName = String(request.nextUrl.searchParams.get('name') || '').trim() || 'download';
+    // 이름을 안 실어 보내는 호출부(모바일 게시판 '열기' 등)에서도 최소한 확장자가
+    // 살아 있는 이름이 되도록 오브젝트 키의 마지막 조각을 폴백으로 쓴다.
+    // 예전 폴백 'download' 는 확장자가 없어 저장 파일이 열리지 않았다.
+    const fileName =
+      String(request.nextUrl.searchParams.get('name') || '').trim()
+      || objectKey.split('/').pop()
+      || 'download';
 
     if (provider !== 'r2') {
       return NextResponse.json({ error: 'Unsupported provider' }, { status: 400 });
@@ -132,31 +149,63 @@ export async function GET(request: NextRequest) {
           // 경로에 방 id 가 없으면 이 객체를 참조하는 메시지로 방을 역추적한다.
           // 찾지 못하면(업로드 직후 등 아직 메시지가 없는 경우) 세션 검사까지만 적용한다 —
           // 키에 UUID 가 들어 있어 열거가 불가능하다.
-          let roomId = roomIdFromPath;
-          if (!roomId) {
+          let roomIds: string[] = roomIdFromPath ? [roomIdFromPath] : [];
+          if (roomIds.length === 0) {
             try {
               // LIKE 는 쓰지 않는다 — D1 이 `LIKE or GLOB pattern too complex` 로 거부한다.
-              // file_url 은 공개 베이스 URL + 객체 키 형태로 저장되므로 정확 일치로 찾는다.
-              // (인코딩 여부가 경로에 따라 갈려 두 형태를 모두 후보로 둔다.)
+              // 정확 일치로 찾되, **저장 형태가 두 가지**라는 점을 반영해야 한다.
+              // 운영 실측(2026-08-27, messages.file_url 2,988건):
+              //   공개 베이스 형태 https://r2.pchos.kr/chat/<file>              1,837건
+              //   내부 프록시 형태 /api/storage/object?provider=r2&bucket=…&key=…  1,151건
+              // 예전에는 공개 베이스 형태만 후보로 만들어 내부 프록시 형태 38.6% 는
+              // IN 조회가 구조적으로 0행이었고, roomId 가 null 인 채 멤버십 검사를
+              // 통째로 건너뛰었다(fail-open). 두 형태를 모두 후보로 만든다.
+              // 내부 프록시 형태의 문자열은 lib/object-storage.ts buildR2AccessUrl 이
+              // URLSearchParams 로 만든 것과 정확히 같아야 한다(키가 %2F 로 인코딩된다).
+              const candidates: string[] = [];
+              const pushCandidate = (value: string) => {
+                if (value && !candidates.includes(value)) candidates.push(value);
+              };
+
               const publicBase = getPublicBaseUrlInternal();
-              const candidates = publicBase
-                ? [`${publicBase}/${encodeObjectKey(objectKey)}`, `${publicBase}/${objectKey}`]
-                : [];
+              if (publicBase) {
+                pushCandidate(`${publicBase}/${encodeObjectKey(objectKey)}`);
+                pushCandidate(`${publicBase}/${objectKey}`);
+              }
+              for (const candidateBucket of [bucket, 'pchos-files']) {
+                pushCandidate(buildInternalObjectUrl(candidateBucket, objectKey));
+              }
+
               if (candidates.length > 0) {
+                const placeholders = candidates.map((_, i) => `?${i + 1}`).join(', ');
                 const found = await d1
-                  .prepare('SELECT room_id FROM messages WHERE file_url IN (?1, ?2) LIMIT 1')
-                  .bind(candidates[0], candidates[1])
-                  .first<{ room_id: string | null }>();
-                if (found?.room_id) roomId = String(found.room_id);
+                  .prepare(
+                    `SELECT DISTINCT room_id FROM messages WHERE file_url IN (${placeholders}) LIMIT 20`,
+                  )
+                  .bind(...candidates)
+                  .all<{ room_id: string | null }>();
+                roomIds = (found?.results ?? [])
+                  .map((row) => String(row?.room_id ?? '').trim())
+                  .filter(Boolean);
               }
             } catch (lookupErr) {
               console.error('[storage/object] 채팅 첨부 방 역추적 실패:', lookupErr);
             }
           }
 
-          if (roomId) {
-            const mem = await assertChatRoomMember(db, roomId, userId);
-            if (!mem.ok) {
+          if (roomIds.length > 0) {
+            // 같은 첨부가 여러 방에 있을 수 있다(전달·재게시 — 운영 실측 13건).
+            // 한 방만 뽑아 검사하면 **다른 방의 정상 멤버가 403** 을 받는다.
+            // 참조하는 방 중 하나라도 멤버면 통과시킨다 — 그 방에서 이미 볼 수 있는 파일이다.
+            let allowed = false;
+            for (const candidateRoomId of roomIds) {
+              const mem = await assertChatRoomMember(db, candidateRoomId, userId);
+              if (mem.ok) {
+                allowed = true;
+                break;
+              }
+            }
+            if (!allowed) {
               return NextResponse.json({ error: '해당 대화방 첨부파일 접근 권한이 없습니다.' }, { status: 403 });
             }
           }
@@ -194,20 +243,12 @@ export async function GET(request: NextRequest) {
         const r2Object = await r2Binding.get(objectKey);
         if (!r2Object) stages.push('binding:object-missing');
         if (r2Object && r2Object.body) {
-          const contentType = r2Object.httpMetadata?.contentType || 'application/octet-stream';
-          const headers: Record<string, string> = {
-            'Content-Type': contentType,
-            'Cache-Control': 'public, max-age=86400, immutable',
-            'X-Content-Type-Options': 'nosniff',
-          };
-          if (r2Object.size) {
-            headers['Content-Length'] = String(r2Object.size);
-          }
-          if (download) {
-            const ascii = fileName.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
-            const encoded = encodeURIComponent(fileName);
-            headers['Content-Disposition'] = `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`;
-          }
+          const headers = buildObjectResponseHeaders({
+            storedContentType: r2Object.httpMetadata?.contentType || 'application/octet-stream',
+            cacheControl: 'public, max-age=86400, immutable',
+            download,
+            fileName,
+            contentLength: r2Object.size ? String(r2Object.size) : null });
           return new NextResponse(r2Object.body as ReadableStream, { status: 200, headers });
         }
       }
@@ -251,19 +292,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const contentType = upstream.headers.get('content-type') || 'application/octet-stream';
-    const contentLength = upstream.headers.get('content-length');
-
-    const headers: Record<string, string> = {
-      'Content-Type': contentType,
-      'Cache-Control': 'private, max-age=3600',
-      'X-Content-Type-Options': 'nosniff' };
-    if (contentLength) headers['Content-Length'] = contentLength;
-    if (download) {
-      const ascii = fileName.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
-      const encoded = encodeURIComponent(fileName);
-      headers['Content-Disposition'] = `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`;
-    }
+    const headers = buildObjectResponseHeaders({
+      storedContentType: upstream.headers.get('content-type') || 'application/octet-stream',
+      cacheControl: 'private, max-age=3600',
+      download,
+      fileName,
+      contentLength: upstream.headers.get('content-length') });
 
     return new NextResponse(upstream.body, { status: 200, headers });
   } catch (error) {

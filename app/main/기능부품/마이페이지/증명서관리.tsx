@@ -44,14 +44,7 @@ type CertificateContextStaff = {
   joined_at?: string | null;
   join_date?: string | null;
   employee_no?: string | null;
-  duty?: string | null;
-  job_duty?: string | null;
-  responsibility?: string | null;
   role?: string | null;
-  rank?: string | null;
-  grade?: string | null;
-  level?: string | null;
-  profile_photo_url?: string | null;
   profile_photo_path?: string | null;
   profile_photo_updated_at?: string | null;
   avatar_url?: string | null;
@@ -135,7 +128,15 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
             .limit(20),
           db
             .from('staff_members')
-            .select('id, name, company, department, position, joined_at, join_date, employee_no, duty, job_duty, responsibility, role, rank, grade, level, profile_photo_url, profile_photo_path, profile_photo_updated_at, avatar_url, photo_url, permissions')
+            // duty / job_duty / responsibility / rank / grade / level / profile_photo_url 은
+            // 운영 D1 staff_members 에 없는 레거시 컬럼이다(PRAGMA 실측). 게이트웨이가
+            // 컬럼명을 큰따옴표로 인용하는 탓에 SQLite 가 이를 에러 대신 문자열 리터럴로
+            // 돌려줘서 `"duty"` 같은 쓰레기 키만 붙어 왔다(lib/staff-query-columns.ts 참고).
+            // 실컬럼만 남긴다. 사진 경로는 permissions JSON 폴백이 있어 permissions 도 유지.
+            .select(
+              'id, name, company, department, position, joined_at, join_date, employee_no, role, ' +
+                'profile_photo_path, profile_photo_updated_at, avatar_url, photo_url, permissions',
+            )
             .eq('id', effectiveUserId)
             .maybeSingle(),
         ]);
@@ -204,18 +205,17 @@ export default function MyCertificates({ user }: Record<string, unknown>) {
   const issuedContext = useMemo<IssuedCertificateContext>(() => {
     const companyLabel =
       String(staffDetail?.company || (resolvedUser?.company as string) || '').trim() || 'SY INC.';
+    // 담당업무(duty) / 직급(rank):
+    //  - duty/job_duty/responsibility 는 운영에 없는 컬럼이라 폴백 체인이 늘 role 까지
+    //    흘러왔다. 실제로 화면에 나가던 값은 role 하나뿐이므로 그것만 남긴다.
+    //    (인사관리 > 문서보관함의 resolveCertContext 와 동일한 결론)
+    //  - rank/grade/level 도 운영에 없다. 직급을 담은 실컬럼은 position 뿐인데
+    //    position 은 '직위/직급' 칸에 이미 그대로 나가므로, rank 를 position 으로
+    //    채우면 "사원 / 사원"으로 중복 출력된다. 그래서 null 로 둔다.
     const dutyLabel =
-      (staffDetail?.duty as string | null) ||
-      (staffDetail?.job_duty as string | null) ||
-      (staffDetail?.responsibility as string | null) ||
       (staffDetail?.role as string | null) ||
-      ((resolvedUser?.duty as string | undefined) ?? null) ||
       ((resolvedUser?.role as string | undefined) ?? null);
-    const rankLabel =
-      (staffDetail?.rank as string | null) ||
-      (staffDetail?.grade as string | null) ||
-      (staffDetail?.level as string | null) ||
-      null;
+    const rankLabel: string | null = null;
     const employeeNo =
       (staffDetail?.employee_no as string | null) ||
       ((resolvedUser?.employee_no as string | undefined) ?? null) ||

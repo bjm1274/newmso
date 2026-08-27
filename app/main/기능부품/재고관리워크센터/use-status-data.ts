@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { db } from '@/lib/db-client';
 import { INVENTORY_SELECT_COLUMNS } from '@/app/main/inventory-utils';
 import type { StockStatusRow, Tone } from './stock-types';
-import { pickNumber, pickString, toMonthString, type Row } from './data-helpers';
+import { fetchAllRowsPaged, pickNumber, pickString, toMonthString, type Row } from './data-helpers';
 
 /** quantity 우선 SSOT (stock·current_quantity 는 레거시 fallback) */
 function mapStatusRow(r: Row): StockStatusRow {
@@ -87,7 +87,12 @@ export function useStatusData(
 
     const load = async () => {
       try {
-        const invQuery = db.from('inventory').select(INVENTORY_SELECT_COLUMNS).limit(500);
+        // INV-01: limit(500) 이면 운영 품목 1,032건 중 532건이 KPI·표·검색에서 통째로 빠진다.
+        // id 정렬은 OFFSET 페이징의 페이지 경계를 확정하기 위한 것이다(정렬이 없으면 중복·누락).
+        const buildInvQuery = () => {
+          const q = db.from('inventory').select(INVENTORY_SELECT_COLUMNS).order('id');
+          return userCompany && userCompany !== '전체' ? q.eq('company', userCompany) : q;
+        };
         let logsQuery = db
           .from('inventory_logs')
           .select('actor_name,department,quantity,change_type,created_at,company')
@@ -98,15 +103,13 @@ export function useStatusData(
           logsQuery = logsQuery.eq('company', userCompany);
         }
         const [inv, logs] = await Promise.all([
-          userCompany && userCompany !== '전체'
-            ? invQuery.eq('company', userCompany)
-            : invQuery,
+          fetchAllRowsPaged(buildInvQuery),
           logsQuery,
         ]);
 
         if (cancelled) return;
 
-        const invRows: Row[] = Array.isArray(inv.data) ? (inv.data as Row[]) : [];
+        const invRows: Row[] = inv.rows;
         const mapped = invRows.map(mapStatusRow);
 
         const zeroCount = mapped.filter((r) => r.status === '재고 0').length;

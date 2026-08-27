@@ -273,9 +273,9 @@ const MAX_POLICY_ROWS_PER_MUTATION = 200;
  * 지우게 만들 수 있었다(판정 대상 ≠ 실행 대상). 폴백 경로는 넷이었고
  * `loadedFromDb` 를 돌려주긴 했지만 호출부가 그것을 보지 않았다.
  *
- * 예외는 하나다 — 정책이 행 내용과 무관하고(PUBLIC/AUTHENTICATED) 컬럼 가드도 없으면
- * 어떤 행으로 검사해도 결과가 같으므로 조회를 생략한다. 이 경우 합성 행은 판정에
- * 영향을 주지 않는다.
+ * 예외는 하나다 — 정책이 행 내용과 무관하고(PUBLIC/AUTHENTICATED/ADMIN_ONLY/ADMIN_OR_MANAGER:
+ * evalPattern 이 claims 만 보고 row 를 읽지 않는다) 컬럼 가드도 없으면 어떤 행으로
+ * 검사해도 결과가 같으므로 조회를 생략한다. 이 경우 합성 행은 판정에 영향을 주지 않는다.
  */
 type PolicyRowLoadResult = {
   rows: Record<string, unknown>[];
@@ -290,20 +290,29 @@ type PolicyRowLoadResult = {
  * 그렇다면 기존 행을 찾을 충돌 키 컬럼을 돌려준다.
  *
  * - `conflict.action === 'update'` → ON CONFLICT(...) DO UPDATE — 지정한 컬럼이 곧 충돌 키.
- * - `onConflict === 'replace'`     → INSERT OR REPLACE — 유니크 제약 충돌 시 기존 행을
- *   지우고 다시 넣는다. 실무상 PK(id)로 충돌하므로 id 로 본다.
+ *   호출자가 키를 **명시**했으므로 그대로 믿는다(`declared: true`).
+ * - `onConflict === 'replace'`     → INSERT OR REPLACE. 이건 특정 컬럼이 아니라 **그 행이
+ *   걸리는 모든 유니크 제약**에 대해 기존 행을 지우고 다시 넣는다. 즉 충돌 키를
+ *   요청만 보고는 알 수 없다. id 는 어디까지나 **가정**이므로 `declared: false` 로 표시하고,
+ *   행에 id 가 없어 그 가정조차 확인할 수 없으면 호출부가 거부한다.
  * - `'ignore'` 계열은 기존 행을 건드리지 않으므로 null (추가 검사 불필요).
  */
+type UpsertConflictTarget = {
+  columns: string[];
+  /** 호출자가 충돌 키를 명시했는가. false 면 우리가 id 로 가정한 것이다. */
+  declared: boolean;
+};
+
 function resolveUpsertConflictColumns(payload: {
   onConflict?: 'ignore' | 'replace';
   conflict?: { columns: string[]; action: 'update' | 'ignore' };
-}): string[] | null {
+}): UpsertConflictTarget | null {
   if (payload.conflict) {
     if (payload.conflict.action !== 'update') return null;
     const cols = payload.conflict.columns.filter((c) => COLUMN_RE.test(c));
-    return cols.length > 0 ? cols : null;
+    return cols.length > 0 ? { columns: cols, declared: true } : null;
   }
-  if (payload.onConflict === 'replace') return ['id'];
+  if (payload.onConflict === 'replace') return { columns: ['id'], declared: false };
   return null;
 }
 
@@ -331,12 +340,21 @@ async function loadPolicyRowsForMutation(
     return blocked('조건 없는 수정·삭제는 허용되지 않습니다. WHERE 를 지정하세요.');
   }
 
-  // 행 내용과 무관한 정책(PUBLIC/AUTHENTICATED)이고 컬럼 가드도 없으면 조회가 무의미하다.
+  // 행 내용과 무관한 정책이고 컬럼 가드도 없으면 조회가 무의미하다.
   // 어떤 행을 잡든 판정이 같으므로 기존처럼 합성 행 1개로 검사해 왕복을 아낀다.
   // (이 경우의 위험은 정책 자체가 과도하게 열려 있다는 것이며, 그건 policies.ts 에서 다룰 문제다.)
+  //
+  // ADMIN_ONLY / ADMIN_OR_MANAGER 도 evalPattern 에서 claims 만 보고 `row` 를 한 번도
+  // 읽지 않는다 — PUBLIC/AUTHENTICATED 와 똑같이 완전히 행-무관이다. 예전에는 이 둘이
+  // 목록에 없어, upsert 가 행마다 판정에 영향을 줄 수 없는 `SELECT ... LIMIT 201` 을
+  // 순차로 한 번씩 더 쳤다(근무표 월 일괄저장 936행 = 936왕복).
   const cfg = POLICY_REGISTRY[table];
   const pattern = cfg?.[op];
-  const rowIndependent = pattern === 'PUBLIC' || pattern === 'AUTHENTICATED';
+  const rowIndependent =
+    pattern === 'PUBLIC' ||
+    pattern === 'AUTHENTICATED' ||
+    pattern === 'ADMIN_ONLY' ||
+    pattern === 'ADMIN_OR_MANAGER';
   const hasGuards = Boolean(cfg?.guards?.[op]) || Boolean(cfg?.asyncGuards?.[op]);
   if (cfg && rowIndependent && !hasGuards) {
     // 이 경우에만 합성 행을 쓴다 — 정책이 행 내용을 보지 않으므로 판정 결과가 같다.
@@ -533,17 +551,44 @@ export async function POST(request: Request) {
       //
       // chat_rooms 에만 같은 방어가 가드 안에 들어 있었는데, 그걸 라우트로 올려
       // 모든 테이블에 적용한다.
-      const upsertColumns = resolveUpsertConflictColumns(payload);
+      const upsertTarget = resolveUpsertConflictColumns(payload);
 
       for (const row of payload.values) {
         await assertAccess({ db, claims, table: payload.table, op: 'insert', row });
 
-        if (!upsertColumns) continue;
+        if (!upsertTarget) continue;
         // 충돌 키가 이 행에 전부 채워져 있어야 기존 행을 특정할 수 있다.
-        const conflictWhere = upsertColumns
+        const conflictWhere = upsertTarget.columns
           .filter((col) => row[col] !== undefined && row[col] !== null)
           .map((col) => ({ field: col, op: 'eq', value: row[col] }));
-        if (conflictWhere.length !== upsertColumns.length) continue;
+        if (conflictWhere.length !== upsertTarget.columns.length) {
+          // 호출자가 충돌 키를 명시하지 않은 `onConflict:'replace'` 인데, 우리가 가정한
+          // id 마저 행에 없다 — 어떤 행을 덮어쓰게 될지 **알 수 없는** 요청이다.
+          //
+          // 예전에는 여기서 그냥 건너뛰어(= update 정책·컬럼 가드를 통째로 생략) 아래
+          // fillId 가 새 UUID 를 붙인 뒤 INSERT OR REPLACE 를 실행했다. REPLACE 는 PK 가
+          // 아니라 **그 행이 걸리는 모든 유니크 제약**으로 충돌하므로, 새 id 를 붙여도
+          // 다른 제약(예: op_patient_checks.schedule_post_id)에 걸린 기존 행이 DELETE 후
+          // 재삽입됐다 — 검사 한 번 없이 남의 회사 임상 기록이 컬럼 DEFAULT 로 초기화됐다.
+          // 조용히 통과시키지 않고 거부한다. 호출부가 onConflict 로 충돌 키를 명시해야 한다.
+          //
+          // id 컬럼 자체가 없는 테이블(system_settings 등 key-value)은 애초에 id 가정이
+          // 성립하지 않는다. 그쪽은 insert 정책과 update 정책이 같은 ADMIN_ONLY 라
+          // 검사를 건너뛰어도 권한 경계가 넓어지지 않으므로 기존 동작을 유지한다
+          // (관리자 백업 복원이 이 형태로 전 테이블을 되돌린다).
+          const hasIdColumn = getKnownTableColumns(payload.table)?.has('id') ?? false;
+          if (!upsertTarget.declared && hasIdColumn) {
+            return NextResponse.json(
+              {
+                ok: false,
+                error:
+                  '덮어쓸 대상 행을 특정할 수 없습니다. upsert 에 충돌 기준 컬럼(onConflict)을 지정하세요.',
+                code: 'UPSERT_CONFLICT_TARGET_UNKNOWN' },
+              { status: 400 },
+            );
+          }
+          continue;
+        }
 
         const targets = await loadPolicyRowsForMutation(db, payload.table, 'update', conflictWhere);
         if (targets.blocked) {
@@ -587,16 +632,49 @@ export async function POST(request: Request) {
       });
       const tableSql = sql.identifier(payload.table);
       const knownCols = getKnownTableColumns(payload.table);
+      // 스키마에 없는 컬럼은 여기서 조용히 사라진다 — update 쪽과 같은 무음 유실이다.
+      // 화면은 성공 토스트를 띄우는데 그 값만 저장되지 않으니, 신고가 "가끔 안 저장돼요"
+      // 로만 올라오고 원인에 도달하지 못한다. 그래서 update 경로와 똑같이
+      // 서버 로그 + 응답 droppedColumns 로 관측 가능하게 남긴다.
+      //
+      // 주의: 여기서 걸러지는 것은 **저장소 schema.ts 기준**이라, 스키마에는 있는데
+      // 운영 D1 에는 없는 컬럼(드리프트)은 통과해 D1 까지 내려간다. 그건 D1 이
+      // `no such column: …` 로 거부하고 아래 catch 가 그 메시지를 그대로 500 으로
+      // 돌려주므로 이미 보인다 — 삼켜지는 쪽은 이 필터뿐이었다.
+      const droppedInsertColumns = new Set<string>();
       const allCols = Array.from(
         serializedValues.reduce<Set<string>>((acc, row) => {
           Object.keys(row).forEach((k) => {
             if (COLUMN_RE.test(k) && (!knownCols || knownCols.has(k))) {
               acc.add(k);
+            } else {
+              droppedInsertColumns.add(k);
             }
           });
           return acc;
         }, new Set()),
       );
+      const droppedColumns = Array.from(droppedInsertColumns);
+      if (droppedColumns.length > 0) {
+        console.warn(
+          `[d1/mutate] ${payload.table}: 스키마에 없는 컬럼을 무시함(insert) → ${droppedColumns.join(', ')}`,
+        );
+      }
+      if (allCols.length === 0) {
+        // 넣을 컬럼이 하나도 안 남았다. 예전에는 컬럼 목록이 빈 INSERT 문을 만들어
+        // D1 문법 오류로 죽었다 — 무엇이 왜 버려졌는지 알 수 없는 500 이었다.
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              droppedColumns.length > 0
+                ? `저장할 수 있는 컬럼이 없습니다. 스키마에 없는 컬럼: ${droppedColumns.join(', ')}`
+                : '저장할 값이 없습니다.',
+            code: 'NO_VALID_COLUMNS',
+            ...(droppedColumns.length > 0 ? { droppedColumns } : {}) },
+          { status: 400 },
+        );
+      }
       const colsSql = sql.join(allCols.map((c) => sql.identifier(c)), sql`, `);
       const returningSql = buildReturningSql(payload.returning);
 
@@ -770,11 +848,19 @@ export async function POST(request: Request) {
       // dispatchPushForNotificationRows 를 호출하므로, 그와 동일한 팬아웃을 여기서도 태운다.
       //
       // 주의: 호출부 대부분이 `.select()` 없이 `.insert()` 만 하므로 RETURNING 이 비어
-      // allResults 가 빈 배열이다. 그래서 triggerMutationSignal 이 채널을 만들 때와 동일하게
-      // payload.values 를 소스로 쓴다(RETURNING 이 있으면 그쪽을 우선).
+      // allResults 가 빈 배열이다. 그때는 **serializedValues** 를 소스로 쓴다 —
+      // payload.values 와 내용은 같지만 위 fillId 가 붙여 준 notifications.id 가 들어 있다.
+      // 그 id 가 아래 rows 매핑의 `id` 로 실려야 푸시 tag 가 알림 단위로 갈리고(NB-02),
+      // 페이로드의 notification_id 로 푸시 탭 → 인앱 읽음처리가 동작한다(NB-04).
+      // payload.values 를 쓰던 시절에는 id 가 없어, 서버 생성 알림만 그 둘을 못 받았다.
+      // (RETURNING 이 id 를 담고 있으면 그쪽이 정본이므로 우선한다.)
       if (payload.table === 'notifications') {
-        const notiRows: Record<string, unknown>[] =
-          allResults.length > 0 ? [...allResults] : [...payload.values];
+        const returnedHasId =
+          allResults.length > 0 &&
+          String((allResults[0] as Record<string, unknown>).id ?? '').trim() !== '';
+        const notiRows: Record<string, unknown>[] = returnedHasId
+          ? [...allResults]
+          : [...serializedValues];
         const dispatchInsertedNotificationPushes = async () => {
           try {
             const { dispatchPushForNotificationRows } = await import(
@@ -798,6 +884,9 @@ export async function POST(request: Request) {
                   }
                 }
                 return {
+                  // 비어 있으면(=id 를 못 구한 경로) 디스패처가 기존 폴백(내용 해시 tag)으로
+                  // 되돌아간다 — 넣어서 나빠지는 경우가 없다.
+                  id: String(row.id ?? ''),
                   user_id: String(row.user_id),
                   type: String(row.type ?? 'notification'),
                   title: String(row.title ?? ''),
@@ -830,7 +919,11 @@ export async function POST(request: Request) {
 
       // RETURNING 결과의 JSON 컬럼 역직렬화 (수정 2)
       await triggerMutationSignal(payload, allResults);
-      return NextResponse.json({ ok: true, data: deserializeRows(payload.table, allResults) });
+      // droppedColumns — 버려진 컬럼이 있을 때만 실린다. update 응답과 같은 모양이다.
+      return NextResponse.json({
+        ok: true,
+        data: deserializeRows(payload.table, allResults),
+        ...(droppedColumns.length > 0 ? { droppedColumns } : {}) });
     }
 
     if (payload.op === 'update') {

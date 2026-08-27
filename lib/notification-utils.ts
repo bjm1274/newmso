@@ -412,9 +412,20 @@ export async function insertNotificationsOrThrow(
       void (async () => {
         try {
           const { dispatchNotificationPush } = await import('@/lib/notification-push-dispatch');
+          // 푸시 행에 **실제로 INSERT 된 notifications.id** 를 함께 넘긴다.
+          //  - NB-02: 디스패치가 이 id 로 푸시 tag 를 알림 단위로 가른다. 없으면 내용 해시
+          //    폴백으로 떨어져 결재 요청 여러 건이 트레이에서 서로를 덮을 여지가 남는다.
+          //  - NB-04: 페이로드의 notification_id 로 실려야 푸시를 탭했을 때 서비스워커가
+          //    인앱 알림함을 읽음 처리한다(없으면 즉시 return).
+          // id 는 rows 가 아니라 values 에서 읽어야 한다 — 호출부(결재 반려/차례/승인 등)는
+          // 대부분 id 를 안 넘기고 normalizeForD1 이 crypto.randomUUID() 로 그 자리에서 만든다.
+          // rows[i].id 만 보면 거의 항상 비어 있어 아무 효과가 없다. values 는 rows 와
+          // 같은 순서로 만들어지므로 인덱스가 그대로 대응한다.
           const pushRows = rows
-            .filter((r) => r.user_id && r.title && r.type)
-            .map((r) => ({
+            .map((r, index) => ({ row: r, id: String(values[index]?.id ?? r.id ?? '') }))
+            .filter(({ row: r }) => r.user_id && r.title && r.type)
+            .map(({ row: r, id }) => ({
+              id,
               user_id: String(r.user_id),
               type: String(r.type),
               title: String(r.title),

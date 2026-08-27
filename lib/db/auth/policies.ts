@@ -31,7 +31,7 @@
 
 import { eq, inArray } from 'drizzle-orm';
 import type { D1Client } from '../client-d1';
-import { messages, board_posts, daily_closures } from '../schema';
+import { messages, board_posts, daily_closures, staff_members } from '../schema';
 import {
   canAccessChatRoom,
   canChangeChatRoomMembers,
@@ -46,6 +46,8 @@ import {
   erpStaffId,
   erpCanManageCompany,
   erpCanManageFinance,
+  erpCompanyId,
+  erpCompanyName,
   erpCompanyMatches,
   erpCompanyNameMatches,
   erpInventoryScopeMatches,
@@ -77,6 +79,12 @@ export type PolicyPattern =
   | 'DEPARTMENT_INVENTORY_SCOPE'
   /** 재무: finance 권한 보유자 + 회사 스코프 (회사 컬럼이 비면 전사 공용으로 간주) */
   | 'FINANCE_SCOPE'
+  /**
+   * 동료에게도 보여야 하는 근태·휴가 행 — 같은 회사 직원의 행까지 열되,
+   * 본인·인사가 아니면 민감 컬럼을 지우고 확정 상태만 남긴다.
+   * 범위는 TEAM_VISIBLE_TABLE_RULES 에 테이블별로 명시한다.
+   */
+  | 'SAME_COMPANY_TEAM_VISIBLE'
   /** 채팅: room 멤버(또는 notice/admin)만 행 접근 — filterByPolicy 에서 배치 평가 */
   | 'CHAT_ROOM_MEMBER';
 
@@ -303,7 +311,8 @@ function staffPrivilegeGuard(
  * 상태 전이는 /api/approvals/transition 전용이다(그 경로는 정책 레지스트리를
  * 거치지 않고 서버에서 직접 쓰므로 이 가드의 영향을 받지 않는다).
  * 결재자 라우팅(current_approver_id·approver_line)과 meta_data 는 클라이언트
- * 위임 동기화가 실제로 쓰고 있어 여기서 막지 않는다 — 별건이다.
+ * 위임 동기화가 실제로 쓰고 있어 컬럼 단위로는 막지 않는다 — 대신 아래
+ * APPROVAL_FINALIZED_STATUSES 로 **확정된 문서 자체**를 잠근다(10차 DLT-01).
  */
 const APPROVAL_TRANSITION_COLUMNS = [
   'status',
@@ -312,7 +321,39 @@ const APPROVAL_TRANSITION_COLUMNS = [
   'company_id',
   // 문서번호는 발급 이력과 대조되는 값이라 임의로 덮어쓸 수 없어야 한다.
   'doc_number',
+  // type 은 서버 후속처리(processFinalApprovalEffects)가 **어떤 집행을 돌릴지**
+  // 고르는 값이다 — '급여인상평가서' 면 base_salary 를, '인사명령' 이면 직급·부서를
+  // 실제로 UPDATE 한다. 기안 시점에 정해지고 그 뒤로 바뀔 이유가 없다:
+  // 저장소 전체에서 approvals.type 을 update 하는 클라이언트 경로는 0건이고
+  // (전부 insert 시 지정), 결재선 변경·위임 동기화도 이 컬럼은 건드리지 않는다.
+  'type',
 ] as const;
+
+/**
+ * 확정 계열 status — 이 상태의 문서는 비관리자에게 read-only 다.
+ *
+ * `isFinalizedApprovalStatus`(lib/server-approval-processing-helpers.ts)가
+ * 집행을 여는 값과 같은 집합이어야 한다. 운영 실측(2026-08-27) status 분포는
+ * 승인 449 · 회수 178 · 대기 61 · 반려 22 이고 '완료' 는 0건이지만,
+ * 집행 쪽이 '완료' 도 확정으로 인정하므로 여기서도 함께 잠근다.
+ */
+const APPROVAL_FINALIZED_STATUSES = new Set(['승인', '완료']);
+
+/**
+ * 확정된 문서에 비관리자가 **그래도** 쓸 수 있는 컬럼 / 문서 종류.
+ *
+ * 유일한 정상 경로가 물품신청 재고 워크플로다 — app/main/hooks/useSupplyWorkflow.ts
+ * 가 `type='물품신청' AND status='승인'` 문서만 골라(:71-74) 불출·발주 진행 상태를
+ * meta_data.inventory_workflow 에 기록한다(:130). 그 화면을 쓰는 사람은 MSO 지원부서
+ * 소속이면 되고 관리자 등급이 아닐 수 있으므로(재고관리워크센터/StatusWorkcenter.tsx:59)
+ * 이 예외가 없으면 불출 처리가 통째로 막힌다.
+ *
+ * 나머지 update 경로는 전부 확정 전 문서만 건드린다 — 위임 동기화는 '대기' 로 필터하고
+ * (전자결재.tsx:704), 지연 알림은 isApprovalOverdue 가 '대기' 만 인정하며
+ * (lib/approval-workflow.ts:203), 재상신 seed 는 '회수' 문서다.
+ */
+const APPROVAL_FINALIZED_UPDATABLE_COLUMNS = new Set(['meta_data']);
+const APPROVAL_FINALIZED_UPDATABLE_TYPES = new Set(['물품신청']);
 
 function approvalsUpdateGuard(
   claims: ErpClaims,
@@ -330,6 +371,30 @@ function approvalsUpdateGuard(
   // 직접 쓸 수 있는 등급이라 여기서 열어도 새로 얻는 권한이 없다 —
   // employmentContractUpdateGuard 도 같은 등급으로 열려 있다.
   if (erpIsAdmin(claims) || erpCanManageCompany(claims)) return true;
+
+  /**
+   * 확정(승인·완료)된 문서는 기안자라도 고칠 수 없다 — 10차 DLT-01 의 P0 체인.
+   *
+   * APPROVAL_SCOPE 는 `sender_id === 나` 면 status 를 보지 않고 통과시킨다. 그래서
+   * 9차 FB1 이 insert 를 막은 뒤에도 **이미 승인된 자기 기안 문서**를 update 로
+   * 계속 고칠 수 있었고, type·meta_data·current_approver_id 를 덮어쓰면
+   * /api/approvals/process-final 이 그 값을 그대로 믿고 staff_members.base_salary 를
+   * UPDATE 했다. 컬럼 하나씩 막는 방식은 form_type·form_slug·evaluationType 처럼
+   * meta_data 안쪽 키까지 전부 세어야 해서 계속 새 나간다 — 그래서 컬럼이 아니라
+   * **행의 확정 여부**로 잠근다.
+   *
+   * row 는 guardRow(=DB 정본 ∪ set)라 status 를 set 으로 덮어쓰면 이 검사를
+   * 비켜갈 수 있어 보이지만, status 자체가 APPROVAL_TRANSITION_COLUMNS 라
+   * 아래 검사에서 어차피 막힌다.
+   */
+  const status = String(getField<string>(row, 'status') ?? '').trim();
+  if (APPROVAL_FINALIZED_STATUSES.has(status)) {
+    const touchedColumns = changedKeys ? Array.from(changedKeys) : Object.keys(row);
+    if (touchedColumns.some((col) => !APPROVAL_FINALIZED_UPDATABLE_COLUMNS.has(col))) return false;
+    const docType = String(getField<string>(row, 'type') ?? '').trim();
+    if (!APPROVAL_FINALIZED_UPDATABLE_TYPES.has(docType)) return false;
+  }
+
   return !APPROVAL_TRANSITION_COLUMNS.some((col) => touchesColumn(row, changedKeys, col));
 }
 
@@ -744,7 +809,21 @@ export const POLICY_REGISTRY: Registry = {
     update: 'AUTHENTICATED',
     delete: 'AUTHENTICATED' },
   system_configs: PUBLIC_ALL('system_configs'),
-  work_shifts: PUBLIC_ALL('work_shifts'),
+  // 근무유형 마스터: 전 직원이 읽어야 하지만(근무현황·출퇴근기록·계약서 미리보기·
+  // 전자서명·팀관리), 쓰기는 관리자·인사만이다.
+  //
+  // PUBLIC_ALL 이던 시절에는 로그인한 아무 직원이나
+  // `{op:'delete', table:'work_shifts', where:[{id,neq,''}]}` 한 번으로 106행을
+  // 전량 지울 수 있었다 — 그러면 shift_assignments 3562행이 고아가 되고 위 화면들이
+  // 동시에 깨진다(10차 D1GW-03). 같은 테이블의 전용 라우트 /api/work-shifts 는
+  // 이미 admin/mso/hr/hr_근무형태 로 막혀 있어 이 등록이 누락이었음이 분명하다.
+  // 클라이언트의 게이트웨이 write 호출은 0건(전부 select)이라 정상 사용은 안 바뀐다.
+  work_shifts: {
+    table: 'work_shifts',
+    select: 'AUTHENTICATED',
+    insert: 'ADMIN_OR_MANAGER',
+    update: 'ADMIN_OR_MANAGER',
+    delete: 'ADMIN_OR_MANAGER' },
   // 계약서 양식·직인: 직원도 읽어야 하지만(증명서·계약서 미리보기), 쓰기는 관리자만.
   // PUBLIC_ALL 이던 시절에는 아무나 근로계약서 본문과 회사 직인 URL 을 바꿀 수 있었다.
   contract_templates: {
@@ -898,21 +977,26 @@ export const POLICY_REGISTRY: Registry = {
     update: 'STAFF_IN_SCOPE',
     delete: 'SELF_ONLY',
     staffIdField: 'user_id' },
+  // 출퇴근 기록: **읽기만** 동료까지 연다(근무현황·조직도의 출근 표시).
+  // 쓰기는 그대로다 — 남의 출퇴근을 찍을 수 있게 되면 안 된다.
+  // 가리는 컬럼은 TEAM_VISIBLE_TABLE_RULES 참조.
   attendance: {
     table: 'attendance',
-    select: 'STAFF_IN_SCOPE',
+    select: 'SAME_COMPANY_TEAM_VISIBLE',
     insert: 'STAFF_IN_SCOPE',
     update: 'STAFF_IN_SCOPE',
     delete: 'SELF_ONLY' },
   attendances: {
     table: 'attendances',
-    select: 'SELF_OR_SAME_COMPANY',
+    select: 'SAME_COMPANY_TEAM_VISIBLE',
     insert: 'SELF_OR_SAME_COMPANY',
     update: 'SELF_OR_SAME_COMPANY',
     delete: 'SELF_OR_SAME_COMPANY' },
+  // 연차/휴가: 공유캘린더가 '전체직원' 모드로 조회하므로 읽기는 동료까지 열되,
+  // 남의 행은 확정('승인')만 + 사유(reason)를 지운다.
   leave_requests: {
     table: 'leave_requests',
-    select: 'SELF_OR_SAME_COMPANY',
+    select: 'SAME_COMPANY_TEAM_VISIBLE',
     insert: 'SELF_OR_SAME_COMPANY',
     update: 'ADMIN_OR_MANAGER',
     delete: 'ADMIN_OR_MANAGER',
@@ -987,6 +1071,19 @@ export const POLICY_REGISTRY: Registry = {
     insert: 'COMPANY_SCOPE_OR_NULL',
     update: 'COMPANY_SCOPE_OR_NULL',
     delete: 'COMPANY_SCOPE_OR_NULL' },
+  // insert 가 COMPANY_SCOPE_OR_NULL 이라 **company_id 없는 payload 는 무조건 통과**한다
+  // (rowCompanyIsNull() → true). 지금 이걸 닫으면 안 된다 — 정상 생성 경로 중 셋이
+  // company_id 를 아예 안 보낸다(2026-08-27 전수 확인):
+  //   - 모바일 체크리스트 저장  app/main/모바일/추가기능/OP체크상세.tsx:150 (schedule_post_id·prep_items 만)
+  //   - 모바일 카드 상태 전환    app/main/모바일/추가기능/data-hooks.ts:1006 (company_name 만 보냄)
+  //   - PC 병동메시지 시각 기록  app/main/기능부품/OP체크.tsx:1882 (schedule_post_id·ward_message_sent_at 만)
+  // 막는 순간 이 셋이 전부 403 이 된다. 남는 위험은 **회사 없는 행이 만들어지는 것**이고,
+  // select 도 OR_NULL 이라 그 행은 전 회사에 보인다. 남의 회사 기존 행을 덮어쓰는 쪽은
+  // 이미 닫혀 있다 — upsert 는 mutate 라우트가 충돌 대상 행을 읽어 update 정책으로 한 번 더
+  // 검사하고(company_id 가 채워진 남의 행은 거기서 걸린다), 충돌 키를 특정할 수 없는
+  // INSERT OR REPLACE 는 UPSERT_CONFLICT_TARGET_UNKNOWN 으로 거부된다.
+  // 실제 수정은 위 세 호출부가 company_id 를 채워 보내는 것이고, 그때 insert 를
+  // COMPANY_SCOPE 로 좁혀야 한다 — 정책만 먼저 좁히면 기능이 죽는다.
   op_patient_checks: {
     table: 'op_patient_checks',
     select: 'COMPANY_SCOPE_OR_NULL',
@@ -1873,6 +1970,15 @@ async function evalPattern(
     return erpTargetStaffInScope(db, claims, rowStaff);
   }
 
+  if (pattern === 'SAME_COMPANY_TEAM_VISIBLE') {
+    // 단건 판정 — 실제 select 는 filterByPolicy 의 배치 경로가 처리한다.
+    // erpCanManageCompany 게이트가 없다는 점만 SELF_OR_SAME_COMPANY 와 다르다.
+    const rowStaff = getField<string>(row, staffField);
+    if (rowStaff === null) return false;
+    if (rowStaff === erpStaffId(claims)) return true;
+    return erpTargetStaffSameCompany(db, claims, rowStaff);
+  }
+
   if (pattern === 'COMPANY_SCOPE_OR_NULL') {
     if (rowCompanyIsNull()) return true;
     return rowCompanyMatches();
@@ -2036,7 +2142,46 @@ export async function assertAccess(args: PolicyCheckArgs): Promise<void> {
 }
 
 /**
+ * message id 묶음의 room_id 를 한 번에 다시 읽는다 (배치).
+ *
+ * select 컬럼에 room_id 가 없을 때만 쓰인다. 행마다 조회하면 100건짜리 대화 목록에서
+ * 요청당 100 왕복이 되므로 100개씩 IN 으로 묶는다(D1 은 쿼리 1건당 bound parameter 100개 제한).
+ */
+async function loadMessageRoomIdsBatch(
+  db: D1Client,
+  messageIds: string[],
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const unique = Array.from(new Set(messageIds.filter((id) => id !== '')));
+  if (unique.length === 0) return out;
+
+  const CHUNK = 100;
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    const chunk = unique.slice(i, i + CHUNK);
+    const found = await db
+      .select({ id: messages.id, room_id: messages.room_id })
+      .from(messages)
+      .where(inArray(messages.id, chunk));
+    for (const row of found) {
+      const rid = String(row.room_id ?? '').trim();
+      if (rid !== '') out.set(String(row.id), rid);
+    }
+  }
+  return out;
+}
+
+/**
  * messages SELECT — room_id 별 멤버십 1회 조회 후 필터 (N+1 방지).
+ *
+ * **room_id 가 select 컬럼에 없으면 id 로 다시 로드한다.** 이 폴백이 없던 시절에는
+ * `String(r.room_id ?? '')` 가 전 행에서 '' 가 되어 allowed 집합이 비고, 결과가
+ * **조용히 빈 배열**이었다 — 오류도 로그도 없이 "과거 대화가 통째로 사라진" 것처럼 보였다
+ * (모바일 채팅 P0). 그때는 호출부(select 에 room_id 추가)를 고쳐 닫았지만, 다음에 누가
+ * room_id 없이 messages 를 조회하면 같은 일이 그대로 다시 난다 — 그래서 여기서 막는다.
+ * 바로 아래 filterChatRoomsByMembership 이 members 없을 때 id 로 다시 읽는 것과 같은 방식이다.
+ *
+ * 폴백해도 room_id 를 못 찾은 행(id 가 없거나 그 id 의 행이 DB 에 없음)은 기존대로 거부한다 —
+ * 판정 근거가 없는 행을 열어 주면 안 된다.
  */
 async function filterMessagesByChatRoomMembership<T extends Record<string, unknown>>(
   db: D1Client,
@@ -2048,13 +2193,27 @@ async function filterMessagesByChatRoomMembership<T extends Record<string, unkno
   const me = claimsStaffIdRaw(claims);
   if (me === null) return [];
 
-  const roomIds = [
-    ...new Set(
-      rows
-        .map((r) => String(r.room_id ?? '').trim())
-        .filter(Boolean),
-    ),
-  ];
+  // room_id 가 비어 있는 행만 id 로 되찾는다 — 정상 경로(room_id 포함)는 추가 쿼리가 0건이다.
+  const idsNeedingRoom: string[] = [];
+  for (const r of rows) {
+    if (String(r.room_id ?? '').trim() !== '') continue;
+    const id = String(r.id ?? '').trim();
+    if (id !== '') idsNeedingRoom.push(id);
+  }
+  const roomIdByMessageId =
+    idsNeedingRoom.length > 0
+      ? await loadMessageRoomIdsBatch(db, idsNeedingRoom)
+      : new Map<string, string>();
+
+  const roomIdOf = (r: T): string => {
+    const direct = String(r.room_id ?? '').trim();
+    if (direct !== '') return direct;
+    const id = String(r.id ?? '').trim();
+    if (id === '') return '';
+    return roomIdByMessageId.get(id) ?? '';
+  };
+
+  const roomIds = [...new Set(rows.map(roomIdOf).filter(Boolean))];
   const allowed = new Set<string>();
   await Promise.all(
     roomIds.map(async (rid) => {
@@ -2062,7 +2221,10 @@ async function filterMessagesByChatRoomMembership<T extends Record<string, unkno
       if (room && canAccessChatRoom(room, me)) allowed.add(rid);
     }),
   );
-  return rows.filter((r) => allowed.has(String(r.room_id ?? '').trim()));
+  return rows.filter((r) => {
+    const rid = roomIdOf(r);
+    return rid !== '' && allowed.has(rid);
+  });
 }
 
 /**
@@ -2139,6 +2301,30 @@ const STAFF_HR_VISIBLE_PII_COLUMNS = new Set([
   'salary_info',
   'base_salary',
   'hourly_rate',
+  // 급여 본체(base_salary)만 가리고 **수당은 통째로 열려 있었다**(10차 D1GW-05).
+  // lib/staff-query-columns.ts 의 STAFF_BOOTSTRAP_COLUMNS 가 이 컬럼들을 그대로
+  // 나열하고 PC 메인 진입 때마다 전 직원분을 받아오므로, 조작된 호출도 필요 없이
+  // 평사원 브라우저 응답에 동료의 야간당직수당·차량유지비·연차수당 금액이 들어 있었다.
+  // 쓰기 가드(SENSITIVE_STAFF_COLUMNS)는 같은 값을 이미 매니저 이상으로 막고 있어
+  // 읽기 등급만 어긋나 있었다.
+  //
+  // 회귀: 이 컬럼들을 읽는 화면(인사관리·급여명세·계약서 렌더)은 **예외 없이
+  // base_salary 도 함께 읽는다**(2026-08-27 전수 확인). 즉 base_salary 마스킹으로
+  // 이미 인사 등급이 필요한 화면들이라, 같은 등급에 얹어도 새로 깨지는 화면이 없다.
+  // 본인 조회(isSelf)와 인사(canManageCompany)는 그대로 통과한다 —
+  // 마이페이지 급여명세서는 본인 행이라 영향이 없다.
+  'salary',
+  'other_taxfree',
+  'position_allowance',
+  'overtime_allowance',
+  'night_work_allowance',
+  'holiday_work_allowance',
+  'annual_leave_pay',
+  'meal_allowance',
+  'night_duty_allowance',
+  'vehicle_allowance',
+  'childcare_allowance',
+  'research_allowance',
   'address',
   'detail_address',
   'salary_type',
@@ -2203,6 +2389,137 @@ function stripStaffSecrets<T extends Record<string, unknown>>(rows: T[], claims?
 
     return next;
   });
+}
+
+/**
+ * SAME_COMPANY_TEAM_VISIBLE 테이블별 노출 범위.
+ *
+ * **넓히는 방향의 수정이라 "무엇을 열지"가 아니라 "무엇을 계속 가릴지"를 여기에 적는다.**
+ * 동료에게 보여도 되는 것: 출근 여부·출퇴근 시각·근무 상태·연차 종류와 기간.
+ * 열면 안 되는 것: 근태 메모(notes)와 휴가 사유(reason) — 병가 사유·개인 사정이 들어간다.
+ *
+ * `allowedStatusesForOthers` 는 남의 행 중 **확정된 것만** 남긴다. 이 값이 없으면
+ * 공유캘린더가 동료의 반려·회수·대기 연차까지 보여 주게 되어(운영 실측 반려 3·회수 2·대기 1)
+ * 지금까지 안 보이던 개인 정보가 새로 노출된다.
+ *
+ * 본인 행과 인사(erp_can_manage_company)·관리자는 이 축소를 받지 않는다 —
+ * 마이페이지·인사관리 화면의 기존 동작이 그대로여야 한다.
+ */
+const TEAM_VISIBLE_TABLE_RULES: Record<
+  string,
+  { maskedColumnsForOthers: readonly string[]; allowedStatusesForOthers?: ReadonlySet<string> }
+> = {
+  attendance: { maskedColumnsForOthers: ['notes'] },
+  attendances: { maskedColumnsForOthers: ['notes'] },
+  leave_requests: {
+    maskedColumnsForOthers: ['reason'],
+    allowedStatusesForOthers: new Set(['승인', '완료']) },
+};
+
+/**
+ * staff id 묶음 중 **나와 같은 회사** 인 것만 골라낸다 (배치).
+ *
+ * 판정 규칙은 erpTargetStaffSameCompany 와 같다(company_id UUID 우선, 없으면 회사명 폴백 —
+ * 운영 staff_members.company_id 는 대부분 비어 있어 UUID 단독으로는 성립하지 않는다).
+ * 다른 점은 erpCanManageCompany 를 요구하지 않는다는 것뿐이다.
+ * 행마다 조회하면 전 직원 화면에서 요청당 수십 쿼리가 되므로 100개씩 IN 으로 묶는다.
+ */
+async function sameCompanyStaffIdsBatch(
+  db: D1Client,
+  claims: ErpClaims,
+  targetStaffIds: string[],
+): Promise<Set<string>> {
+  const allowed = new Set<string>();
+  if (targetStaffIds.length === 0) return allowed;
+
+  const myId = erpCompanyId(claims);
+  const myName = erpCompanyName(claims);
+  if (myId === null && myName === null) return allowed;
+  const myNameTrimmed = myName === null ? null : myName.trim();
+
+  const unique = Array.from(new Set(targetStaffIds.filter((id) => typeof id === 'string' && id !== '')));
+  const CHUNK = 100; // D1 은 쿼리 1건당 bound parameter 100개 제한
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    const chunk = unique.slice(i, i + CHUNK);
+    const rows = await db
+      .select({
+        id: staff_members.id,
+        company_id: staff_members.company_id,
+        company: staff_members.company })
+      .from(staff_members)
+      .where(inArray(staff_members.id, chunk));
+    for (const row of rows) {
+      if (myId !== null && row.company_id != null && String(row.company_id) === myId) {
+        allowed.add(row.id);
+        continue;
+      }
+      if (myNameTrimmed !== null && row.company != null && String(row.company).trim() === myNameTrimmed) {
+        allowed.add(row.id);
+      }
+    }
+  }
+  return allowed;
+}
+
+/**
+ * SAME_COMPANY_TEAM_VISIBLE 배치 필터.
+ *
+ * 이 경로가 없던 시절에는 attendance/attendances 가 STAFF_IN_SCOPE·SELF_OR_SAME_COMPANY 라
+ * 비관리자에게 **본인 행만** 남았다. 그래서 근무현황의 '현재 근무중' 이 실제로 21명이
+ * 근무 중인 날에도 "출근한 직원이 없습니다" 로 뜨고 조직도의 출근 표시가 통째로 비었다
+ * (10차 D1GW-01). 공유캘린더도 같은 이유로 동료 연차가 하나도 안 찍혔다(D1GW-02).
+ * 오류 토스트가 없고 관리자 화면에서는 정상이라 신고가 원인에 도달하지 못했다.
+ */
+async function filterTeamVisibleRows<T extends Record<string, unknown>>(
+  db: D1Client,
+  claims: ErpClaims,
+  table: string,
+  cfg: TablePolicy,
+  rows: T[],
+): Promise<T[]> {
+  if (rows.length === 0) return rows;
+
+  const rule = TEAM_VISIBLE_TABLE_RULES[table];
+  const staffField = cfg.staffIdField ?? 'staff_id';
+  const me = erpStaffId(claims);
+  const canManageCompany = erpCanManageCompany(claims);
+
+  const otherStaffIds: string[] = [];
+  for (const row of rows) {
+    const v = getField<string>(row, staffField);
+    if (v !== null && v !== me) otherStaffIds.push(v);
+  }
+  const sameCompany = otherStaffIds.length > 0
+    ? await sameCompanyStaffIdsBatch(db, claims, otherStaffIds)
+    : new Set<string>();
+
+  const out: T[] = [];
+  for (const row of rows) {
+    const rowStaff = getField<string>(row, staffField);
+    // staff 필드가 비어 있으면 기존 패턴과 동일하게 거부한다.
+    if (rowStaff === null) continue;
+    if (me !== null && rowStaff === me) {
+      out.push(row);
+      continue;
+    }
+    if (!sameCompany.has(rowStaff)) continue;
+    // 인사·관리자는 기존 SELF_OR_SAME_COMPANY 와 같은 범위를 그대로 본다.
+    if (canManageCompany) {
+      out.push(row);
+      continue;
+    }
+    if (!rule) continue;
+    if (rule.allowedStatusesForOthers) {
+      const status = String(getField<string>(row, 'status') ?? '').trim();
+      if (!rule.allowedStatusesForOthers.has(status)) continue;
+    }
+    const masked = { ...row };
+    for (const col of rule.maskedColumnsForOthers) {
+      if (col in masked) delete masked[col];
+    }
+    out.push(masked);
+  }
+  return out;
 }
 
 /**
@@ -2273,6 +2590,11 @@ export async function filterByPolicy<T extends Record<string, unknown>>(
   }
   if (erpIsAdmin(claims)) {
     return stripSecrets ? stripStaffSecrets(rows, claims) : rows;
+  }
+
+  // 근태·휴가 동료 가시성 — 배치 평가 (행마다 회사 조회하면 N+1 이 된다)
+  if (cfg.select === 'SAME_COMPANY_TEAM_VISIBLE') {
+    return filterTeamVisibleRows(db, claims, table, cfg, rows);
   }
 
   // 채팅 멤버 스코프 — 배치 평가

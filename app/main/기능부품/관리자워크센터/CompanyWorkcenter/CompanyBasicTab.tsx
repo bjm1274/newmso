@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/db-client';
+import { toast } from '@/lib/toast';
 import { Card, SmBtn } from '../admin-workcenter-common';
 import TeamManager from '../../관리자전용서브/팀관리';
 import CompanyBrandAssets from '@/app/components/CompanyBrandAssets';
@@ -27,15 +28,52 @@ interface CompanyData {
   leave_policy?: string;
 }
 
+/**
+ * companies.type 은 운영 DDL 에 CHECK 제약이 걸려 있다.
+ *   CONSTRAINT companies_type_check CHECK ((type) IN ('MSO', 'HOSPITAL', 'CLINIC'))
+ * 예전 드롭다운은 '의료법인·주식회사·…' 같은 한글 값을 그대로 저장하려 해서
+ * 어떤 항목을 골라도 CHECK 위반으로 거부됐다(회사 추가 100% 실패).
+ * → 화면에는 한글 라벨을 보여 주되 저장값은 반드시 아래 세 값 중 하나여야 한다.
+ */
+const COMPANY_TYPE_OPTIONS = [
+  { value: 'HOSPITAL', label: '병원·의원' },
+  { value: 'CLINIC', label: '진료지점(클리닉)' },
+  { value: 'MSO', label: 'MSO(경영지원 법인)' },
+] as const;
+
+const DEFAULT_COMPANY_TYPE = 'HOSPITAL';
+
+/** 저장값 → 한글 라벨. 편집 폼이 올바른 항목을 선택하려면 이 역매핑이 필요하다. */
+function companyTypeLabel(value: string): string {
+  return COMPANY_TYPE_OPTIONS.find((o) => o.value === value)?.label ?? value;
+}
+
+/** DB 에서 읽은 값이 허용값이 아니면(옛 한글 값 등) 드롭다운이 빈 선택으로 보이므로 기본값으로 맞춘다. */
+function normalizeCompanyType(raw: unknown): string {
+  const value = String(raw ?? '');
+  return COMPANY_TYPE_OPTIONS.some((o) => o.value === value) ? value : DEFAULT_COMPANY_TYPE;
+}
+
 const FALLBACK_COMPANIES: CompanyData[] = [
-  { id: '1', name: '박철홍정형외과', type: '의료법인', ceo_name: '박철홍', business_no: '123-45-67890', address: '서울특별시 강남구 테헤란로 213', phone: '02-1234-5678', memo: '본사·진료' },
-  { id: '2', name: '수연의원', type: '지점·진료', ceo_name: '김지오', business_no: '987-65-43210', address: '서울특별시 서초구 강남대로 349', phone: '02-9876-5432', memo: '지점·진료' },
-  { id: '3', name: 'MSO 본사', type: '주식회사', ceo_name: '박유진', business_no: '111-22-33333', address: '서울특별시 송파구 올림픽로 88', phone: '02-5555-4444', memo: '경영지원' },
-  { id: '4', name: '지점 A', type: '지점·진료', ceo_name: '백민', business_no: '444-55-66666', address: '부산광역시 해운대구 우동 10', phone: '051-123-4567', memo: '지점·진료' },
+  { id: '1', name: '박철홍정형외과', type: 'HOSPITAL', ceo_name: '박철홍', business_no: '123-45-67890', address: '서울특별시 강남구 테헤란로 213', phone: '02-1234-5678', memo: '본사·진료' },
+  { id: '2', name: '수연의원', type: 'HOSPITAL', ceo_name: '김지오', business_no: '987-65-43210', address: '서울특별시 서초구 강남대로 349', phone: '02-9876-5432', memo: '지점·진료' },
+  { id: '3', name: 'MSO 본사', type: 'MSO', ceo_name: '박유진', business_no: '111-22-33333', address: '서울특별시 송파구 올림픽로 88', phone: '02-5555-4444', memo: '경영지원' },
+  { id: '4', name: '지점 A', type: 'CLINIC', ceo_name: '백민', business_no: '444-55-66666', address: '부산광역시 해운대구 우동 10', phone: '051-123-4567', memo: '지점·진료' },
 ];
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null;
+}
+
+/** 게이트웨이/D1 오류 객체에서 사용자에게 보여 줄 사유를 뽑는다. */
+function describeError(e: unknown): string {
+  const message = String((e as { message?: unknown } | null)?.message ?? e ?? '').trim();
+  if (!message) return '알 수 없는 오류';
+  if (message.includes('companies_type_check')) return '법인 구분 값이 허용되지 않습니다.';
+  if (message.includes('companies_name_key') || message.toLowerCase().includes('unique')) {
+    return '같은 이름의 회사가 이미 등록되어 있습니다.';
+  }
+  return message;
 }
 
 export default function CompanyBasicTab() {
@@ -50,7 +88,7 @@ export default function CompanyBasicTab() {
   // Add Company Modal State
   const [showAddModal, setShowAddModal] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newType, setNewType] = useState('의료법인');
+  const [newType, setNewType] = useState<string>(DEFAULT_COMPANY_TYPE);
   const [newCeo, setNewCeo] = useState('');
   const [newBizNo, setNewBizNo] = useState('');
   const [newAddress, setNewAddress] = useState('');
@@ -73,7 +111,7 @@ export default function CompanyBasicTab() {
         const list = data.filter(isRecord).map((r): CompanyData => ({
           id: String(r.id),
           name: String(r.name),
-          type: String(r.type ?? '의료법인'),
+          type: normalizeCompanyType(r.type),
           ceo_name: typeof r.ceo_name === 'string' ? r.ceo_name : null,
           business_no: typeof r.business_no === 'string' ? r.business_no : (typeof r.business_number === 'string' ? r.business_number : null),
           address: typeof r.address === 'string' ? r.address : null,
@@ -176,9 +214,13 @@ export default function CompanyBasicTab() {
       setCompanies(prev => prev.map(c => c.id === info.id ? { ...info } : c));
       setSavedAt(new Date().toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul' }));
     } catch (e) {
-      console.warn('[CompanyBasicTab] Update failed, fallback to state:', e);
-      setCompanies(prev => prev.map(c => c.id === info.id ? { ...info } : c));
-      setSavedAt(new Date().toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul' }) + ' (임시)');
+      // 예전에는 실패해도 로컬 state 를 갱신하고 '(임시)' 라고만 붙여, 저장된 것처럼 보였다.
+      // 실제로는 아무 데도 남지 않아 새로고침하면 증발했다. → 실패는 실패라고 말하고
+      // 낙관적 편집분은 마지막으로 서버에서 읽은 값으로 되돌린다.
+      console.error('[CompanyBasicTab] update failed:', e);
+      const serverRow = companies.find(c => c.id === info.id);
+      if (serverRow) setInfo({ ...serverRow });
+      toast(`회사 정보 저장 실패 — 입력값을 되돌렸습니다.\n${describeError(e)}`, 'error');
     } finally {
       setSaving(false);
     }
@@ -206,13 +248,9 @@ export default function CompanyBasicTab() {
         setInfo(null);
       }
     } catch (e) {
-      console.warn('[CompanyBasicTab] Delete failed, fallback locally:', e);
-      const nextList = companies.filter(c => c.id !== id);
-      setCompanies(nextList);
-      if (selectedId === id && nextList.length > 0) {
-        setSelectedId(nextList[0].id);
-        setInfo(nextList[0]);
-      }
+      // 삭제되지도 않은 회사를 목록에서 지우면 "지워졌다" 고 믿게 된다. 목록은 그대로 두고 실패를 알린다.
+      console.error('[CompanyBasicTab] delete failed:', e);
+      toast(`"${name}" 삭제 실패 — 회사가 그대로 남아 있습니다.\n${describeError(e)}`, 'error');
     }
   };
 
@@ -251,29 +289,21 @@ export default function CompanyBasicTab() {
       setSelectedId(newId);
       setInfo(newCo);
       setShowAddModal(false);
-      
+
       // Reset fields
       setNewName('');
+      setNewType(DEFAULT_COMPANY_TYPE);
       setNewCeo('');
       setNewBizNo('');
       setNewAddress('');
       setNewPhone('');
       setNewMemo('');
     } catch (e) {
-      console.warn('[CompanyBasicTab] Insert failed, fallback locally:', e);
-      const newCo: CompanyData = {
-        id: crypto.randomUUID(),
-        name: newName,
-        type: newType,
-        ceo_name: newCeo || null,
-        business_no: newBizNo || null,
-        address: newAddress || null,
-        phone: newPhone || null,
-        memo: newMemo || null };
-      setCompanies(prev => [...prev, newCo]);
-      setSelectedId(newCo.id);
-      setInfo(newCo);
-      setShowAddModal(false);
+      // 예전에는 여기서 crypto.randomUUID() 로 "가짜 회사" 를 만들어 목록에 끼워 넣었다.
+      // DB 에는 없는 회사라 다른 화면·다른 사람에게는 존재하지 않는다.
+      // → 만들지 않는다. 모달을 열어 둔 채로 실패 사유를 보여 주고 다시 시도하게 한다.
+      console.error('[CompanyBasicTab] insert failed:', e);
+      toast(`회사 등록 실패 — 등록되지 않았습니다.\n${describeError(e)}`, 'error');
     }
   };
 
@@ -336,7 +366,7 @@ export default function CompanyBasicTab() {
                   label="법인 구분"
                   value={info.type}
                   onChange={(v) => handleFieldChange('type', v)}
-                  options={['의료법인', '주식회사', '사단법인', '개인사업자', '지점·진료', '경영지원']}
+                  options={COMPANY_TYPE_OPTIONS}
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -411,7 +441,7 @@ export default function CompanyBasicTab() {
                     <div className="flex min-w-0 flex-col gap-0.5">
                       <div className="font-bold text-[12.5px] text-[var(--foreground)] truncate">{c.name}</div>
                       <span className="text-[10.5px] text-[var(--toss-gray-4)] truncate">
-                        {c.type} · {c.ceo_name || '대표 미등록'}
+                        {companyTypeLabel(c.type)} · {c.ceo_name || '대표 미등록'}
                         {c.seal_url ? ' · 직인✓' : ' · 직인없음'}
                       </span>
                     </div>
@@ -479,7 +509,7 @@ export default function CompanyBasicTab() {
                   label="법인 구분"
                   value={newType}
                   onChange={setNewType}
-                  options={['의료법인', '주식회사', '사단법인', '개인사업자', '지점·진료', '경영지원']}
+                  options={COMPANY_TYPE_OPTIONS}
                 />
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -568,7 +598,8 @@ function SelectField({
   label: string;
   value: string;
   onChange: (v: string) => void;
-  options: string[];
+  // 표시 라벨과 저장값이 다르다(companies.type CHECK). 둘을 분리해 받는다.
+  options: readonly { value: string; label: string }[];
 }) {
   return (
     <div>
@@ -585,8 +616,8 @@ function SelectField({
         className="w-full px-2.5 py-1.5 text-[12px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
       >
         {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
+          <option key={o.value} value={o.value}>
+            {o.label}
           </option>
         ))}
       </select>

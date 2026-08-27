@@ -4,6 +4,14 @@ import { toast } from '@/lib/toast';
 
 import { useEffect, useMemo, useState } from 'react';
 import { db, d1 } from '@/lib/db-client';
+import { formatKoreanDateKey } from '@/lib/seoul-time';
+// 잔여 집계는 PC 워크센터·/api/annual-leave/summary 와 **같은 함수**를 쓴다.
+import {
+  aggregateLedgerEntries,
+  getLeaveCycle,
+  resolveHireDateKey,
+  type LedgerRowLike,
+} from '@/lib/leave-cycle';
 
 interface Props {
   staffs: any[];
@@ -45,19 +53,58 @@ export default function AnnualLeaveExpiryAlert({ staffs, selectedCo }: Props) {
           return;
         }
 
-        const [{ data: leaveBalances }, { data: leaveLedgers }] = await Promise.all([
+        const [{ data: leaveBalances }, { data: leaveLedgers }, { data: hireRows }] = await Promise.all([
           db.from('leave_balances').select('*').in('staff_id', staffIds),
-          db.from('leave_ledger').select('staff_id, days').in('staff_id', staffIds),
+          db
+            .from('leave_ledger')
+            .select('id, staff_id, entry_type, days, occurred_on, period_key, source_id, note')
+            .in('staff_id', staffIds),
+          // 주기 판정에 입사일이 필요하다. staffs prop 에 입사일이 실려 오지 않는
+          // 호출부가 있어 원본에서 직접 읽는다(PC 워크센터와 동일).
+          db.from('staff_members').select('id, hire_date, join_date, joined_at').in('id', staffIds),
         ]);
 
+        // 원장(leave_ledger)은 **생애 전체** 기록이고 잔여는 **현재 주기**(입사기념일
+        // 단위) 값이어야 한다. 예전에는 `select('staff_id, days')` 로 주기 정보 없이
+        // 전 이력을 더했다 — 직전 주기의 auto_annual(+15)과 expire(-15)가 함께 남아
+        // 재직자 다수의 잔여가 최대 31일까지 부풀었고, 그 값이 아래 알림 본문
+        // ("보유 연차 N일이 ...에 소멸 예정")과 예상 손실액에 그대로 실려 나갔다.
+        // 주기 판정·집계는 다시 짜지 않고 워크센터·서버 요약과 같은 함수를 쓴다.
+        const todayKey = formatKoreanDateKey(new Date());
+        const hireKeyByStaff = new Map<string, string>();
+        for (const raw of (hireRows as any[]) || []) {
+          if (!raw || typeof raw !== 'object') continue;
+          const sId = String(raw.id ?? '').trim();
+          const hireKey = resolveHireDateKey(raw);
+          if (sId && hireKey) hireKeyByStaff.set(sId, hireKey);
+        }
+
+        const ledgerRowsByStaff = new Map<string, LedgerRowLike[]>();
+        for (const raw of (leaveLedgers as any[]) || []) {
+          if (!raw || typeof raw !== 'object') continue;
+          const sId = String(raw.staff_id || '').trim();
+          if (!sId) continue;
+          const entry: LedgerRowLike = {
+            id: raw.id,
+            entry_type: raw.entry_type,
+            days: raw.days,
+            occurred_on: typeof raw.occurred_on === 'string' ? raw.occurred_on : null,
+            period_key: raw.period_key,
+            source_id: typeof raw.source_id === 'string' ? raw.source_id : null,
+            note: typeof raw.note === 'string' ? raw.note : null };
+          const list = ledgerRowsByStaff.get(sId);
+          if (list) list.push(entry);
+          else ledgerRowsByStaff.set(sId, [entry]);
+        }
+
         const ledgerRemainingMap = new Map<string, number>();
-        if (leaveLedgers && leaveLedgers.length > 0) {
-          (leaveLedgers as any[]).forEach((row) => {
-            const sId = String(row.staff_id || '');
-            if (!sId) return;
-            const days = Number(row.days) || 0;
-            ledgerRemainingMap.set(sId, (ledgerRemainingMap.get(sId) || 0) + days);
-          });
+        for (const [sId, rows] of ledgerRowsByStaff) {
+          const hireKey = hireKeyByStaff.get(sId);
+          const cycle = hireKey ? getLeaveCycle(hireKey, todayKey) : null;
+          // 입사일이 없어 주기를 못 잡는 직원은 원장 합산을 포기하고
+          // 아래 leave_balances 미러 값으로 내려간다(전 이력 합산보다 낫다).
+          if (!cycle) continue;
+          ledgerRemainingMap.set(sId, aggregateLedgerEntries(rows, cycle).remaining);
         }
 
         const now = new Date();

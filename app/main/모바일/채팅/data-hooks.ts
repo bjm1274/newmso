@@ -475,7 +475,7 @@ export function useMobileChatReadCounts(
  *
  * 형제가 없으면 `[roomId]` 한 개라 그룹방·일반 1:1 방에서는 동작이 동일하다.
  */
-async function resolveConversationRoomIds(roomId: string): Promise<string[]> {
+export async function resolveConversationRoomIds(roomId: string): Promise<string[]> {
   try {
     const { data } = await fetchAllChatRooms();
     const expanded = getConversationRoomIdsByRoomId(roomId, (data || []) as ChatRoom[]);
@@ -655,6 +655,10 @@ export function useChatMessagesForRoom(
         if (!isStaleRoom(currentRoomId, gen)) {
           setLoading(false);
         }
+        // 캐시에 쓸 목록. 재확인이 돌면 그 결과로 갈아끼운다 — merged 를 그대로 쓰면
+        // 화면에서만 지운 원문(환자명·차트번호)이 IndexedDB 뷰 캐시에 다시 기록돼
+        // 앱을 껐다 켜면 되살아난다(아래 재확인이 고치려던 바로 그 경로).
+        let cacheList = merged;
         // 보존한 과거 구간의 삭제·수정 여부를 다시 확인한다.
         //
         // refresh 는 최신 MESSAGES_LIMIT 건만 받아오므로, 그 창 **바깥**에서
@@ -670,33 +674,47 @@ export function useChatMessagesForRoom(
             .slice(-OLDER_RECHECK_LIMIT);
           if (keptIds.length > 0) {
             try {
-              const { data: liveRows } = await db
+              // room_id 를 반드시 함께 뽑아야 한다. messages 의 select 정책은
+              // CHAT_ROOM_MEMBER 라 게이트웨이가 응답 행의 r.room_id 로 방 멤버십을
+              // 판정하는데(lib/db/auth/policies.ts), 컬럼이 없으면 모든 행의 키가 ''
+              // 이라 비관리자에게는 항상 빈 배열이 돌아온다. 그러면 아래 "조회에 안
+              // 잡히면 하드 삭제" 분기가 보존 구간을 통째로 지운다.
+              // 관리자는 그 필터를 우회하므로 관리자 계정으로는 재현되지 않는다.
+              const { data: liveRows, error: liveError } = await db
                 .from('messages')
-                .select('id, content, is_deleted')
+                .select('id, room_id, content, is_deleted')
                 .in('id', keptIds);
               if (isStaleRoom(currentRoomId, gen)) return;
-              const liveById = new Map(
-                (Array.isArray(liveRows) ? liveRows : []).map(
-                  (row) => [String((row as { id?: unknown }).id || ''), row] as const,
-                ),
-              );
-              setMessages((prev) =>
-                prev.filter((message) => {
-                  const id = String(message.id || '');
-                  if (!keptIds.includes(id)) return true;
-                  const live = liveById.get(id) as { is_deleted?: unknown } | undefined;
-                  // 조회에 안 잡히면 하드 삭제된 것이다.
-                  if (!live) return false;
-                  return !live.is_deleted;
-                }).map((message) => {
-                  const live = liveById.get(String(message.id || '')) as
-                    | { content?: unknown }
-                    | undefined;
-                  if (!live || live.content === undefined) return message;
-                  if (String(live.content ?? '') === String(message.content ?? '')) return message;
-                  return { ...message, content: live.content as ChatMessage['content'] };
-                }),
-              );
+              // "조회 결과 없음"과 "조회 실패"를 구분한다. D1 클라이언트는 실패를
+              // throw 하지 않고 { data: null, error } 로 돌려주므로(lib/d1-compat),
+              // error 를 안 보면 429/5xx 한 번에 보존 구간 전체를 하드 삭제로 오판한다.
+              // 실패한 tick 에서는 아무것도 제거·수정하지 않고 다음 폴링에서 다시 본다.
+              if (!liveError && Array.isArray(liveRows)) {
+                const liveById = new Map(
+                  liveRows.map(
+                    (row) => [String((row as { id?: unknown }).id || ''), row] as const,
+                  ),
+                );
+                const applyRecheck = (list: ChatMessage[]): ChatMessage[] =>
+                  list.filter((message) => {
+                    const id = String(message.id || '');
+                    if (!keptIds.includes(id)) return true;
+                    const live = liveById.get(id) as { is_deleted?: unknown } | undefined;
+                    // 조회에 안 잡히면 하드 삭제된 것이다.
+                    if (!live) return false;
+                    return !live.is_deleted;
+                  }).map((message) => {
+                    const live = liveById.get(String(message.id || '')) as
+                      | { content?: unknown }
+                      | undefined;
+                    if (!live || live.content === undefined) return message;
+                    if (String(live.content ?? '') === String(message.content ?? '')) return message;
+                    return { ...message, content: live.content as ChatMessage['content'] };
+                  });
+                setMessages((prev) => applyRecheck(prev));
+                // 화면과 캐시가 같은 목록이 되도록 캐시 쓰기 대상도 함께 정리한다.
+                cacheList = applyRecheck(merged);
+              }
             } catch {
               // 재확인 실패는 조용히 넘긴다 — 다음 폴링에서 다시 본다.
             }
@@ -717,7 +735,7 @@ export function useChatMessagesForRoom(
           userId,
           MESSAGES_CACHE_SCOPE,
           currentRoomId,
-          merged.map((message) => reactionById.get(String(message.id || '')) || message),
+          cacheList.map((message) => reactionById.get(String(message.id || '')) || message),
         );
       }
     } catch {
@@ -743,8 +761,22 @@ export function useChatMessagesForRoom(
     loadingOlderRef.current = true;
     setLoadingOlder(true);
     try {
-      // D1 created_at 과 동일 SQL UTC 포맷으로 비교 (ISO 변환 시 페이지네이션 공집합)
-      const cursorSql = toUtcSqlTimestamp(cursor);
+      // 커서는 DB 원문 created_at 을 그대로 쓴다.
+      //
+      // 예전에는 toUtcSqlTimestamp 로 공백형('YYYY-MM-DD HH:MM:SS')으로 바꿔 넘겼는데,
+      // 비교 대상 컬럼은 정규화되지 않은 원문이고 운영 messages.created_at 에는 T형
+      // ('...T11:53:25.917617+00:00')이 절반 가까이 섞여 있다. 10번째 문자가
+      // 'T'(0x54) > ' '(0x20) 이라 **같은 날짜의 T형 행은 시각과 무관하게 항상 커서보다
+      // 크고**, `.lt` 에서 전부 탈락하고 페이지가 그 날짜를 통째로 건너뛰었다.
+      // (운영 실측: 21건 이상 방 102개 중 81개에서 2,821건이 스크롤로 도달 불가.
+      //  건너뛴 페이지가 20건 미만이면 아래 setHasMore(false) 로 스크롤이 조기 종료됐다.)
+      //
+      // ORDER BY 도 원문 컬럼 기준이므로, 원문 커서로 비교해야 "정렬상 이 행 다음"이라는
+      // keyset 페이지네이션이 성립한다 — 누락도 중복도 생기지 않는다.
+      // 같은 방·같은 날짜에 두 형식이 섞인 경우(운영 실측 6쌍)의 표시 순서 문제는
+      // 정렬 자체의 문제라 여기서 커서를 정규화해도 고쳐지지 않는다.
+      // jumpToMessage(:1015, :1027)도 원문 created_at 으로 비교한다.
+      const cursorSql = cursor;
       // 최신 페이지와 같은 범위를 봐야 한다 — 형제 방을 빼면 위로 올릴수록
       // 대화가 반쪽만 나온다.
       const conversationRoomIds =
@@ -1132,8 +1164,42 @@ export function useChatMessageSearch(
         const pattern = `%${escapeLikePattern(trimmed)}%`;
         const collected = new Map<string, ChatMessageSearchHit>();
 
-        for (let i = 0; i < ids.length; i += MESSAGE_SEARCH_ROOM_CHUNK) {
-          const chunk = ids.slice(i, i + MESSAGE_SEARCH_ROOM_CHUNK);
+        // 검색 대상에 형제 방을 펼친다.
+        //
+        // 넘겨받는 roomIds 는 목록이 쓰는 dedupedRooms — 중복 생성된 1:1 방을 대표
+        // 방 하나로 접은 것이다. 방을 열면 형제 방 메시지까지 합쳐 보이는데
+        // (resolveConversationRoomIds) 검색만 대표 방을 훑어, 화면에 보이는 메시지를
+        // 그대로 검색해도 0건이 나왔다(운영 실측: 비대표 방에 미삭제 메시지 450건,
+        // 최악은 메모 233건이 전부 형제 방에 있는 '나와의 채팅').
+        //
+        // 결과의 room_id 는 다시 대표 방으로 되돌린다 — 목록이 hit.roomId 로 방 제목을
+        // 찾고(채팅목록.tsx) onOpen 도 그 id 로 방을 열기 때문에, 형제 방 id 를 그대로
+        // 내보내면 제목이 비고 목록에 없는 방을 열게 된다.
+        const repByRoomId = new Map<string, string>();
+        const searchIds: string[] = [];
+        try {
+          const { data: roomsData } = await fetchAllChatRooms();
+          const allRooms = (roomsData || []) as ChatRoom[];
+          ids.forEach((repId) => {
+            const expanded = getConversationRoomIdsByRoomId(repId, allRooms);
+            (expanded.length > 0 ? expanded : [repId]).forEach((relatedId) => {
+              if (repByRoomId.has(relatedId)) return;
+              repByRoomId.set(relatedId, repId);
+              searchIds.push(relatedId);
+            });
+          });
+        } catch {
+          // 방 목록 조회 실패 시에는 최소한 대표 방이라도 검색한다.
+        }
+        if (searchIds.length === 0) {
+          ids.forEach((repId) => {
+            repByRoomId.set(repId, repId);
+            searchIds.push(repId);
+          });
+        }
+
+        for (let i = 0; i < searchIds.length; i += MESSAGE_SEARCH_ROOM_CHUNK) {
+          const chunk = searchIds.slice(i, i + MESSAGE_SEARCH_ROOM_CHUNK);
           const { data, error } = await selectChatMessagesWithFallback<ChatMessage[]>(
             ({ omittedColumns, selectClause }) => {
               let q = db
@@ -1153,9 +1219,11 @@ export function useChatMessageSearch(
           (Array.isArray(data) ? data : []).forEach((m) => {
             const id = String(m.id || '');
             if (!id) return;
+            const hitRoomId = String(m.room_id || '');
             collected.set(id, {
               id,
-              roomId: String(m.room_id || ''),
+              // 형제 방에서 걸린 결과도 목록에는 대표 방으로 보여야 한다.
+              roomId: repByRoomId.get(hitRoomId) || hitRoomId,
               content: String(m.content || ''),
               senderId: (m.sender_id as string | null | undefined) ?? null,
               senderName: (m.sender_name as string | null | undefined) ?? null,

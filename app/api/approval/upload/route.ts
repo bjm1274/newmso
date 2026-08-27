@@ -15,6 +15,9 @@ import {
   hasBlockedUploadExtension,
   normalizeUploadMimeType,
   toSafeObjectKeyExtension } from '@/lib/upload-mime';
+import {
+  ACTIVE_CONTENT_UPLOAD_ERROR,
+  isActiveContentUpload } from '@/app/api/storage/object/content-policy';
 
 /**
  * POST /api/approval/upload
@@ -89,6 +92,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         { error: '실행 파일 형식은 첨부할 수 없습니다.' },
         { status: 415 },
       );
+    }
+    // 아래 화이트리스트는 `'text/'`·`'image/'` 프리픽스라 `text/html` 과
+    // `image/svg+xml` 을 그대로 통과시켰다 — 그 첨부는 /api/storage/object 가
+    // 앱 오리진에서 inline 으로 내보내 저장형 XSS 가 된다(계통 전체 결함이라
+    // 게시판·채팅과 같은 판정을 쓴다).
+    if (isActiveContentUpload(rawFileName, mime)) {
+      return NextResponse.json({ error: ACTIVE_CONTENT_UPLOAD_ERROR }, { status: 415 });
     }
     if (!isAllowedMime(mime)) {
       return NextResponse.json(

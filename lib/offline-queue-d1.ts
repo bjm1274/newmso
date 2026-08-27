@@ -28,7 +28,13 @@ export type EnqueueD1MutationOpts<T = unknown> = {
   payload: Record<string, unknown> | Record<string, unknown>[];
   /** update/delete 조건 */
   match?: Record<string, unknown>;
-  /** upsert 충돌 기준 컬럼 (예: 'staff_id,date'). 미지정 시 PK 기준 */
+  /**
+   * upsert 충돌 기준 컬럼 (예: 'staff_id,date'). **upsert 에는 필수다.**
+   *
+   * 미지정 시 db-client 가 INSERT OR REPLACE 로 폴백하는데, 그건 PK 가 아니라
+   * 그 행이 걸리는 **모든 유니크 제약**에 대해 기존 행을 지우고 다시 넣는다.
+   * op_patient_checks(UNIQUE schedule_post_id) 가 그렇게 통째로 초기화됐다.
+   */
   onConflict?: string;
   /** true면 충돌 시 DO NOTHING(기존 행 보존) */
   ignoreDuplicates?: boolean;
@@ -82,11 +88,17 @@ async function executeMutation<T>(
       break;
     }
     case 'upsert':
+      // onConflict 를 안 넘기면 db-client 가 INSERT OR REPLACE 로 폴백해 기존 행을
+      // DELETE 후 재삽입한다(= 넘기지 않은 컬럼이 전부 DEFAULT 로 초기화). update/delete 의
+      // match 와 같은 급의 필수 인자이므로 같은 방식으로 즉시 실패시킨다.
+      if (!onConflict) {
+        throw new Error(`[offline-queue] upsert requires onConflict: table=${table}`);
+      }
       q = db
         .from(table)
         .upsert(
           Array.isArray(payload) ? payload : [payload],
-          onConflict ? { onConflict, ...(ignoreDuplicates ? { ignoreDuplicates: true } : {}) } : undefined,
+          { onConflict, ...(ignoreDuplicates ? { ignoreDuplicates: true } : {}) },
         )
         .select();
       break;

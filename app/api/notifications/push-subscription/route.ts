@@ -114,31 +114,18 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    if (fcmToken && !endpoint) {
-      // fcm-only 갱신 시 같은 staff의 fcm_token IS NULL 행 정리
-      await db
-        .delete(push_subscriptions)
-        .where(
-          and(
-            eq(push_subscriptions.staff_id, staffId),
-            isNull(push_subscriptions.fcm_token),
-          ),
-        );
-    }
-
-    if (fcmToken && endpoint) {
-      // endpoint가 있으면, 같은 staff의 fcm_token IS NULL이고 endpoint가 다른 행 정리
-      await db
-        .delete(push_subscriptions)
-        .where(
-          and(
-            eq(push_subscriptions.staff_id, staffId),
-            isNull(push_subscriptions.fcm_token),
-            ne(push_subscriptions.endpoint, endpoint),
-          ),
-        );
-    }
-
+    // '토큰 없는 구독 잔재(fcm_token IS NULL)' 를 staff_id 만 보고 지우던 두 블록을 제거했다.
+    //
+    // 운영에서 fcm_token IS NULL 인 구독은 **전부 아이폰 설치형(PWA)** 이다 — 애플 모바일은
+    // FCM 토큰 발급 자체가 막혀 있다(알림시스템.tsx isAppleMobileDevice 분기). 반면 PC·안드로이드는
+    // 전부 토큰을 갖고 등록한다. 그래서 예전 조건은 "같은 사람이 PC/안드로이드에서 앱을 한 번 열
+    // 때마다 자기 아이폰 구독을 서버에서 지운다" 로 동작했다(10차 NB-01). 아이폰 PWA 는 재구독이
+    // 번거로워 한 번 지워지면 앱을 완전히 다시 열 때까지 그 기기로 푸시가 끊긴다.
+    //
+    // 기기 구분 키는 (staff_id, device_id) 다 — idx_push_subscriptions_staff_device_unique
+    // 가 그 조합으로 잡혀 있다. 잔재 정리는 아래 device_id 블록 하나로 충분하다:
+    // 그 조건(같은 staff + 같은 device + 다른 endpoint)이 지워야 할 토큰 없는 잔재를 이미
+    // 전부 포함하고, 다른 기기의 구독은 건드리지 않는다.
     if (supportsExtendedColumns && deviceId) {
       // 같은 device가 다른 endpoint로 등록되어 있던 잔재 제거
       await db

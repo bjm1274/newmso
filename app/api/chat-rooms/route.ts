@@ -66,8 +66,33 @@ function buildD1Row(payload: ChatRoomPayload, currentUserId: string): ChatRoomIn
     created_at: new Date().toISOString() };
 }
 
-/** 멤버 집합을 순서·중복과 무관한 키로. 같은 대화면 같은 값이 나온다. */
-function directMembersKey(members: unknown): string | null {
+const SELF_ROOM_NAME = '나와의 채팅';
+
+/**
+ * 이 방이 '나와의 채팅' 인가.
+ *
+ * 클라이언트 판정(app/main/기능부품/메신저유틸.ts `isSelfChatRoom`)과 **같은 기준**을
+ * 쓴다 — `type==='self'` 이거나 이름이 '나와의 채팅' 이고, 멤버가 2명 이상이면
+ * 자기 방으로 보지 않는다(메신저유틸.ts:210-213).
+ *
+ * 서버와 클라이언트의 기준이 어긋나면 서버가 재사용해 준 방을 클라이언트가
+ * 자기 방으로 인정하지 않아, '나와의 채팅' 이 영영 만들어지지 않는다(10차 FB7-02).
+ */
+function isSelfRoomShape(name: unknown, type: unknown, memberIds: string[]): boolean {
+  if (String(type ?? '').trim().toLowerCase() === 'self') return true;
+  if (String(name ?? '').trim() !== SELF_ROOM_NAME) return false;
+  return memberIds.length <= 1;
+}
+
+/**
+ * 멤버 집합을 순서·중복과 무관한 키로. 같은 대화면 같은 값이 나온다.
+ *
+ * 멤버 집합만으로는 부족하다 — **멤버가 나 혼자인 방은 두 종류**다.
+ * '나와의 채팅' 과, 상대가 퇴장해 나만 남은 1:1 방이다. 둘을 같은 키로 만들면
+ * 자기 방을 만들려는 요청이 퇴장한 1:1 방을 재사용해 버린다(10차 FB7-02).
+ * 그래서 키 앞에 방 타입(self 여부)을 붙인다.
+ */
+function directMembersKey(members: unknown, name: unknown, type: unknown): string | null {
   let list: unknown = members;
   if (typeof list === 'string') {
     try {
@@ -80,7 +105,9 @@ function directMembersKey(members: unknown): string | null {
   const ids = Array.from(
     new Set(list.map((m) => String(m ?? '').trim()).filter(Boolean)),
   ).sort();
-  return ids.length > 0 ? ids.join('|') : null;
+  if (ids.length === 0) return null;
+  const scope = isSelfRoomShape(name, type, ids) ? 'self' : 'direct';
+  return `${scope}:${ids.join('|')}`;
 }
 
 /**
@@ -101,7 +128,7 @@ async function findReusableDirectRoom(
   payload: ChatRoomPayload,
 ): Promise<ChatRoomSelect | null> {
   if (String(payload.type || '').toLowerCase() !== 'direct') return null;
-  const wantedKey = directMembersKey(payload.members);
+  const wantedKey = directMembersKey(payload.members, payload.name, payload.type);
   if (!wantedKey) return null;
 
   const rows = (await db
@@ -109,7 +136,9 @@ async function findReusableDirectRoom(
     .from(chatRoomsTable)
     .where(eq(chatRoomsTable.type, 'direct'))) as ChatRoomSelect[];
 
-  const matches = rows.filter((row) => directMembersKey(row.members) === wantedKey);
+  const matches = rows.filter(
+    (row) => directMembersKey(row.members, row.name, row.type) === wantedKey,
+  );
   if (matches.length === 0) return null;
 
   // 여러 개면 가장 최근 활동한 방을 고른다 — 목록 화면의 dedup 규칙과 같다.

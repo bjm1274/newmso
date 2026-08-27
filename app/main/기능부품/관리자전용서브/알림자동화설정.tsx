@@ -266,6 +266,10 @@ function NotificationAutomationDesktop({ user: userRaw }: Record<string, unknown
             remain_days: remain,
             notification_id: notifData?.id ?? null,
             meta: { sent_by: user?.['id'] as string, today: todayYmd, expiry_date: expiryLabel } },
+          // 위에서 만든 결정적 id 가 곧 충돌 키다. 옵션을 안 주면 INSERT OR REPLACE 로
+          // 나가는데, 그건 PK 가 아니라 그 행이 걸리는 **모든** 유니크 제약으로 충돌하는
+          // 별개 동작이다. 의도한 대상(id)을 그대로 명시한다 — 동작은 같다.
+          { onConflict: 'id' },
         );
 
         // 3) 문서보관함(document_repository) 저장

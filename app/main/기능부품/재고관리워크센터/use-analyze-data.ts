@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { db } from '@/lib/db-client';
 import { INVENTORY_SELECT_COLUMNS } from '@/app/main/inventory-utils';
 import type { AbcGrade, ForecastRow, InspectRow, Tone } from './stock-types';
-import { asString, pickNumber, pickString, type Row } from './data-helpers';
+import { asString, fetchAllRowsPaged, pickNumber, pickString, type Row } from './data-helpers';
 
 const OUTBOUND_TYPES = new Set([
   '출고',
@@ -250,20 +250,27 @@ export function useAnalyzeData(
 
     const load = async () => {
       try {
-        let invQ = db.from('inventory').select(INVENTORY_SELECT_COLUMNS).limit(800);
+        // INV-01: limit(800) 이면 품목 1,032건 중 232건이 ABC 등급·수요예측에서 빠진다.
+        // id 정렬은 OFFSET 페이징의 페이지 경계를 확정하기 위한 것이다.
+        const buildInvQ = () => {
+          const q = db.from('inventory').select(INVENTORY_SELECT_COLUMNS).order('id');
+          return companyFilter ? q.eq('company', companyFilter) : q;
+        };
         let logQ = db
           .from('inventory_logs')
           .select(
             'item_id,inventory_id,quantity,unit_price,change_type,type,prev_quantity,next_quantity,created_at,notes',
           )
           .order('created_at', { ascending: false })
-          .limit(2000);
+          // limit(2000) 은 /api/d1/query 의 limit 상한(MAX_LIMIT=1000)을 넘어 payload 검증에서
+          // 400 이 나고, 아래가 error 를 안 봐서 ABC 등급·수요예측이 로그 0건으로 계산됐다.
+          // (운영 inventory_logs 는 현재 0행이라 증상이 드러나지 않았을 뿐이다.)
+          .limit(1000);
         if (companyFilter) {
-          invQ = invQ.eq('company', companyFilter);
           logQ = logQ.eq('company', companyFilter);
         }
         const [invRes, logRes, sessionRes] = await Promise.all([
-          invQ,
+          fetchAllRowsPaged(buildInvQ),
           logQ,
           db
             .from('inventory_count_sessions')
@@ -276,7 +283,7 @@ export function useAnalyzeData(
 
         if (cancelled) return;
 
-        const invRows: Row[] = Array.isArray(invRes.data) ? (invRes.data as Row[]) : [];
+        const invRows: Row[] = invRes.rows;
         const logRows: Row[] = Array.isArray(logRes.data) ? (logRes.data as Row[]) : [];
         const sessionRows: Row[] = Array.isArray(sessionRes.data)
           ? (sessionRes.data as Row[])

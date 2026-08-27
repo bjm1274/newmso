@@ -13,6 +13,28 @@ export function isMissingTableError(error: any, tableName = 'system_settings') {
   return code === 'PGRST205' || message.includes(tableName.toLowerCase());
 }
 
+export type WriteFailureKind = 'missing-table' | 'missing-column' | 'other';
+
+/**
+ * 쓰기 실패 사유를 구분한다.
+ * isMissingTableError 는 `message.includes(tableName)` 이라,
+ * `table approval_form_types has no column named base_slug` 같은 **컬럼 누락** 오류까지
+ * "테이블 자체가 없음" 으로 삼켜 버렸다(10차 TB5 — 그래서 console.warn 조차 남지 않았다).
+ * → 컬럼 오류를 먼저 걸러낸 뒤에 테이블 판정을 한다.
+ */
+export function classifyWriteFailure(error: any, tableName: string): WriteFailureKind {
+  const message = String(error?.message || error?.details || '').toLowerCase();
+  if (
+    message.includes('no column named') ||
+    message.includes('no such column') ||
+    message.includes('has no column')
+  ) {
+    return 'missing-column';
+  }
+  if (isMissingTableError(error, tableName)) return 'missing-table';
+  return 'other';
+}
+
 export function slugFromName(name: string) {
   return name.replace(/\s+/g, '').replace(/[^\w가-힣a-zA-Z0-9-]/g, '') || 'custom';
 }

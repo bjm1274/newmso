@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
-import { readSessionFromRequest } from '@/lib/server-session';
 import {
+  createSessionToken,
+  getSessionCookieOptions,
+  readSessionFromRequest,
+  SESSION_COOKIE_NAME } from '@/lib/server-session';
+import {
+  markStaffSessionsLoggedOut,
   pickStoredPassword,
   selectStaffCredentialByIdD1,
   selectStaffCredentialsByEmployeeNoD1,
@@ -132,6 +137,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: message }, { status: 500 });
     }
 
+    // 비밀번호를 바꾸면 이전 비밀번호로 로그인해 둔 다른 기기의 세션을 끊는다.
+    // 지금까지는 password 컬럼만 갱신해서, 분실한 폰·공용 PC·인수인계 전 단말이
+    // 30일 슬라이딩 세션으로 계속 살아 있었다(사실상 만료 없음).
+    let sessionCutoffIso: string | null = null;
+    try {
+      sessionCutoffIso = await markStaffSessionsLoggedOut(targetStaff.id);
+    } catch (logoutErr) {
+      console.error('[change-password] force_logout_at 기록 실패:', logoutErr instanceof Error ? logoutErr.message : String(logoutErr));
+      // 세션 종료 기록 실패가 비밀번호 변경 자체를 되돌리지는 않는다.
+    }
+
     // audit_logs 기록 — D1 Drizzle (best-effort)
     try {
       const d1 = await getD1Binding();
@@ -144,14 +160,32 @@ export async function POST(request: Request) {
           target_id: targetStaff.id,
           user_id: targetStaff.id,
           user_name: sessionUserName || targetStaff.name || '',
-          details: JSON.stringify({ updatedColumn }),
+          details: JSON.stringify({ updatedColumn, forceLogoutAt: sessionCutoffIso }),
           created_at: new Date().toISOString() });
       }
     } catch {
       // 감사 로그 실패가 본 흐름을 막지 않음
     }
 
-    return NextResponse.json({ ok: true });
+    const response = NextResponse.json({ ok: true });
+
+    // 끊는 대상에는 '지금 이 요청을 보낸 세션'도 포함된다. 그대로 두면 비밀번호를 바꾼
+    // 본인이 그 자리에서 반쯤 죽은 화면을 보게 된다 — 세션 폴링이 30분 주기라
+    // 로그인 화면으로 넘어가기 전까지 API 만 401 로 떨어진다.
+    // 그래서 다른 기기는 끊고 이 기기만 새 토큰으로 이어 준다. markStaffSessionsLoggedOut 이
+    // 초 경계로 내림한 시각을 찍으므로, 지금 발급하는 토큰의 iat 는 그 값 이상이라 살아남고
+    // 그보다 앞서 발급된 토큰만 무효가 된다.
+    if (sessionCutoffIso && targetStaff.id === sessionUserId) {
+      try {
+        const refreshedToken = await createSessionToken(session.user);
+        response.cookies.set(SESSION_COOKIE_NAME, refreshedToken, getSessionCookieOptions());
+      } catch (tokenErr) {
+        console.error('[change-password] 세션 토큰 재발급 실패:', tokenErr instanceof Error ? tokenErr.message : String(tokenErr));
+        // 재발급 실패 시 이 기기도 다음 요청에서 로그아웃된다 — 열리는 방향이 아니라 안전하다.
+      }
+    }
+
+    return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Password update failed';
     return NextResponse.json({ ok: false, error: message }, { status: 500 });

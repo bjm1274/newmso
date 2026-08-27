@@ -319,6 +319,9 @@ export default function SBoardDetail({
   const poll = extractPoll((post as { poll?: unknown }).poll);
   const pollVotes = parsePollVotes((post as { poll_votes?: unknown }).poll_votes);
 
+  // 인라인 새 탭은 **이미지 첨부(크게 보기)** 전용이다. 비이미지 첨부의 카드는
+  // PC·모바일 결재와 같이 다운로드 경로(downloadAttachment)로 간다 — 인라인으로
+  // 열면 브라우저가 URL 마지막 조각인 'object' 를 파일명으로 삼는 문제도 있었다.
   const openAttachment = (att: SafeAttachment) => {
     const inline = buildStorageInlineUrl(att.url, att.name);
     if (typeof window !== 'undefined') {

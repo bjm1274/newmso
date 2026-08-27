@@ -117,11 +117,19 @@ export function useApprovalList(staffId: string | null, company?: string | null)
     try {
       const { data, error: queryError } = await withMissingColumnsFallback(
         (omittedColumns) => {
+          // EA-02: limit(200) 은 **정책 필터 이전**의 '전사 최신 200건' 창이라,
+          // 운영 710건 중 2026-07-16 이전 510건이 결재함·기안함·참조함·문서조회에서
+          // 통째로 사라졌다(그 안에 대기 41건·처리 가능 11건). PC(전자결재.tsx:684-691)는
+          // 상한이 없어 같은 문서가 PC 에서는 보인다 — 정본인 PC 에 맞춘다.
+          //
+          // 상한을 range 페이징으로 바꾸지 않은 이유: 게이트웨이가 정책 필터를
+          // SQL LIMIT '뒤에' 돌리므로(app/api/d1/query/route.ts:462-463) 페이지가
+          // 반환 건수보다 먼저 줄어들어, "짧은 페이지 = 마지막 페이지" 판정이 성립하지 않는다.
+          // 상한을 없애면 서버가 정책 통과분만 돌려주므로 실제 전송량은 오히려 작다.
           const q = db
             .from('approvals')
             .select(buildApprovalSelect(omittedColumns))
-            .order('created_at', { ascending: false })
-            .limit(200);
+            .order('created_at', { ascending: false });
           return q;
         },
         APPROVAL_OPTIONAL_COLUMNS,
