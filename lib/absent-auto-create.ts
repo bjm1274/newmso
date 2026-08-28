@@ -36,6 +36,8 @@ import { syncAttendanceToAttendances, LEGACY_STATUS_TO_MODERN } from '@/lib/atte
 import { getKoreanTodayString, formatKoreanDateKey } from '@/lib/seoul-time';
 import { isKoreanPublicHoliday } from '@/lib/korean-public-holidays';
 
+import { isGroupAccount } from '@/types';
+
 /** YYYY-MM-DD 에 일수를 더한 날짜 키 (UTC 산술 — 런타임 로컬 TZ 를 타지 않는다) */
 function shiftDateKey(dateKey: string, days: number): string {
   const [year, month, day] = dateKey.split('-').map(Number);
@@ -109,6 +111,8 @@ interface StaffMember {
   id: string;
   name?: string;
   status?: string;
+  permissions?: string | null;
+  [key: string]: unknown;
 }
 
 /**
@@ -152,7 +156,7 @@ async function execD1(sql: string, params: unknown[] = []): Promise<void> {
  */
 async function fetchStaffsWithoutYesterdayAttendance(yesterday: string): Promise<StaffMember[]> {
   const rows = await queryD1(
-    `SELECT sm.id, sm.name, sm.status
+    `SELECT sm.id, sm.name, sm.status, sm.permissions
      FROM staff_members sm
      WHERE sm.status NOT IN ('퇴사', '퇴직')
        AND sm.id NOT IN (
@@ -550,6 +554,10 @@ export async function runAbsentAutoCreate(
 
     for (const staff of staffsWithoutAttendance) {
       if (!staff.id) {
+        absentSkipped++;
+        continue;
+      }
+      if (isGroupAccount(staff)) {
         absentSkipped++;
         continue;
       }

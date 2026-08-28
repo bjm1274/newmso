@@ -69,9 +69,25 @@ export function isGroupAccount(staff: Partial<StaffMember> | Record<string, unkn
   if (!staff) return false;
   if (staff.is_group_account === 1 || staff.is_group_account === true) return true;
   if (staff.account_type === 'team_group' || staff.account_type === 'group') return true;
-  const perms = staff.permissions as Record<string, unknown> | null | undefined;
-  if (perms?.is_group_account === 1 || perms?.is_group_account === true) return true;
-  if (perms?.account_type === 'team_group' || perms?.account_type === 'group') return true;
+
+  let perms = staff.permissions as Record<string, unknown> | string | null | undefined;
+  if (typeof perms === 'string' && perms.trim()) {
+    try {
+      perms = JSON.parse(perms) as Record<string, unknown>;
+    } catch {
+      perms = null;
+    }
+  }
+  if (perms && typeof perms === 'object') {
+    if (perms.is_group_account === 1 || perms.is_group_account === true) return true;
+    if (perms.account_type === 'team_group' || perms.account_type === 'group') return true;
+  }
+
+  // 외래팀1, 수술팀1, 병동팀1 등 팀/부서 공용 단체 계정 식별
+  const name = String(staff.name || '').trim();
+  if (/(?:팀|부서|실)\s*\d+$/i.test(name) || /^(?:외래|수술|병동|진료|원무|행정|영양|상담|간호|마취)팀\d+$/i.test(name)) {
+    return true;
+  }
   return false;
 }
 

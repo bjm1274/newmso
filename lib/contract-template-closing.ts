@@ -183,9 +183,9 @@ export type ContractClosingData = {
   employeeAddress?: string;
   employeePhone?: string;
   contractDate: string;
-  signatureDataUrl?: string;
+  signatureDataUrl?: string | null;
   /** 교부확인란에 자필로 작성된 '교부 받음' 이미지(dataURL). */
-  receiptTraceDataUrl?: string;
+  receiptTraceDataUrl?: string | null;
 };
 
 function escapeHTML(value: unknown) {

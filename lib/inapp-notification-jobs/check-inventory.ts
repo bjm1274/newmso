@@ -1,9 +1,10 @@
 /**
  * Phase 8-A — 재고 부족 알림 보강.
  * inventory where (stock OR quantity) <= min_stock
- *   → 권한자(permissions.menu_재고관리=true 또는 행정/총무/원무팀) 에게 'inventory' 알림.
+ *   → 권한자(permissions.menu_재고관리=true 또는 행정/총무/원무팀) 에게 1건의 통합 'inventory' 알림 발송.
+ *   → 제품마다 개별 발송하지 않고 수신자/회사별 1회 통합 발송하며 내용을 확인하도록 안내.
  * company 격리: 품목 company/company_id 와 수신자 company/company_id 매칭.
- * dedupe key: `inventory:low:{item_id}:{stock}`
+ * dedupe key: `inventory:low_summary:{kst_date}:{fingerprint_hash}`
  */
 import 'server-only';
 import {
@@ -71,6 +72,19 @@ function sameCompany(
   if (!itemCo && !itemCid) return true;
   if (!itemCo) return false;
   return itemCo === staffCo;
+}
+
+function simpleHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
+function getKstDateString(): string {
+  const now = new Date();
+  return new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 type InventoryRecipient = {
@@ -160,31 +174,49 @@ export async function checkInventoryLowStock(): Promise<CheckJobResult> {
     return { detected: lowStockItems.length, created: 0, errors: [errorMessage(err)] };
   }
 
+  const kstDate = getKstDateString();
   const toInsert: NotificationInsertRow[] = [];
-  for (const item of lowStockItems) {
-    const stock = Number(item.stock ?? item.quantity ?? 0);
-    const minStock = Number(item.min_stock ?? item.min_quantity ?? 0);
-    const dedupeKey = `inventory:low:${item.id}:${stock}`;
-    const itemName = item.item_name || '품목';
-    for (const recipient of recipients) {
-      // 회사 격리: 타사 재고 부족 알림 누수 방지
-      if (!sameCompany(item, recipient)) continue;
-      if (sentKeys.has(`${recipient.id}|${dedupeKey}`)) continue;
-      toInsert.push({
-        user_id: recipient.id,
+
+  for (const recipient of recipients) {
+    // 회사 격리: 타사 재고 부족 알림 누수 방지 (해당 수신자 소속 회사 품목만 필터)
+    const userLowStockItems = lowStockItems.filter((item) => sameCompany(item, recipient));
+    if (userLowStockItems.length === 0) continue;
+
+    const count = userLowStockItems.length;
+    const firstItemName = userLowStockItems[0].item_name || '품목';
+
+    // 품목 ID 및 재고 수량의 조합으로 상태 지문(fingerprint) 생성
+    const fingerprint = userLowStockItems
+      .map((item) => `${item.id}:${Number(item.stock ?? item.quantity ?? 0)}`)
+      .sort()
+      .join(',');
+    const fingerprintHash = simpleHash(fingerprint);
+    const dedupeKey = `inventory:low_summary:${kstDate}:${fingerprintHash}`;
+
+    if (sentKeys.has(`${recipient.id}|${dedupeKey}`)) continue;
+
+    const title = '재고 부족 알림';
+    const body =
+      count === 1
+        ? `${firstItemName} 품목의 재고가 부족합니다. 재고관리에서 상세 내용을 확인해 주세요.`
+        : `${firstItemName} 외 ${count - 1}건의 재고가 부족합니다. 재고관리에서 상세 내용을 확인해 주세요.`;
+
+    toInsert.push({
+      user_id: recipient.id,
+      type: 'inventory',
+      title,
+      body,
+      metadata: {
         type: 'inventory',
-        title: `재고 부족 — ${itemName}`,
-        body: `${itemName} 현재 ${stock}개 (최소 ${minStock}개). 발주를 검토해 주세요.`,
-        metadata: {
-          type: 'inventory',
-          item_id: item.id,
-          stock,
-          min_stock: minStock,
-          company: item.company,
-          company_id: item.company_id,
-          dedupe_key: dedupeKey },
-        read_at: null });
-    }
+        open_menu: '재고관리',
+        open_inventory_view: '현황',
+        inventory_view: '현황',
+        item_count: count,
+        first_item_name: firstItemName,
+        company: recipient.company,
+        company_id: recipient.company_id,
+        dedupe_key: dedupeKey },
+      read_at: null });
   }
 
   if (toInsert.length === 0) {
@@ -193,3 +225,4 @@ export async function checkInventoryLowStock(): Promise<CheckJobResult> {
   const { created, errors } = await insertNotificationsChunked(toInsert);
   return { detected: lowStockItems.length, created, errors };
 }
+

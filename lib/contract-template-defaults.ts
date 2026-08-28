@@ -75,8 +75,7 @@ export const CONTRACT_SALARY_COMPOSITION_BLOCK = `기본급: 금 {{base_salary}}
 연장근로수당(약정): 금 {{agreed_overtime_allowance}}원
 야간근로수당(약정): 금 {{agreed_night_allowance}}원
 야간당직수당: 금 {{night_duty_allowance}}원
-합계(비과세 포함): 금 {{total_salary}}원
-통상시급: 금 {{hourly_wage}}원`;
+합계(비과세 포함): 금 {{total_salary}}원`;
 
 const CONTRACT_TEMPLATE_BASE_UP_TO_ARTICLE_9 = `제1조 [계약의 목적]
 본 계약은 사용자와 근로자 간의 근로조건을 명확히 정함으로써 상호 신뢰와 협력을 바탕으로 성실히 근로관계를 유지하는 것을 목적으로 한다.
@@ -204,8 +203,10 @@ const CONTRACT_SALARY_BLOCK_PATTERN =
 // 구형/커스텀 템플릿의 제6조 급여 블록을 표준 구성(모든 수당 항목 포함)으로 보정한다.
 // 일부 수당 항목 줄이 누락된 템플릿에서도 약정수당·비과세 항목이 빠짐없이 노출되도록 한다.
 // 함수형 치환을 사용해 치환 문자열의 특수문자($&, $1 등) 해석을 방지한다. 매칭이 없으면 원본을 그대로 반환한다.
-const upgradeSalaryCompositionBlock = (content: string) =>
-  content.replace(CONTRACT_SALARY_BLOCK_PATTERN, () => CONTRACT_SALARY_COMPOSITION_BLOCK);
+const upgradeSalaryCompositionBlock = (content: string) => {
+  const upgraded = content.replace(CONTRACT_SALARY_BLOCK_PATTERN, () => CONTRACT_SALARY_COMPOSITION_BLOCK);
+  return upgraded.replace(/\n\s*통상시급\s*[:：]\s*금\s*\{\{\s*hourly_wage\s*\}\}\s*원/g, '');
+};
 
 export const upgradeLegacyContractTemplate = (content?: string | null) => {
   const normalized = normalizeTemplate(content);

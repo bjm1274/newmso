@@ -1,6 +1,6 @@
 'use client';
 import { toast } from '@/lib/toast';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { db } from '@/lib/db-client';
 import SignatureCanvas from 'react-signature-canvas';
 import { upgradeLegacyContractTemplate } from '@/lib/contract-template-defaults';
@@ -49,64 +49,43 @@ const REQUIRED_AGREEMENTS = [
 ];
 
 export default function ContractSignatureModal({ contract, user, templateText, onClose, onSuccess }: Props) {
-    const [step, setStep] = useState<number>(1);
     const [privacyConsent, setPrivacyConsent] = useState<boolean | null>(null);
     const [agreements, setAgreements] = useState<Record<string, boolean>>({});
+    const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
+    const [receiptTraceDataUrl, setReceiptTraceDataUrl] = useState<string | null>(null);
+    const [activePadModal, setActivePadModal] = useState<'signature' | 'receipt' | null>(null);
     const sigCanvas = useRef<SignatureCanvas>(null);
-    const submitLockRef = useRef(false);
-    const [isSigEmpty, setIsSigEmpty] = useState(true);
-    // 교부확인: 최종 서명 단계에서 '교부 받음'을 자필로 작성하는 캔버스
-    const [isReceiptEmpty, setIsReceiptEmpty] = useState(true);
     const receiptCanvas = useRef<SignatureCanvas>(null);
+    const [isPadEmpty, setIsPadEmpty] = useState(true);
+    const submitLockRef = useRef(false);
     const [company, setCompany] = useState<Record<string, unknown> | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
+    const padContainerRef = useRef<HTMLDivElement>(null);
+    const [padWidth, setPadWidth] = useState(380);
+    const [padHeight, setPadHeight] = useState(200);
 
-    const sigContainerRef = useRef<HTMLDivElement>(null);
-    const receiptContainerRef = useRef<HTMLDivElement>(null);
-    const [sigWidth, setSigWidth] = useState(400);
-    const [sigHeight, setSigHeight] = useState(220);
-    const [receiptWidth, setReceiptWidth] = useState(400);
-    const [receiptHeight, setReceiptHeight] = useState(160);
-
-    // step 4 진입 시 캔버스 크기를 컨테이너 실제 폭/높이와 정확히 동기화
     useEffect(() => {
-        if (step !== 4) return;
-        const measure = (el: HTMLDivElement | null) => {
-            if (!el) return { w: 0, h: 0 };
-            const rect = el.getBoundingClientRect();
-            const w = Math.floor(rect.width || el.clientWidth);
-            const h = Math.floor(rect.height || el.clientHeight);
-            return {
-                w: Math.max(200, w),
-                h: Math.max(100, h),
-            };
-        };
-
-        const updateSizes = () => {
-            const sig = measure(sigContainerRef.current);
-            if (sig.w > 0 && sig.h > 0) {
-                setSigWidth(sig.w);
-                setSigHeight(sig.h);
-            }
-            const receipt = measure(receiptContainerRef.current);
-            if (receipt.w > 0 && receipt.h > 0) {
-                setReceiptWidth(receipt.w);
-                setReceiptHeight(receipt.h);
+        if (!activePadModal) return;
+        const measure = () => {
+            if (!padContainerRef.current) return;
+            const rect = padContainerRef.current.getBoundingClientRect();
+            const w = Math.floor(rect.width || padContainerRef.current.clientWidth);
+            const h = Math.floor(rect.height || padContainerRef.current.clientHeight);
+            if (w > 0 && h > 0) {
+                setPadWidth(Math.max(260, w));
+                setPadHeight(Math.max(140, h));
             }
         };
-
-        // 초기 측정 및 애니메이션 완료 후 재측정 (모바일 뷰포트 안정화 대응)
-        updateSizes();
-        const timer1 = setTimeout(updateSizes, 60);
-        const timer2 = setTimeout(updateSizes, 200);
-
-        window.addEventListener('resize', updateSizes);
+        measure();
+        const t1 = setTimeout(measure, 60);
+        const t2 = setTimeout(measure, 180);
+        window.addEventListener('resize', measure);
         return () => {
-            clearTimeout(timer1);
-            clearTimeout(timer2);
-            window.removeEventListener('resize', updateSizes);
+            clearTimeout(t1);
+            clearTimeout(t2);
+            window.removeEventListener('resize', measure);
         };
-    }, [step]);
+    }, [activePadModal]);
 
     const [localTemplateText, setLocalTemplateText] = useState<string>('');
     const [isTemplateLoading, setIsTemplateLoading] = useState(false);
@@ -114,25 +93,9 @@ export default function ContractSignatureModal({ contract, user, templateText, o
 
     useEffect(() => {
         let isMounted = true;
-
-        const buildResolvedTemplateText = async (
-            rawTemplateText: string,
-            shiftData: Record<string, unknown> | null,
-            companyData: Record<string, unknown> | null,
-            sealUrl: string | null,
-        ) => {
-            const nextCompany =
-                companyData || sealUrl
-                    ? { ...(companyData ?? {}), ...(sealUrl ? { seal_url: sealUrl } : {}) }
-                    : null;
-
-            return fillEmploymentContractTemplate(
-                upgradeLegacyContractTemplate(rawTemplateText),
-                user,
-                contract,
-                shiftData,
-                nextCompany,
-            );
+        const buildResolvedTemplateText = async (rawTemplateText: string, shiftData: Record<string, unknown> | null, companyData: Record<string, unknown> | null, sealUrl: string | null) => {
+            const nextCompany = companyData || sealUrl ? { ...(companyData ?? {}), ...(sealUrl ? { seal_url: sealUrl } : {}) } : null;
+            return fillEmploymentContractTemplate(upgradeLegacyContractTemplate(rawTemplateText), user, contract, shiftData, nextCompany);
         };
 
         const fetchTemplateAndCompany = async () => {
@@ -141,31 +104,22 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                 setCompany(null);
                 return;
             }
-
             setIsTemplateLoading(true);
-            setLocalTemplateText('');
             try {
                 const targetCompany = String(user?.company || contract?.company_name || '전체');
                 let companyData: Record<string, unknown> | null = null;
                 let sealUrl: string | null = null;
                 let shiftData: Record<string, unknown> | null = null;
                 let resolvedTemplateText = hasTemplateOverride ? (templateText || '') : '';
-
                 const shiftIds = getWeeklyRotationShiftIds(user, contract?.shift_id ?? user?.shift_id);
                 if (shiftIds.length > 0) {
-                    const { data: shiftRows } = await db
-                        .from('work_shifts')
-                        .select('*')
-                        .in('id', shiftIds);
+                    const { data: shiftRows } = await db.from('work_shifts').select('*').in('id', shiftIds);
                     let orderedShiftRows = orderShiftsByIds(shiftRows, shiftIds);
                     if (orderedShiftRows.length === 1 && isShiftBandGroupRow(orderedShiftRows[0])) {
                         const seedShift = orderedShiftRows[0];
                         const seedCompanyName = String(seedShift.company_name || seedShift.company || '');
                         const seedShiftType = String(seedShift.shift_type || '');
-                        let siblingQuery = db
-                            .from('work_shifts')
-                            .select('*')
-                            .eq('is_active', true);
+                        let siblingQuery = db.from('work_shifts').select('*').eq('is_active', true);
                         if (seedCompanyName) siblingQuery = siblingQuery.eq('company_name', seedCompanyName);
                         if (seedShiftType) siblingQuery = siblingQuery.eq('shift_type', seedShiftType);
                         const { data: siblingRows } = await siblingQuery;
@@ -174,48 +128,22 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                     }
                     shiftData = withWeeklyRotationShifts(orderedShiftRows);
                 }
-
                 if (targetCompany && targetCompany !== '전체') {
-                    const { data: companyRow } = await db
-                        .from('companies')
-                        .select('*')
-                        .eq('name', targetCompany)
-                        .maybeSingle();
+                    const { data: companyRow } = await db.from('companies').select('*').eq('name', targetCompany).maybeSingle();
                     companyData = companyRow;
                 }
-
                 if (!hasTemplateOverride) {
-                    const { data: companyTemplateRow } = await db
-                        .from('contract_templates')
-                        .select('template_content, seal_url')
-                        .eq('company_name', targetCompany)
-                        .maybeSingle();
-
+                    const { data: companyTemplateRow } = await db.from('contract_templates').select('template_content, seal_url').eq('company_name', targetCompany).maybeSingle();
                     resolvedTemplateText = companyTemplateRow?.template_content || '';
                     sealUrl = companyTemplateRow?.seal_url || null;
-
                     if (!resolvedTemplateText && targetCompany !== '전체') {
-                        const { data: fallbackTemplateRow } = await db
-                            .from('contract_templates')
-                            .select('template_content, seal_url')
-                            .eq('company_name', '전체')
-                            .maybeSingle();
+                        const { data: fallbackTemplateRow } = await db.from('contract_templates').select('template_content, seal_url').eq('company_name', '전체').maybeSingle();
                         resolvedTemplateText = fallbackTemplateRow?.template_content || '';
                         sealUrl = sealUrl || fallbackTemplateRow?.seal_url || null;
                     }
                 }
-
-                const nextCompany =
-                    companyData || sealUrl
-                        ? { ...(companyData ?? {}), ...(sealUrl ? { seal_url: sealUrl } : {}) }
-                        : null;
-                const result = await buildResolvedTemplateText(
-                    resolvedTemplateText,
-                    shiftData,
-                    companyData,
-                    sealUrl,
-                );
-
+                const nextCompany = companyData || sealUrl ? { ...(companyData ?? {}), ...(sealUrl ? { seal_url: sealUrl } : {}) } : null;
+                const result = await buildResolvedTemplateText(resolvedTemplateText, shiftData, companyData, sealUrl);
                 if (!isMounted) return;
                 setCompany(nextCompany);
                 setLocalTemplateText(result);
@@ -225,759 +153,361 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                 setCompany(null);
                 setLocalTemplateText('');
             } finally {
-                if (isMounted) {
-                    setIsTemplateLoading(false);
-                }
+                if (isMounted) setIsTemplateLoading(false);
             }
         };
-
         void fetchTemplateAndCompany();
-        return () => {
-            isMounted = false;
-        };
-        // JM2: contract/user 객체를 통째로 deps에 두면 상위에서 매 렌더마다 새 참조가
-        // 들어올 때마다 fetchTemplateAndCompany가 재호출되어 무한 fetch → setState →
-        // 부모 리렌더 루프의 원인이 된다. 실제 fetch에 영향을 주는 primitive만 deps에 둔다.
-         
-    }, [
-        contract?.id,
-        contract?.shift_id,
-        contract?.company_name,
-        contract?.contract_type,
-        contract?.requested_at,
-        contract?.sent_at,
-        contract?.issued_at,
-        contract?.created_at,
-        user?.id,
-        user?.name,
-        user?.company,
-        user?.shift_id,
-        user?.address,
-        user?.phone,
-        templateText,
-        hasTemplateOverride,
-    ]);
+        return () => { isMounted = false; };
+    }, [contract?.id, contract?.shift_id, contract?.company_name, contract?.contract_type, contract?.requested_at, contract?.sent_at, contract?.issued_at, contract?.created_at, user?.id, user?.name, user?.company, user?.shift_id, user?.address, user?.phone, templateText, hasTemplateOverride]);
 
-    const allAgreed = REQUIRED_AGREEMENTS.every(item => agreements[item.id]);
-    const isTemplateReady = localTemplateText.trim().length > 0;
+    const agreedCount = useMemo(() => REQUIRED_AGREEMENTS.filter(item => Boolean(agreements[item.id])).length, [agreements]);
+    const allAgreed = agreedCount === REQUIRED_AGREEMENTS.length;
+    const isPrivacyValid = privacyConsent !== null;
+    const isSignatureDone = Boolean(signatureDataUrl);
+    const isReceiptDone = Boolean(receiptTraceDataUrl);
+    const isAllReadyToSubmit = allAgreed && isPrivacyValid && isSignatureDone && isReceiptDone;
+
+    const handleToggleAllAgreements = () => {
+        if (allAgreed) setAgreements({});
+        else {
+            const next: Record<string, boolean> = {};
+            REQUIRED_AGREEMENTS.forEach(item => { next[item.id] = true; });
+            setAgreements(next);
+        }
+    };
 
     const formatKoreanDate = (input: unknown): string => {
         if (!input) return '';
         const date = input instanceof Date ? input : new Date(String(input));
         if (Number.isNaN(date.getTime())) return '';
-        return date.toLocaleDateString('ko-KR', {
-            timeZone: 'Asia/Seoul',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric' });
+        return date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric' });
     };
 
-    const contractIssueDate =
-        formatKoreanDate(
-            contract?.requested_at ?? contract?.sent_at ?? contract?.issued_at ?? contract?.created_at,
-        ) || formatKoreanDate(new Date());
-
+    const contractIssueDate = formatKoreanDate(contract?.requested_at ?? contract?.sent_at ?? contract?.issued_at ?? contract?.created_at) || formatKoreanDate(new Date());
     const closingData: ContractClosingData = {
-        companyName: String(
-            (company?.name as string | undefined) || user?.company || contract?.company_name || '',
-        ),
+        companyName: String((company?.name as string | undefined) || user?.company || contract?.company_name || ''),
         companyAddress: String((company?.address as string | undefined) || ''),
-        companyCeo: String(
-            (company?.ceo_name as string | undefined) ||
-            (company?.representative_name as string | undefined) || '',
-        ),
+        companyCeo: String((company?.ceo_name as string | undefined) || (company?.representative_name as string | undefined) || ''),
         companyPhone: String((company?.phone as string | undefined) || ''),
-        companyBusinessNo: String(
-            (company?.business_no as string | undefined) ||
-            (company?.business_number as string | undefined) || '',
-        ),
+        companyBusinessNo: String((company?.business_no as string | undefined) || (company?.business_number as string | undefined) || ''),
         sealUrl: (company?.seal_url as string | undefined) || null,
         employeeName: String(user?.name || ''),
         employeeAddress: String(user?.address || ''),
         employeePhone: String(user?.phone || ''),
-        contractDate: contractIssueDate };
-
-    const handleNext = () => {
-        if (step === 1) {
-            if (privacyConsent === null) {
-                return toast('제11조 개인정보의 수집·이용 동의 여부를 선택해 주세요.');
-            }
-            setStep(2);
-        }
-        else if (step === 2) {
-            if (!allAgreed) return toast('모든 필수 항목에 동의해야 합니다.');
-            setStep(3);
-        } else if (step === 3) {
-            if (!agreements['confidentiality']) return toast('비밀유지서약서 내용에 동의해야 합니다.');
-            setStep(4);
-        }
+        contractDate: contractIssueDate
     };
 
-    const handleClearSignature = () => {
-        sigCanvas.current?.clear();
-        setIsSigEmpty(true);
-    };
-
-    const handleClearReceipt = () => {
-        receiptCanvas.current?.clear();
-        setIsReceiptEmpty(true);
-    };
-
-    const openContractPrintPreview = (fullContractHTML: string, targetWindow?: Window | null) => {
-        // 모바일 기기(PWA/웹뷰)에서는 window.print() 호출 시 앱이 튕기거나(크래시) 오작동할 수 있으므로 인쇄 미리보기를 생략합니다.
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
-        if (isMobile) {
-            if (targetWindow) {
-                try { targetWindow.close(); } catch (_) {}
-            }
-            return;
-        }
-
+    const openContractPrintPreview = (fullContractHTML: string) => {
         try {
-            const printWindow = targetWindow || window.open('', '_blank');
+            const printWindow = window.open('', '_blank');
             const styles = `
-                    /* A4 고정: 용지 밖으로 내용이 짤리지 않도록 페이지 크기·여백을 명시 */
-                    @page { size: A4 portrait; margin: 8mm 10mm; }
-                    *, *::before, *::after { box-sizing: border-box; }
-                    html, body { margin: 0; padding: 0; }
-                    body {
-                        font-family: 'Noto Sans KR', sans-serif;
-                        line-height: 1.6;
-                        color: #1f2937;
-                        -webkit-print-color-adjust: exact;
-                        print-color-adjust: exact;
-                        padding: 0 8mm;
-                    }
-                    body::before {
-                        content: '';
-                        position: fixed;
-                        top: 0;
-                        left: 0;
-                        right: 0;
-                        bottom: 0;
-                        border: 2px solid #1e2a4a;
-                        pointer-events: none;
-                        z-index: 100;
-                    }
-                    body::after {
-                        content: '';
-                        position: fixed;
-                        top: 1.2mm;
-                        left: 1.2mm;
-                        right: 1.2mm;
-                        bottom: 1.2mm;
-                        border: 1px solid #c2a14d;
-                        pointer-events: none;
-                        z-index: 100;
-                    }
-                    img { max-width: 100%; height: auto; }
-                    pre { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
-                    /* 모든 콘텐츠를 인쇄 영역 폭 안으로 제한 → 우측 짤림 방지 */
-                    .contract-wrapper { padding: 0; }
-                    .contract-wrapper, .contract-wrapper * { max-width: 100%; }
-
-                    /* 조항 스타일 컴팩트화 */
-                    .shift-card-container {
-                        margin-top: 6px !important;
-                        margin-bottom: 6px !important;
-                        padding-bottom: 0 !important;
-                    }
-                    .shift-card {
-                        padding: 8px 12px !important;
-                    }
-                    .contract-article {
-                        break-inside: avoid;
-                        page-break-inside: avoid;
-                    }
-
-                    /* 페이지마다 상·하 여백 확보 (관리자 미리보기와 동일한 표 header/footer 스페이서 방식) */
-                    .contract-print-table { width: 100%; border-collapse: collapse; }
-                    .contract-print-table > thead { display: table-header-group; }
-                    .contract-print-table > tfoot { display: table-footer-group; }
-                    .contract-print-spacer { height: 12mm; padding: 0; border: 0; }
-
-                    @media print {
-                        body { margin: 0; padding: 0 8mm; }
-                        .contract-page, [style*="page-break-before: always"] {
-                            page-break-before: always;
-                        }
-                        /* 첫 콘텐츠 앞 빈 페이지 방지 */
-                        .contract-wrapper > :first-child { page-break-before: avoid; }
-                    }
-                `;
-
+                @page { size: A4; margin: 12mm 14mm 14mm 14mm; }
+                * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                html, body { margin: 0; padding: 0; background: #fff; color: #111827; font-family: Pretendard, -apple-system, 'Noto Sans KR', sans-serif; font-size: 11pt; line-height: 1.6; }
+                body::before { content: ''; position: fixed; top: 0; left: 0; right: 0; bottom: 0; border: 2px solid #1e2a4a; pointer-events: none; z-index: 100; }
+                body::after { content: ''; position: fixed; top: 1.2mm; left: 1.2mm; right: 1.2mm; bottom: 1.2mm; border: 1px solid #c2a14d; pointer-events: none; z-index: 100; }
+                img { max-width: 100%; height: auto; }
+                pre { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
+                .contract-wrapper { padding: 0; }
+                .contract-wrapper, .contract-wrapper * { max-width: 100%; }
+                .contract-article { break-inside: avoid; page-break-inside: avoid; }
+                .contract-print-table { width: 100%; border-collapse: collapse; }
+                .contract-print-table > thead { display: table-header-group; }
+                .contract-print-table > tfoot { display: table-footer-group; }
+                .contract-print-spacer { height: 12mm; padding: 0; border: 0; }
+                @media print { body { margin: 0; padding: 0 8mm; } .contract-page, [style*="page-break-before: always"] { page-break-before: always; } .contract-wrapper > :first-child { page-break-before: avoid; } }
+            `;
             const fullHtml = `<html><head><meta charset="utf-8" /><title>계약서_통합본_${user?.name}</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Noto+Serif+KR:wght@300;400;700;900&display=swap" rel="stylesheet"><style>${styles}</style></head><body>${fullContractHTML}</body></html>`;
-
             if (!printWindow) {
                 const iframe = document.createElement('iframe');
-                iframe.setAttribute('aria-hidden', 'true');
-                iframe.style.position = 'fixed';
-                iframe.style.right = '0';
-                iframe.style.bottom = '0';
-                iframe.style.width = '0';
-                iframe.style.height = '0';
-                iframe.style.border = '0';
-                iframe.style.opacity = '0';
-
-                const cleanup = () => {
-                    window.setTimeout(() => {
-                        iframe.remove();
-                    }, 1200);
-                };
-
-                iframe.onload = () => {
-                    const frameWindow = iframe.contentWindow;
-                    if (!frameWindow) {
-                        cleanup();
-                        toast('인쇄 미리보기를 여는 중 오류가 발생했습니다.', 'error');
-                        return;
-                    }
-                    frameWindow.focus();
-                    frameWindow.print();
-                    cleanup();
-                };
-
-                iframe.srcdoc = fullHtml;
-                document.body.appendChild(iframe);
-                return;
+                iframe.style.position = 'fixed'; iframe.style.right = '0'; iframe.style.bottom = '0'; iframe.style.width = '0'; iframe.style.height = '0'; iframe.style.border = '0'; iframe.style.opacity = '0';
+                const cleanup = () => { window.setTimeout(() => { iframe.remove(); }, 1200); };
+                iframe.onload = () => { const frameWindow = iframe.contentWindow; if (!frameWindow) { cleanup(); toast('인쇄 미리보기 오류', 'error'); return; } frameWindow.focus(); frameWindow.print(); cleanup(); };
+                iframe.srcdoc = fullHtml; document.body.appendChild(iframe); return;
             }
+            printWindow.document.open(); printWindow.document.write(fullHtml); printWindow.document.close();
+            window.setTimeout(() => { try { printWindow.print(); printWindow.close(); } catch (e) { console.warn(e); } }, 500);
+        } catch (e) { console.warn(e); }
+    };
 
-            printWindow.document.open();
-            printWindow.document.write(fullHtml);
-            printWindow.document.close();
+    const handleApplySignaturePad = () => {
+        if (!sigCanvas.current || sigCanvas.current.isEmpty()) { toast('서명을 입력해 주세요.', 'warning'); return; }
+        setSignatureDataUrl(sigCanvas.current.toDataURL('image/png'));
+        setActivePadModal(null);
+        toast('근로자 서명이 등록되었습니다.', 'success');
+    };
 
-            window.setTimeout(() => {
-                try {
-                    printWindow.print();
-                    printWindow.close();
-                } catch (error) {
-                    console.warn('Contract print preview failed:', error);
-                }
-            }, 500);
-        } catch (error) {
-            console.warn('Contract print preview failed:', error);
-        }
+    const handleApplyReceiptPad = () => {
+        if (!receiptCanvas.current || receiptCanvas.current.isEmpty()) { toast("'교부 받음'을 자필로 작성해 주세요.", 'warning'); return; }
+        setReceiptTraceDataUrl(receiptCanvas.current.toDataURL('image/png'));
+        setActivePadModal(null);
+        toast('교부확인 자필이 등록되었습니다.', 'success');
     };
 
     const handleSubmit = async () => {
         if (submitLockRef.current || isGenerating) return;
-        if (isSigEmpty || sigCanvas.current?.isEmpty()) {
-            return toast('서명을 완료해 주세요.', 'warning');
-        }
-        if (isReceiptEmpty || receiptCanvas.current?.isEmpty()) {
-            return toast("교부확인란에 '교부 받음'을 자필로 작성해 주세요.", 'warning');
-        }
-
-        submitLockRef.current = true;
-        setIsGenerating(true);
+        if (!isPrivacyValid || !allAgreed || !signatureDataUrl || !receiptTraceDataUrl) return toast('모든 필수 항목을 완료해 주세요.', 'warning');
+        submitLockRef.current = true; setIsGenerating(true);
         try {
-            // react-signature-canvas v1.1.0-alpha부터 getTrimmedCanvas 제거 → toDataURL 직접 호출
-            const signatureData = sigCanvas.current?.toDataURL('image/png');
-            if (!signatureData) {
-                toast('서명을 다시 시도해 주세요.', 'error');
-                return;
-            }
-            // 교부확인('교부 받음') 자필 — 최종 서명 단계에서 함께 작성되어 계약서에 삽입된다.
-            const receiptTraceData = receiptCanvas.current?.toDataURL('image/png');
-            if (!receiptTraceData) {
-                toast("'교부 받음' 자필을 다시 시도해 주세요.", 'error');
-                return;
-            }
-
-            // 1. 전체 통합 HTML 구성 (인쇄 및 저장용)
-            // - 계약서 본문
-            // - 동의 항목 리스트 (서명 포함)
-            // - 비밀유지서약서 (서명 포함)
             const today = new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric' });
-
             const agreementsSection = `
                 <div style="page-break-before: always; padding: 40px; font-family: sans-serif;">
                     <h2 style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px;">주요 계약 조항 동의서</h2>
                     <div style="margin-top: 30px;">
-                        ${REQUIRED_AGREEMENTS.map(item => `
-                            <div style="margin-bottom: 15px; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                                <p style="font-weight: bold; margin: 0;">[동의] ${item.title}</p>
-                                <p style="font-size: 12px; color: #666; margin: 5px 0 0 0;">${item.desc}</p>
-                            </div>
-                        `).join('')}
+                        ${REQUIRED_AGREEMENTS.map(item => `<div style="margin-bottom: 15px; padding: 10px; border: 1px solid #ddd; border-radius: 8px;"><p style="font-weight: bold; margin: 0;">[동의] ${item.title}</p><p style="font-size: 12px; color: #666; margin: 5px 0 0 0;">${item.desc}</p></div>`).join('')}
                     </div>
-                    <div style="margin-top: 50px; text-align: right;">
-                        <p style="font-weight: bold;">위 항목들에 대해 충분히 설명 듣고 동의함</p>
-                        <div style="display: inline-block; vertical-align: middle;">
-                            <span style="font-weight: bold; margin-right: 10px;">근로자: ${user?.name}</span>
-                            <img src="${signatureData}" style="width: 100px; height: auto; border-bottom: 1px solid #000;" />
-                        </div>
+                    <div style="margin-top: 50px; text-align: right;"><p style="font-weight: bold;">위 항목들에 대해 충분히 설명 듣고 동의함</p>
+                        <div style="display: inline-block; vertical-align: middle;"><span style="font-weight: bold; margin-right: 10px;">근로자: ${user?.name}</span><img src="${signatureDataUrl}" style="width: 100px; height: auto; border-bottom: 1px solid #000;" /></div>
                         <p style="margin-top: 20px;">${today}</p>
                     </div>
-                </div>
-            `;
-
-            // 비밀유지서약서 본문은 관리자 미리보기(React 컴포넌트)와 동일한 공유 소스 사용
-            const confidentialitySection = buildConfidentialityPledgePrintHTML({
-                companyName: company?.name || user?.company || '',
-                employeeName: user?.name || '',
-                contractDate: today,
-                signatureDataUrl: signatureData });
-
+                </div>`;
+            const confidentialitySection = buildConfidentialityPledgePrintHTML({ companyName: company?.name || user?.company || '', employeeName: user?.name || '', contractDate: today, signatureDataUrl: signatureDataUrl });
             const { mainText: strippedTemplate } = stripContractClosingLines(localTemplateText);
             const bodyText = strippedTemplate || localTemplateText;
-            const closingHTML = buildClosingPrintHTML({
-                ...closingData,
-                signatureDataUrl: signatureData,
-                receiptTraceDataUrl: receiptTraceData });
-
+            const closingHTML = buildClosingPrintHTML({ ...closingData, signatureDataUrl: signatureDataUrl, receiptTraceDataUrl: receiptTraceDataUrl });
             let resolvedBodyText = bodyText;
             if (privacyConsent !== null) {
-                // 개인정보 동의 선택 결과를 본문에 체크표시(☑/□)로 반영한다.
-                // 템플릿마다 '□ 동의' 와 '□ 동의하지 않음' 사이 공백 수가 달라도 매칭되도록 정규식 사용.
-                const agreeMark = privacyConsent ? '☑' : '□';
-                const declineMark = privacyConsent ? '□' : '☑';
-                resolvedBodyText = resolvedBodyText.replace(
-                    /□\s*동의\s+□\s*동의하지\s*않음/,
-                    `${agreeMark} 동의    ${declineMark} 동의하지 않음`,
-                );
+                resolvedBodyText = resolvedBodyText.replace(/□\s*동의\s+□\s*동의하지\s*않음/, `${privacyConsent ? '☑' : '□'} 동의    ${privacyConsent ? '□' : '☑'} 동의하지 않음`);
             }
-
             const bodyHTML = buildContractBodyPrintHTML(resolvedBodyText);
-
-            // 비밀유지서약서와 주요 조항 동의서는 각각 별도의 tr 행으로 분리하여 인쇄 시 뒷장으로 깔끔하게 넘어가도록 처리한다.
-            const fullContractHTML = `
-                <table class="contract-print-table" style="width:100%; border-collapse:collapse;">
-                    <thead><tr><td class="contract-print-spacer"></td></tr></thead>
-                    <tbody>
-                      <tr>
-                        <td style="padding:0; margin:0; border:0;">
-                          <div class="contract-wrapper">
-                            <div class="contract-page">
-                                ${bodyHTML}
-                                ${closingHTML}
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr style="page-break-before:always; break-before:page;">
-                        <td style="padding:0; margin:0; border:0;">
-                          <div class="contract-wrapper">
-                            <div class="contract-page">
-                                ${confidentialitySection}
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr style="page-break-before:always; break-before:page;">
-                        <td style="padding:0; margin:0; border:0;">
-                          <div class="contract-wrapper">
-                            ${agreementsSection}
-                          </div>
-                        </td>
-                      </tr>
-                    </tbody>
-                    <tfoot><tr><td class="contract-print-spacer"></td></tr></tfoot>
-                </table>
-            `;
-
-            await Promise.resolve(onSuccess(signatureData, fullContractHTML, receiptTraceData, privacyConsent));
-            try {
-                openContractPrintPreview(fullContractHTML);
-            } catch (printError) {
-                console.warn('Failed to open contract print preview:', printError);
-            }
-        } catch (error) {
-            console.error(error);
-            toast(error instanceof Error ? error.message : "서류 생성 중 오류가 발생했습니다.", 'error');
-        } finally {
-            submitLockRef.current = false;
-            setIsGenerating(false);
-        }
+            const fullContractHTML = `<table class="contract-print-table" style="width:100%; border-collapse:collapse;"><thead><tr><td class="contract-print-spacer"></td></tr></thead><tbody><tr><td style="padding:0; margin:0; border:0;"><div class="contract-wrapper"><div class="contract-page">${bodyHTML}${closingHTML}</div></div></td></tr><tr style="page-break-before:always; break-before:page;"><td style="padding:0; margin:0; border:0;"><div class="contract-wrapper"><div class="contract-page">${confidentialitySection}</div></div></td></tr><tr style="page-break-before:always; break-before:page;"><td style="padding:0; margin:0; border:0;"><div class="contract-wrapper">${agreementsSection}</div></td></tr></tbody><tfoot><tr><td class="contract-print-spacer"></td></tr></tfoot></table>`;
+            await Promise.resolve(onSuccess(signatureDataUrl, fullContractHTML, receiptTraceDataUrl, privacyConsent));
+            openContractPrintPreview(fullContractHTML);
+        } catch (e) { console.error(e); toast('서류 생성 중 오류가 발생했습니다.', 'error'); } finally { submitLockRef.current = false; setIsGenerating(false); }
     };
 
     return (
-        <div data-testid="contract-signature-modal" className="fixed inset-0 z-[1200] flex items-center justify-center md:p-4 p-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-[var(--card)] w-full h-[100dvh] md:h-auto md:max-h-[90vh] max-w-2xl md:border-2 md:border-[var(--border)] md:rounded-2xl shadow-sm overflow-hidden flex flex-col">
-
-                <div
-                    className="px-4 pb-3 border-b border-[var(--border)] flex items-center justify-between bg-[var(--tab-bg)] shrink-0"
-                    style={{
-                        // .mso-mobile 내부 fixed 모달은 셸이 이미 sat 반영 — 이중 padding 금지
-                        paddingTop: 12,
-                    }}
-                >
+        <div data-testid="contract-signature-modal" className="fixed inset-0 z-[1200] flex items-center justify-center md:p-4 p-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 font-sans">
+            <div className="bg-slate-50 w-full h-[100dvh] md:h-[92vh] max-w-3xl md:border md:border-slate-300 md:rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+                <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-white shrink-0" style={{ paddingTop: 12 }}>
                     <div className="min-w-0 pr-2">
-                        <span className="px-2.5 py-1 text-[11px] font-bold text-blue-700 bg-blue-500/20 rounded-lg mb-1.5 inline-block">
-                            전자서명 진행 중 · {step}/4
-                        </span>
-                        <h2 className="text-[18px] md:text-xl font-extrabold tracking-tight text-[var(--foreground)] truncate">
-                            {contract?.contract_type || '표준근로계약서'}
-                        </h2>
+                        <div className="flex items-center gap-2 mb-1"><span className="px-2.5 py-0.5 text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 rounded-full inline-block">전자계약 체결</span><span className="text-[11.5px] font-medium text-slate-500">{isAllReadyToSubmit ? '✅ 모든 필수 입력 완료' : '필수 서명 및 동의를 진행해 주세요'}</span></div>
+                        <h2 className="text-[17px] md:text-[19px] font-extrabold tracking-tight text-slate-900 truncate">{contract?.contract_type || '근로계약서'}</h2>
                     </div>
+                    <button onClick={() => { if (!isGenerating) toast('서명을 완료해야 계약이 확정됩니다.', 'info'); onClose(); }} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:text-red-600 hover:bg-red-50 border border-slate-200 transition-colors cursor-pointer" aria-label="닫기"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                </div>
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-3.5 md:p-6 space-y-6">
+                    <div className="bg-white p-5 md:p-7 border border-slate-200 rounded-2xl shadow-sm space-y-6">
+                        {isTemplateLoading ? (
+                            <div className="min-h-[280px] flex flex-col items-center justify-center gap-3 text-center"><div className="w-8 h-8 rounded-full border-2 border-blue-200 border-t-blue-600 animate-spin" /><p className="text-[13.5px] font-bold text-slate-800">계약서 내용을 불러오는 중입니다.</p></div>
+                        ) : (
+                            <><div className="text-center pb-4 border-b border-slate-100"><h1 className="text-[20px] md:text-[22px] font-black text-slate-900 tracking-wider">근 로 계 약 서</h1></div><ContractBodyBlock templateText={localTemplateText} privacyConsent={privacyConsent} onPrivacyConsentChange={setPrivacyConsent} isInteractive={true} /></>
+                        )}
+                    </div>
+                    <div className="bg-white p-5 md:p-6 border border-slate-200 rounded-2xl shadow-sm space-y-3.5">
+                        <div className="flex items-center justify-between pb-2 border-b border-slate-100"><div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-blue-600" /><h3 className="text-[14.5px] font-extrabold text-slate-900">주요 계약 조항 확인 및 동의</h3></div><button type="button" onClick={handleToggleAllAgreements} className="text-[12px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1 rounded-lg">{allAgreed ? '전체 해제' : '전체 동의하기'}</button></div>
+                        {REQUIRED_AGREEMENTS.map((item) => {
+                            const checked = Boolean(agreements[item.id]);
+                            return (
+                                <label key={item.id} className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer ${checked ? 'bg-blue-50/60 border-blue-300' : 'bg-slate-50 border-slate-200'}`}>
+                                    <div className="pt-0.5 shrink-0"><input type="checkbox" checked={checked} onChange={(e) => setAgreements({ ...agreements, [item.id]: e.target.checked })} className="sr-only" /><span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center ${checked ? 'bg-blue-600 border-blue-600' : 'border-slate-400 bg-white'}`}>{checked && <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}</span></div>
+                                    <div><p className={`text-[13.5px] font-bold ${checked ? 'text-blue-900' : 'text-slate-800'}`}>{item.title}</p><p className="text-[11.5px] text-slate-500">{item.desc}</p></div>
+                                </label>
+                            );
+                        })}
+                    </div>
+                    <div className="bg-white p-5 md:p-6 border border-slate-200 rounded-2xl shadow-sm space-y-3">
+                        <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                            <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+                            <h3 className="text-[14.5px] font-extrabold text-slate-900">비밀유지 및 정보보호 서약서</h3>
+                        </div>
+                        <p className="text-[12.5px] text-slate-700 leading-relaxed">
+                            {CONFIDENTIALITY_PLEDGE_INTRO_PREFIX}
+                            <span className="font-bold text-slate-900">{company?.name || user?.company || '회사'}</span>
+                            {CONFIDENTIALITY_PLEDGE_INTRO_SUFFIX}
+                        </p>
+                        <div className="space-y-2 p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-[12px] text-slate-600 leading-relaxed">
+                            {CONFIDENTIALITY_PLEDGE_CLAUSES.map((clause, ci) => (
+                                <div key={ci} className="space-y-0.5">
+                                    <p className="font-bold text-slate-800">{clause.title}</p>
+                                    <p className="pl-2 border-l border-slate-300 text-slate-600">{clause.body}</p>
+                                </div>
+                            ))}
+                        </div>
+                        <p className="text-[12.5px] font-bold text-slate-800 text-center pt-1">
+                            {CONFIDENTIALITY_PLEDGE_AFFIRMATION}
+                        </p>
+                    </div>
+                    <div className="bg-white p-5 md:p-6 border border-slate-200 rounded-2xl shadow-sm">
+                        <h3 className="text-[14.5px] font-extrabold text-slate-900 pb-3">계약 당사자 확인 및 서명</h3>
+                        <ContractClosingBlock {...closingData} signatureDataUrl={signatureDataUrl} receiptTraceDataUrl={receiptTraceDataUrl} isInteractive={true} onOpenSignature={() => { setIsPadEmpty(true); setActivePadModal('signature'); }} onOpenReceipt={() => { setIsPadEmpty(true); setActivePadModal('receipt'); }} />
+                    </div>
+                </div>
+                <div className="p-4 bg-white border-t border-slate-200 shrink-0 shadow-lg flex flex-col md:flex-row items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                        <span className={`px-2.5 py-1 text-[11.5px] font-bold rounded-lg border flex items-center gap-1 ${
+                            isPrivacyValid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'
+                        }`}>
+                            <span>{isPrivacyValid ? '✓' : '•'}</span> 개인정보동의
+                        </span>
+                        <span className={`px-2.5 py-1 text-[11.5px] font-bold rounded-lg border flex items-center gap-1 ${
+                            allAgreed ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'
+                        }`}>
+                            <span>{allAgreed ? '✓' : '•'}</span> 주요조항 ({agreedCount}/7)
+                        </span>
+                        <span className={`px-2.5 py-1 text-[11.5px] font-bold rounded-lg border flex items-center gap-1 ${
+                            isSignatureDone ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'
+                        }`}>
+                            <span>{isSignatureDone ? '✓' : '•'}</span> 근로자서명
+                        </span>
+                        <span className={`px-2.5 py-1 text-[11.5px] font-bold rounded-lg border flex items-center gap-1 ${
+                            isReceiptDone ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'
+                        }`}>
+                            <span>{isReceiptDone ? '✓' : '•'}</span> 교부확인
+                        </span>
+                    </div>
+
                     <button
-                        onClick={() => {
-                            // 서명 대기 중 단순 닫기 시 안내 — 완전 이탈은 가능하되 재진입 유도
-                            if (step >= 1 && !isGenerating) {
-                                toast('서명을 완료해야 계약이 확정됩니다. 내정보에서 다시 열 수 있습니다.', 'warning');
-                            }
-                            onClose();
-                        }}
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--card)] text-[var(--toss-gray-4)] hover:text-red-500 border border-[var(--border)] transition-colors"
-                        aria-label="닫기"
+                        data-testid="contract-signature-submit-button"
+                        type="button"
+                        onClick={handleSubmit}
+                        disabled={!isAllReadyToSubmit || isGenerating}
+                        className={`w-full md:w-auto md:min-w-[240px] py-3.5 px-6 rounded-xl font-bold text-[14.5px] shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] ${
+                            isAllReadyToSubmit && !isGenerating
+                                ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                : 'bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed shadow-none'
+                        }`}
                     >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        {isGenerating ? (
+                            <>
+                                <span className="inline-block h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                                <span>계약서 생성 및 저장 중…</span>
+                            </>
+                        ) : (
+                            <>
+                                <span>✍️</span>
+                                <span>전자서명 제출 및 계약 완료</span>
+                            </>
+                        )}
                     </button>
                 </div>
+            </div>
 
-                <div className="flex bg-[var(--tab-bg)] h-2 shrink-0">
-                    <div className="bg-blue-600 transition-all duration-300 rounded-r-full" style={{ width: `${(step / 4) * 100}%` }} />
-                </div>
-
-                <div className={`flex-1 overflow-y-auto custom-scrollbar bg-[var(--page-bg)] ${step === 4 ? 'p-3 md:p-5' : 'p-4 md:p-5'}`}>
-
-                    {step === 1 && (
-                        <div className="space-y-4 animate-in slide-in-from-right-4">
-                            <div className="text-center mb-4">
-                                <span className="text-4xl block mb-2">📄</span>
-                                <h3 className="text-lg font-bold text-[var(--foreground)]">계약서 내용을 꼼꼼히 확인해 주세요</h3>
-                                <p className="text-xs text-[var(--toss-gray-4)] font-bold mt-1">하단으로 끝까지 스크롤하여 모든 내용을 확인해야 합니다.</p>
+            {/* ─── 서명 패드 팝업 모달 ─── */}
+            {activePadModal === 'signature' && (
+                <div className="fixed inset-0 z-[1300] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200 font-sans">
+                    <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+                        <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                            <div>
+                                <h3 className="text-[15px] font-extrabold text-slate-900">근로자 전자서명</h3>
+                                <p className="text-[11px] text-slate-500">서명 패드에 정자로 서명해 주세요.</p>
                             </div>
-
-                            <div className="bg-[var(--card)] p-4 md:p-5 border border-[var(--border)] max-h-[50vh] md:max-h-[55vh] overflow-y-auto custom-scrollbar shadow-inner rounded-2xl" style={{ fontFamily: 'Noto Sans KR, sans-serif' }}>
-                                {isTemplateLoading ? (
-                                    <div className="min-h-[280px] flex flex-col items-center justify-center gap-3 text-center">
-                                        <div className="w-8 h-8 rounded-full border-2 border-blue-200 border-t-blue-600 animate-spin" />
-                                        <p className="text-[13px] font-bold text-[var(--foreground)]">계약서 내용을 불러오는 중입니다.</p>
-                                        <p className="text-[11px] text-[var(--toss-gray-4)]">잠시만 기다려 주세요.</p>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <ContractBodyBlock
-                                            templateText={localTemplateText}
-                                            privacyConsent={privacyConsent}
-                                            onPrivacyConsentChange={setPrivacyConsent}
-                                            isInteractive={true}
-                                        />
-                                        <ContractClosingBlock {...closingData} />
-                                    </>
-                                )}
-                            </div>
-
-                            {/* 개인정보 수집·이용 동의 확인 카드 (본문 파싱 누락 방지 및 모바일 직관성 확보) */}
-                            <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200">
-                                <div className="flex items-center justify-between gap-2 mb-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-blue-600" />
-                                        <span className="text-[13.5px] font-extrabold text-blue-900">제11조 개인정보 수집·이용 동의</span>
-                                    </div>
-                                    <span className="text-[11px] font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">필수 선택</span>
-                                </div>
-                                <p className="text-[11.5px] text-blue-800/80 mb-3 leading-relaxed">
-                                    인적자원관리, 4대보험 및 세무대행, 법률자문 등을 위한 개인정보 수집·이용에 동의하십니까?
-                                </p>
-                                <div className="flex items-center gap-3">
-                                    <label
-                                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border-2 cursor-pointer transition-all select-none ${
-                                            privacyConsent === true
-                                                ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
-                                                : 'bg-white border-blue-200 text-blue-900 hover:bg-blue-50'
-                                        }`}
-                                    >
-                                        <input
-                                            type="radio"
-                                            name="privacyConsentExplicit"
-                                            checked={privacyConsent === true}
-                                            onChange={() => setPrivacyConsent(true)}
-                                            className="sr-only"
-                                        />
-                                        <span className="text-[13px] font-extrabold">동의함</span>
-                                    </label>
-                                    <label
-                                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border-2 cursor-pointer transition-all select-none ${
-                                            privacyConsent === false
-                                                ? 'bg-red-600 border-red-600 text-white shadow-sm'
-                                                : 'bg-white border-blue-200 text-slate-700 hover:bg-red-50'
-                                        }`}
-                                    >
-                                        <input
-                                            type="radio"
-                                            name="privacyConsentExplicit"
-                                            checked={privacyConsent === false}
-                                            onChange={() => setPrivacyConsent(false)}
-                                            className="sr-only"
-                                        />
-                                        <span className="text-[13px] font-extrabold">동의하지 않음</span>
-                                    </label>
-                                </div>
-                            </div>
-
+                            <button
+                                type="button"
+                                onClick={() => setActivePadModal(null)}
+                                className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+                            >
+                                ✕
+                            </button>
                         </div>
-                    )}
 
-                    {step === 2 && (
-                        <div className="space-y-4 animate-in slide-in-from-right-4">
-                            <div className="text-center mb-4">
-                                <span className="text-3xl block mb-2">✅</span>
-                                <h3 className="text-lg font-bold text-[var(--foreground)]">주요 계약 조항 확인 및 동의</h3>
-                            </div>
-
-                            <div className="space-y-2.5">
-                                {REQUIRED_AGREEMENTS.map((item) => (
-                                    <label
-                                        key={item.id}
-                                        className={`flex items-start gap-3 p-4 rounded-2xl border-2 transition-all cursor-pointer active:scale-[0.995] ${agreements[item.id]
-                                            ? 'bg-blue-500/10 border-blue-500 shadow-sm'
-                                            : 'bg-[var(--card)] border-[var(--border-subtle)] hover:border-[var(--border)]'
-                                            }`}
-                                    >
-                                        <div className="pt-0.5 shrink-0">
-                                            <input
-                                                data-testid={`contract-agreement-${item.id}`}
-                                                type="checkbox"
-                                                checked={!!agreements[item.id]}
-                                                onChange={(e) => setAgreements({ ...agreements, [item.id]: e.target.checked })}
-                                                className="w-6 h-6 rounded-md border-[var(--border)] text-blue-600 focus:ring-blue-500"
-                                            />
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className={`text-[14px] font-extrabold leading-snug ${agreements[item.id] ? 'text-blue-700' : 'text-[var(--foreground)]'}`}>
-                                                {item.title}
-                                            </p>
-                                            <p className="text-[12px] font-medium text-[var(--toss-gray-4)] mt-1 leading-relaxed">
-                                                {item.desc}
-                                            </p>
-                                        </div>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {step === 3 && (
-                        <div className="space-y-4 animate-in slide-in-from-right-4">
-                            <div className="text-center mb-4">
-                                <span className="text-3xl block mb-2">📜</span>
-                                <h2 className="text-lg font-black tracking-widest underline underline-offset-4">비 밀 유 지 서 약 서</h2>
-                            </div>
-
-                            <div className="bg-[var(--tab-bg)] border border-[var(--border)] p-4 rounded-xl font-serif text-[11px] leading-[1.8] text-[var(--foreground)] overflow-y-auto max-h-[300px] custom-scrollbar">
-                                <p className="mb-4 font-bold">
-                                    {CONFIDENTIALITY_PLEDGE_INTRO_PREFIX}
-                                    <span className="font-bold text-[var(--foreground)]">{String(company?.name || user?.company || '회사')}</span>
-                                    {CONFIDENTIALITY_PLEDGE_INTRO_SUFFIX}
-                                </p>
-                                <div className="space-y-4">
-                                    {CONFIDENTIALITY_PLEDGE_CLAUSES.map((clause, idx) => (
-                                        <div key={idx} className="space-y-1">
-                                            <p className="font-bold text-[12px] text-[var(--foreground)]">{clause.title}</p>
-                                            <p className="text-[var(--toss-gray-5)] pl-2.5 border-l-2 border-[var(--border-subtle)] leading-relaxed">{clause.body}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <label className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl cursor-pointer hover:bg-emerald-100 transition-colors active:scale-[0.995]">
-                                <input data-testid="contract-confidentiality-checkbox" type="checkbox" checked={agreements['confidentiality'] || false} onChange={e => setAgreements({ ...agreements, confidentiality: e.target.checked })} className="w-6 h-6 shrink-0 rounded-md border-emerald-300 text-emerald-600 focus:ring-emerald-500" />
-                                <span className="text-[14px] font-extrabold text-emerald-800 leading-snug">{CONFIDENTIALITY_PLEDGE_AFFIRMATION}</span>
-                            </label>
-                        </div>
-                    )}
-
-                    {step === 4 && (
-                        <div className="flex flex-col gap-3 animate-in slide-in-from-right-4">
-                            <div className="rounded-2xl bg-[var(--card)] border border-[var(--border)] px-3.5 py-2.5">
-                                <p className="text-[15px] font-extrabold text-[var(--foreground)]">최종 전자서명</p>
-                                <p className="text-[12px] font-semibold text-[var(--toss-gray-4)] mt-0.5 leading-snug">
-                                    아래 1번(서명)과 2번(교부확인)을 손가락으로 각각 작성해 주세요.
-                                </p>
-                            </div>
-
-                            {/* 1. 전자서명 패드 */}
-                            <section className="rounded-2xl bg-[var(--card)] border border-[var(--border)] overflow-hidden shadow-sm">
-                                <div className="flex items-center justify-between gap-2 px-3.5 py-2 bg-blue-50/90 border-b border-blue-100">
-                                    <div className="flex items-center gap-2">
-                                        <span className={`w-2 h-2 rounded-full ${isSigEmpty ? 'bg-amber-500' : 'bg-blue-600'}`} />
-                                        <p className="text-[13.5px] font-extrabold text-blue-900">1. 전자서명 (성함)</p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={handleClearSignature}
-                                        className="shrink-0 px-3 py-1 rounded-lg bg-white border border-blue-200 text-[11.5px] font-extrabold text-blue-700 active:scale-[0.98]"
-                                    >
-                                        다시 쓰기
-                                    </button>
-                                </div>
-                                <div
-                                    ref={sigContainerRef}
-                                    data-testid="contract-signature-canvas"
-                                    className="relative bg-white overflow-hidden"
-                                    style={{
-                                        height: 'min(24vh, 180px)',
-                                        minHeight: 140,
-                                        touchAction: 'none',
-                                        backgroundImage:
-                                            'linear-gradient(to bottom, transparent 0, transparent calc(100% - 30px), rgba(37,99,235,0.12) calc(100% - 30px), rgba(37,99,235,0.12) calc(100% - 28px), transparent calc(100% - 28px))',
-                                    }}
-                                >
-                                    <SignatureCanvas
-                                        ref={sigCanvas}
-                                        penColor="#0f172a"
-                                        minWidth={1.8}
-                                        maxWidth={3.6}
-                                        canvasProps={{
-                                            width: sigWidth,
-                                            height: sigHeight,
-                                            className: 'w-full h-full cursor-crosshair',
-                                            style: { touchAction: 'none', display: 'block', width: '100%', height: '100%' },
-                                        }}
-                                        onBegin={() => setIsSigEmpty(false)}
-                                        onEnd={() => setIsSigEmpty(sigCanvas.current?.isEmpty() ?? true)}
-                                    />
-                                    {isSigEmpty && (
-                                        <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center gap-1 text-slate-300">
-                                            <span className="text-[24px] leading-none opacity-60">✍️</span>
-                                            <span className="text-[12.5px] font-extrabold tracking-wide">여기에 성함을 서명하세요</span>
-                                        </div>
-                                    )}
-                                    {!isSigEmpty && (
-                                        <span className="absolute right-2.5 top-2 rounded-md bg-blue-600 px-2 py-0.5 text-[10px] font-extrabold text-white pointer-events-none">
-                                            작성 완료 ✓
-                                        </span>
-                                    )}
-                                </div>
-                            </section>
-
-                            {/* 2. 교부확인 패드 */}
-                            <section className="rounded-2xl bg-[var(--card)] border border-[var(--border)] overflow-hidden shadow-sm">
-                                <div className="flex items-center justify-between gap-2 px-3.5 py-2 bg-emerald-50/90 border-b border-emerald-100">
-                                    <div className="flex items-center gap-2">
-                                        <span className={`w-2 h-2 rounded-full ${isReceiptEmpty ? 'bg-amber-500' : 'bg-emerald-600'}`} />
-                                        <p className="text-[13.5px] font-extrabold text-emerald-900">2. 교부확인 (「교부 받음」 자필)</p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={handleClearReceipt}
-                                        className="shrink-0 px-3 py-1 rounded-lg bg-white border border-emerald-200 text-[11.5px] font-extrabold text-emerald-700 active:scale-[0.98]"
-                                    >
-                                        다시 쓰기
-                                    </button>
-                                </div>
-                                <div
-                                    ref={receiptContainerRef}
-                                    data-testid="contract-receipt-canvas"
-                                    className="relative bg-white overflow-hidden"
-                                    style={{
-                                        height: 'min(20vh, 150px)',
-                                        minHeight: 120,
-                                        touchAction: 'none',
-                                        backgroundImage:
-                                            'linear-gradient(to bottom, transparent 0, transparent calc(100% - 28px), rgba(16,185,129,0.18) calc(100% - 28px), rgba(16,185,129,0.18) calc(100% - 26px), transparent calc(100% - 26px))',
-                                    }}
-                                >
-                                    <SignatureCanvas
-                                        ref={receiptCanvas}
-                                        penColor="#0f172a"
-                                        minWidth={1.8}
-                                        maxWidth={3.6}
-                                        canvasProps={{
-                                            width: receiptWidth,
-                                            height: receiptHeight,
-                                            className: 'w-full h-full cursor-crosshair',
-                                            style: { touchAction: 'none', display: 'block', width: '100%', height: '100%' },
-                                        }}
-                                        onBegin={() => setIsReceiptEmpty(false)}
-                                        onEnd={() => setIsReceiptEmpty(receiptCanvas.current?.isEmpty() ?? true)}
-                                    />
-                                    {isReceiptEmpty && (
-                                        <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center gap-1 text-emerald-400">
-                                            <span className="text-[20px] font-black tracking-[0.18em]">교부 받음</span>
-                                            <span className="text-[11px] font-bold opacity-80">위 글자를 따라 써 주세요</span>
-                                        </div>
-                                    )}
-                                    {!isReceiptEmpty && (
-                                        <span className="absolute right-2.5 top-2 rounded-md bg-emerald-600 px-2 py-0.5 text-[10px] font-extrabold text-white pointer-events-none">
-                                            작성 완료 ✓
-                                        </span>
-                                    )}
-                                </div>
-                            </section>
-
-                            <div className="rounded-xl bg-blue-50 border border-blue-100 px-3.5 py-2.5 text-[11.5px] font-bold text-blue-700 leading-relaxed text-center">
-                                이 전자 서명은 인감 날인과 동일한 법적 효력을 가집니다.
-                                {(isSigEmpty || isReceiptEmpty) && (
-                                    <span className="block mt-0.5 text-[11px] text-amber-700 font-extrabold">
-                                        {isSigEmpty && isReceiptEmpty
-                                            ? '⚠️ 1번 전자서명과 2번 교부확인을 모두 작성해 주세요.'
-                                            : isSigEmpty
-                                                ? '⚠️ 1번 전자서명을 작성해 주세요.'
-                                                : '⚠️ 2번 교부확인(교부 받음)을 작성해 주세요.'}
+                        <div className="p-5 flex flex-col items-center">
+                            <div
+                                ref={padContainerRef}
+                                className="w-full h-48 bg-slate-50 border-2 border-dashed border-blue-300 rounded-xl relative overflow-hidden flex items-center justify-center shadow-inner"
+                            >
+                                <SignatureCanvas
+                                    ref={sigCanvas}
+                                    canvasProps={{
+                                        width: padWidth,
+                                        height: padHeight,
+                                        className: 'touch-none cursor-crosshair w-full h-full block' }}
+                                    backgroundColor="rgba(255, 255, 255, 0)"
+                                    penColor="#1e293b"
+                                    onBegin={() => setIsPadEmpty(false)}
+                                />
+                                {isPadEmpty && (
+                                    <span className="absolute text-[13px] font-medium text-slate-400 select-none pointer-events-none">
+                                        이곳에 서명해 주세요
                                     </span>
                                 )}
                             </div>
                         </div>
-                    )}
 
-                </div>
-
-                <div
-                    className="border-t border-[var(--border)] bg-[var(--card)] shrink-0"
-                    style={{
-                        padding: '12px 16px',
-                        paddingBottom: 'max(12px, env(safe-area-inset-bottom, 0px))',
-                    }}
-                >
-                    <div className="flex gap-2.5 md:gap-3">
-                        {step > 1 && (
+                        <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
                             <button
-                                data-testid="contract-signature-prev-button"
-                                onClick={() => setStep((s) => s - 1)}
-                                className="min-h-[52px] md:min-h-[48px] px-4 md:px-5 rounded-2xl bg-[var(--tab-bg)] text-[var(--toss-gray-5)] font-extrabold text-[14px] md:text-[13px] border border-[var(--border)] active:scale-[0.98]"
+                                type="button"
+                                onClick={() => {
+                                    sigCanvas.current?.clear();
+                                    setIsPadEmpty(true);
+                                }}
+                                className="py-2.5 px-4 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold text-[13px] hover:bg-slate-100 cursor-pointer"
                             >
-                                이전
+                                다시 쓰기
                             </button>
-                        )}
-
-                        {step < 4 ? (
                             <button
-                                data-testid="contract-signature-next-button"
-                                onClick={handleNext}
-                                disabled={step === 1 && (!isTemplateReady || isTemplateLoading)}
-                                className={`flex-1 min-h-[52px] md:min-h-[48px] px-4 rounded-2xl text-white font-extrabold text-[15px] md:text-[14px] shadow-md transition-all flex items-center justify-center gap-2 active:scale-[0.98] ${
-                                    step === 1 && (!isTemplateReady || isTemplateLoading)
-                                        ? 'bg-[var(--border)] cursor-not-allowed opacity-60'
-                                        : 'bg-[var(--accent)] hover:bg-blue-600'
-                                }`}
+                                type="button"
+                                onClick={handleApplySignaturePad}
+                                className="flex-1 py-2.5 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-[13.5px] shadow-sm cursor-pointer"
                             >
-                                확인 및 다음 단계
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                                </svg>
+                                서명 등록 완료
                             </button>
-                        ) : (
-                            <button
-                                data-testid="contract-signature-submit-button"
-                                onClick={handleSubmit}
-                                disabled={isSigEmpty || isReceiptEmpty || isGenerating}
-                                className={`flex-1 min-h-[56px] md:min-h-[52px] px-4 rounded-2xl text-white font-black text-[16px] md:text-[15px] shadow-lg transition-all flex items-center justify-center gap-2 active:scale-[0.98] ${
-                                    isSigEmpty || isReceiptEmpty || isGenerating
-                                        ? 'bg-[var(--border)] cursor-not-allowed opacity-60 shadow-none'
-                                        : 'bg-emerald-600 hover:bg-emerald-700'
-                                }`}
-                            >
-                                {isGenerating ? (
-                                    <>
-                                        <span className="inline-block h-5 w-5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                                        서류 생성 중...
-                                    </>
-                                ) : (
-                                    <>
-                                        <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                        </svg>
-                                        최종 서명 및 저장
-                                    </>
-                                )}
-                            </button>
-                        )}
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
+
+            {/* ─── 교부확인 자필 팝업 모달 ─── */}
+            {activePadModal === 'receipt' && (
+                <div className="fixed inset-0 z-[1300] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200 font-sans">
+                    <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+                        <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                            <div>
+                                <h3 className="text-[15px] font-extrabold text-slate-900">근로계약서 교부확인 자필</h3>
+                                <p className="text-[11px] text-slate-500">'교부 받음' 글자를 따라 정자로 작성해 주세요.</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setActivePadModal(null)}
+                                className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="p-5 flex flex-col items-center">
+                            <div
+                                ref={padContainerRef}
+                                className="w-full h-40 bg-slate-50 border-2 border-dashed border-indigo-300 rounded-xl relative overflow-hidden flex items-center justify-center shadow-inner"
+                            >
+                                <span className="absolute text-[24px] font-extrabold tracking-[0.35em] text-slate-300 select-none pointer-events-none">
+                                    교부 받음
+                                </span>
+                                <SignatureCanvas
+                                    ref={receiptCanvas}
+                                    canvasProps={{
+                                        width: padWidth,
+                                        height: 160,
+                                        className: 'touch-none cursor-crosshair w-full h-full block relative z-10' }}
+                                    backgroundColor="rgba(255, 255, 255, 0)"
+                                    penColor="#1e293b"
+                                    onBegin={() => setIsPadEmpty(false)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    receiptCanvas.current?.clear();
+                                    setIsPadEmpty(true);
+                                }}
+                                className="py-2.5 px-4 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold text-[13px] hover:bg-slate-100 cursor-pointer"
+                            >
+                                다시 쓰기
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleApplyReceiptPad}
+                                className="flex-1 py-2.5 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[13.5px] shadow-sm cursor-pointer"
+                            >
+                                교부확인 작성 완료
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -379,10 +379,24 @@ export default function MessageBubble({
               )}
               {(replyTarget || message.reply_to_id) && (
                 <div 
+                  role="button"
+                  tabIndex={0}
+                  aria-label="원문 메시지로 이동"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (message.reply_to_id) {
-                      onJumpToMessage?.(String(message.reply_to_id));
+                    const targetId = message.reply_to_id || replyTarget?.id;
+                    if (targetId) {
+                      onJumpToMessage?.(String(targetId));
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const targetId = message.reply_to_id || replyTarget?.id;
+                      if (targetId) {
+                        onJumpToMessage?.(String(targetId));
+                      }
                     }
                   }}
                   style={{
@@ -393,20 +407,39 @@ export default function MessageBubble({
                     borderLeft: `2px solid ${mine ? 'rgba(255, 255, 255, 0.85)' : 'var(--m-accent)'}`,
                     color: mine ? 'rgba(255, 255, 255, 0.9)' : 'var(--z-700)',
                     margin: '0 -4px 8px',
-                    cursor: 'pointer' }}
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    WebkitTapHighlightColor: 'transparent',
+                  }}
                 >
                   <div style={{ fontWeight: 700, marginBottom: 2, color: mine ? '#fff' : 'var(--m-accent)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {replyTarget ? (
-                      `${replyTarget.sender_name || staffs.find((s) => String(s.id) === String(replyTarget.sender_id))?.name || '알 수 없음'}에게 답장`
-                    ) : (
-                      '이전 대화 답글'
-                    )}
+                    <MIcon name="reply" size={12} color={mine ? '#fff' : 'var(--m-accent)'} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {replyTarget ? (
+                        `${replyTarget.sender_name || staffs.find((s) => String(s.id) === String(replyTarget.sender_id))?.name || '알 수 없음'}에게 답장`
+                      ) : (
+                        '답글 원문 메시지'
+                      )}
+                    </span>
+                    <span 
+                      style={{ 
+                        marginLeft: 'auto', 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        opacity: 0.85,
+                        flexShrink: 0
+                      }}
+                      title="원문 메시지로 이동"
+                    >
+                      <MIcon name="chevU" size={13} color={mine ? '#fff' : 'var(--m-accent)'} />
+                    </span>
                   </div>
-                  <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', opacity: 0.9 }}>
+                  <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', opacity: 0.9, fontSize: 11.5 }}>
                     {replyTarget ? (
                       typeof replyTarget.content === 'string' && replyTarget.content ? replyTarget.content : (replyTarget.file_name ? '첨부파일' : '(내용 없음)')
                     ) : (
-                      '원문 메시지로 이동하려면 클릭하세요.'
+                      '원문 메시지'
                     )}
                   </div>
                 </div>

@@ -18,6 +18,7 @@ import {
 } from '@/lib/db';
 import { getLeaveUnit, isAnnualLeaveType } from '@/lib/leave-type';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
+import { processSingleStaffAccrual } from '@/lib/annual-leave-accrual';
 // 주기 계산·원장 집계는 클라이언트도 같은 함수를 써야 해서 lib/leave-cycle.ts 로
 // 내렸다. 이 파일은 DB 접근이 필요한 부분만 담당하고, 순수 계산은 재수출한다.
 import {
@@ -104,10 +105,13 @@ async function getStaffLeaveContext(staffId: string) {
   const rows = await db
     .select({
       id: staffMembersTable.id,
+      name: staffMembersTable.name,
       company_id: staffMembersTable.company_id,
+      status: staffMembersTable.status,
       hire_date: staffMembersTable.hire_date,
       join_date: staffMembersTable.join_date,
       joined_at: staffMembersTable.joined_at,
+      permissions: staffMembersTable.permissions,
       annual_leave_total: staffMembersTable.annual_leave_total,
       annual_leave_used: staffMembersTable.annual_leave_used,
     })
@@ -333,6 +337,14 @@ export async function getUnifiedAnnualLeaveSummary(
   asOfDate = formatKoreanDateKey(new Date()),
 ): Promise<UnifiedLeaveSummary> {
   const { db, staff, hireDate } = await getStaffLeaveContext(staffId);
+
+  // 직원의 당일 기준 법정 연차/월차 자동발생 미부여분을 온디맨드로 평가 및 안전하게 원장 반영 (멱등성 보장)
+  try {
+    await processSingleStaffAccrual(db, staff, asOfDate);
+  } catch (err) {
+    console.warn(`[getUnifiedAnnualLeaveSummary] 온디맨드 연차 자동발생 평가 실패 (${staff.id}):`, err);
+  }
+
   const cycle = getLeaveCycle(hireDate, asOfDate) ?? {
     key: `fallback:${asOfDate.slice(0, 4)}`,
     start: `${asOfDate.slice(0, 4)}-01-01`,

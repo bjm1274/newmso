@@ -51,30 +51,30 @@ export function buildConfidentialityPledgePrintHTML(opts: ConfidentialityPledgeP
   const { companyName, employeeName, contractDate, signatureDataUrl } = opts;
 
   const signatureHTML = signatureDataUrl
-    ? `<img src="${escapeHTML(signatureDataUrl)}" alt="서명" style="height:30px;object-fit:contain;vertical-align:middle;margin-left:10px;mix-blend-mode:multiply;" />`
-    : `<span style="display:inline-block;min-width:120px;border-bottom:1px solid #6b7280;height:16px;vertical-align:middle;margin-left:10px;"></span><span style="font-size:11px;color:#9ca3af;margin-left:6px;">(서명)</span>`;
+    ? `<img src="${escapeHTML(signatureDataUrl)}" alt="서명" style="height:32px;object-fit:contain;vertical-align:middle;margin-left:10px;mix-blend-mode:multiply;" />`
+    : `<span style="display:inline-block;min-width:120px;border-bottom:2px solid #cbd5e1;height:16px;vertical-align:middle;margin-left:10px;"></span><span style="font-size:11px;color:#94a3b8;margin-left:6px;">(서명)</span>`;
 
   const clausesHTML = CONFIDENTIALITY_PLEDGE_CLAUSES.map(
     (clause) => `
         <div style="margin-bottom:14px;">
-          <p style="font-size:13.5px;font-weight:800;color:#111827;margin:0 0 5px 0;">${escapeHTML(clause.title)}</p>
-          <p style="font-size:12.5px;color:#374151;line-height:1.8;margin:0;padding-left:12px;border-left:2px solid #e5e7eb;">${escapeHTML(clause.body)}</p>
+          <p style="font-size:13.5px;font-weight:800;color:#0f172a;margin:0 0 5px 0;">${escapeHTML(clause.title)}</p>
+          <p style="font-size:12.5px;color:#334155;line-height:1.8;margin:0;padding-left:12px;border-left:2px solid #e2e8f0;">${escapeHTML(clause.body)}</p>
         </div>`,
   ).join('');
 
   return `
-      <div style="padding:28px 40px 40px;font-family:'Noto Sans KR', sans-serif;">
+      <div style="padding:28px 40px 40px;font-family:Pretendard, -apple-system, 'Noto Sans KR', sans-serif;">
         <div style="text-align:center;margin-bottom:22px;">
-          <h2 style="font-family:'Noto Serif KR', Georgia, serif;font-size:20px;font-weight:900;letter-spacing:0.35em;color:#111827;margin:0;">비 밀 유 지 서 약 서</h2>
+          <h2 style="font-family:Pretendard, -apple-system, 'Noto Sans KR', sans-serif;font-size:20px;font-weight:900;letter-spacing:0.15em;color:#0f172a;margin:0;">비 밀 유 지 서 약 서</h2>
         </div>
-        <p style="font-size:13px;color:#374151;line-height:1.9;margin:0 0 18px 0;">${escapeHTML(CONFIDENTIALITY_PLEDGE_INTRO_PREFIX)}<span style="font-weight:700;color:#111827;">${escapeHTML(companyName || '회사')}</span>${escapeHTML(CONFIDENTIALITY_PLEDGE_INTRO_SUFFIX)}</p>
+        <p style="font-size:13px;color:#334155;line-height:1.9;margin:0 0 18px 0;">${escapeHTML(CONFIDENTIALITY_PLEDGE_INTRO_PREFIX)}<span style="font-weight:700;color:#0f172a;">${escapeHTML(companyName || '회사')}</span>${escapeHTML(CONFIDENTIALITY_PLEDGE_INTRO_SUFFIX)}</p>
         <div>${clausesHTML}
         </div>
-        <p style="margin:24px 0 0 0;text-align:center;font-size:13px;font-weight:700;color:#111827;">${escapeHTML(CONFIDENTIALITY_PLEDGE_AFFIRMATION)}</p>
-        <p style="margin:18px 0 0 0;text-align:center;font-size:13px;font-weight:700;color:#111827;">${escapeHTML(contractDate)}</p>
+        <p style="margin:24px 0 0 0;text-align:center;font-size:13px;font-weight:700;color:#0f172a;">${escapeHTML(CONFIDENTIALITY_PLEDGE_AFFIRMATION)}</p>
+        <p style="margin:18px 0 0 0;text-align:center;font-size:13px;font-weight:700;color:#0f172a;">${escapeHTML(contractDate)}</p>
         <div style="margin-top:18px;text-align:right;">
-          <span style="font-size:10px;font-weight:700;color:#9ca3af;margin-right:8px;">[서약자]</span>
-          <span style="font-weight:700;color:#111827;font-size:14px;">${escapeHTML(employeeName)}</span>${signatureHTML}
+          <span style="font-size:11px;font-weight:700;color:#64748b;margin-right:8px;">[서약자]</span>
+          <span style="font-weight:700;color:#0f172a;font-size:14px;">${escapeHTML(employeeName)}</span>${signatureHTML}
         </div>
       </div>
   `;

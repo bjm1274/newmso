@@ -23,6 +23,7 @@ import {
   eq,
   and,
   gte,
+  lte,
   lt,
   inArray,
   isNotNull } from '@/lib/db';
@@ -122,6 +123,11 @@ async function isFullAttendanceMonth(
   startKey: string,
   endKey: string,
 ): Promise<boolean> {
+  const pStart = parseKey(startKey);
+  const pEnd = parseKey(endKey);
+  // 말일 클램핑(예: 1월 31일 -> 2월 28일)의 경우 해당 월 말일 당일까지 포함
+  const isMonthEndClamped = Boolean(pStart && pEnd && pStart.d > pEnd.d);
+
   const rows = await db
     .select({ id: attendancesTable.id })
     .from(attendancesTable)
@@ -129,7 +135,9 @@ async function isFullAttendanceMonth(
       and(
         eq(attendancesTable.staff_id, staffId),
         gte(attendancesTable.work_date, startKey),
-        lt(attendancesTable.work_date, endKey),
+        isMonthEndClamped
+          ? lte(attendancesTable.work_date, endKey)
+          : lt(attendancesTable.work_date, endKey),
         inArray(attendancesTable.status, [...ABSENT_STATUSES]),
       ),
     )
@@ -173,16 +181,175 @@ type StaffRow = {
   name: string;
   company_id: string | null;
   status: string | null;
-  annual_leave_total: number | null;
+  annual_leave_total?: number | null;
   join_date: string | null;
   joined_at: string | null;
   hire_date: string | null;
+  permissions?: string | null;
+  account_type?: string | null;
+  is_group_account?: number | boolean | null;
 };
 
 function resolveHireKey(s: StaffRow): string | null {
   const raw = s.hire_date ?? s.join_date ?? s.joined_at ?? null;
   if (!raw) return null;
   return String(raw).slice(0, 10);
+}
+
+/**
+ * 단일 직원 대상 연차/월차 자동발생 처리 (온디맨드 및 크론 공통)
+ * @returns 부여된 연차 목록 (이미 부여되어 변경 없으면 빈 배열)
+ */
+export async function processSingleStaffAccrual(
+  db: DrizzleDb,
+  s: StaffRow,
+  todayKey: string,
+): Promise<AccrualGrant[]> {
+  const granted: AccrualGrant[] = [];
+
+  // 단체 계정(공용 아이디)은 연차 자동 발생 대상에서 제외
+  if (isGroupAccount(s)) return granted;
+
+  // 재직자만 (공백·null 은 재직으로 간주, '퇴사'/'inactive' 등만 제외)
+  const statusNorm = String(s.status ?? '').trim();
+  if (
+    statusNorm &&
+    statusNorm !== '재직' &&
+    statusNorm.toLowerCase() !== 'active' &&
+    statusNorm !== '재직중'
+  ) {
+    return granted;
+  }
+
+  const hireKey = resolveHireKey(s);
+  if (!hireKey || hireKey > todayKey) return granted;
+
+  // 1) 만 N년차 연차 부여 (멱등성 소급 적용 포함)
+  const maxYears = tenureYears(hireKey, todayKey);
+  if (maxYears >= 1) {
+    const existingAccruals = await db
+      .select({ period_key: leaveLedgerTable.period_key })
+      .from(leaveLedgerTable)
+      .where(
+        and(
+          eq(leaveLedgerTable.staff_id, s.id),
+          eq(leaveLedgerTable.entry_type, 'auto_annual'),
+        ),
+      );
+    const existingAnnualKeys = new Set(existingAccruals.map((a) => a.period_key));
+
+    for (let n = 1; n <= maxYears; n += 1) {
+      const periodKey = `annual:${n}`;
+      if (!existingAnnualKeys.has(periodKey)) {
+        const days = annualLeaveDaysForTenure(n);
+        const ok = await tryInsertAccrual(db, {
+          staffId: s.id,
+          companyId: s.company_id,
+          kind: 'annual',
+          periodKey,
+          days,
+          sourceDate: addYearsKey(hireKey, n) ?? todayKey,
+          note: `만 ${n}년차 연차 ${days}일 자동부여`,
+        });
+        if (ok) {
+          granted.push({
+            staffId: s.id,
+            staffName: s.name,
+            kind: 'annual',
+            days,
+            periodKey,
+            note: `만 ${n}년차 ${days}일`,
+          });
+        }
+      }
+    }
+  }
+
+  // 2) 1년 미만 월 만근 → +1일 (경과한 모든 월 구간 소급 부여, 만 2년 미만까지)
+  const MONTHLY_BACKFILL_TENURE_LIMIT = 2;
+  if (maxYears < MONTHLY_BACKFILL_TENURE_LIMIT) {
+    const existingMonthly = await db
+      .select({ period_key: leaveLedgerTable.period_key })
+      .from(leaveLedgerTable)
+      .where(
+        and(
+          eq(leaveLedgerTable.staff_id, s.id),
+          eq(leaveLedgerTable.entry_type, 'auto_monthly'),
+        ),
+      );
+    const existingMonthlyKeys = new Set(existingMonthly.map((a) => a.period_key));
+
+    for (let k = 1; k <= 11; k += 1) {
+      const startKey = addMonthsKey(hireKey, k - 1);
+      const endKey = addMonthsKey(hireKey, k);
+      if (!startKey || !endKey) continue;
+      if (endKey > todayKey) break; // 아직 끝나지 않은 월 구간
+      const periodKey = startKey.slice(0, 7); // 'YYYY-MM'
+      if (existingMonthlyKeys.has(periodKey)) continue; // 이미 부여됨
+
+      const fullAttendance = await isFullAttendanceMonth(db, s.id, startKey, endKey);
+      if (!fullAttendance) continue; // 결근 있음 → 미부여
+
+      const ok = await tryInsertAccrual(db, {
+        staffId: s.id,
+        companyId: s.company_id,
+        kind: 'monthly',
+        periodKey,
+        days: 1,
+        sourceDate: endKey,
+        note: `${k}개월차 만근 +1일`,
+      });
+      if (ok) {
+        granted.push({
+          staffId: s.id,
+          staffName: s.name,
+          kind: 'monthly',
+          days: 1,
+          periodKey,
+          note: `${k}개월차 만근`,
+        });
+      }
+    }
+  }
+
+  return granted;
+}
+
+/**
+ * 단일 직원 대상 연차 자동발생 온디맨드 실행 (외부 호출용)
+ */
+export async function processStaffAnnualLeaveAccrual(
+  staffId: string,
+  todayKey = formatKoreanTodayKey(),
+): Promise<AccrualGrant[]> {
+  const d1 = await getD1Binding();
+  if (!d1) return [];
+  const db = getD1Drizzle(d1);
+
+  const rows = (await db
+    .select({
+      id: staffMembersTable.id,
+      name: staffMembersTable.name,
+      company_id: staffMembersTable.company_id,
+      status: staffMembersTable.status,
+      join_date: staffMembersTable.join_date,
+      joined_at: staffMembersTable.joined_at,
+      hire_date: staffMembersTable.hire_date,
+      permissions: staffMembersTable.permissions,
+    })
+    .from(staffMembersTable)
+    .where(eq(staffMembersTable.id, staffId))
+    .limit(1)) as StaffRow[];
+
+  const staff = rows[0];
+  if (!staff) return [];
+  return processSingleStaffAccrual(db, staff, todayKey);
+}
+
+function formatKoreanTodayKey(): string {
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return kst.toISOString().slice(0, 10);
 }
 
 /**
@@ -204,18 +371,18 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
       status: staffMembersTable.status,
       join_date: staffMembersTable.join_date,
       joined_at: staffMembersTable.joined_at,
-      hire_date: staffMembersTable.hire_date })
+      hire_date: staffMembersTable.hire_date,
+      permissions: staffMembersTable.permissions,
+    })
     .from(staffMembersTable)
     .where(isNotNull(staffMembersTable.id))) as StaffRow[];
 
   for (const s of staffs) {
     result.scanned += 1;
-    // 단체 계정(공용 아이디)은 연차 자동 발생 대상에서 제외
     if (isGroupAccount(s)) {
       result.skipped += 1;
       continue;
     }
-    // 재직자만 (공백·null 은 재직으로 간주, '퇴사'/'inactive' 등만 제외)
     const statusNorm = String(s.status ?? '').trim();
     if (
       statusNorm &&
@@ -233,108 +400,10 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
     }
 
     try {
-      // 1) 만 N년차 연차 부여 (멱등성 소급 적용 포함)
-      const maxYears = tenureYears(hireKey, todayKey);
-      let annualGranted = false;
-      if (maxYears >= 1) {
-        // 이미 부여된 연차 목록 조회
-        const existingAccruals = await db
-          .select({ period_key: leaveLedgerTable.period_key })
-          .from(leaveLedgerTable)
-          .where(
-            and(
-              eq(leaveLedgerTable.staff_id, s.id),
-              eq(leaveLedgerTable.entry_type, 'auto_annual')
-            )
-          );
-        const existingAnnualKeys = new Set(existingAccruals.map((a) => a.period_key));
-
-        for (let n = 1; n <= maxYears; n += 1) {
-          const periodKey = `annual:${n}`;
-          if (!existingAnnualKeys.has(periodKey)) {
-            const days = annualLeaveDaysForTenure(n);
-            const ok = await tryInsertAccrual(db, {
-              staffId: s.id,
-              companyId: s.company_id,
-              kind: 'annual',
-              periodKey,
-              days,
-              sourceDate: addYearsKey(hireKey, n) ?? todayKey,
-              note: `만 ${n}년차 연차 ${days}일 자동부여` });
-            if (ok) {
-              result.granted.push({
-                staffId: s.id,
-                staffName: s.name,
-                kind: 'annual',
-                days,
-                periodKey,
-                note: `만 ${n}년차 ${days}일` });
-              annualGranted = true;
-            }
-          }
-        }
-      }
-
-      // 2) 1년 미만 월 만근 → +1일 (경과한 모든 월 구간을 소급 부여)
-      // 기존에는 입사 응당일 당일에만 부여해서, cron 이 그 하루를 거르면(배포 공백/CRON_SECRET 미설정 등)
-      // 해당 월 +1일이 영구 누락됐다. 이제 경과한 모든 월 구간 중 미부여분을 매 실행마다 메꾼다(멱등).
-      //
-      // 예전에는 만 1년이 지나면 위에서 무조건 `continue` 해 이 블록에 아예 들어오지
-      // 못했다(아래 `tenureYears >= 1` 가드는 그래서 죽은 코드였다). 그 결과
-      // 입사 1년째 마지막 달에 크론이 멈춰 있었으면 그 달의 월차 +1일이
-      // **영구히 복구 불가**가 됐다. 이제 1년을 넘겨도 미부여분을 메꾼다.
-      //
-      // 다만 무제한은 아니다. 만근 판정은 "결근 기록이 없으면 만근"이라서,
-      // 시스템 도입 이전에 입사해 첫 해 근태 기록이 통째로 없는 직원까지 대상에
-      // 넣으면 없던 11일이 새로 생긴다. 크론 공백을 메우는 데 필요한 만큼만
-      // (만 2년 미만) 소급한다.
-      const MONTHLY_BACKFILL_TENURE_LIMIT = 2;
-      if (maxYears >= MONTHLY_BACKFILL_TENURE_LIMIT) {
-        if (!annualGranted) result.skipped += 1;
-        continue;
-      }
-
-      // 이미 부여된 월차 period_key 집합 (멱등 + 소급 판정)
-      const existingMonthly = await db
-        .select({ period_key: leaveLedgerTable.period_key })
-        .from(leaveLedgerTable)
-        .where(
-          and(
-            eq(leaveLedgerTable.staff_id, s.id),
-            eq(leaveLedgerTable.entry_type, 'auto_monthly'),
-          ),
-        );
-      const existingMonthlyKeys = new Set(existingMonthly.map((a) => a.period_key));
-
-      let monthlyGranted = 0;
-      for (let k = 1; k <= 11; k += 1) {
-        const startKey = addMonthsKey(hireKey, k - 1);
-        const endKey = addMonthsKey(hireKey, k);
-        if (!startKey || !endKey) continue;
-        if (endKey > todayKey) break; // 아직 끝나지 않은 월 구간 → 이후 구간도 모두 미완료
-        const periodKey = startKey.slice(0, 7); // 'YYYY-MM'
-        if (existingMonthlyKeys.has(periodKey)) continue; // 이미 부여됨
-        const fullAttendance = await isFullAttendanceMonth(db, s.id, startKey, endKey);
-        if (!fullAttendance) continue; // 결근 있음 → 미부여
-        const ok = await tryInsertAccrual(db, {
-          staffId: s.id,
-          companyId: s.company_id,
-          kind: 'monthly',
-          periodKey,
-          days: 1,
-          sourceDate: endKey,
-          note: `${k}개월차 만근 +1일` });
-        if (!ok) continue;
-        monthlyGranted += 1;
-        result.granted.push({
-          staffId: s.id,
-          staffName: s.name,
-          kind: 'monthly',
-          days: 1,
-          periodKey,
-          note: `${k}개월차 만근` });
-      }
-      if (monthlyGranted === 0 && !annualGranted) {
+      const granted = await processSingleStaffAccrual(db, s, todayKey);
+      if (granted.length > 0) {
+        result.granted.push(...granted);
+      } else {
         result.skipped += 1;
       }
     } catch (err) {
@@ -344,3 +413,4 @@ export async function processAnnualLeaveAccrual(todayKey: string): Promise<Accru
 
   return result;
 }
+
