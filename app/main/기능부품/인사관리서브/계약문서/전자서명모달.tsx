@@ -299,10 +299,38 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                         {REQUIRED_AGREEMENTS.map((item) => {
                             const checked = Boolean(agreements[item.id]);
                             return (
-                                <label key={item.id} className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer ${checked ? 'bg-blue-50/60 border-blue-300' : 'bg-slate-50 border-slate-200'}`}>
-                                    <div className="pt-0.5 shrink-0"><input type="checkbox" checked={checked} onChange={(e) => setAgreements({ ...agreements, [item.id]: e.target.checked })} className="sr-only" /><span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center ${checked ? 'bg-blue-600 border-blue-600' : 'border-slate-400 bg-white'}`}>{checked && <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}</span></div>
-                                    <div><p className={`text-[13.5px] font-bold ${checked ? 'text-blue-900' : 'text-slate-800'}`}>{item.title}</p><p className="text-[11.5px] text-slate-500">{item.desc}</p></div>
-                                </label>
+                                <div
+                                    key={item.id}
+                                    role="checkbox"
+                                    aria-checked={checked}
+                                    tabIndex={0}
+                                    onClick={() => setAgreements(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
+                                    onKeyDown={(e) => {
+                                        if (e.key === ' ' || e.key === 'Enter') {
+                                            e.preventDefault();
+                                            setAgreements(prev => ({ ...prev, [item.id]: !prev[item.id] }));
+                                        }
+                                    }}
+                                    className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer select-none transition-all active:scale-[0.99] ${
+                                        checked ? 'bg-blue-50/70 border-blue-300 shadow-xs' : 'bg-slate-50 border-slate-200 hover:bg-slate-100/70'
+                                    }`}
+                                >
+                                    <div className="pt-0.5 shrink-0">
+                                        <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
+                                            checked ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white'
+                                        }`}>
+                                            {checked && (
+                                                <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3.5}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            )}
+                                        </span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className={`text-[13.5px] font-bold ${checked ? 'text-blue-900' : 'text-slate-800'}`}>{item.title}</p>
+                                        <p className="text-[11.5px] text-slate-500 mt-0.5 leading-snug">{item.desc}</p>
+                                    </div>
+                                </div>
                             );
                         })}
                     </div>

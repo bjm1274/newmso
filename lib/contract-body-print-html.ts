@@ -68,11 +68,26 @@ export function buildContractBodyPrintHTML(templateText: string): string {
 
     function parseShiftTimeString(s: string) {
         if (!s) return { label: '근무시간', time: '' };
-        const match = s.match(/^(.+?)\s+([0-9]{1,2}:[0-9]{2}.*)$/);
-        if (match) {
-            return { label: match[1].trim(), time: match[2].trim() };
+        const trimmed = s.trim();
+        const rangeMatch = trimmed.match(/^(.*?)\s*([0-9]{1,2}:[0-9]{2})\s*(?:~|-)\s*([0-9]{1,2}:[0-9]{2})(.*)$/);
+        if (rangeMatch) {
+            const rawLabel = (rangeMatch[1] + ' ' + rangeMatch[4]).trim();
+            const cleanLabel = rawLabel.replace(/[~:\-\/]/g, '').trim();
+            return {
+                label: cleanLabel || '근무시간',
+                time: `${rangeMatch[2]} ~ ${rangeMatch[3]}`
+            };
         }
-        return { label: '근무시간', time: s.trim() };
+        const singleMatch = trimmed.match(/^(.*?)\s*([0-9]{1,2}:[0-9]{2})(.*)$/);
+        if (singleMatch) {
+            const rawLabel = (singleMatch[1] + ' ' + singleMatch[3]).trim();
+            const cleanLabel = rawLabel.replace(/[~:\-\/]/g, '').trim();
+            return {
+                label: cleanLabel || '근무시간',
+                time: singleMatch[2]
+            };
+        }
+        return { label: '근무시간', time: trimmed };
     }
 
     const sectionsHTML = matches.map((sec, si) => {

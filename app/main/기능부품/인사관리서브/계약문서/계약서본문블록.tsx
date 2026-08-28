@@ -123,11 +123,26 @@ export default function ContractBodyBlock({
 
                 function parseShiftTimeString(s: string) {
                     if (!s) return { label: '근무시간', time: '' };
-                    const match = s.match(/^(.+?)\s+([0-9]{1,2}:[0-9]{2}.*)$/);
-                    if (match) {
-                        return { label: match[1].trim(), time: match[2].trim() };
+                    const trimmed = s.trim();
+                    const rangeMatch = trimmed.match(/^(.*?)\s*([0-9]{1,2}:[0-9]{2})\s*(?:~|-)\s*([0-9]{1,2}:[0-9]{2})(.*)$/);
+                    if (rangeMatch) {
+                        const rawLabel = (rangeMatch[1] + ' ' + rangeMatch[4]).trim();
+                        const cleanLabel = rawLabel.replace(/[~:\-\/]/g, '').trim();
+                        return {
+                            label: cleanLabel || '근무시간',
+                            time: `${rangeMatch[2]} ~ ${rangeMatch[3]}`
+                        };
                     }
-                    return { label: '근무시간', time: s.trim() };
+                    const singleMatch = trimmed.match(/^(.*?)\s*([0-9]{1,2}:[0-9]{2})(.*)$/);
+                    if (singleMatch) {
+                        const rawLabel = (singleMatch[1] + ' ' + singleMatch[3]).trim();
+                        const cleanLabel = rawLabel.replace(/[~:\-\/]/g, '').trim();
+                        return {
+                            label: cleanLabel || '근무시간',
+                            time: singleMatch[2]
+                        };
+                    }
+                    return { label: '근무시간', time: trimmed };
                 }
 
                 return (
@@ -281,7 +296,7 @@ export default function ContractBodyBlock({
                                 }
                                 const isPrivacyConsentLine =
                                     /(?:□|☑|\[\s*\]|\(\s*\))?\s*동의\s+(?:□|☑|\[\s*\]|\(\s*\))?\s*동의하지\s*않음/.test(t) ||
-                                    (t.includes('동의') && t.includes('동의하지 않음'));
+                                    /^\s*동의\s+동의하지\s*않음\s*$/.test(t);
                                 if (isPrivacyConsentLine) {
                                     if (isInteractive) {
                                         const consentOptions: { value: boolean; label: string }[] = [
@@ -293,8 +308,13 @@ export default function ContractBodyBlock({
                                                 {consentOptions.map((opt) => {
                                                     const selected = privacyConsent === opt.value;
                                                     return (
-                                                        <label
+                                                        <button
+                                                            type="button"
                                                             key={opt.label}
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                onPrivacyConsentChange?.(opt.value);
+                                                            }}
                                                             className={`flex-1 flex items-center justify-center gap-2 cursor-pointer select-none px-4 py-2.5 rounded-xl border-2 transition-all active:scale-[0.98] ${
                                                                 selected
                                                                     ? opt.value
@@ -303,13 +323,6 @@ export default function ContractBodyBlock({
                                                                     : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                                                             }`}
                                                         >
-                                                            <input
-                                                                type="radio"
-                                                                name="privacy-consent-active"
-                                                                checked={selected}
-                                                                onChange={() => onPrivacyConsentChange?.(opt.value)}
-                                                                className="sr-only"
-                                                            />
                                                             <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
                                                                 selected
                                                                     ? opt.value
@@ -324,7 +337,7 @@ export default function ContractBodyBlock({
                                                                 )}
                                                             </span>
                                                             <span className="text-[13px]">{opt.label}</span>
-                                                        </label>
+                                                        </button>
                                                     );
                                                 })}
                                             </div>

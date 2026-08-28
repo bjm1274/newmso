@@ -164,9 +164,10 @@ export function buildShiftContractVariables(
     return `${index + 1}주차`;
   };
 
-  const formatSegmentValues = (values: string[]) => {
+  const formatSegmentValues = (values: string[], includeSingleShiftName = false) => {
     if (rotationShifts.length <= 1) {
       const val = values.find(Boolean) || '';
+      if (!includeSingleShiftName) return val;
       const shiftName = String(rotationShifts[0]?.name || '').trim();
       if (val && shiftName) {
         return `${stripShiftBandSuffix(shiftName) || shiftName} ${val}`;
@@ -188,7 +189,7 @@ export function buildShiftContractVariables(
   const breakTimeRanges = breakStarts.map((start, index) => {
     const s = start ? String(start).trim() : '';
     const e = breakEnds[index] ? String(breakEnds[index]).trim() : '';
-    return s && e ? `${s}~${e}` : s || e || '';
+    return s && e ? `${s} ~ ${e}` : s || e || '';
   });
   const shiftNames = rotationShifts
     .map((shift, index) => {
@@ -221,8 +222,8 @@ export function buildShiftContractVariables(
     shift_end: formatSegmentValues(shiftEnds),
     break_start: formatSegmentValues(breakStarts),
     break_end: formatSegmentValues(breakEnds),
-    shift_time_range: formatSegmentValues(shiftTimeRanges),
-    shift_time: formatSegmentValues(shiftTimeRanges),
+    shift_time_range: formatSegmentValues(shiftTimeRanges, true),
+    shift_time: formatSegmentValues(shiftTimeRanges, true),
     break_time_range: formatSegmentValues(breakTimeRanges),
     shift_schedule: scheduleText,
     weekly_rotation_shift_schedule: scheduleText,
