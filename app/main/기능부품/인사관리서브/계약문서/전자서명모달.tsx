@@ -162,10 +162,22 @@ export default function ContractSignatureModal({ contract, user, templateText, o
 
     const agreedCount = useMemo(() => REQUIRED_AGREEMENTS.filter(item => Boolean(agreements[item.id])).length, [agreements]);
     const allAgreed = agreedCount === REQUIRED_AGREEMENTS.length;
-    const isPrivacyValid = privacyConsent !== null;
+    const isPrivacyValid = privacyConsent === true;
     const isSignatureDone = Boolean(signatureDataUrl);
     const isReceiptDone = Boolean(receiptTraceDataUrl);
     const isAllReadyToSubmit = allAgreed && isPrivacyValid && isSignatureDone && isReceiptDone;
+
+    const scrollToSection = (targetId: string, message?: string) => {
+        if (message) toast(message, 'warning');
+        const el = document.getElementById(targetId);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('ring-2', 'ring-blue-500', 'ring-offset-2', 'transition-all');
+            window.setTimeout(() => {
+                el.classList.remove('ring-2', 'ring-blue-500', 'ring-offset-2');
+            }, 1800);
+        }
+    };
 
     const handleToggleAllAgreements = () => {
         if (allAgreed) setAgreements({});
@@ -246,8 +258,37 @@ export default function ContractSignatureModal({ contract, user, templateText, o
 
     const handleSubmit = async () => {
         if (submitLockRef.current || isGenerating) return;
-        if (!isPrivacyValid || !allAgreed || !signatureDataUrl || !receiptTraceDataUrl) return toast('모든 필수 항목을 완료해 주세요.', 'warning');
-        submitLockRef.current = true; setIsGenerating(true);
+
+        if (privacyConsent !== true) {
+            scrollToSection('privacy-consent-section', '제11조 개인정보 수집·이용에 [동의]를 체크해 주세요.');
+            return;
+        }
+
+        if (!allAgreed) {
+            scrollToSection('required-agreements-section', `주요 계약 조항 (${agreedCount}/7)을 모두 확인하고 동의해 주세요.`);
+            return;
+        }
+
+        if (!signatureDataUrl) {
+            scrollToSection('employee-signature-section', '근로자 서명란의 [서명하기] 버튼을 눌러 서명해 주세요.');
+            window.setTimeout(() => {
+                setIsPadEmpty(true);
+                setActivePadModal('signature');
+            }, 380);
+            return;
+        }
+
+        if (!receiptTraceDataUrl) {
+            scrollToSection('employee-receipt-section', "근로계약서 교부확인란의 [자필 작성]을 눌러 '교부 받음'을 작성해 주세요.");
+            window.setTimeout(() => {
+                setIsPadEmpty(true);
+                setActivePadModal('receipt');
+            }, 380);
+            return;
+        }
+
+        submitLockRef.current = true;
+        setIsGenerating(true);
         try {
             const today = new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric' });
             const agreementsSection = `
@@ -294,8 +335,8 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                             <><div className="text-center pb-4 border-b border-slate-100"><h1 className="text-[20px] md:text-[22px] font-black text-slate-900 tracking-wider">근 로 계 약 서</h1></div><ContractBodyBlock templateText={localTemplateText} privacyConsent={privacyConsent} onPrivacyConsentChange={setPrivacyConsent} isInteractive={true} /></>
                         )}
                     </div>
-                    <div className="bg-white p-5 md:p-6 border border-slate-200 rounded-2xl shadow-sm space-y-3.5">
-                        <div className="flex items-center justify-between pb-2 border-b border-slate-100"><div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-blue-600" /><h3 className="text-[14.5px] font-extrabold text-slate-900">주요 계약 조항 확인 및 동의</h3></div><button type="button" onClick={handleToggleAllAgreements} className="text-[12px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1 rounded-lg">{allAgreed ? '전체 해제' : '전체 동의하기'}</button></div>
+                    <div id="required-agreements-section" className="bg-white p-5 md:p-6 border border-slate-200 rounded-2xl shadow-sm space-y-3.5 scroll-mt-20">
+                        <div className="flex items-center justify-between pb-2 border-b border-slate-100"><div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-blue-600" /><h3 className="text-[14.5px] font-extrabold text-slate-900">주요 계약 조항 확인 및 동의 <span className="text-xs text-red-500 font-semibold">(필수)</span></h3></div><button type="button" onClick={handleToggleAllAgreements} className="text-[12px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">{allAgreed ? '전체 해제' : '전체 동의하기'}</button></div>
                         {REQUIRED_AGREEMENTS.map((item) => {
                             const checked = Boolean(agreements[item.id]);
                             return (
@@ -357,43 +398,71 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                         </p>
                     </div>
                     <div className="bg-white p-5 md:p-6 border border-slate-200 rounded-2xl shadow-sm">
-                        <h3 className="text-[14.5px] font-extrabold text-slate-900 pb-3">계약 당사자 확인 및 서명</h3>
+                        <h3 className="text-[14.5px] font-extrabold text-slate-900 pb-3">계약 당사자 확인 및 서명 <span className="text-xs text-red-500 font-semibold">(2곳 서명 필수)</span></h3>
                         <ContractClosingBlock {...closingData} signatureDataUrl={signatureDataUrl} receiptTraceDataUrl={receiptTraceDataUrl} isInteractive={true} onOpenSignature={() => { setIsPadEmpty(true); setActivePadModal('signature'); }} onOpenReceipt={() => { setIsPadEmpty(true); setActivePadModal('receipt'); }} />
                     </div>
                 </div>
                 <div className="p-4 bg-white border-t border-slate-200 shrink-0 shadow-lg flex flex-col md:flex-row items-center justify-between gap-3">
                     <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                        <span className={`px-2.5 py-1 text-[11.5px] font-bold rounded-lg border flex items-center gap-1 ${
-                            isPrivacyValid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'
-                        }`}>
+                        <button
+                            type="button"
+                            onClick={() => scrollToSection('privacy-consent-section')}
+                            className={`px-2.5 py-1 text-[11.5px] font-bold rounded-lg border flex items-center gap-1 cursor-pointer transition-all active:scale-[0.98] ${
+                                isPrivacyValid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200 animate-pulse'
+                            }`}
+                        >
                             <span>{isPrivacyValid ? '✓' : '•'}</span> 개인정보동의
-                        </span>
-                        <span className={`px-2.5 py-1 text-[11.5px] font-bold rounded-lg border flex items-center gap-1 ${
-                            allAgreed ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'
-                        }`}>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => scrollToSection('required-agreements-section')}
+                            className={`px-2.5 py-1 text-[11.5px] font-bold rounded-lg border flex items-center gap-1 cursor-pointer transition-all active:scale-[0.98] ${
+                                allAgreed ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'
+                            }`}
+                        >
                             <span>{allAgreed ? '✓' : '•'}</span> 주요조항 ({agreedCount}/7)
-                        </span>
-                        <span className={`px-2.5 py-1 text-[11.5px] font-bold rounded-lg border flex items-center gap-1 ${
-                            isSignatureDone ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'
-                        }`}>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                scrollToSection('employee-signature-section');
+                                if (!isSignatureDone) {
+                                    setTimeout(() => { setIsPadEmpty(true); setActivePadModal('signature'); }, 300);
+                                }
+                            }}
+                            className={`px-2.5 py-1 text-[11.5px] font-bold rounded-lg border flex items-center gap-1 cursor-pointer transition-all active:scale-[0.98] ${
+                                isSignatureDone ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'
+                            }`}
+                        >
                             <span>{isSignatureDone ? '✓' : '•'}</span> 근로자서명
-                        </span>
-                        <span className={`px-2.5 py-1 text-[11.5px] font-bold rounded-lg border flex items-center gap-1 ${
-                            isReceiptDone ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'
-                        }`}>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                scrollToSection('employee-receipt-section');
+                                if (!isReceiptDone) {
+                                    setTimeout(() => { setIsPadEmpty(true); setActivePadModal('receipt'); }, 300);
+                                }
+                            }}
+                            className={`px-2.5 py-1 text-[11.5px] font-bold rounded-lg border flex items-center gap-1 cursor-pointer transition-all active:scale-[0.98] ${
+                                isReceiptDone ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'
+                            }`}
+                        >
                             <span>{isReceiptDone ? '✓' : '•'}</span> 교부확인
-                        </span>
+                        </button>
                     </div>
 
                     <button
                         data-testid="contract-signature-submit-button"
                         type="button"
                         onClick={handleSubmit}
-                        disabled={!isAllReadyToSubmit || isGenerating}
+                        disabled={isGenerating}
                         className={`w-full md:w-auto md:min-w-[240px] py-3.5 px-6 rounded-xl font-bold text-[14.5px] shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] ${
-                            isAllReadyToSubmit && !isGenerating
-                                ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                                : 'bg-slate-200 text-slate-400 border border-slate-300 cursor-not-allowed shadow-none'
+                            isGenerating
+                                ? 'bg-slate-300 text-slate-500 cursor-wait'
+                                : isAllReadyToSubmit
+                                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                    : 'bg-slate-800 hover:bg-slate-900 text-white'
                         }`}
                     >
                         {isGenerating ? (
@@ -401,10 +470,15 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                                 <span className="inline-block h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
                                 <span>계약서 생성 및 저장 중…</span>
                             </>
-                        ) : (
+                        ) : isAllReadyToSubmit ? (
                             <>
                                 <span>✍️</span>
                                 <span>전자서명 제출 및 계약 완료</span>
+                            </>
+                        ) : (
+                            <>
+                                <span>👉</span>
+                                <span>다음 필수 항목으로 이동</span>
                             </>
                         )}
                     </button>

@@ -304,7 +304,7 @@ export default function ContractBodyBlock({
                                             { value: false, label: '동의하지 않음' },
                                         ];
                                         return (
-                                            <div key={li} className="flex items-center gap-3 my-3 p-3 bg-slate-50/90 rounded-xl border border-slate-200 shrink-0">
+                                            <div id="privacy-consent-section" key={li} className="flex items-center gap-3 my-3 p-3 bg-slate-50/90 rounded-xl border border-slate-200 shrink-0 scroll-mt-20">
                                                 {consentOptions.map((opt) => {
                                                     const selected = privacyConsent === opt.value;
                                                     return (

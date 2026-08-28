@@ -108,7 +108,7 @@ export default function ContractClosingBlock(props: Props) {
                         {renderRow('성명', employeeName, 'employee')}
                         {renderRow('주소', employeeAddress, 'employee')}
                         {renderRow('연락처', employeePhone, 'employee')}
-                        <div className="flex items-stretch text-[12px] min-h-[50px] print:min-h-[36px]">
+                        <div id="employee-signature-section" className="flex items-stretch text-[12px] min-h-[50px] print:min-h-[36px] scroll-mt-20">
                             <span className="w-[82px] shrink-0 flex items-center px-3 bg-blue-50 text-blue-700 font-bold print:px-1.5">서명</span>
                             <span className="flex-1 min-w-0 px-3 py-1.5 leading-snug flex items-center justify-between gap-2 print:px-1.5 print:pb-1">
                                 {signatureDataUrl ? (
@@ -146,7 +146,7 @@ export default function ContractClosingBlock(props: Props) {
                                 )}
                             </span>
                         </div>
-                        <div className="flex items-stretch text-[12px] min-h-[50px] print:min-h-[34px]">
+                        <div id="employee-receipt-section" className="flex items-stretch text-[12px] min-h-[50px] print:min-h-[34px] scroll-mt-20">
                             <span className="w-[82px] shrink-0 flex items-center px-3 bg-blue-50 text-blue-700 font-bold print:px-1.5">교부확인</span>
                             <span className="flex-1 min-w-0 px-3 py-1.5 flex items-center justify-between text-center leading-tight print:px-1.5">
                                 {receiptTraceDataUrl ? (
