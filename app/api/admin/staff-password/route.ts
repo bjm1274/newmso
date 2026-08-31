@@ -12,6 +12,7 @@ import {
   staff_members as staffMembersTable,
   audit_logs as auditLogsTable,
   eq } from '@/lib/db';
+import { resetStaffRateLimits } from '@/lib/rate-limit';
 
 /**
  * 대상 계정이 시스템마스터인가.
@@ -98,35 +99,40 @@ export async function POST(request: Request) {
       );
     }
 
-    // 시스템마스터 계정의 비밀번호는 시스템마스터만 바꿀 수 있다.
-    //
-    // 예전에는 대상 행을 아예 보지 않았다. isAdminSession 은 permissions.admin 만
-    // 있어도 통과하므로, 일반 관리자가 시스템마스터 계정의 비밀번호를 재설정하고
-    // 그 계정으로 로그인하면 시스템마스터센터·연차수동부여·백업복구가 전부 열렸다.
-    //
-    // 대상 행을 읽지 못하면 거부한다 — 시스템마스터가 아니라는 것을 확인하지
-    // 못한 채로 비밀번호를 바꾸면 이 검사가 없는 것과 같다.
+    let targetStaffRow: any = null;
+    const d1 = await getD1Binding();
+    if (d1) {
+      try {
+        const rows = await getD1Drizzle(d1)
+          .select({
+            name: staffMembersTable.name,
+            employee_no: staffMembersTable.employee_no,
+            email: staffMembersTable.email,
+            phone: staffMembersTable.phone,
+            is_system_master: staffMembersTable.is_system_master,
+            permissions: staffMembersTable.permissions })
+          .from(staffMembersTable)
+          .where(eq(staffMembersTable.id, staffId))
+          .limit(1);
+        if (rows.length > 0) {
+          targetStaffRow = rows[0];
+        }
+      } catch (findErr) {
+        console.error('[staff-password] 직원 조회 오류:', findErr);
+      }
+    }
+
     if (!isSystemMasterSession(session.user)) {
-      const d1 = await getD1Binding();
       if (!d1) {
         return NextResponse.json(
           { ok: false, error: '대상 계정을 확인할 수 없어 요청을 거부했습니다.' },
           { status: 503 },
         );
       }
-      const rows = await getD1Drizzle(d1)
-        .select({
-          employee_no: staffMembersTable.employee_no,
-          is_system_master: staffMembersTable.is_system_master,
-          permissions: staffMembersTable.permissions })
-        .from(staffMembersTable)
-        .where(eq(staffMembersTable.id, staffId))
-        .limit(1);
-
-      if (rows.length === 0) {
+      if (!targetStaffRow) {
         return NextResponse.json({ ok: false, error: '대상 직원을 찾을 수 없습니다.' }, { status: 404 });
       }
-      if (isSystemMasterRow(rows[0])) {
+      if (isSystemMasterRow(targetStaffRow)) {
         return NextResponse.json(
           { ok: false, error: '시스템마스터 계정의 비밀번호는 변경할 수 없습니다.' },
           { status: 403 },
@@ -146,13 +152,6 @@ export async function POST(request: Request) {
       }
 
       // 비밀번호 초기화 플래그 + 초기화 시각 — D1 (boolean 바인딩 불가 → 정수 1)
-      //
-      // force_logout_at 을 같은 UPDATE 로 함께 쓴다. 두 가지를 동시에 하기 때문이다.
-      //  (1) 초기화했는데 대상자의 기존 세션이 그대로 살아 있던 문제를 닫는다.
-      //      비밀번호를 지워도 세션은 30일 슬라이딩으로 스스로 연장돼 아무 영향이 없었다.
-      //  (2) master-login 의 first-login 창(초기 비밀번호를 정할 수 있는 기간) 시작점이 된다.
-      //      따로 쓰면 한쪽만 실패했을 때 "플래그는 섰는데 시작점이 없는" 계정이 남는다.
-      // 이 UPDATE 가 통째로 실패하면 계정은 열리는 게 아니라 잠긴다(플래그 0 → 로그인 차단).
       const clearCutoffIso = sessionLogoutCutoffIso();
       try {
         const d1 = await getD1Binding();
@@ -165,7 +164,20 @@ export async function POST(request: Request) {
         }
       } catch (flagErr) {
         console.error('[staff-password] D1 password_reset_required 플래그 설정 실패:', flagErr instanceof Error ? flagErr.message : String(flagErr));
-        // 플래그 설정 실패가 본 흐름을 막지 않음
+      }
+
+      // 관리자가 비밀번호를 초기화하면 이전 로그인 실패 잠금(Rate Limit / 15분 차단)을 즉시 완전 해제한다.
+      try {
+        await resetStaffRateLimits([
+          targetStaffRow?.name,
+          targetStaffRow?.employee_no,
+          targetStaffRow?.email,
+          targetStaffRow?.phone,
+          String(staffId),
+          targetStaffRow?.employee_no ? `#${targetStaffRow.employee_no}` : null,
+        ]);
+      } catch (rateErr) {
+        console.error('[staff-password] rate limit 초기화 실패:', rateErr);
       }
 
       // 감사 로그 기록 — D1 직접 INSERT
@@ -188,10 +200,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: message }, { status: 500 });
     }
 
-    // 관리자가 비밀번호를 바꿔 준 계정도 기존 세션을 끊는다.
-    // 여기까지 오는 건 '분실·유출로 관리자가 대신 바꿔 준' 상황이라, 옛 비밀번호로 로그인해
-    // 둔 단말이 계속 살아 있으면 변경 자체가 무의미하다. 대상자는 새 비밀번호로 다시 들어온다.
-    // (관리자가 자기 계정을 대상으로 하면 자기 세션도 끊긴다 — 그게 맞는 동작이다.)
+    // 관리자가 비밀번호를 바꿔 준 계정도 기존 세션을 끊고 로그인 실패 잠금을 해제한다.
+    try {
+      await resetStaffRateLimits([
+        targetStaffRow?.name,
+        targetStaffRow?.employee_no,
+        targetStaffRow?.email,
+        targetStaffRow?.phone,
+        String(staffId),
+        targetStaffRow?.employee_no ? `#${targetStaffRow.employee_no}` : null,
+      ]);
+    } catch (rateErr) {
+      console.error('[staff-password] rate limit 초기화 실패:', rateErr);
+    }
+
     let forceLogoutAt: string | null = null;
     try {
       forceLogoutAt = await markStaffSessionsLoggedOut(staffId);

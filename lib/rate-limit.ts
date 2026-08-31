@@ -268,3 +268,30 @@ export async function resetAttempts(key: string): Promise<void> {
     console.error('[rate-limit] resetAttempts D1 오류:', err);
   }
 }
+
+/**
+ * 직원의 가능한 모든 로그인 식별자(사번, 이름, 이메일, 전화번호 등)에 대한 로그인 실패 잠금을 완전 초기화한다.
+ */
+export async function resetStaffRateLimits(identifiers: (string | null | undefined)[]): Promise<void> {
+  const d1 = await resolveD1();
+  if (!d1) return;
+
+  const validKeys = Array.from(new Set(
+    identifiers
+      .map(k => String(k || '').trim())
+      .filter(Boolean)
+  ));
+
+  if (validKeys.length === 0) return;
+
+  for (const key of validKeys) {
+    try {
+      await d1
+        .prepare('DELETE FROM rate_limit_attempts WHERE key = ?')
+        .bind(key)
+        .run();
+    } catch (err) {
+      console.error(`[rate-limit] resetStaffRateLimits D1 오류 (${key}):`, err);
+    }
+  }
+}
