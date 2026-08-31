@@ -174,7 +174,7 @@ export default function ContractClosingBlock(props: Props) {
                                         className="w-full py-2 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-[12px] flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-[0.98] print:hidden cursor-pointer"
                                     >
                                         <span>✍️</span>
-                                        <span>'교부 받음' 자필 작성</span>
+                                        <span>&apos;교부 받음&apos; 자필 작성</span>
                                     </button>
                                 ) : (
                                     <div className="w-full flex flex-col items-center justify-center">

@@ -138,10 +138,130 @@ export default function BoardDetailHeader({
         </div>
       </div>
 
+      {/* 예약 게시 공지사항 안내 */}
+      {post.board_type === '공지사항' && post.scheduled_publish_at && (
+        <div
+          style={{
+            margin: '10px 0',
+            padding: '8px 12px',
+            borderRadius: 8,
+            background: 'rgba(217, 119, 6, 0.1)',
+            border: '1px solid rgba(217, 119, 6, 0.2)',
+            fontSize: 12,
+            fontWeight: 700,
+            color: '#b45309',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <MIcon name="clock" size={14} color="#b45309" />
+          <span>
+            예약 게시: {new Date(post.scheduled_publish_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
+          </span>
+        </div>
+      )}
+
+      {/* 수술일정 / MRI일정 상세 정보 박스 */}
+      {(post.board_type === '수술일정' || post.board_type === 'MRI일정' || post.board_type === '수술' || post.board_type === 'mri') && (
+        <div
+          className="macos-glass macos-squircle-sm"
+          style={{
+            marginTop: 14,
+            padding: 14,
+            background: 'rgba(255, 255, 255, 0.55)',
+            border: '1px solid rgba(0, 0, 0, 0.06)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+          }}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--z-450)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                📅 일정 일시
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--z-900)', marginTop: 2 }}>
+                {post.schedule_date || '-'} {post.schedule_time || ''}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--z-450)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                📍 수술실 / 검사실
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--z-900)', marginTop: 2 }}>
+                {post.schedule_room || '위치 미지정'}
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              paddingTop: 10,
+              borderTop: '1px solid rgba(0, 0, 0, 0.05)',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: 10,
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--z-450)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                👤 환자명
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--m-accent)', marginTop: 2 }}>
+                {post.patient_name || '환자 미지정'}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--z-450)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                📋 차트번호
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--z-800)', marginTop: 2 }}>
+                {post.content || '-'}
+              </div>
+            </div>
+          </div>
+
+          {(post.surgery_fasting || post.surgery_inpatient || post.surgery_guardian || post.surgery_caregiver || post.surgery_transfusion || post.mri_contrast_required) && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingTop: 6, borderTop: '1px solid rgba(0, 0, 0, 0.05)' }}>
+              {post.surgery_fasting && <MChip tone="danger">금식 필요</MChip>}
+              {post.surgery_inpatient && <MChip tone="accent">입원 예정</MChip>}
+              {post.surgery_guardian && <MChip tone="success">보호자 동반</MChip>}
+              {post.surgery_caregiver && <MChip tone="warning">간병인 배치</MChip>}
+              {post.surgery_transfusion && <MChip tone="danger">수혈 필요</MChip>}
+              {post.mri_contrast_required && <MChip tone="accent">조영제 필요</MChip>}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 본문 — 안전한 markdown 렌더 (JM5: dangerouslySetInnerHTML 금지) */}
-      <div style={{ padding: '16px 0' }}>
-        <BoardMarkdown source={bodyForRender} />
-      </div>
+      {bodyForRender && !(post.board_type === '수술일정' || post.board_type === 'MRI일정' || post.board_type === '수술' || post.board_type === 'mri') && (
+        <div style={{ padding: '16px 0' }}>
+          <BoardMarkdown source={bodyForRender} />
+        </div>
+      )}
+
+      {/* 태그 목록 */}
+      {Array.isArray(post.tags) && post.tags.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '8px 0 14px' }}>
+          {post.tags.map((tag, idx) => (
+            <span
+              key={idx}
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: 'var(--m-accent)',
+                background: 'var(--m-accent-soft)',
+                padding: '2px 8px',
+                borderRadius: 6,
+              }}
+            >
+              #{String(tag)}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* 투표/설문 + 상품 추첨 */}
       {poll && (

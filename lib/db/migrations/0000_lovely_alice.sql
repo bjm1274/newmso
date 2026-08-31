@@ -1,6 +1,4 @@
 -- Current sql file was generated after introspecting the database
--- If you want to run this migration please uncomment this code before executing migrations
-/*
 CREATE TABLE `access_logs` (
 	`id` text PRIMARY KEY NOT NULL,
 	`user_id` text,
@@ -539,7 +537,7 @@ CREATE TABLE `department_private_inventory_items` (
 	FOREIGN KEY (`company_id`) REFERENCES `companies`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `department_private_inventory_unique_item` ON `department_private_inventory_items` (``);--> statement-breakpoint
+CREATE UNIQUE INDEX `department_private_inventory_unique_item` ON `department_private_inventory_items` (`company_id`,`department`,`item_name`);--> statement-breakpoint
 CREATE INDEX `department_private_inventory_scope_idx` ON `department_private_inventory_items` (`company_id`,`department`,`item_name`);--> statement-breakpoint
 CREATE TABLE `department_private_inventory_logs` (
 	`id` text PRIMARY KEY NOT NULL,
@@ -674,6 +672,8 @@ CREATE TABLE `employment_contracts` (
 	`break_start_time` text DEFAULT '12:00:00',
 	`break_end_time` text DEFAULT '13:00:00',
 	`signature_data` text,
+	`receipt_signature_data` text,
+	`privacy_consent` integer,
 	`requested_at` text DEFAULT (CURRENT_TIMESTAMP),
 	`signed_at` text,
 	`created_at` text DEFAULT (CURRENT_TIMESTAMP),
@@ -827,7 +827,7 @@ CREATE TABLE `inventory_categories` (
 	FOREIGN KEY (`parent_id`) REFERENCES `inventory_categories`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `idx_inventory_categories_parent_name` ON `inventory_categories` (``);--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_inventory_categories_parent_name` ON `inventory_categories` (`parent_id`,`name`);--> statement-breakpoint
 CREATE INDEX `idx_inventory_categories_parent_id` ON `inventory_categories` (`parent_id`);--> statement-breakpoint
 CREATE TABLE `inventory_closing_snapshots` (
 	`id` text PRIMARY KEY NOT NULL,
@@ -1301,9 +1301,9 @@ CREATE TABLE `op_check_templates` (
 	FOREIGN KEY (`created_by`) REFERENCES `staff_members`(`id`) ON UPDATE no action ON DELETE set null
 );
 --> statement-breakpoint
-CREATE INDEX `idx_op_check_templates_surgery_name` ON `op_check_templates` (``);--> statement-breakpoint
+CREATE INDEX `idx_op_check_templates_surgery_name` ON `op_check_templates` (`surgery_name`);--> statement-breakpoint
 CREATE INDEX `idx_op_check_templates_company_scope` ON `op_check_templates` (`company_id`,`template_scope`,`is_active`);--> statement-breakpoint
-CREATE INDEX `idx_op_check_templates_anesthesia` ON `op_check_templates` (``);--> statement-breakpoint
+CREATE INDEX `idx_op_check_templates_anesthesia` ON `op_check_templates` (`anesthesia_type`);--> statement-breakpoint
 CREATE TABLE `op_patient_checks` (
 	`id` text PRIMARY KEY NOT NULL,
 	`schedule_post_id` text NOT NULL,
@@ -1335,7 +1335,7 @@ CREATE TABLE `op_patient_checks` (
 	FOREIGN KEY (`created_by`) REFERENCES `staff_members`(`id`) ON UPDATE no action ON DELETE set null
 );
 --> statement-breakpoint
-CREATE INDEX `idx_op_patient_checks_patient_name` ON `op_patient_checks` (``);--> statement-breakpoint
+CREATE INDEX `idx_op_patient_checks_patient_name` ON `op_patient_checks` (`patient_name`);--> statement-breakpoint
 CREATE INDEX `idx_op_patient_checks_company_date` ON `op_patient_checks` (`company_id`,`schedule_date`,`updated_at`);--> statement-breakpoint
 CREATE TABLE `org_teams` (
 	`id` text PRIMARY KEY NOT NULL,
@@ -2320,5 +2320,3 @@ CREATE TABLE `work_shifts` (
 	`is_active` integer DEFAULT 1,
 	`created_at` text DEFAULT (CURRENT_TIMESTAMP)
 );
-
-*/

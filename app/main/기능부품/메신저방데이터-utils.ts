@@ -1,4 +1,4 @@
-import { toUtcSqlTimestamp } from '@/lib/chat-read-cursors';
+import { toUtcSqlTimestamp } from '@/lib/chat-timestamp';
 import { selectChatMessagesWithFallback as defaultSelectChatMessagesWithFallback } from './메신저데이터유틸';
 import { CHAT_METADATA_QUERY_CHUNK_SIZE, type SelectChatMessagesWithFallback } from './메신저방데이터-types';
 

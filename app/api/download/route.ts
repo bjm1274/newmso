@@ -36,6 +36,36 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'url 파라미터가 필요합니다' }, { status: 400 });
     }
 
+    // 내부 스토리지 프록시 상대 경로 처리
+    if (fileUrl.startsWith('/api/storage/object') || fileUrl.startsWith('/')) {
+      const redirectUrl = new URL(fileUrl, request.nextUrl.origin);
+      if (inline) {
+        redirectUrl.searchParams.set('inline', '1');
+      } else {
+        redirectUrl.searchParams.set('download', '1');
+      }
+      if (fileName && fileName !== 'download') {
+        redirectUrl.searchParams.set('name', fileName);
+      }
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    // r2.pchos.kr 등 공개 R2 도메인은 내부 프록시로 안전하게 리다이렉트
+    if (fileUrl.includes('r2.pchos.kr')) {
+      try {
+        const parsed = new URL(fileUrl);
+        const objectKey = decodeURIComponent(parsed.pathname.replace(/^\/+/, ''));
+        const internalUrl = new URL('/api/storage/object', request.nextUrl.origin);
+        internalUrl.searchParams.set('provider', 'r2');
+        internalUrl.searchParams.set('bucket', 'pchos-files');
+        internalUrl.searchParams.set('key', objectKey);
+        if (inline) internalUrl.searchParams.set('inline', '1');
+        else internalUrl.searchParams.set('download', '1');
+        if (fileName && fileName !== 'download') internalUrl.searchParams.set('name', fileName);
+        return NextResponse.redirect(internalUrl);
+      } catch {}
+    }
+
     if (!isAllowedUrl(fileUrl)) {
       return NextResponse.json({ error: '허용되지 않는 URL입니다' }, { status: 403 });
     }

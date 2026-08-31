@@ -179,3 +179,9 @@ electron-app/*-Windows-*/
 
 # 로컬 개발용 D1 sqlite (build 산출물이 아니라 빈 고아 파일이었다)
 /lib/db/local.sqlite
+
+# 배포용 키 및 아카이브
+*.key
+AllERP.key
+*.tar.gz
+allerp-deploy.tar.gz

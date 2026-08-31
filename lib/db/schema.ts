@@ -585,6 +585,7 @@ export const device_inspections = sqliteTable("device_inspections", {
 
 export const discharge_reviews = sqliteTable("discharge_reviews", {
 	id: text().primaryKey().notNull(),
+	company_id: text(),
 	patient_name: text().notNull(),
 	department: text().notNull(),
 	admission_date: text().notNull(),

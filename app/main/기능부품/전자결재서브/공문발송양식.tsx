@@ -6,7 +6,8 @@ import { getKoreanTodayString } from '@/lib/seoul-time';
 import SmartDatePicker from '../공통/SmartDatePicker';
 import {
   buildOfficialDocumentApprovalContent,
-  type OfficialDocRequest } from '@/lib/official-document-approval';
+  extractOfficialDocRequest,
+  type OfficialDocRequest } from '@/lib/official-document-shared';
 
 type OfficialDocumentDraft = Partial<OfficialDocRequest>;
 

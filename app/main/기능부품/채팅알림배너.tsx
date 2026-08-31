@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { toNotificationText, getInitials } from '@/lib/notification-utils';
+import { toNotificationText, getInitials } from '@/lib/notification-format';
 
 type ChatDetail = {
   title?: unknown;

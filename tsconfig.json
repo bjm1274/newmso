@@ -54,6 +54,7 @@
     "scratch_zip",
     "handoff",
     "outputs",
-    "electron-app"
+    "electron-app",
+    "agent-claw"
   ]
 }

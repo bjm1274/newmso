@@ -4,12 +4,6 @@ import { withMissingColumnFallback, withMissingColumnsFallback } from '@/lib/db-
 import {
   callAtomicStockTransfer,
   postStockMovement } from '@/lib/inventory-stock-client';
-import {
-  getD1Binding,
-  getD1Drizzle,
-  inventory as inventoryTable,
-  and,
-  eq } from '@/lib/db';
 import type { InventoryItem, StaffMember } from '@/types';
 
 type LooseRecord = Record<string, unknown>;
@@ -485,25 +479,6 @@ export async function fetchSupportInventoryRows(): Promise<{
   error: unknown;
 }> {
   try {
-    const d1 = await getD1Binding();
-    if (d1) {
-      // 서버/Workers — D1 직접 조회
-      const db = getD1Drizzle(d1);
-      const rows = await db
-        .select()
-        .from(inventoryTable)
-        .where(
-          and(
-            eq(inventoryTable.company, INVENTORY_SUPPORT_COMPANY),
-            eq(inventoryTable.department, INVENTORY_SUPPORT_DEPARTMENT),
-          ),
-        );
-      return {
-        data: normalizeSupportInventoryRows(toLooseRecordArray(rows) as InventoryLike[]),
-        error: null };
-    }
-
-    // 브라우저 — d1Client가 /api/d1/query로 D1을 읽는다
     const { data, error } = await d1Client
       .from('inventory')
       .select(INVENTORY_SELECT_COLUMNS)

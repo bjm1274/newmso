@@ -5,8 +5,8 @@ import { toast } from '@/lib/toast';
 import {
   DEFAULT_LEAVE_POLICY_SETTINGS,
   loadLeavePolicySettings,
-  saveLeavePolicySettings,
-  type LeavePolicySettings } from '@/lib/leave-policy-settings';
+  saveLeavePolicySettingsClient as saveLeavePolicySettings,
+  type LeavePolicySettings } from '@/lib/leave-policy-shared';
 
 type HolidayWorkPolicySettingsProps = {
   selectedCo: string;

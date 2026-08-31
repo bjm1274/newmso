@@ -1,11 +1,5 @@
-import { sql } from 'drizzle-orm';
+import 'server-only';
 import { withMissingColumnsFallback } from '@/lib/db-compat';
-import {
-  payroll_records as payrollRecordsTable,
-  getD1Binding,
-  getD1Drizzle,
-  resolveDataBackend } from '@/lib/db';
-import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
 
 type SupabaseMutationResult<T = unknown> = {
   data: T | null;
@@ -107,60 +101,6 @@ function normalizePayrollRecordForD1(record: Record<string, unknown>): Record<st
   return next;
 }
 
-// D1 binding 필수 — Workers env 가 없으면 throw. (서버 라우트 안에서만 호출)
-async function requireD1ForPayrollRecords(label: string) {
-  const backend = await resolveDataBackend();
-  const d1 = await getD1Binding();
-  if (!d1) {
-    logD1BindingMissing({ label, backend });
-    throw new Error(`[payroll_records] D1 binding not available (${label})`);
-  }
-  return getD1Drizzle(d1);
-}
-
-// onConflict target 목록 — D1 unique index와 일치해야 함
-function resolveD1ConflictTargetColumns(conflictTarget: string) {
-  if (conflictTarget === PAYROLL_RECORD_LEGACY_CONFLICT_TARGET) {
-    return [payrollRecordsTable.staff_id, payrollRecordsTable.year_month];
-  }
-  return [
-    payrollRecordsTable.staff_id,
-    payrollRecordsTable.year_month,
-    payrollRecordsTable.record_type,
-  ];
-}
-
-const PAYROLL_UPDATE_SET = {
-  base_salary: sql`excluded.base_salary`,
-  meal_allowance: sql`excluded.meal_allowance`,
-  vehicle_allowance: sql`excluded.vehicle_allowance`,
-  childcare_allowance: sql`excluded.childcare_allowance`,
-  research_allowance: sql`excluded.research_allowance`,
-  other_taxfree: sql`excluded.other_taxfree`,
-  extra_allowance: sql`excluded.extra_allowance`,
-  overtime_pay: sql`excluded.overtime_pay`,
-  bonus: sql`excluded.bonus`,
-  night_duty_allowance: sql`excluded.night_duty_allowance`,
-  total_taxable: sql`excluded.total_taxable`,
-  total_taxfree: sql`excluded.total_taxfree`,
-  total_deduction: sql`excluded.total_deduction`,
-  net_pay: sql`excluded.net_pay`,
-  gross_pay: sql`excluded.gross_pay`,
-  attendance_deduction: sql`excluded.attendance_deduction`,
-  attendance_deduction_detail: sql`excluded.attendance_deduction_detail`,
-  deduction_detail: sql`excluded.deduction_detail`,
-  status: sql`excluded.status`,
-  severance_pay: sql`excluded.severance_pay`,
-  settlement_reason: sql`excluded.settlement_reason`,
-  settlement_date: sql`excluded.settlement_date`,
-  advance_pay: sql`excluded.advance_pay`,
-  national_pension: sql`excluded.national_pension`,
-  health_insurance: sql`excluded.health_insurance`,
-  long_term_care: sql`excluded.long_term_care`,
-  employment_insurance: sql`excluded.employment_insurance`,
-  income_tax: sql`excluded.income_tax`,
-  local_tax: sql`excluded.local_tax` } as const;
-
 async function runPayrollRecordUpsert(
   payload: PayrollRecordPayload,
   conflictTarget: string,
@@ -209,15 +149,60 @@ async function runPayrollRecordUpsert(
       }
 
       try {
-        const db = await requireD1ForPayrollRecords('runPayrollRecordUpsert');
+        const { getD1Binding, getD1Drizzle, resolveDataBackend, payroll_records } = await import('@/lib/db');
+        const { logD1BindingMissing } = await import('@/lib/db/mirror-metrics');
+        const { sql } = await import('drizzle-orm');
+
+        const backend = await resolveDataBackend();
+        const d1 = await getD1Binding();
+        if (!d1) {
+          logD1BindingMissing({ label: 'runPayrollRecordUpsert', backend });
+          throw new Error('[payroll_records] D1 binding not available (runPayrollRecordUpsert)');
+        }
+        const db = getD1Drizzle(d1);
         const normalized = records.map(normalizePayrollRecordForD1);
-        const targetCols = resolveD1ConflictTargetColumns(nextConflictTarget);
+        const targetCols =
+          nextConflictTarget === PAYROLL_RECORD_LEGACY_CONFLICT_TARGET
+            ? [payroll_records.staff_id, payroll_records.year_month]
+            : [payroll_records.staff_id, payroll_records.year_month, payroll_records.record_type];
+
+        const updateSet = {
+          base_salary: sql`excluded.base_salary`,
+          meal_allowance: sql`excluded.meal_allowance`,
+          vehicle_allowance: sql`excluded.vehicle_allowance`,
+          childcare_allowance: sql`excluded.childcare_allowance`,
+          research_allowance: sql`excluded.research_allowance`,
+          other_taxfree: sql`excluded.other_taxfree`,
+          extra_allowance: sql`excluded.extra_allowance`,
+          overtime_pay: sql`excluded.overtime_pay`,
+          bonus: sql`excluded.bonus`,
+          night_duty_allowance: sql`excluded.night_duty_allowance`,
+          total_taxable: sql`excluded.total_taxable`,
+          total_taxfree: sql`excluded.total_taxfree`,
+          total_deduction: sql`excluded.total_deduction`,
+          net_pay: sql`excluded.net_pay`,
+          gross_pay: sql`excluded.gross_pay`,
+          attendance_deduction: sql`excluded.attendance_deduction`,
+          attendance_deduction_detail: sql`excluded.attendance_deduction_detail`,
+          deduction_detail: sql`excluded.deduction_detail`,
+          status: sql`excluded.status`,
+          severance_pay: sql`excluded.severance_pay`,
+          settlement_reason: sql`excluded.settlement_reason`,
+          settlement_date: sql`excluded.settlement_date`,
+          advance_pay: sql`excluded.advance_pay`,
+          national_pension: sql`excluded.national_pension`,
+          health_insurance: sql`excluded.health_insurance`,
+          long_term_care: sql`excluded.long_term_care`,
+          employment_insurance: sql`excluded.employment_insurance`,
+          income_tax: sql`excluded.income_tax`,
+          local_tax: sql`excluded.local_tax` };
+
         await db
-          .insert(payrollRecordsTable)
+          .insert(payroll_records)
           .values(normalized as never)
           .onConflictDoUpdate({
             target: targetCols,
-            set: PAYROLL_UPDATE_SET as never });
+            set: updateSet as never });
         return { data: normalized, error: null };
       } catch (err) {
         return { data: null, error: err };

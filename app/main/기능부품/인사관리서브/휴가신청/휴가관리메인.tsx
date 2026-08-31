@@ -3,7 +3,7 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useEffect, useMemo, useState } from 'react';
 import { db } from '@/lib/db-client';
-import { calculateApprovedAnnualLeaveUsage } from '@/lib/annual-leave-ledger';
+import { calculateApprovedAnnualLeaveUsage } from '@/lib/annual-leave-calculator';
 import { logAudit, readClientAuditActor } from '@/lib/audit';
 import { isNamedSystemMasterAccount } from '@/lib/system-master';
 import { STORAGE_KEYS } from '@/lib/storage-keys';

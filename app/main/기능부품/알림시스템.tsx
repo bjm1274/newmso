@@ -12,7 +12,7 @@ import {
   NOTIFICATION_MENU_LABELS,
   resolveNotificationTarget } from '@/lib/notification-metadata';
 import { CHAT_ACTIVE_ROOM_KEY as ACTIVE_CHAT_ROOM_SESSION_KEY } from '@/app/main/navigation-state';
-import { toNotificationText } from '@/lib/notification-utils';
+import { toNotificationText } from '@/lib/notification-format';
 
 // ─── 서브모듈 re-exports (외부 import 호환성 유지) ───
 export type { NotifSettings } from './알림시스템/settings';

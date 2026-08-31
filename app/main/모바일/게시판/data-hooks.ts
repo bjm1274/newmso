@@ -135,25 +135,25 @@ const BOARD_LIST_LIMIT = 1000;
 
 /** board_type → cat. 미매칭(전역 subView '전체' 등)은 'all' — free로 강제하지 않음 */
 export function boardTypeToCat(boardType: string | null | undefined): BoardCatId {
-  if (!boardType || boardType === '전체' || boardType === 'all') return 'all';
+  if (!boardType || boardType === '전체' || boardType === 'all') return 'notice';
   const cat = BOARD_CATS.find((c) => c.boardType === boardType || c.id === boardType);
-  return cat ? cat.id : 'all';
+  return cat && cat.id !== 'all' ? cat.id : 'notice';
 }
 
 /**
  * 게시판 subView 해석.
- * - '전체'/빈값/타 메뉴 잔여값 → 전체 리스트 (리스트가 메인)
+ * - '전체'/빈값/타 메뉴 잔여값 → 공지사항 리스트 (공지가 기본)
  * - 보드 id/board_type → 해당 카테고리 리스트
  */
 export function resolveBoardSubView(subView: string | null | undefined): {
   cat: BoardCatId;
   openList: boolean;
 } {
-  // 메인 진입: 항상 리스트(전체). 카테고리 홈은 쓰지 않음.
+  // 메인 진입: 항상 리스트(공지사항 기본).
   if (!subView || subView === '전체' || subView === 'all') {
-    return { cat: 'all', openList: true };
+    return { cat: 'notice', openList: true };
   }
-  // 폐지 보드·레거시 id → 전체로 폴백
+  // 폐지 보드·레거시 id → 공지로 폴백
   if (
     subView === 'suggest' ||
     subView === 'anon' ||
@@ -161,13 +161,13 @@ export function resolveBoardSubView(subView: string | null | undefined): {
     subView === '익명소리함' ||
     subView === '제안함'
   ) {
-    return { cat: 'all', openList: true };
+    return { cat: 'notice', openList: true };
   }
-  const isCatId = BOARD_CATS.some((c) => c.id === subView);
+  const isCatId = BOARD_CATS.some((c) => c.id === subView && c.id !== 'all');
   if (isCatId) return { cat: subView as BoardCatId, openList: true };
   const cat = BOARD_CATS.find((c) => c.boardType === subView);
-  if (cat) return { cat: cat.id, openList: true };
-  return { cat: 'all', openList: true };
+  if (cat && cat.id !== 'all') return { cat: cat.id, openList: true };
+  return { cat: 'notice', openList: true };
 }
 
 // ─────────────────────────────────────────────

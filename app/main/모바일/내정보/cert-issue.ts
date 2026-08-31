@@ -158,8 +158,8 @@ export async function issueAndPrintMyCert(
       if (insertError) throw insertError;
     } catch (insertError) {
       console.error('[mobile-cert] issuance insert failed', insertError);
-      // 인쇄는 진행하되 이력 저장 실패는 별도 안내(PC는 무음 처리하나 모바일은 안내).
-      toast('발급 이력 저장에 실패했지만 인쇄는 진행합니다.', 'warning');
+      toast('증명서 발급 이력 저장에 실패하여 발급을 중단합니다.', 'error');
+      return false;
     }
 
     // 발급 컨텍스트 구성 (증명서발급.tsx handleIssue 모방, 본인 1건).

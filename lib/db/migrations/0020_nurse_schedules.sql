@@ -16,3 +16,9 @@ CREATE TABLE IF NOT EXISTS nurse_schedules (
 
 CREATE INDEX IF NOT EXISTS idx_nurse_schedules_ym ON nurse_schedules (year_month);
 CREATE INDEX IF NOT EXISTS idx_nurse_schedules_staff_ym ON nurse_schedules (staff_id, year_month);
+
+ALTER TABLE nurse_schedules ADD COLUMN staff_name TEXT;
+ALTER TABLE nurse_schedules ADD COLUMN company TEXT;
+ALTER TABLE nurse_schedules ADD COLUMN department TEXT;
+ALTER TABLE nurse_schedules ADD COLUMN notes TEXT;
+ALTER TABLE nurse_schedules ADD COLUMN updated_at TEXT DEFAULT (CURRENT_TIMESTAMP);

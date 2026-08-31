@@ -17,7 +17,8 @@ import {
   getD1Binding,
   getD1Drizzle,
   staff_members as staffMembersTable,
-  eq } from '@/lib/db';
+  eq,
+  or } from '@/lib/db';
 
 async function successResponse(user: any, notice?: string) {
   const safeUser = normalizeSessionUser(user);
@@ -131,9 +132,10 @@ async function fetchStaffLoginRowByEmployeeNoD1(loginId: string): Promise<StaffL
     .select()
     .from(staffMembersTable)
     .where(eq(staffMembersTable.employee_no, loginId))
-    .limit(1);
-  const row = rows[0] ?? null;
-  return row ? normalizeD1LoginRow(row as Record<string, unknown>) : null;
+    .limit(10);
+  const normalized = rows.map((r) => normalizeD1LoginRow(r as Record<string, unknown>));
+  const active = normalized.find((r) => isActiveStaff(r));
+  return active ?? normalized[0] ?? null;
 }
 
 async function fetchStaffLoginRowsByNameD1(name: string): Promise<StaffLoginRow[]> {
@@ -159,6 +161,26 @@ async function fetchStaffLoginRowByNameSingleD1(name: string): Promise<StaffLogi
     .limit(1);
   const row = rows[0] ?? null;
   return row ? normalizeD1LoginRow(row as Record<string, unknown>) : null;
+}
+
+async function fetchStaffLoginRowsByEmailOrPhoneD1(identifier: string): Promise<StaffLoginRow[]> {
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[master-login] D1 binding not available (fetchStaffLoginRowsByEmailOrPhoneD1)');
+  const db = getD1Drizzle(d1);
+  const normalizedPhone = identifier.replace(/[^0-9]/g, '');
+  const rows = await db
+    .select()
+    .from(staffMembersTable)
+    .where(
+      or(
+        eq(staffMembersTable.email, identifier),
+        eq(staffMembersTable.staff_email, identifier),
+        eq(staffMembersTable.phone, identifier),
+        ...(normalizedPhone ? [eq(staffMembersTable.phone, normalizedPhone)] : [])
+      )
+    )
+    .limit(10);
+  return rows.map((r) => normalizeD1LoginRow(r as Record<string, unknown>));
 }
 
 // ----------------------------------------------------------------
@@ -228,8 +250,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    loginId = String(body?.loginId ?? '').trim();
-    password = String(body?.password ?? '');
+    loginId = String(body?.loginId ?? body?.login_id ?? body?.id ?? '').trim();
+    password = String(body?.password ?? body?.passwd ?? '');
   } catch {
     return failureResponse('잘못된 요청 형식입니다.', 400);
   }
@@ -272,10 +294,16 @@ export async function POST(request: NextRequest) {
         }
         if (activeNameMatches.length === 1) {
           userRow = activeNameMatches[0];
+        } else {
+          // 사번/이름 매칭이 없을 때 이메일 또는 연락처로 조회
+          const byAltRows = await fetchStaffLoginRowsByEmailOrPhoneD1(loginId);
+          const activeAltMatches = byAltRows.filter(isActiveStaffForLogin);
+          if (activeAltMatches.length === 1) {
+            userRow = activeAltMatches[0];
+          } else if (activeAltMatches.length > 1) {
+            return failureResponse('동일한 연락처/이메일 계정이 여러 개 있습니다. 사번으로 로그인해 주세요.');
+          }
         }
-        // 예전에는 여기에 `else if (byNameRows.length === 1) { userRow = byNameRows[0]; }` 폴백이 있었다.
-        // 재직 매칭이 0건일 때 퇴사자 단일 행을 그대로 통과시키는 경로라, 재직 검사가
-        // 사실상 동명이인 판별용으로만 남아 있었다. 퇴사자는 이름으로도 들어올 수 없어야 한다.
       }
     } catch (d1Err) {
       console.error('[master-login] D1 staff_members 조회 실패:', d1Err instanceof Error ? d1Err.message : String(d1Err));

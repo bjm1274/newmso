@@ -157,6 +157,9 @@ export async function applyDueAppointments(todayKey?: string): Promise<Appointme
       if (isSeparationOrder(row.order_type)) {
         staffUpdates.status = '퇴사';
         staffUpdates.resigned_at = effectiveDate;
+        staffUpdates.role = 'inactive';
+        staffUpdates.permissions = '[]';
+        staffUpdates.force_logout_at = new Date().toISOString();
       }
 
       if (Object.keys(staffUpdates).length > 0) {

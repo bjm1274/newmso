@@ -20,8 +20,8 @@ import { toast } from '@/lib/toast';
 import {
   type NotificationAutomationSettings,
   DEFAULT_NOTIFICATION_AUTOMATION,
-  loadNotificationAutomationSettings,
-  saveNotificationAutomationSettings } from '@/lib/notification-automation-settings';
+  loadNotificationAutomationSettingsClient as loadNotificationAutomationSettings,
+  saveNotificationAutomationSettingsClient as saveNotificationAutomationSettings } from '@/lib/notification-automation-shared';
 
 interface StaffLite {
   id: string;

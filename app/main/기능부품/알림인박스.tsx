@@ -31,7 +31,7 @@ import {
   markNotificationsAsRead,
   NOTIFICATION_LIST_UPDATED_EVENT } from './알림시스템/notification-api';
 import { normalizeKeywordList } from './알림시스템/filter-helpers';
-import { timeAgo } from '@/lib/notification-utils';
+import { timeAgo } from '@/lib/notification-format';
 
 // ─── 타입 설정 ───
 const TABS = [

@@ -19,6 +19,7 @@ import { z } from 'zod';
 import { sql, getTableColumns, type SQL } from 'drizzle-orm';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { emitRealtimeSignal } from '@/lib/realtime/server-signal';
+import { isCloudflareWorkerRuntime } from '@/lib/cloudflare-runtime';
 import {
   userId,
   buildClaimsFromSession,
@@ -353,8 +354,7 @@ async function loadPolicyRowsForMutation(
   const rowIndependent =
     pattern === 'PUBLIC' ||
     pattern === 'AUTHENTICATED' ||
-    pattern === 'ADMIN_ONLY' ||
-    pattern === 'ADMIN_OR_MANAGER';
+    pattern === 'ADMIN_ONLY';
   const hasGuards = Boolean(cfg?.guards?.[op]) || Boolean(cfg?.asyncGuards?.[op]);
   if (cfg && rowIndependent && !hasGuards) {
     // 이 경우에만 합성 행을 쓴다 — 정책이 행 내용을 보지 않으므로 판정 결과가 같다.
@@ -823,16 +823,18 @@ export async function POST(request: Request) {
         // Cloudflare Workers: waitUntil 로 응답 후 작업 보장. 로컬/미지원 시 fire-and-forget.
         // (클라이언트 triggerChatPush + 5분 cron 이 최종 폴백)
         let scheduled = false;
-        try {
-          const { getCloudflareContext } = await import('@opennextjs/cloudflare');
-          const cf = getCloudflareContext();
-          const waitUntil = (cf as { ctx?: { waitUntil?: (p: Promise<unknown>) => void } })?.ctx?.waitUntil;
-          if (typeof waitUntil === 'function') {
-            waitUntil(dispatchInsertedPushes());
-            scheduled = true;
+        if (isCloudflareWorkerRuntime()) {
+          try {
+            const { getCloudflareContext } = await import('@opennextjs/cloudflare');
+            const cf = getCloudflareContext();
+            const waitUntil = (cf as { ctx?: { waitUntil?: (p: Promise<unknown>) => void } })?.ctx?.waitUntil;
+            if (typeof waitUntil === 'function') {
+              waitUntil(dispatchInsertedPushes());
+              scheduled = true;
+            }
+          } catch {
+            // getCloudflareContext 불가(로컬 next dev 등)
           }
-        } catch {
-          // getCloudflareContext 불가(로컬 next dev 등)
         }
         if (!scheduled) {
           void dispatchInsertedPushes();
@@ -901,16 +903,18 @@ export async function POST(request: Request) {
         };
 
         let notiScheduled = false;
-        try {
-          const { getCloudflareContext } = await import('@opennextjs/cloudflare');
-          const cf = getCloudflareContext();
-          const waitUntil = (cf as { ctx?: { waitUntil?: (p: Promise<unknown>) => void } })?.ctx?.waitUntil;
-          if (typeof waitUntil === 'function') {
-            waitUntil(dispatchInsertedNotificationPushes());
-            notiScheduled = true;
+        if (isCloudflareWorkerRuntime()) {
+          try {
+            const { getCloudflareContext } = await import('@opennextjs/cloudflare');
+            const cf = getCloudflareContext();
+            const waitUntil = (cf as { ctx?: { waitUntil?: (p: Promise<unknown>) => void } })?.ctx?.waitUntil;
+            if (typeof waitUntil === 'function') {
+              waitUntil(dispatchInsertedNotificationPushes());
+              notiScheduled = true;
+            }
+          } catch {
+            // getCloudflareContext 불가(로컬 next dev 등)
           }
-        } catch {
-          // getCloudflareContext 불가(로컬 next dev 등)
         }
         if (!notiScheduled) {
           void dispatchInsertedNotificationPushes();

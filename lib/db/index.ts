@@ -17,11 +17,7 @@ export * from './types';
 export { getD1Drizzle } from './client-d1';
 export type { D1Client } from './client-d1';
 
-// Supabase→D1 병행쓰기(dual-write) 헬퍼는 D1 컷오버 완료로 제거했다.
-// 호출부가 한 곳도 없었고, 배럴 재수출만 남아 살아 있는 것처럼 보였다.
-// (아래 mirror / mirror-metrics 는 여전히 사용 중이다 — work-shifts 라우트 등)
-
-// Phase 2 — Next.js API route용 D1 binding 헬퍼
+// Next.js API route용 D1/SQLite 통합 binding 헬퍼
 export { getD1Binding, resolveDataBackend } from './get-binding';
 
 // Phase 2 — 일반화된 D1 미러 헬퍼 (테이블별 dual-write 확장용)

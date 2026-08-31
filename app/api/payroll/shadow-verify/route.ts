@@ -23,7 +23,7 @@ import {
   getD1Drizzle,
   payroll_locks as payrollLocksTable,
   tax_insurance_rates as taxInsuranceRatesTable } from '@/lib/db';
-import { logAudit } from '@/lib/audit';
+import { logAuditServer as logAudit } from '@/lib/audit-server';
 import { hasStaffRecordScope, userId } from '@/lib/d1-api-helpers';
 import { normalizeSessionUser, readSessionFromRequest } from '@/lib/server-session';
 import {

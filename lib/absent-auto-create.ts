@@ -170,8 +170,21 @@ async function fetchStaffsWithoutYesterdayAttendance(yesterday: string): Promise
          WHERE (lr.status = '승인' OR lr.status = 'approved')
            AND lr.start_date <= ?
            AND lr.end_date >= ?
+       )
+       AND sm.id NOT IN (
+         SELECT DISTINCT app.sender_id
+         FROM approvals app
+         WHERE (app.status = '승인' OR app.status = 'approved')
+           AND (
+             app.type IN ('외근신청서', '출장신청서', '재택근무신청서', '교육신청서', '외부교육신청서')
+             OR app.title LIKE '%외근%'
+             OR app.title LIKE '%출장%'
+             OR app.title LIKE '%재택%'
+           )
+           AND substr(app.created_at, 1, 10) <= ?
+           AND substr(COALESCE(app.updated_at, app.created_at), 1, 10) >= ?
        )`,
-    [yesterday, yesterday, yesterday],
+    [yesterday, yesterday, yesterday, yesterday, yesterday],
   );
   return rows as unknown as StaffMember[];
 }

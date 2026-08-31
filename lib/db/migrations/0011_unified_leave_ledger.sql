@@ -58,9 +58,9 @@ SELECT
   substr(start_date, 1, 10),
   'request:' || id,
   id,
-  '?? ?? ?? ?? ??',
+  '레거시 휴가 신청 이관',
   created_at
 FROM leave_requests
-WHERE status IN ('??', 'approved')
-  AND leave_type NOT LIKE '%??%'
-  AND leave_type LIKE '%??%';
+WHERE status IN ('승인', 'approved')
+  AND leave_type NOT LIKE '%무급%'
+  AND (leave_type LIKE '%연차%' OR leave_type LIKE '%반차%');

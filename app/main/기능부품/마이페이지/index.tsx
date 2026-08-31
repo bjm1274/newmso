@@ -28,7 +28,6 @@ import { completeContractSigning } from '@/lib/contract-sign-complete';
 import { useAnnualLeaveSummary } from '@/lib/annual-leave-summary';
 import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 import { isActiveStaff } from '@/lib/active-staff';
-import { sendAdminNotifications } from '@/lib/notification-utils';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { HR_TAB_KEY, INV_VIEW_KEY, MYPAGE_TAB_KEY } from '@/app/main/navigation-state';
@@ -326,13 +325,18 @@ function MyPageMain({
         console.warn('[마이페이지] 온보딩 체크리스트 업데이트 실패(서명·문서는 완료):', checklistError.message);
       }
 
-      // HR에게 알림 전송 — [4차 전수조사 admin-05] 존재하지 않는 user_id='system_admin'
-      // (FK 위반) 대신 HR 담당 부서 staff에게 fan-out + dedupe하는 공통 헬퍼 사용.
-      await sendAdminNotifications([{
-        type: 'SUCCESS',
-        title: '계약서 서명 완료',
-        body: `${user?.name} 님이 근로계약서에 전자서명을 완료했습니다.`,
-        dedupeKey: `contract-signed:${pendingContract.id}` }]);
+      // HR에게 알림 전송
+      try {
+        await fetch('/api/notifications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'SUCCESS',
+            title: '계약서 서명 완료',
+            body: `${user?.name} 님이 근로계약서에 전자서명을 완료했습니다.`,
+            metadata: { dedupe_key: `contract-signed:${pendingContract.id}` } }),
+        });
+      } catch {}
 
       toast('근로계약서 서명이 성공적으로 완료되었습니다. 마이페이지 > 급여·증명서 또는 문서보관함에서 확인하실 수 있습니다.', 'success');
       window.dispatchEvent(new CustomEvent('erp-contract-signed', { detail: { staffId: resolvedStaffId, contractId: pendingContract.id } }));

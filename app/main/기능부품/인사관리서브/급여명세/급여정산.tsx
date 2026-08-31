@@ -26,8 +26,8 @@ import {
   calculateEarlyLeaveMinutes,
   buildDateWithTime } from '../../마이페이지/출퇴근기록/checkin-utils';
 import { decideCheckInStatus } from '../../마이페이지/출퇴근기록/late-status';
-import { upsertPayrollRecordsWithFallback } from '@/lib/payroll-record-upsert';
-import { NP_INCOME_CEILING, NP_INCOME_FLOOR, NIGHT_DUTY_TAX_FREE_LIMIT } from '@/lib/tax-free-limits';
+import { NIGHT_DUTY_TAX_FREE_LIMIT } from '@/lib/tax-free-limits';
+import { upsertPayrollRecordsWithFallback } from '@/lib/payroll-record-client';
 import { calcStatutoryDeductions, type StatutoryDeductionOptions } from '@/lib/payroll-deductions';
 import { verifyPayrollBeforeSave } from '@/lib/payroll-shadow-verify';
 import { getPayrollInsuranceSettings, resolvePayrollAsOfDate, hasAnyEmployeePayrollInsurance, isDuruNuriActiveForYearMonth } from '@/lib/payroll-insurance-settings';

@@ -16,7 +16,7 @@ import { canAccessHrSection } from '@/lib/access-control';
 import {
   extractApprovalDocNumberFromDocument,
   mapApprovalToDocumentRepositoryEntry,
-} from '@/lib/approval-document-archive';
+} from '@/lib/approval-document-shared';
 import {
   DOC_REPO_GROUP_META,
   buildFolderCategories,

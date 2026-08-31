@@ -10,9 +10,11 @@
 //         chat/typing · read-cursors · upload, quick-reply
 // ============================================================
 
-import { eq } from 'drizzle-orm';
-import type { D1Client } from '@/lib/db/client-d1';
-import { chat_rooms } from '@/lib/db/schema';
+import 'server-only';
+export * from '@/lib/chat-members-parser';
+import { parseMembersField } from '@/lib/chat-members-parser';
+
+type D1Client = any;
 
 export type ChatRoomMembership = {
   id: string;
@@ -20,30 +22,6 @@ export type ChatRoomMembership = {
   members: string[];
   created_by: string | null;
 };
-
-/** D1 text(JSON) 또는 이미 파싱된 배열 → string[] (클라이언트 normalizeMemberIds 와 정합) */
-export function parseMembersField(raw: unknown): string[] {
-  let parsed: unknown = raw;
-  if (typeof raw === 'string') {
-    const trimmed = raw.trim();
-    if (!trimmed) return [];
-    try {
-      parsed = JSON.parse(trimmed);
-    } catch {
-      // 단일 UUID 문자열
-      return [trimmed];
-    }
-  }
-  if (Array.isArray(parsed)) {
-    return parsed.map((m) => String(m ?? '').trim()).filter(Boolean);
-  }
-  if (parsed && typeof parsed === 'object') {
-    return Object.values(parsed as Record<string, unknown>)
-      .map((m) => String(m ?? '').trim())
-      .filter(Boolean);
-  }
-  return [];
-}
 
 export function isNoticeRoomType(type: string | null | undefined): boolean {
   return String(type ?? '').trim() === 'notice';
@@ -72,6 +50,9 @@ export async function loadChatRoomMembership(
 ): Promise<ChatRoomMembership | null> {
   const rid = String(roomId || '').trim();
   if (!rid) return null;
+
+  const { eq } = await import('drizzle-orm');
+  const { chat_rooms } = await import('@/lib/db/schema');
 
   const rows = await db
     .select({

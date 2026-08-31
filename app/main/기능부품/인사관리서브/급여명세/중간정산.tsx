@@ -5,7 +5,7 @@ import { type ChangeEvent, useEffect, useRef, useState } from 'react';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { formatPayrollMutationError } from '@/lib/payroll-records';
-import { upsertPayrollRecordWithFallback } from '@/lib/payroll-record-upsert';
+import { upsertPayrollRecordWithFallback } from '@/lib/payroll-record-client';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import {
   calculateDcRetirementBenefitFromMonthlyWage,

@@ -31,7 +31,7 @@ import {
   defaultResolveStoredCurrentApproverId,
 } from '@/lib/approval-inbox';
 import { resolveStoredCurrentApproverId, resolveEffectiveApproverIdCore } from '@/lib/approval-shared';
-import { toUtcSqlTimestamp } from '@/lib/chat-read-cursors';
+import { toUtcSqlTimestamp } from '@/lib/chat-timestamp';
 
 // ─────────────────────────────────────────────
 // 타입

@@ -19,8 +19,8 @@ export type ChatPresenceInfo = {
   onlineAt: string;
 };
 
-/** 온라인 판정 freshness 5분 대비 여유 있는 폴링 주기 */
-export const PRESENCE_POLL_MS = 45_000;
+/** 온라인 판정 freshness 대비 고속 폴링 주기 (오라클 전용 서버 10초) */
+export const PRESENCE_POLL_MS = 10_000;
 
 type PresenceRow = {
   userId?: unknown;

@@ -13,7 +13,7 @@ import {
   isRelationMarkedMissing,
   rememberMissingRelation,
   withMissingColumnsFallback } from '@/lib/db-compat';
-import { normalizeRoomReadCursorIds, toUtcSqlTimestamp } from '@/lib/chat-read-cursors';
+import { normalizeRoomReadCursorIds, toUtcSqlTimestamp } from '@/lib/chat-timestamp';
 import { getProfilePhotoUrl, normalizeProfileUser } from '@/lib/profile-photo';
 import { buildChatNotificationMetadata } from '@/lib/notification-metadata';
 import { CHAT_ACTIVE_ROOM_KEY, CHAT_FOCUS_KEY, CHAT_ROOM_KEY } from '@/app/main/navigation-state';

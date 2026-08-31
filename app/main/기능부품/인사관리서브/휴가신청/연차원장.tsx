@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { db } from '@/lib/db-client';
-import { calculateLeaveDays, isAnnualLeaveType, isApprovedLeaveStatus } from '@/lib/annual-leave-ledger';
+import { calculateLeaveDays, isAnnualLeaveType, isApprovedLeaveStatus } from '@/lib/annual-leave-calculator';
 import { isActiveStaff } from '@/lib/active-staff';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
 // 잔여 집계는 PC 워크센터·모바일 연차관리자·/api/annual-leave/summary 와 **같은 함수**를 쓴다.

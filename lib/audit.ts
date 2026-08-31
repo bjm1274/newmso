@@ -1,10 +1,5 @@
 import { STORAGE_KEYS } from './storage-keys';
-import {
-  audit_logs as auditLogsTable,
-  getD1Binding,
-  getD1Drizzle,
-  resolveDataBackend } from './db';
-import { logD1BindingMissing } from './db/mirror-metrics';
+import { db } from './db-client';
 
 export type AuditAction = string;
 
@@ -109,7 +104,8 @@ export function buildAuditDiff(
   return {
     changed_fields,
     before: before_values,
-    after: after_values };
+    after: after_values,
+  };
 }
 
 export function readClientAuditActor() {
@@ -122,21 +118,11 @@ export function readClientAuditActor() {
     const parsed = raw ? JSON.parse(raw) : null;
     return {
       userId: parsed?.id,
-      userName: parsed?.name };
+      userName: parsed?.name,
+    };
   } catch {
     return { userId: undefined, userName: undefined };
   }
-}
-
-// D1 binding 필수 — Workers env 가 없으면 throw. (서버 라우트 안에서만 호출)
-async function requireD1ForAuditLogs(label: string) {
-  const backend = await resolveDataBackend();
-  const d1 = await getD1Binding();
-  if (!d1) {
-    logD1BindingMissing({ label, backend });
-    throw new Error(`[audit_logs] D1 binding not available (${label})`);
-  }
-  return getD1Drizzle(d1);
 }
 
 export async function logAudit(
@@ -145,38 +131,23 @@ export async function logAudit(
   targetId: string | null,
   details: Record<string, unknown>,
   userId?: string,
-  userName?: string
+  userName?: string,
 ) {
   const createdAt = new Date().toISOString();
   try {
-    // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat db 경유
-    if (typeof window !== 'undefined') {
-      const { db: db } = await import('./db-client');
-      const { error } = await db.from('audit_logs').insert({
-        id: crypto.randomUUID(),
-        user_id: userId || null,
-        user_name: userName || null,
-        action,
-        target_type: targetType,
-        target_id: targetId,
-        details,
-        created_at: createdAt });
-      if (error) {
-        console.warn('[audit_logs] logAudit (client):', error.message);
-      }
-      return;
-    }
-    // 서버: D1 binding 직접 INSERT — details(jsonb) → text(JSON.stringify) 변환
-    const db = await requireD1ForAuditLogs('logAudit');
-    await db.insert(auditLogsTable).values({
+    const { error } = await db.from('audit_logs').insert({
       id: crypto.randomUUID(),
       user_id: userId || null,
       user_name: userName || null,
       action,
       target_type: targetType,
       target_id: targetId,
-      details: JSON.stringify(details),
-      created_at: createdAt });
+      details,
+      created_at: createdAt,
+    });
+    if (error) {
+      console.warn('[audit_logs] logAudit:', error.message);
+    }
   } catch (e) {
     console.error('Audit log failed:', e);
   }

@@ -4,7 +4,7 @@ import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction 
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { db } from '@/lib/db-client';
-import { toUtcSqlTimestamp } from '@/lib/chat-read-cursors';
+import { toUtcSqlTimestamp } from '@/lib/chat-timestamp';
 import type { ChatMessage, ChatRoom } from '@/types';
 import {
   getConversationRoomIdsByRoomId,

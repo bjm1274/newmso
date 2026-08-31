@@ -16,8 +16,15 @@ type StaffLike = {
  * (메신저유틸.ts의 RESIGNED_STATUSES 기준과 동일)
  */
 export function isActiveStaff(staff: StaffLike): boolean {
+  if (!staff) return false;
   const status = String(staff?.status ?? staff?.상태 ?? '').trim();
-  if (status === '퇴사' || status === '퇴직') return false;
+  if (status === '퇴사' || status === '퇴직' || status === 'resigned' || status === 'inactive') return false;
+
+  const role = String((staff as any)?.role ?? '').trim();
+  if (role === 'inactive' || role === 'resigned') return false;
+
+  const isActiveFlag = (staff as any)?.is_active;
+  if (isActiveFlag === 0 || isActiveFlag === false || isActiveFlag === '0') return false;
 
   const resignDate = (staff as any)?.resigned_at || (staff as any)?.resign_date;
   if (typeof resignDate === 'string' && resignDate.trim()) {
@@ -26,7 +33,7 @@ export function isActiveStaff(staff: StaffLike): boolean {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit' }).format(new Date()); // YYYY-MM-DD KST
-    if (resignDate.trim() <= todayStr) {
+    if (resignDate.trim().slice(0, 10) <= todayStr) {
       return false;
     }
   }

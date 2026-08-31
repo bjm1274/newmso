@@ -25,7 +25,7 @@ import {
   isAnnualLeaveType,
   isApprovedLeaveStatus,
   isHalfLeaveType,
-} from '@/lib/annual-leave-ledger';
+} from '@/lib/annual-leave-calculator';
 import { getKoreanTodayString } from '@/lib/seoul-time';
 
 export type LeaveHistoryStatus = '승인' | '대기' | '반려';

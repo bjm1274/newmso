@@ -363,13 +363,25 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
     void loadOlder();
   }, [hasMore, loadOlder, loadingOlder]);
 
+  const sendingInFlightRef = useRef<boolean>(false);
+  const lastSentTextRef = useRef<{ text: string; time: number }>({ text: '', time: 0 });
+
   const handleSendText = useCallback(async () => {
     if (!userId) {
       toast('로그인 정보를 찾을 수 없습니다.', 'error');
       return;
     }
+    if (sendingInFlightRef.current) return;
     const text = composerInputRef.current?.value.trim() || '';
     if (!text) return;
+
+    const now = Date.now();
+    if (lastSentTextRef.current.text === text && now - lastSentTextRef.current.time < 500) {
+      return;
+    }
+
+    sendingInFlightRef.current = true;
+    lastSentTextRef.current = { text, time: now };
 
     // Optimistic UI: 즉시 임시 메시지 표시 + 입력 초기화
     const optimisticId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -392,25 +404,29 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
     const savedReplyTo = replyTo;
     setReplyTo(null);
 
-    // 백그라운드에서 서버 전송
-    const result = await sendMobileTextMessage({
-      roomId: String(room.id),
-      senderId: userId,
-      content: text,
-      replyToId: savedReplyTo ? String(savedReplyTo.id) : null });
-    if (!result.ok) {
-      toast(result.error, 'error');
-      removeOptimistic(optimisticId);
-      // 입력·답장 대상 복구
-      if (composerInputRef.current) {
-        composerInputRef.current.value = text;
+    try {
+      // 백그라운드에서 서버 전송
+      const result = await sendMobileTextMessage({
+        roomId: String(room.id),
+        senderId: userId,
+        content: text,
+        replyToId: savedReplyTo ? String(savedReplyTo.id) : null });
+      if (!result.ok) {
+        toast(result.error, 'error');
+        removeOptimistic(optimisticId);
+        // 입력·답장 대상 복구
+        if (composerInputRef.current) {
+          composerInputRef.current.value = text;
+        }
+        setHasText(true);
+        if (savedReplyTo) setReplyTo(savedReplyTo);
+        return;
       }
-      setHasText(true);
-      if (savedReplyTo) setReplyTo(savedReplyTo);
-      return;
+      // 성공: temp → 실제 메시지로 교체
+      replaceOptimistic(optimisticId, result.message);
+    } finally {
+      sendingInFlightRef.current = false;
     }
-    // 성공: temp → 실제 메시지로 교체
-    replaceOptimistic(optimisticId, result.message);
   }, [room.id, userId, userName, replyTo, appendOptimistic, replaceOptimistic, removeOptimistic]);
 
 

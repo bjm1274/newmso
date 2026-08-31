@@ -2,7 +2,7 @@
 
 import { useCallback, type Dispatch, type MutableRefObject, type RefObject, type SetStateAction } from 'react';
 import { CHAT_ACTIVE_ROOM_KEY, CHAT_ROOM_KEY } from '@/app/main/navigation-state';
-import { toUtcSqlTimestamp } from '@/lib/chat-read-cursors';
+import { toUtcSqlTimestamp } from '@/lib/chat-timestamp';
 import type { ChatRoom } from '@/types';
 import { getConversationRoomIdsByRoomId } from './메신저유틸';
 

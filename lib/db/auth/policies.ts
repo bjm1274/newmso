@@ -424,7 +424,16 @@ const APPROVAL_INSERT_ALLOWED_STATUS = new Set(['', '대기', '진행중', '임�
  */
 function approvalsInsertGuard(claims: ErpClaims, row: Record<string, unknown>): boolean {
   const status = String(getField<string>(row, 'status') ?? '').trim();
-  return APPROVAL_INSERT_ALLOWED_STATUS.has(status);
+  if (!APPROVAL_INSERT_ALLOWED_STATUS.has(status)) return false;
+
+  // 기안자 위조 방지: 관리자가 아닌 일반 사용자는 sender_id 가 반드시 본인(erpStaffId)이어야 함
+  if (!erpIsAdmin(claims)) {
+    const senderId = String(getField<string>(row, 'sender_id') ?? '').trim();
+    if (senderId && senderId !== erpStaffId(claims)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /** employment_contracts: 본인 서명 필드만 허용, 급여/본문 등은 관리자·매니저 */
@@ -807,7 +816,12 @@ export const POLICY_REGISTRY: Registry = {
     select: 'AUTHENTICATED',
     insert: 'AUTHENTICATED',
     update: 'AUTHENTICATED',
-    delete: 'AUTHENTICATED' },
+    delete: 'AUTHENTICATED',
+    asyncGuards: {
+      select: dailyClosureItemsScopeGuard,
+      insert: dailyClosureItemsScopeGuard,
+      update: dailyClosureItemsScopeGuard,
+      delete: dailyClosureItemsScopeGuard } },
   system_configs: PUBLIC_ALL('system_configs'),
   // 근무유형 마스터: 전 직원이 읽어야 하지만(근무현황·출퇴근기록·계약서 미리보기·
   // 전자서명·팀관리), 쓰기는 관리자·인사만이다.
@@ -910,7 +924,7 @@ export const POLICY_REGISTRY: Registry = {
   // 달고 지울 수 있었다. 본인 행만 쓰도록 좁힌다(열람은 방 UI 표시용이라 유지).
   room_read_cursors: {
     table: 'room_read_cursors',
-    select: 'PUBLIC',
+    select: 'AUTHENTICATED',
     insert: 'SELF_ONLY',
     update: 'SELF_ONLY',
     delete: 'SELF_ONLY',
@@ -918,7 +932,7 @@ export const POLICY_REGISTRY: Registry = {
   },
   message_reactions: {
     table: 'message_reactions',
-    select: 'PUBLIC',
+    select: 'AUTHENTICATED',
     insert: 'SELF_ONLY',
     update: 'SELF_ONLY',
     delete: 'SELF_ONLY',
@@ -926,33 +940,33 @@ export const POLICY_REGISTRY: Registry = {
   },
   message_bookmarks: {
     table: 'message_bookmarks',
-    select: 'PUBLIC',
-    insert: 'AUTHENTICATED',
-    update: 'AUTHENTICATED',
-    delete: 'AUTHENTICATED',
+    select: 'SELF_ONLY',
+    insert: 'SELF_ONLY',
+    update: 'SELF_ONLY',
+    delete: 'SELF_ONLY',
     staffIdField: 'user_id',
   },
   pinned_messages: {
     table: 'pinned_messages',
-    select: 'PUBLIC',
+    select: 'AUTHENTICATED',
     insert: 'AUTHENTICATED',
     update: 'AUTHENTICATED',
     delete: 'AUTHENTICATED',
   },
   board_post_likes: {
     table: 'board_post_likes',
-    select: 'PUBLIC',
-    insert: 'AUTHENTICATED',
-    update: 'AUTHENTICATED',
-    delete: 'AUTHENTICATED',
+    select: 'AUTHENTICATED',
+    insert: 'SELF_ONLY',
+    update: 'SELF_ONLY',
+    delete: 'SELF_ONLY',
     staffIdField: 'user_id',
   },
   board_post_comments: {
     table: 'board_post_comments',
-    select: 'PUBLIC',
+    select: 'AUTHENTICATED',
     insert: 'AUTHENTICATED',
-    update: 'AUTHENTICATED',
-    delete: 'AUTHENTICATED',
+    update: 'SELF_ONLY',
+    delete: 'SELF_ONLY',
     staffIdField: 'author_id',
   },
 
@@ -1518,11 +1532,10 @@ POLICY_REGISTRY['polls'] = {
   update: 'CHAT_ROOM_MEMBER',
   delete: 'SELF_ONLY',
   staffIdField: 'creator_id' };
-// poll_votes 에는 room_id 가 없어(poll_id 만) CHAT_ROOM_MEMBER 를 쓸 수 없다.
-// 투표 집계 렌더링이 타인 투표를 읽어야 하므로 select 는 AUTHENTICATED.
+// poll_votes: 익명 투표 보호를 위해 select는 SELF_ONLY로 제한 (전체 집계는 서버 전용 라우트 /api/chat/poll-votes 담당)
 POLICY_REGISTRY['poll_votes'] = {
   table: 'poll_votes',
-  select: 'AUTHENTICATED',
+  select: 'SELF_ONLY',
   insert: 'SELF_ONLY',
   update: 'SELF_ONLY',
   delete: 'SELF_ONLY',
@@ -1653,18 +1666,17 @@ POLICY_REGISTRY['handover_notes'] = {
   table: 'handover_notes',
   select: 'AUTHENTICATED',
   insert: 'AUTHENTICATED',
-  update: 'AUTHENTICATED',
+  update: 'SELF_ONLY',
   delete: 'SELF_ONLY',
   staffIdField: 'author_id' };
-// 주의: discharge_reviews 에는 환자 PHI(이름·생년월일·진단명)가 들어 있는데
-// 회사/부서 컬럼이 아예 없어 격리 수단이 없다. 공유 심사 큐가 업무 전제라 현재는
-// AUTHENTICATED 로 두되, company_id 컬럼 추가 후 COMPANY_SCOPE_OR_NULL 전환이 필요하다.
+// discharge_reviews: 환자 PHI(이름·생년월일·진단명·수술기록) 보호를 위해 company_id 스코프 강제
 POLICY_REGISTRY['discharge_reviews'] = {
   table: 'discharge_reviews',
-  select: 'AUTHENTICATED',
-  insert: 'AUTHENTICATED',
-  update: 'AUTHENTICATED',
+  select: 'COMPANY_SCOPE_OR_NULL',
+  insert: 'COMPANY_SCOPE_OR_NULL',
+  update: 'COMPANY_SCOPE_OR_NULL',
   delete: 'ADMIN_OR_MANAGER',
+  companyIdField: 'company_id',
   staffIdField: 'reviewer_id' };
 // 템플릿 편집이 일반 심사 화면에서 일어나므로 insert/update 는 열어 둔다.
 POLICY_REGISTRY['discharge_templates'] = {
@@ -1929,7 +1941,10 @@ async function evalPattern(
   }
 
   if (pattern === 'ADMIN_OR_MANAGER') {
-    return erpCanManageCompany(claims);
+    if (!erpCanManageCompany(claims)) return false;
+    if (erpIsAdmin(claims)) return true;
+    if (rowCompanyIsNull()) return true;
+    return rowCompanyMatches();
   }
 
   if (pattern === 'MANAGE_COMPANY') {

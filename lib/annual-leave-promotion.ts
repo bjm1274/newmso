@@ -124,17 +124,30 @@ export function calculateAnnualLeaveExpiryDate(
   return expiry;
 }
 
+function subtractMonthsClamped(date: Date, months: number): Date {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const day = date.getDate();
+
+  const targetDate = new Date(year, month - months, 1);
+  const targetYear = targetDate.getFullYear();
+  const targetMonth = targetDate.getMonth();
+  const lastDayOfTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+
+  return new Date(targetYear, targetMonth, Math.min(day, lastDayOfTargetMonth));
+}
+
 /**
  * 만료일 기반 1차/2차 촉진일 계산
- * - 1차: 만료 6개월 전
- * - 2차: 만료 2개월 전
+ * - 1년 이상: 만료 6개월 전(1차), 2개월 전(2차) (근로기준법 제61조 제1항)
+ * - 1년 미만: 만료 3개월 전(1차), 1개월 전(2차) (근로기준법 제61조 제2항)
  */
-export function calculatePromotionDates(expiryDate: Date): { step1: Date; step2: Date } {
-  const step1 = new Date(expiryDate);
-  step1.setMonth(step1.getMonth() - 6);
+export function calculatePromotionDates(expiryDate: Date, isFirstYear = false): { step1: Date; step2: Date } {
+  const step1Months = isFirstYear ? 3 : 6;
+  const step2Months = isFirstYear ? 1 : 2;
 
-  const step2 = new Date(expiryDate);
-  step2.setMonth(step2.getMonth() - 2);
+  const step1 = subtractMonthsClamped(expiryDate, step1Months);
+  const step2 = subtractMonthsClamped(expiryDate, step2Months);
 
   return { step1, step2 };
 }
@@ -148,8 +161,13 @@ export function getStaffPromotionSchedule(
 ): PromotionSchedule | null {
   if (!hireDate) return null;
 
+  const hDate = new Date(hireDate);
+  const isFirstYear =
+    !Number.isNaN(hDate.getTime()) &&
+    referenceDate.getTime() - hDate.getTime() < 365 * MS_PER_DAY;
+
   const expiryDate = calculateAnnualLeaveExpiryDate(hireDate, referenceDate);
-  const { step1, step2 } = calculatePromotionDates(expiryDate);
+  const { step1, step2 } = calculatePromotionDates(expiryDate, isFirstYear);
   const daysUntilExpiry = Math.ceil((expiryDate.getTime() - referenceDate.getTime()) / MS_PER_DAY);
 
   return {

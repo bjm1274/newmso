@@ -37,7 +37,7 @@ export default function LoginPage() {
         }
 
         localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(payload.user));
-        router.replace('/main');
+        window.location.replace('/main');
       } catch {
         localStorage.removeItem(STORAGE_KEYS.USER);
         localStorage.removeItem(STORAGE_KEYS.LOGIN_AT);
@@ -90,7 +90,7 @@ export default function LoginPage() {
       if (payload.notice) {
         toast(payload.notice);
       }
-      router.push('/main');
+      window.location.replace('/main');
     } catch {
       setError('시스템 접속 중 오류가 발생했습니다.');
       setLoading(false);

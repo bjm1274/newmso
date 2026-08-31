@@ -556,7 +556,7 @@ export default function ContractSignatureModal({ contract, user, templateText, o
                         <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                             <div>
                                 <h3 className="text-[15px] font-extrabold text-slate-900">근로계약서 교부확인 자필</h3>
-                                <p className="text-[11px] text-slate-500">'교부 받음' 글자를 따라 정자로 작성해 주세요.</p>
+                                <p className="text-[11px] text-slate-500">&apos;교부 받음&apos; 글자를 따라 정자로 작성해 주세요.</p>
                             </div>
                             <button
                                 type="button"

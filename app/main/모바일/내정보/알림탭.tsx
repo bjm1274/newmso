@@ -9,9 +9,9 @@
  * JM: 단일 책임 (알림 리스트 표시)
  */
 
-import { memo, useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import type { ErpUser } from '@/types';
-import { timeAgo, toNotificationText } from '@/lib/notification-utils';
+import { timeAgo, toNotificationText } from '@/lib/notification-format';
 import {
   resolveNotificationTarget,
   toNotificationMetadataRecord } from '@/lib/notification-metadata';

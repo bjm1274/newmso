@@ -2,13 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   createR2DownloadUrl,
   getConfiguredR2ChatBucket,
+  getS3ObjectStream,
+  getLocalDiskStream,
+  fetchFromCloudflareR2Api,
 } from '@/lib/object-storage';
 import { readSessionFromRequest, isAdminSession } from '@/lib/server-session';
 import { assertChatRoomMember } from '@/lib/chat-room-membership';
 import { getD1Binding, getD1Drizzle } from '@/lib/db';
 import { sql } from 'drizzle-orm';
-import { getCloudflareContext } from '@opennextjs/cloudflare';
+import { isCloudflareWorkerRuntime } from '@/lib/cloudflare-runtime';
 import { buildObjectResponseHeaders } from './content-policy';
+import { normalizeUploadMimeType } from '@/lib/upload-mime';
 
 export const dynamic = 'force-dynamic';
 
@@ -225,45 +229,86 @@ export async function GET(request: NextRequest) {
      */
     const stages: string[] = [];
 
+    // 0. Direct Local Disk File Storage (Docker Standalone / Local 환경)
+    const localFile = getLocalDiskStream(objectKey);
+    if (localFile && localFile.stream) {
+      const mimeType = normalizeUploadMimeType(fileName, 'application/octet-stream');
+      const headers = buildObjectResponseHeaders({
+        storedContentType: mimeType,
+        cacheControl: isPublicAsset ? 'public, max-age=86400, immutable' : 'private, max-age=3600',
+        download,
+        fileName,
+        contentLength: String(localFile.contentLength),
+      });
+      return new NextResponse(localFile.stream as any, { status: 200, headers });
+    }
+
     // 1. Direct Cloudflare R2 Worker Binding Attempt (Zero-latency direct stream)
-    try {
-      // `{ async: true }` 가 필요하다. 인자 없는 동기 형태는 요청 처리 중 env 를
-      // 내주지 못하고 던진다. 그러면 아래 catch 로 빠져 바인딩이 멀쩡한데도 없는
-      // 것으로 취급되고, 서명 URL 폴백으로 내려간다. 그런데 운영 워커에는
-      // R2_ACCOUNT_ID·R2_ACCESS_KEY_ID 시크릿이 설정돼 있지 않아 그 폴백도
-      // 만들어지지 않는다 — 결국 500 "Cloudflare R2 is not configured" 가 나가고
-      // 사용자에게는 "파일 다운로드에 실패했습니다" 로만 보였다.
-      // 동작하는 D1 헬퍼(lib/db/get-binding.ts)와 같은 형태로 맞춘다.
-      const cfCtx = await getCloudflareContext({ async: true });
-      const r2Binding = (cfCtx?.env as any)?.R2;
-      if (!r2Binding || typeof r2Binding.get !== 'function') {
-        stages.push('binding:unavailable');
-      }
-      if (r2Binding && typeof r2Binding.get === 'function') {
-        const r2Object = await r2Binding.get(objectKey);
-        if (!r2Object) stages.push('binding:object-missing');
-        if (r2Object && r2Object.body) {
-          const headers = buildObjectResponseHeaders({
-            storedContentType: r2Object.httpMetadata?.contentType || 'application/octet-stream',
-            cacheControl: 'public, max-age=86400, immutable',
-            download,
-            fileName,
-            contentLength: r2Object.size ? String(r2Object.size) : null });
-          return new NextResponse(r2Object.body as ReadableStream, { status: 200, headers });
+    if (isCloudflareWorkerRuntime()) {
+      try {
+        const { getCloudflareContext } = await import('@opennextjs/cloudflare');
+        const cfCtx = await getCloudflareContext({ async: true });
+        const r2Binding = (cfCtx?.env as any)?.R2;
+        if (!r2Binding || typeof r2Binding.get !== 'function') {
+          stages.push('binding:unavailable');
         }
+        if (r2Binding && typeof r2Binding.get === 'function') {
+          const r2Object = await r2Binding.get(objectKey);
+          if (!r2Object) stages.push('binding:object-missing');
+          if (r2Object && r2Object.body) {
+            const headers = buildObjectResponseHeaders({
+              storedContentType: r2Object.httpMetadata?.contentType || 'application/octet-stream',
+              cacheControl: 'public, max-age=86400, immutable',
+              download,
+              fileName,
+              contentLength: r2Object.size ? String(r2Object.size) : null });
+            return new NextResponse(r2Object.body as ReadableStream, { status: 200, headers });
+          }
+        }
+      } catch (bindingErr) {
+        stages.push('binding:error');
       }
-    } catch (bindingErr) {
-      // Fallback to S3 Presigned URL / REST API
-      stages.push('binding:error');
-      console.error('[storage/object] R2 바인딩 조회 실패:', bindingErr);
+    }
+
+    // 1.2 Direct Cloudflare R2 REST API Stream & Auto-Cache (Node.js Standalone / Docker 환경)
+    try {
+      const r2ApiObj = await fetchFromCloudflareR2Api(objectKey, bucket);
+      if (r2ApiObj && r2ApiObj.stream) {
+        const headers = buildObjectResponseHeaders({
+          storedContentType: r2ApiObj.contentType,
+          cacheControl: isPublicAsset ? 'public, max-age=86400, immutable' : 'private, max-age=3600',
+          download,
+          fileName,
+          contentLength: r2ApiObj.contentLength,
+        });
+        return new NextResponse(r2ApiObj.stream, { status: 200, headers });
+      }
+    } catch {
+      stages.push('r2-rest-api:error');
+    }
+
+    // 1.5 Direct S3 SDK Stream Attempt (Node.js Standalone / Docker 환경)
+    try {
+      const s3Obj = await getS3ObjectStream(bucket, objectKey);
+      if (s3Obj && s3Obj.stream) {
+        const headers = buildObjectResponseHeaders({
+          storedContentType: s3Obj.contentType,
+          cacheControl: isPublicAsset ? 'public, max-age=86400, immutable' : 'private, max-age=3600',
+          download,
+          fileName,
+          contentLength: s3Obj.contentLength });
+        return new NextResponse(s3Obj.stream as any, { status: 200, headers });
+      }
+    } catch (s3StreamErr) {
+      stages.push('s3-sdk-stream:error');
     }
 
     // 2. Fallback to S3 Presigned URL
     const signedUrl = await createR2DownloadUrl(bucket, objectKey);
     if (!signedUrl) {
       return NextResponse.json(
-        { error: 'Cloudflare R2 is not configured', stages: [...stages, 'signed-url:not-configured'] },
-        { status: 500 },
+        { error: '요청한 파일을 스토리지에서 찾을 수 없습니다.', stages: [...stages, 'not-found'] },
+        { status: 404 },
       );
     }
 

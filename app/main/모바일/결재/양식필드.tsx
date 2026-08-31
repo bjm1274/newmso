@@ -17,7 +17,7 @@
  * JM6(label·input 연결, MSegRow aria)
  */
 
-import { buildOfficialDocumentApprovalContent } from '@/lib/official-document-approval';
+import { buildOfficialDocumentApprovalContent } from '@/lib/official-document-shared';
 import { MField, MInput, MSegRow } from '../인사관리/form-helpers';
 
 // ─────────────────────────────────────────────

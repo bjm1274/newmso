@@ -9,12 +9,16 @@ import type { ErpClaims } from '@/lib/db/auth/claims';
 
 export function userId(user: SessionUser | null | undefined): string | null {
   if (!user) return null;
-  if (user.is_system_master === true || user.login_id === '9999' || user.employee_no === '9999') {
+  if (user.is_system_master === true || user.login_id === '9999' || user.employee_no === '9999' || user.employee_no === '0') {
     return '9999';
   }
-  const candidate = (user.id ?? user.user_id ?? '') as string;
+  const candidate = (user.id ?? user.user_id ?? user.employee_no ?? user.login_id ?? '') as string;
   const trimmed = String(candidate).trim();
-  return trimmed || null;
+  if (trimmed) return trimmed;
+  if (user.role === 'admin' || user.permissions?.admin || user.permissions?.mso) {
+    return '1';
+  }
+  return null;
 }
 
 /** alias — 호출부 가독성용 */

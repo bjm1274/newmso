@@ -23,7 +23,7 @@ import {
   resolveNotificationTarget,
   toNotificationMetadataRecord } from '@/lib/notification-metadata';
 import { getStaffLikeId, normalizeStaffLike, resolveStaffLike } from '@/lib/staff-identity';
-import { toNotificationText, timeAgo } from '@/lib/notification-utils';
+import { toNotificationText, timeAgo } from '@/lib/notification-format';
 import {
   countUnreadNotifications,
   deleteNotificationById,

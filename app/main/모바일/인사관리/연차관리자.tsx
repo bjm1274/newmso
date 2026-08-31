@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { db } from '@/lib/db-client';
 import type { StaffMember, ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
-import { calculateLeaveDays } from '@/lib/annual-leave-ledger';
+import { calculateLeaveDays } from '@/lib/annual-leave-calculator';
 import { formatKoreanDateKey } from '@/lib/seoul-time';
 // 잔여 집계는 PC 워크센터·/api/annual-leave/summary 와 **같은 함수**를 쓴다.
 import {

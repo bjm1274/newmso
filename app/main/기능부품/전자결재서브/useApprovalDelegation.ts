@@ -1,5 +1,4 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
-import { upsertNotificationWithDedupe } from '@/lib/notification-utils';
 import {
   appendApprovalHistory,
   getApprovalRevision,
@@ -121,24 +120,26 @@ export function useApprovalDelegation({
       );
 
       try {
-        // 같은 결재+승인자+회차에 대해 어디서 호출되든 1건만 생성되도록 결정적 ID로 dedupe.
-        // 여러 탭/기기가 동시에 syncDelegatedApprovalDelayNotifications를 실행해도 중복 알림 방지.
-        await upsertNotificationWithDedupe({
-          user_id: currentApproverId,
-          type: 'approval',
-          title: `[결재 지연] ${String(item.title || '전자결재 문서')}`,
-          body: `${String(item.sender_name || '기안자')} 문서가 ${delayHours}시간 이상 대기 중입니다.`,
-          metadata: {
-            id: item.id,
-            approval_id: item.id,
+        await fetch('/api/notifications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: currentApproverId,
             type: 'approval',
-            approval_view: '결재함',
-            approval_role: 'delayed',
-            delay_hours: delayConfig.thresholdHours,
-            delay_repeat_hours: delayConfig.repeatHours,
-            delay_max_notifications: delayConfig.maxNotifications,
-            delay_count: nextCount },
-          dedupeKey: `approval-delay:${String(item.id)}:${currentApproverId}:${nextCount}` });
+            title: `[결재 지연] ${String(item.title || '전자결재 문서')}`,
+            body: `${String(item.sender_name || '기안자')} 문서가 ${delayHours}시간 이상 대기 중입니다.`,
+            metadata: {
+              id: item.id,
+              approval_id: item.id,
+              type: 'approval',
+              approval_view: '결재함',
+              approval_role: 'delayed',
+              delay_hours: delayConfig.thresholdHours,
+              delay_repeat_hours: delayConfig.repeatHours,
+              delay_max_notifications: delayConfig.maxNotifications,
+              delay_count: nextCount,
+              dedupe_key: `approval-delay:${String(item.id)}:${currentApproverId}:${nextCount}` } }),
+        });
         await db.from('approvals').update({ meta_data: nextMetaData }).eq('id', item.id);
       } catch (delayError) {
         console.error('approval delay notification failed:', delayError);

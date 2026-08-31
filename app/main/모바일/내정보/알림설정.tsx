@@ -16,8 +16,8 @@ import {
   saveNotifSettings,
   sendNotification,
   type PushConnectionStatus } from '../../기능부품/알림시스템';
+import { timeAgo } from '@/lib/notification-format';
 import { normalizeKeywordList } from '../../기능부품/알림시스템/filter-helpers';
-import { timeAgo } from '@/lib/notification-utils';
 import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 
 export type 알림설정Props = {

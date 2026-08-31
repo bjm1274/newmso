@@ -24,7 +24,7 @@ import {
   subscribeRealtime,
   type TableFilter } from '@/lib/realtime-bus';
 import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
-import { toUtcSqlTimestamp } from '@/lib/chat-read-cursors';
+import { toUtcSqlTimestamp } from '@/lib/chat-timestamp';
 import { parseDbTimestampMs } from '@/lib/date-formatter';
 import { fetchAllChatRooms } from '@/app/main/기능부품/chatQueryService';
 import {
@@ -345,12 +345,12 @@ export function useChatRoomsForMobile(
 // (목록 진입은 방 목록만; 방 오픈 시에만 이 훅이 메시지를 조회)
 // ─────────────────────────────────────────────
 
-const MESSAGES_LIMIT = 20;
-/** 보존한 과거 구간에서 삭제·수정 여부를 다시 확인할 최대 건수 (D1 바인딩 한도 대비). */
-const OLDER_RECHECK_LIMIT = 80;
+const MESSAGES_LIMIT = 60;
+/** 보존한 과거 구간에서 삭제·수정 여부를 다시 확인할 최대 건수. */
+const OLDER_RECHECK_LIMIT = 150;
 /** 방별 최근 메시지 캐시 스코프 (lib/view-cache) */
 const MESSAGES_CACHE_SCOPE = 'chat:messages';
-const ROOM_MESSAGE_POLL_INTERVAL_MS = 5000; // polling-bus 채팅 기본값(5초)과 정렬. 개별 방도 동일 간격 적용.
+const ROOM_MESSAGE_POLL_INTERVAL_MS = 2000; // 오라클 전용 서버 2초 고속 폴링 & WebSocket 즉시 브로드캐스트
 
 type UseChatMessagesResult = {
   messages: ChatMessage[];

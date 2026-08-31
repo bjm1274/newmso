@@ -275,7 +275,7 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
   const accuracyTooLow = !isBypassed && !!coords && coords.accuracy > ACCURACY_WARN_M;
 
   const state: 'before' | 'in' | 'done' =
-    !todayLog?.check_in ? 'before' : !todayLog?.check_out ? 'in' : 'done';
+    !openLog?.check_in ? 'before' : !openLog?.check_out ? 'in' : 'done';
   const canAct = !!staffId && !submitting;
 
   /**
@@ -434,11 +434,11 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
           );
         }
       } else if (state === 'in') {
-        const dateKey = todayLog?.date ?? today;
-        const checkInIso = todayLog?.check_in ?? null;
+        const dateKey = openLog?.date ?? today;
+        const checkInIso = openLog?.check_in ?? null;
 
         // 지각 기준시간 구하고 조퇴 여부 판정
-        let finalStatus = todayLog?.status || '정상';
+        let finalStatus = openLog?.status || '정상';
         let earlyLeaveMinutes = 0;
         try {
           const lateThreshold = await resolveLateThreshold(staffId, dateKey, { company });
@@ -457,12 +457,20 @@ export default function SAttend({ staffId, company, onBack }: SAttendProps) {
         if (queued) {
           // 낙관적 업데이트 — 큐잉됨
           if (todayLog) setTodayLog({ ...todayLog, check_out: nowIso, status: finalStatus });
+          if (staleLog) setStaleLog({ ...staleLog, check_out: nowIso, status: finalStatus });
           toast('오프라인 — 퇴근 기록이 동기화 대기 중입니다.', 'warning');
         } else {
           const row = Array.isArray(data) ? (data[0] as OpenLog) : (data as OpenLog);
-          if (row) setTodayLog(row);
-          else if (todayLog) setTodayLog({ ...todayLog, check_out: nowIso, status: finalStatus });
-          else if (!data) throw new Error('이미 퇴근 처리되었거나 출근 기록이 없습니다.');
+          if (row) {
+            if (row.date === today) setTodayLog(row);
+            else setStaleLog(row);
+          } else if (todayLog) {
+            setTodayLog({ ...todayLog, check_out: nowIso, status: finalStatus });
+          } else if (staleLog) {
+            setStaleLog({ ...staleLog, check_out: nowIso, status: finalStatus });
+          } else if (!data) {
+            throw new Error('이미 퇴근 처리되었거나 출근 기록이 없습니다.');
+          }
 
           try {
             await syncAttendanceToAttendances(staffId, dateKey, {

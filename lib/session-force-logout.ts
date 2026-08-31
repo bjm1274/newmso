@@ -32,12 +32,22 @@ export function getStoredSessionLoginAt(): string {
   }
 }
 
+function parseTimestampToUtcMs(raw: unknown): number {
+  if (!raw) return 0;
+  const str = String(raw).trim();
+  if (!str) return 0;
+  const spaceForm = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d+)?)$/.exec(str);
+  const normalized = spaceForm ? `${spaceForm[1]}T${spaceForm[2]}Z` : str;
+  const ms = new Date(normalized).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
 export function isForceLogoutAfterLogin(
   forceLogoutAt: unknown,
   loginAt: string | null | undefined = getStoredSessionLoginAt(),
 ): boolean {
-  const forceLogoutMs = new Date(String(forceLogoutAt || '')).getTime();
-  const loginMs = new Date(String(loginAt || FALLBACK_LOGIN_AT)).getTime();
+  const forceLogoutMs = parseTimestampToUtcMs(forceLogoutAt);
+  const loginMs = parseTimestampToUtcMs(loginAt || FALLBACK_LOGIN_AT);
 
-  return Number.isFinite(forceLogoutMs) && Number.isFinite(loginMs) && forceLogoutMs > loginMs;
+  return forceLogoutMs > 0 && loginMs > 0 && forceLogoutMs > loginMs;
 }

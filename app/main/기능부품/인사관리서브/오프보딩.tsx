@@ -14,7 +14,7 @@ import {
   isMissingColumnError,
   withMissingColumnsFallback } from '@/lib/db-compat';
 import { patchChatRoom } from '@/lib/chat-rooms-client';
-import { parseMembersField } from '@/lib/chat-room-membership';
+import { parseMembersField } from '@/lib/chat-members-parser';
 import {
   countChecklistDone,
   getDefaultChecklist,

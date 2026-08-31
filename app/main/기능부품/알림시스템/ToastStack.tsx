@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { getInitials, timeAgo } from '@/lib/notification-utils';
+import { getInitials, timeAgo } from '@/lib/notification-format';
 import { getTypeCfg } from './ui-config';
 
 export type ToastItem = {

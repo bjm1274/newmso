@@ -44,7 +44,7 @@ import {
   and,
   inArray } from '@/lib/db';
 import { logD1BindingMissing } from '@/lib/db/mirror-metrics';
-import { logAudit } from '@/lib/audit';
+import { logAuditServer as logAudit } from '@/lib/audit-server';
 
 export const dynamic = 'force-dynamic';
 

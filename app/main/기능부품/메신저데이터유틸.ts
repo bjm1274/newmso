@@ -1,7 +1,7 @@
 'use client';
 
 import { buildChatMessageSelect, CHAT_MESSAGE_OPTIONAL_COLUMNS } from '@/lib/chat-query-columns';
-import { toUtcSqlTimestamp } from '@/lib/chat-read-cursors';
+import { toUtcSqlTimestamp } from '@/lib/chat-timestamp';
 import { withMissingColumnsFallback } from '@/lib/db-compat';
 import type { ChatRoom } from '@/types';
 import {

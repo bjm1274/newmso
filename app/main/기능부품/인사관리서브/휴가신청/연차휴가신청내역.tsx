@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { isActiveStaff } from '@/lib/active-staff';
-import { isAnnualLeaveType } from '@/lib/annual-leave-ledger';
+import { isAnnualLeaveType } from '@/lib/annual-leave-calculator';
 import { normalizeLeaveType } from '@/lib/leave-type';
 import { ResponsiveTable, type Column } from '@/app/components/ResponsiveTable';
 

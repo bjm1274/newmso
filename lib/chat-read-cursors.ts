@@ -1,7 +1,6 @@
-import {
-  getD1Binding,
-  getD1Drizzle,
-  room_read_cursors as roomReadCursorsTable } from '@/lib/db';
+import 'server-only';
+export * from '@/lib/chat-timestamp';
+import { normalizeRoomReadCursorIds, toUtcSqlTimestamp } from '@/lib/chat-timestamp';
 
 export type RoomReadCursorWriteResult = {
   ok: boolean;
@@ -9,40 +8,6 @@ export type RoomReadCursorWriteResult = {
   readAt: string;
   error: unknown | null;
 };
-
-/**
- * 읽음 커서 시각을 D1(SQLite) CURRENT_TIMESTAMP와 동일한 "YYYY-MM-DD HH:MM:SS"
- * UTC 형식으로 정규화한다. messages.created_at(D1 기본값)과 형식을 맞춰야
- * 안 읽음 집계의 문자열 비교(created_at > last_read_at)가 올바르게 동작한다.
- * ISO("...Z") 입력은 UTC 기준으로 변환한다.
- *
- * 클라·서버 공용 — unread SQL 필터·API 쓰기 경로에서 반드시 사용.
- */
-export function toUtcSqlTimestamp(value?: string | null): string {
-  const raw = String(value || '').trim();
-  if (!raw) {
-    return new Date().toISOString().slice(0, 19).replace('T', ' ');
-  }
-  // 이미 SQL 포맷 (초 단위)
-  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(raw)) return raw;
-  // 소수 초가 붙은 SQL 유사 포맷
-  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+$/.test(raw)) {
-    return raw.slice(0, 19);
-  }
-  const parsed = new Date(raw);
-  const base = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
-  return base.toISOString().slice(0, 19).replace('T', ' ');
-}
-
-export function normalizeRoomReadCursorIds(roomIds: Array<string | null | undefined>) {
-  return Array.from(
-    new Set(
-      roomIds
-        .map((roomId) => String(roomId || '').trim())
-        .filter(Boolean),
-    ),
-  );
-}
 
 export async function upsertRoomReadCursors(
   params: {
@@ -63,6 +28,7 @@ export async function upsertRoomReadCursors(
       error: null };
   }
 
+  const { getD1Binding, getD1Drizzle, room_read_cursors } = await import('@/lib/db');
   const d1 = await getD1Binding();
   if (!d1) throw new Error('[chat-read-cursors] D1 binding not available (upsertRoomReadCursors)');
   const db = getD1Drizzle(d1);
@@ -72,7 +38,7 @@ export async function upsertRoomReadCursors(
     // 'no matching constraint' 오류가 날 수 있으므로 0014를 배포와 함께 적용할 것.
     if (roomIds.length > 0) {
       await db
-        .insert(roomReadCursorsTable)
+        .insert(room_read_cursors)
         .values(
           roomIds.map((roomId) => ({
             id: crypto.randomUUID(),
@@ -81,7 +47,7 @@ export async function upsertRoomReadCursors(
             last_read_at: readAt })),
         )
         .onConflictDoUpdate({
-          target: [roomReadCursorsTable.user_id, roomReadCursorsTable.room_id],
+          target: [room_read_cursors.user_id, room_read_cursors.room_id],
           set: { last_read_at: readAt } });
     }
     return { ok: true, roomIds, readAt, error: null };

@@ -6,13 +6,8 @@
  * - 팀 추가/삭제 같은 mutation 후에는 invalidateOrgTeams로 캐시 무효화 필수
  */
 
-import { eq } from 'drizzle-orm';
 import { fetcher, invalidateCache } from '@/lib/fetcher';
 import { db } from '@/lib/db-client';
-import {
-  getD1Binding,
-  getD1Drizzle,
-  org_teams as orgTeamsTable } from '@/lib/db';
 
 const ORG_TTL = 300_000; // 5분
 
@@ -102,44 +97,21 @@ export type OrgTeamCreateInput = {
   applicable_shifts?: string | null;
 };
 
-async function requireOrgD1() {
-  const d1 = await getD1Binding();
-  if (!d1) {
-    throw new Error('[org] D1 binding not available');
-  }
-  return getD1Drizzle(d1);
-}
-
 /**
  * 팀 생성. 성공 시 해당 회사의 org:teams 캐시 자동 무효화.
  */
 export async function createOrgTeam(input: OrgTeamCreateInput): Promise<{ error: Error | null }> {
   try {
-    // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat db 경유
-    if (typeof window !== 'undefined') {
-      const { db: sb } = await import('@/lib/db-client');
-      const { error } = await sb.from('org_teams').insert({
-        id: crypto.randomUUID(),
-        company_name: input.company_name,
-        division: input.division,
-        team_name: input.team_name,
-        sort_order: input.sort_order,
-        created_at: new Date().toISOString(),
-        applicable_shifts: input.applicable_shifts || null });
-      if (error) throw error;
-      invalidateOrgTeams(input.company_name);
-      return { error: null };
-    }
-    // 서버: D1 binding 직접 사용
-    const db = await requireOrgD1();
-    await db.insert(orgTeamsTable).values({
+    const { error } = await db.from('org_teams').insert({
       id: crypto.randomUUID(),
       company_name: input.company_name,
       division: input.division,
       team_name: input.team_name,
       sort_order: input.sort_order,
       created_at: new Date().toISOString(),
-      applicable_shifts: input.applicable_shifts || null });
+      applicable_shifts: input.applicable_shifts || null,
+    });
+    if (error) throw error;
     invalidateOrgTeams(input.company_name);
     return { error: null };
   } catch (err) {
@@ -153,17 +125,8 @@ export async function createOrgTeam(input: OrgTeamCreateInput): Promise<{ error:
  */
 export async function deleteOrgTeam(id: string, company?: string): Promise<{ error: Error | null }> {
   try {
-    // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat db 경유
-    if (typeof window !== 'undefined') {
-      const { db: sb } = await import('@/lib/db-client');
-      const { error } = await sb.from('org_teams').delete().eq('id', id);
-      if (error) throw error;
-      invalidateOrgTeams(company);
-      return { error: null };
-    }
-    // 서버: D1 binding 직접 사용
-    const db = await requireOrgD1();
-    await db.delete(orgTeamsTable).where(eq(orgTeamsTable.id, id));
+    const { error } = await db.from('org_teams').delete().eq('id', id);
+    if (error) throw error;
     invalidateOrgTeams(company);
     return { error: null };
   } catch (err) {
@@ -186,31 +149,16 @@ export type OrgTeamUpdateInput = {
  */
 export async function updateOrgTeam(input: OrgTeamUpdateInput): Promise<{ error: Error | null }> {
   try {
-    // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat db 경유
-    if (typeof window !== 'undefined') {
-      const { db: sb } = await import('@/lib/db-client');
-      const { error } = await sb
-        .from('org_teams')
-        .update({
-          division: input.division,
-          team_name: input.team_name,
-          sort_order: input.sort_order,
-          applicable_shifts: input.applicable_shifts || null })
-        .eq('id', input.id);
-      if (error) throw error;
-      invalidateOrgTeams(input.company_name);
-      return { error: null };
-    }
-    // 서버: D1 binding 직접 사용
-    const db = await requireOrgD1();
-    await db
-      .update(orgTeamsTable)
-      .set({
+    const { error } = await db
+      .from('org_teams')
+      .update({
         division: input.division,
         team_name: input.team_name,
         sort_order: input.sort_order,
-        applicable_shifts: input.applicable_shifts || null })
-      .where(eq(orgTeamsTable.id, input.id));
+        applicable_shifts: input.applicable_shifts || null,
+      })
+      .eq('id', input.id);
+    if (error) throw error;
     invalidateOrgTeams(input.company_name);
     return { error: null };
   } catch (err) {
@@ -218,4 +166,3 @@ export async function updateOrgTeam(input: OrgTeamUpdateInput): Promise<{ error:
     return { error };
   }
 }
-

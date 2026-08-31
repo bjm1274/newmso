@@ -1,27 +1,7 @@
-import {
-  getD1Binding,
-  resolveDataBackend,
-  getD1Drizzle,
-  notifications as notificationsTable,
-  staff_members as staffMembersTable,
-  or } from './db';
-import { logD1MirrorFailure, logD1BindingMissing } from './db/mirror-metrics';
-import { sql, eq } from 'drizzle-orm';
-import { emitRealtimeSignal } from './realtime/server-signal';
+import 'server-only';
 import { parseDbTimestampMs } from './date-formatter';
 
 const recentAdminAlertDispatches = new Map<string, number>();
-
-// ─────────────────────────────────────────────────────────────
-// Phase 8-B — notifications 테이블 서버측 D1 직접 사용
-// ─────────────────────────────────────────────────────────────
-//
-// 본 파일은 Phase 8 이전엔 Supabase insert + mirrorNotificationsToD1 으로
-// 동작했지만, Phase 8-B 부터는 D1 binding 을 직접 사용해 INSERT 한다.
-// mirrorNotificationsToD1 함수 자체는 다른 곳에서 import 되므로 유지.
-//
-// metadata는 Supabase에선 jsonb, D1에선 text(JSON 직렬화) 보관.
-// (mirrorNotificationsToD1 안에 normalizeForD1 가 그대로 처리)
 
 export type NotificationRow = {
   id?: string | null;
@@ -34,9 +14,7 @@ export type NotificationRow = {
   created_at?: string | null;
 };
 
-type NotificationsD1Row = typeof notificationsTable.$inferInsert;
-
-function normalizeForD1(row: NotificationRow): NotificationsD1Row {
+function normalizeForD1(row: NotificationRow): any {
   return {
     id: row.id ?? crypto.randomUUID(),
     user_id: row.user_id ?? null,
@@ -47,7 +25,8 @@ function normalizeForD1(row: NotificationRow): NotificationsD1Row {
       ? null
       : JSON.stringify(row.metadata),
     read_at: row.read_at ?? null,
-    created_at: row.created_at ?? new Date().toISOString() };
+    created_at: row.created_at ?? new Date().toISOString(),
+  };
 }
 
 export async function mirrorNotificationsToD1(
@@ -55,6 +34,9 @@ export async function mirrorNotificationsToD1(
   options?: { onConflict?: 'do_nothing' | 'throw' },
 ): Promise<void> {
   if (rows.length === 0) return;
+
+  const { resolveDataBackend, getD1Binding, getD1Drizzle, notifications: notificationsTable } = await import('./db');
+  const { logD1MirrorFailure, logD1BindingMissing } = await import('./db/mirror-metrics');
 
   const backend = await resolveDataBackend();
   if (backend === 'supabase') return;
@@ -157,8 +139,9 @@ function pruneRecentAdminAlertDispatches(referenceTime: number) {
   }
 }
 
-// D1 binding 필수 — Workers env 가 없으면 throw. (서버 라우트 안에서만 호출)
 async function requireD1ForNotifications(label: string) {
+  const { resolveDataBackend, getD1Binding, getD1Drizzle } = await import('./db');
+  const { logD1BindingMissing } = await import('./db/mirror-metrics');
   const backend = await resolveDataBackend();
   const d1 = await getD1Binding();
   if (!d1) {
@@ -173,7 +156,6 @@ export async function sendAdminNotifications(
 ): Promise<number> {
   if (alerts.length === 0) return 0;
 
-  // 클라이언트(브라우저)는 D1 binding 접근 불가 → compat db 경유
   if (typeof window !== 'undefined') {
     const { db, d1 } = await import('./db-client');
     const { data: adminUsers, error: adminError } = await db
@@ -210,6 +192,8 @@ export async function sendAdminNotifications(
     return rows.length;
   }
 
+  const { staff_members: staffMembersTable, notifications: notificationsTable, or } = await import('./db');
+  const { sql, eq } = await import('drizzle-orm');
   const db = await requireD1ForNotifications('sendAdminNotifications:lookup');
 
   const adminUsers = await db
@@ -254,7 +238,6 @@ export async function sendAdminNotifications(
     );
 
     try {
-      // alertTypes가 빈 경우 lookup 자체를 건너뜀 (adminUserIds는 이미 가드됨)
       if (alertTypes.length > 0) {
         const rows = await db
           .select({
@@ -270,7 +253,6 @@ export async function sendAdminNotifications(
           );
 
         existingNotifications = rows.map((row) => {
-          // D1은 metadata를 text(JSON)로 보관 → 객체로 parse
           let parsedMetadata: Record<string, unknown> | null = null;
           if (typeof row.metadata === 'string' && row.metadata.length > 0) {
             try {
@@ -363,7 +345,7 @@ export async function sendAdminNotifications(
   });
 
   if (notifications.length > 0) {
-    // D1 직접 INSERT — mirror 호출 불필요 (자기 자신이 primary)
+    const { notifications: notificationsTable } = await import('./db');
     const values = (notifications as NotificationRow[]).map(normalizeForD1);
     try {
       await db.insert(notificationsTable).values(values);
@@ -390,6 +372,8 @@ export async function insertNotificationsOrThrow(
     return entry as NotificationRow;
   });
 
+  const { notifications: notificationsTable } = await import('./db');
+  const { emitRealtimeSignal } = await import('./realtime/server-signal');
   const db = await requireD1ForNotifications('insertNotificationsOrThrow');
   const values = rows.map(normalizeForD1);
 
@@ -412,15 +396,6 @@ export async function insertNotificationsOrThrow(
       void (async () => {
         try {
           const { dispatchNotificationPush } = await import('@/lib/notification-push-dispatch');
-          // 푸시 행에 **실제로 INSERT 된 notifications.id** 를 함께 넘긴다.
-          //  - NB-02: 디스패치가 이 id 로 푸시 tag 를 알림 단위로 가른다. 없으면 내용 해시
-          //    폴백으로 떨어져 결재 요청 여러 건이 트레이에서 서로를 덮을 여지가 남는다.
-          //  - NB-04: 페이로드의 notification_id 로 실려야 푸시를 탭했을 때 서비스워커가
-          //    인앱 알림함을 읽음 처리한다(없으면 즉시 return).
-          // id 는 rows 가 아니라 values 에서 읽어야 한다 — 호출부(결재 반려/차례/승인 등)는
-          // 대부분 id 를 안 넘기고 normalizeForD1 이 crypto.randomUUID() 로 그 자리에서 만든다.
-          // rows[i].id 만 보면 거의 항상 비어 있어 아무 효과가 없다. values 는 rows 와
-          // 같은 순서로 만들어지므로 인덱스가 그대로 대응한다.
           const pushRows = rows
             .map((r, index) => ({ row: r, id: String(values[index]?.id ?? r.id ?? '') }))
             .filter(({ row: r }) => r.user_id && r.title && r.type)
@@ -505,6 +480,7 @@ export async function upsertNotificationWithDedupe(input: DedupedNotificationInp
   }
 
   // 서버: D1 binding 직접 upsert (id PK 충돌 시 무시 — race condition 가드)
+  const { notifications: notificationsTable } = await import('./db');
   const db = await requireD1ForNotifications('upsertNotificationWithDedupe');
   const value = normalizeForD1(row as NotificationRow);
 

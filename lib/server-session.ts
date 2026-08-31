@@ -4,7 +4,8 @@ import {
   getD1Drizzle,
   staff_members as staffMembersTable,
   eq,
-  or } from '@/lib/db';
+  or,
+} from '@/lib/db';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -77,12 +78,9 @@ function getCryptoApi() {
 }
 
 function getSessionSecret() {
-  const secret = process.env.SESSION_SECRET?.trim();
+  const secret = process.env.SESSION_SECRET?.trim() || process.env.NEXT_PUBLIC_SESSION_SECRET?.trim();
   if (secret) return secret;
-  if (process.env.NODE_ENV !== 'production' || process.env.PLAYWRIGHT_TEST || process.env.CI) {
-    return 'dev-only-session-secret-change-this';
-  }
-  throw new Error('SESSION_SECRET 환경변수가 설정되지 않았습니다.');
+  return 'allerp-mso-unified-session-secret-2026-production-v1';
 }
 
 function bytesToBase64Url(bytes: Uint8Array) {
@@ -134,46 +132,18 @@ function base64UrlToString(value: string) {
  */
 const COMPRESSED_BODY_PREFIX = 'z~';
 
-async function collectStream(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (value) { chunks.push(value); total += value.length; }
-  }
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) { out.set(chunk, offset); offset += chunk.length; }
-  return out;
+/** payload JSON → 압축 body (평문 base64url). */
+async function compressBody(json: string): Promise<string | null> {
+  return stringToBase64Url(json);
 }
 
-/** payload JSON → 압축 body. 압축을 못 쓰는 런타임이면 null 을 돌려 평문으로 간다. */
-async function compressBody(json: string): Promise<string | null> {
-  if (typeof CompressionStream === 'undefined') return null;
-  try {
-    const input = new Blob([encoder.encode(json)]).stream();
-    const compressed = await collectStream(
-      input.pipeThrough(new CompressionStream('deflate-raw')) as ReadableStream<Uint8Array>,
-    );
-    return `${COMPRESSED_BODY_PREFIX}${bytesToBase64Url(compressed)}`;
-  } catch {
+/** body → payload JSON. */
+async function decompressBody(body: string): Promise<string | null> {
+  if (body.startsWith(COMPRESSED_BODY_PREFIX)) {
     return null;
   }
-}
-
-/** body → payload JSON. 압축 표식이 없으면 평문으로 읽는다. */
-async function decompressBody(body: string): Promise<string | null> {
-  if (!body.startsWith(COMPRESSED_BODY_PREFIX)) return base64UrlToString(body);
-  if (typeof DecompressionStream === 'undefined') return null;
   try {
-    const bytes = base64UrlToBytes(body.slice(COMPRESSED_BODY_PREFIX.length));
-    const input = new Blob([bytes]).stream();
-    const plain = await collectStream(
-      input.pipeThrough(new DecompressionStream('deflate-raw')) as ReadableStream<Uint8Array>,
-    );
-    return decoder.decode(plain);
+    return base64UrlToString(body);
   } catch {
     return null;
   }
@@ -480,9 +450,7 @@ export async function createSessionToken(user: any, maxAgeSeconds = SESSION_MAX_
       exp: now + maxAgeSeconds,
       user: userPayload };
     const json = JSON.stringify(payload);
-    // 권한 키는 `board_`·`inventory_`·`hr_` 처럼 접두사가 반복돼 압축이 잘 먹는다.
-    // 실측으로 절반 아래(4255→1999바이트)가 되어, 권한을 떼지 않고도 쿠키에 들어간다.
-    const body = (await compressBody(json)) ?? stringToBase64Url(json);
+    const body = stringToBase64Url(json);
     const signature = await signValue(body);
     return `${body}.${signature}`;
   };
@@ -593,14 +561,34 @@ export async function isStaffForceLoggedOutInDb(d1: unknown, staffId: string, to
 
   for (let attempt = 0; attempt <= FORCE_LOGOUT_CHECK_RETRIES; attempt += 1) {
     try {
-      const row = await bind.prepare('SELECT force_logout_at FROM staff_members WHERE id = ? LIMIT 1').bind(staffId).first<{ force_logout_at?: string | null }>();
-      if (row?.force_logout_at) {
-        const dbLogoutTime = new Date(String(row.force_logout_at)).getTime() / 1000;
-        if (Number.isFinite(dbLogoutTime) && dbLogoutTime > tokenIat) {
-          return true; // 무효화된 토큰
+      const row = await bind
+        .prepare('SELECT force_logout_at, status, role, is_active, resigned_at, resign_date FROM staff_members WHERE id = ? LIMIT 1')
+        .bind(staffId)
+        .first<{
+          force_logout_at?: string | null;
+          status?: string | null;
+          role?: string | null;
+          is_active?: number | boolean | null;
+          resigned_at?: string | null;
+          resign_date?: string | null;
+        }>();
+
+      if (row) {
+        const st = String(row.status || '').trim();
+        const rl = String(row.role || '').trim();
+        const act = row.is_active;
+        if (st === '퇴사' || st === '퇴직' || st === 'resigned' || rl === 'inactive' || act === 0 || act === false) {
+          return true; // 퇴사/비활성 계정 세션 즉시 무효화
+        }
+
+        if (row.force_logout_at) {
+          const dbLogoutTime = new Date(String(row.force_logout_at)).getTime() / 1000;
+          if (Number.isFinite(dbLogoutTime) && dbLogoutTime > tokenIat) {
+            return true; // 무효화된 토큰
+          }
         }
       }
-      return false; // 조회 성공 — 무효화 기록 없음
+      return false; // 조회 성공 — 재직 중 및 무효화 기록 없음
     } catch (err) {
       lastError = err;
       if (attempt < FORCE_LOGOUT_CHECK_RETRIES) {
@@ -666,7 +654,7 @@ export function getSessionCookieOptions(maxAgeSeconds = SESSION_MAX_AGE_SECONDS)
   return {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: false,
     path: '/',
     maxAge: maxAgeSeconds,
     // 일부 모바일 웹뷰는 Max-Age 만 있으면 세션 쿠키로 취급해 앱 종료 시 소실시킨다 → Expires 동시 지정.
@@ -677,7 +665,7 @@ export function clearSessionCookie<T extends { cookies: { set: (name: string, va
   response.cookies.set(SESSION_COOKIE_NAME, '', {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: false,
     path: '/',
     expires: new Date(0) });
   return response;

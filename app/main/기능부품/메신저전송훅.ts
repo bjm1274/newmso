@@ -3,7 +3,7 @@
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import { pokeChannel } from '@/lib/polling-bus';
 import { toast } from '@/lib/toast';
-import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useCallback, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { ChatMessage, ChatRoom, StaffMember } from '@/types';
 import { getMessageDisplayText } from './메신저첨부';
 import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
@@ -84,6 +84,9 @@ export function useChatMessageSending({
   emitTypingState,
   triggerChatPush,
   openSlashDraftFromText }: UseChatMessageSendingParams) {
+  const sendingInFlightRef = useRef<boolean>(false);
+  const lastSentTextRef = useRef<{ text: string; time: number }>({ text: '', time: 0 });
+
   const handleSendMessage = useCallback(async ({
     fileUrl,
     fileSizeBytes,
@@ -99,6 +102,10 @@ export function useChatMessageSending({
     const actorId = effectiveChatUserId || user?.id;
     if (!user || !actorId) return false;
 
+    if (sendingInFlightRef.current && !retryMessageId) {
+      return false;
+    }
+
     const retryPayload = retryMessageId
       ? deliveryStatesRef.current[retryMessageId]?.retryPayload || null
       : null;
@@ -111,6 +118,12 @@ export function useChatMessageSending({
       : typeof contentOverride === 'string'
         ? contentOverride
         : trimmed;
+
+    // 동일 메시지 초고속(500ms 이내) 중복 발송 방지
+    const now = Date.now();
+    if (!retryMessageId && !fileUrl && content && lastSentTextRef.current.text === content && now - lastSentTextRef.current.time < 500) {
+      return false;
+    }
     const resolvedFileUrl = retryPayload?.fileUrl ?? fileUrl ?? null;
     const resolvedFileName = retryPayload?.fileName ?? fileName ?? null;
     const resolvedFileSizeBytes = retryPayload?.fileSizeBytes ?? fileSizeBytes ?? null;
@@ -205,99 +218,118 @@ export function useChatMessageSending({
       clearTimeout(typingClearRef.current);
       typingClearRef.current = null;
     }
-    emitTypingState(false);
-
-    const { data: inserted, error } = await insertChatMessageWithFallback<ChatMessage>(db, insertPayload);
-
-    if (!error && inserted) {
-      removeChatRetryQueueEntry(actorId, optimisticId);
-      const optimisticInsertedMessage = {
-        ...inserted,
-        staff: { name: user.name, photo_url: getProfilePhotoUrl(user) } } as ChatMessage;
-
-      setMessages((prev) => {
-        const seenIds = new Set<string>();
-        return prev
-          .map((message) =>
-            String(message.id) === String(optimisticId) ? optimisticInsertedMessage : message,
-          )
-          .filter((message) => {
-            const normalizedId = String(message.id || '');
-            if (seenIds.has(normalizedId)) return false;
-            seenIds.add(normalizedId);
-            return true;
-          });
-      });
-
-      setDeliveryStates((prev) => {
-        const next = { ...prev };
-        delete next[optimisticId];
-        next[String(inserted.id)] = {
-          status: 'sent',
-          retryPayload: retrySnapshot,
-          error: null };
-        return next;
-      });
-
-      // conversation 그룹에 속한 모든 방 ID를 업데이트하여 사이드바
-      // 대표 방의 preview도 즉시 반영되도록 한다.
-      setChatRooms((prev) => {
-        const convRoomIds = getConversationRoomIdsByRoomId(String(roomId), prev);
-        const targetIds = Array.from(
-          new Set([...(convRoomIds.length > 0 ? convRoomIds : [String(roomId)]), String(roomId)].filter(Boolean)),
-        );
-        return sortChatRoomsWithNoticeFirst(
-          prev.map((room) =>
-            targetIds.includes(String(room.id))
-              ? {
-                  ...room,
-                  last_message: getMessageDisplayText(
-                    content,
-                    resolvedFileName,
-                    resolvedFileUrl,
-                    room.last_message,
-                  ),
-                  last_message_preview: getMessageDisplayText(
-                    content,
-                    resolvedFileName,
-                    resolvedFileUrl,
-                    room.last_message_preview,
-                  ),
-                  last_message_at: inserted.created_at || new Date().toISOString() }
-              : room,
-          ),
-        );
-      });
-
-      broadcastChatSync('message-sent', roomId);
-      // 본인 송신 직후 다음 polling 주기를 기다리지 않고 즉시 tail 재조회 트리거.
-      // 같은 탭 내 다른 구독자(방 목록 배지 등)와 같은 사용자의 다른 탭은
-      // BroadcastChannel 경로로, 다른 사용자는 본인 측 polling이 곧바로 발화.
-      pokeChannel(`chat-realtime-${roomId}`);
-      pokeChannel('chat-global-messages');
-      pokeChannel('chat-rooms-list');
-      if (shouldTriggerImmediateChatPush({
-        albumId: inserted.album_id,
-        albumIndex: inserted.album_index,
-        albumTotal: inserted.album_total })) {
-        void triggerChatPush(String(inserted.room_id), String(inserted.id));
-      }
-      return true;
+    if (!retryMessageId) {
+      sendingInFlightRef.current = true;
     }
 
-    setDeliveryStates((prev) => ({
-      ...prev,
-      [optimisticId]: {
-        status: 'failed',
-        retryPayload: retrySnapshot,
-        error: error?.message || '메시지 전송 실패' } }));
-    upsertFailedChatRetryEntry(actorId, {
-      id: optimisticId,
-      payload: retrySnapshot,
-      error: error?.message || '메시지 전송 실패',
-      createdAt: optimisticMessage.created_at });
-    console.error('message send failed', error);
-    return false;
+    try {
+      const { data: inserted, error } = await insertChatMessageWithFallback<ChatMessage>(db, insertPayload);
+
+      if (!error && inserted) {
+        removeChatRetryQueueEntry(actorId, optimisticId);
+        const optimisticInsertedMessage = {
+          ...inserted,
+          staff: { name: user.name, photo_url: getProfilePhotoUrl(user) } } as ChatMessage;
+
+        setMessages((prev) => {
+          const seenIds = new Set<string>();
+          return prev
+            .map((message) =>
+              String(message.id) === String(optimisticId) ? optimisticInsertedMessage : message,
+            )
+            .filter((message) => {
+              const normalizedId = String(message.id || '');
+              if (seenIds.has(normalizedId)) return false;
+              seenIds.add(normalizedId);
+              return true;
+            });
+        });
+
+        setDeliveryStates((prev) => {
+          const next = { ...prev };
+          delete next[optimisticId];
+          next[String(inserted.id)] = {
+            status: 'sent',
+            retryPayload: retrySnapshot,
+            error: null };
+          return next;
+        });
+
+        // conversation 그룹에 속한 모든 방 ID를 업데이트하여 사이드바
+        // 대표 방의 preview도 즉시 반영되도록 한다.
+        setChatRooms((prev) => {
+          const convRoomIds = getConversationRoomIdsByRoomId(String(roomId), prev);
+          const targetIds = Array.from(
+            new Set([...(convRoomIds.length > 0 ? convRoomIds : [String(roomId)]), String(roomId)].filter(Boolean)),
+          );
+          return sortChatRoomsWithNoticeFirst(
+            prev.map((room) =>
+              targetIds.includes(String(room.id))
+                ? {
+                    ...room,
+                    last_message: getMessageDisplayText(
+                      content,
+                      resolvedFileName,
+                      resolvedFileUrl,
+                      room.last_message,
+                    ),
+                    last_message_preview: getMessageDisplayText(
+                      content,
+                      resolvedFileName,
+                      resolvedFileUrl,
+                      room.last_message_preview,
+                    ),
+                    last_message_at: inserted.created_at || new Date().toISOString() }
+                : room,
+            ),
+          );
+        });
+
+        broadcastChatSync('message-sent', roomId);
+        pokeChannel(`chat-realtime-${roomId}`);
+        pokeChannel('chat-global-messages');
+        pokeChannel('chat-rooms-list');
+        if (shouldTriggerImmediateChatPush({
+          albumId: inserted.album_id,
+          albumIndex: inserted.album_index,
+          albumTotal: inserted.album_total })) {
+          void triggerChatPush(String(inserted.room_id), String(inserted.id));
+        }
+        return true;
+      }
+
+      setDeliveryStates((prev) => ({
+        ...prev,
+        [optimisticId]: {
+          status: 'failed',
+          retryPayload: retrySnapshot,
+          error: error?.message || '메시지 전송 실패' } }));
+      upsertFailedChatRetryEntry(actorId, {
+        id: optimisticId,
+        payload: retrySnapshot,
+        error: error?.message || '메시지 전송 실패',
+        createdAt: optimisticMessage.created_at });
+      console.error('message send failed', error);
+      return false;
+    } catch (sendErr) {
+      console.error('message send exception', sendErr);
+      setDeliveryStates((prev) => ({
+        ...prev,
+        [optimisticId]: {
+          status: 'failed',
+          retryPayload: retrySnapshot,
+          error: sendErr instanceof Error ? sendErr.message : '메시지 전송 실패' } }));
+      upsertFailedChatRetryEntry(actorId, {
+        id: optimisticId,
+        payload: retrySnapshot,
+        error: sendErr instanceof Error ? sendErr.message : '메시지 전송 실패',
+        createdAt: optimisticMessage.created_at });
+      return false;
+    } finally {
+      if (!retryMessageId) {
+        sendingInFlightRef.current = false;
+      }
+    }
   }, [
     broadcastChatSync,
     canWriteNotice,

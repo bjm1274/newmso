@@ -1,13 +1,14 @@
 // ============================================================
 // lib/db/get-binding.ts
-// Next.js API route에서 Cloudflare D1 binding을 가져오는 헬퍼.
+// Next.js API route에서 D1 / 로컬 SQLite binding을 가져오는 헬퍼.
 //
-// OpenNext on Cloudflare Workers는 getCloudflareContext()로 env에 접근.
-// 로컬 개발(`next dev`)에서는 Cloudflare context가 없으므로 undefined 반환.
+// 1) Cloudflare Workers 환경 (OpenNext) -> getCloudflareContext()로 env.DB 반환
+// 2) Node.js Standalone / Docker / 로컬 환경 -> SqliteD1Adapter(better-sqlite3 WAL) 반환
 // ============================================================
 
 import type { D1Database } from '@cloudflare/workers-types';
-import { getDataBackend, type DataBackend } from './types';
+import { isCloudflareWorkerRuntime } from '@/lib/cloudflare-runtime';
+import { type DataBackend } from './types';
 
 // CloudflareEnv 타입 보강 — wrangler.toml의 [[d1_databases]] binding과 [vars]
 declare global {
@@ -18,148 +19,52 @@ declare global {
   }
 }
 
-let cachedLocalD1: D1Database | undefined = undefined;
-
-function getLocalD1Mock(): D1Database | undefined {
-  if (cachedLocalD1) return cachedLocalD1;
-
-  try {
-    const fs = eval("require('fs')");
-    const path = eval("require('path')");
-    const Database = eval("require('better-sqlite3')");
-
-    const cwd = typeof process.cwd === 'function' ? process.cwd() : '';
-    const dir = path.join(cwd, '.wrangler', 'state', 'v3', 'd1', 'miniflare-D1DatabaseObject');
-    if (!fs.existsSync(dir)) {
-      console.warn('[getLocalD1Mock] wrangler local D1 state directory not found at:', dir);
-      return undefined;
-    }
-
-    const files = fs.readdirSync(dir);
-    const sqliteFile = files.find((f: string) => f.endsWith('.sqlite') && f !== 'metadata.sqlite');
-    if (!sqliteFile) {
-      console.warn('[getLocalD1Mock] No .sqlite file found in:', dir);
-      return undefined;
-    }
-
-    const dbPath = path.join(dir, sqliteFile);
-    console.log('[getLocalD1Mock] Connecting to local D1 SQLite database:', dbPath);
-
-    class MockD1Database {
-      private db: any;
-
-      constructor(dbPath: string) {
-        this.db = new Database(dbPath);
-        this.db.pragma('foreign_keys = ON');
-      }
-
-      prepare(query: string) {
-        return new MockD1PreparedStatement(this.db, query);
-      }
-
-      async batch(statements: any[]) {
-        const results = [];
-        for (const stmt of statements) {
-          results.push(await stmt.all());
-        }
-        return results;
-      }
-
-      async exec(query: string) {
-        this.db.exec(query);
-        return { count: 0, duration: 0 };
-      }
-    }
-
-    class MockD1PreparedStatement {
-      private db: any;
-      private query: string;
-      private params: any[] = [];
-
-      constructor(db: any, query: string) {
-        this.db = db;
-        this.query = query;
-      }
-
-      bind(...params: any[]) {
-        this.params = params.map((p) => {
-          if (typeof p === 'boolean') return p ? 1 : 0;
-          return p;
-        });
-        return this;
-      }
-
-      async all() {
-        const stmt = this.db.prepare(this.query);
-        const results = stmt.all(...this.params);
-        return {
-          results,
-          success: true,
-          meta: { duration: 0, changes: 0, rows_read: results.length, rows_written: 0 } };
-      }
-
-      async run() {
-        const stmt = this.db.prepare(this.query);
-        const info = stmt.run(...this.params);
-        return {
-          success: true,
-          meta: { duration: 0, changes: info.changes, rows_read: 0, rows_written: info.changes } };
-      }
-
-      async first() {
-        const stmt = this.db.prepare(this.query);
-        const row = stmt.get(...this.params);
-        return row || null;
-      }
-
-      async raw() {
-        const stmt = this.db.prepare(this.query);
-        return stmt.raw().all(...this.params);
-      }
-    }
-
-    cachedLocalD1 = new MockD1Database(dbPath) as unknown as D1Database;
-    return cachedLocalD1;
-  } catch (err) {
-    console.error('[getLocalD1Mock] Failed to initialize mock D1 database:', err);
-    return undefined;
-  }
-}
-
 /**
- * D1 binding을 가져옴. Workers 외 환경이거나 binding이 없으면 undefined.
+ * DB binding을 가져옴.
+ * Cloudflare Worker 환경이면 env.DB, Node.js 서버(Docker/Standalone/로컬)이면 SqliteD1Adapter 반환.
  *
  * Next.js API route에서 사용:
  *   const d1 = await getD1Binding();
  *   if (d1) { ... use d1 ... }
+ *
+ * better-sqlite3 는 동적 import 한다. 정적 import 하면 Edge/클라이언트/워커 번들에
+ * 네이티브 모듈이 새어 `util.promisify` 가 객체를 받고 페이지가 죽는다.
  */
 export async function getD1Binding(): Promise<D1Database | undefined> {
   if (typeof window !== 'undefined') {
     return undefined;
   }
 
+  // 1. globalThis에 사전 등록된 SQLite 어댑터가 있으면 즉시 반환 (0ms)
+  if ((globalThis as any).__allerp_sqlite_adapter) {
+    return (globalThis as any).__allerp_sqlite_adapter;
+  }
+
+  // 2. 실제 Workers 런타임에서만 Cloudflare 컨텍스트를 읽는다.
+  //    Node 에서 getCloudflareContext({ async: true }) 를 호출하면 wrangler 가
+  //    기동되며 The "original" argument must be of type Function 이 난다.
+  if (isCloudflareWorkerRuntime()) {
+    try {
+      const { getCloudflareContext } = await import('@opennextjs/cloudflare');
+      const { env } = await getCloudflareContext({ async: true });
+      if (env?.DB) return env.DB;
+    } catch {
+      // Cloudflare Context 없음 -> Node.js 런타임으로 진행
+    }
+  }
+
+  // 3. Node.js 런타임 환경에서 기본 SQLite 어댑터 반환
   try {
-    const { getCloudflareContext } = await import('@opennextjs/cloudflare');
-    const { env } = await getCloudflareContext({ async: true });
-    if (env.DB) return env.DB;
-  } catch {
-    // ignore
+    const { getSqliteD1Adapter } = await import('./client-sqlite');
+    return getSqliteD1Adapter();
+  } catch (err) {
+    console.error('[getD1Binding] Failed to initialize SQLite database adapter:', err);
+    return undefined;
   }
-
-  // OpenNext may expose NODE_ENV="development" in a production Worker bundle.
-  // Never invoke the Node-only local D1 fallback when the Worker runtime exists.
-  const isWorkerRuntime = typeof (globalThis as typeof globalThis & { WebSocketPair?: unknown }).WebSocketPair !== 'undefined';
-  if (process.env.NODE_ENV === 'development' && !isWorkerRuntime) {
-    return getLocalD1Mock();
-  }
-
-  return undefined;
 }
 
 /**
- * 현재 백엔드 모드 — wrangler.toml [vars].DATA_BACKEND 또는 process.env.DATA_BACKEND
- *
- * 동기 호출이 가능하면 그쪽을 우선 시도하고, async context만 가능하면 그것 사용.
+ * 현재 백엔드 모드 — SQLite / D1 기반
  */
 export async function resolveDataBackend(): Promise<DataBackend> {
   return 'd1';

@@ -310,7 +310,7 @@ function calculateSalaryAmountWithChanges({
   }
 
   if (resignDate) {
-    const lastEmployedDate = shiftPayrollDate(resignDate, -1);
+    const lastEmployedDate = resignDate;
     const resignYear = lastEmployedDate.getFullYear();
     const resignMonth = lastEmployedDate.getMonth() + 1;
     if (resignYear === bounds.end.getFullYear() && resignMonth === (bounds.end.getMonth() + 1)) {

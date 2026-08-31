@@ -282,7 +282,7 @@ function MessengerComposerImpl({
 
   const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== 'Enter') return;
-    if (event.nativeEvent.isComposing) return;
+    if (event.nativeEvent.isComposing || (event as any).isComposing || event.keyCode === 229) return;
 
     const isMobileComposer = isMobileChatViewport();
     if (isMobileComposer || event.shiftKey) {

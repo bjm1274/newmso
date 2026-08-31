@@ -17,7 +17,7 @@ import { withMissingColumnsFallback, isMissingColumnError } from '@/lib/db-compa
 import { APPROVAL_OPTIONAL_COLUMNS, buildApprovalSelect } from '@/lib/approval-query-columns';
 import { notificationMatchesApprovalId } from '@/lib/notification-metadata';
 import type { StaffMember } from '@/types';
-import { extractOfficialDocRequest } from '@/lib/official-document-approval';
+import { extractOfficialDocRequest } from '@/lib/official-document-shared';
 import { useActionDialog } from '@/app/components/useActionDialog';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
 import ApprovalComposerView from './전자결재서브/ApprovalComposerView';

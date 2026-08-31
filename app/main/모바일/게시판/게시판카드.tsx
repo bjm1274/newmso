@@ -12,6 +12,8 @@ import MChip from '../공통/MChip';
 import MAvatar from '../공통/MAvatar';
 import { BOARD_CATS, type BoardListPost, boardTypeToCat, formatShortDate, pickAvatarTone } from './data-hooks';
 
+import { getBoardPostPreview } from '@/app/main/기능부품/게시판-view-utils';
+
 function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void }) {
   const cat = boardTypeToCat(post.board_type as string | null);
   void BOARD_CATS.find((c) => c.id === cat); // cat 유효성 (표시는 아래 분기)
@@ -21,6 +23,7 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
   const tone = pickAvatarTone(String(post.id ?? authorName));
   const views = typeof post.views === 'number' ? post.views : 0;
   const commentCount = post.comment_count ?? 0;
+  const previewText = getBoardPostPreview(post, 90);
 
   const isSchedule = cat === 'op' || cat === 'mri';
 
@@ -87,13 +90,14 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
             </div>
           </div>
 
-          {(post.surgery_fasting || post.surgery_inpatient || post.surgery_guardian || post.surgery_caregiver || post.surgery_transfusion) && (
+          {(post.surgery_fasting || post.surgery_inpatient || post.surgery_guardian || post.surgery_caregiver || post.surgery_transfusion || post.mri_contrast_required) && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 10 }}>
               {post.surgery_fasting && <MChip tone="danger">금식</MChip>}
               {post.surgery_inpatient && <MChip tone="accent">입원</MChip>}
               {post.surgery_guardian && <MChip tone="success">보호자 동반</MChip>}
               {post.surgery_caregiver && <MChip tone="warning">간병인</MChip>}
               {post.surgery_transfusion && <MChip tone="danger">수혈</MChip>}
+              {post.mri_contrast_required && <MChip tone="accent">조영제</MChip>}
             </div>
           )}
         </button>
@@ -166,6 +170,43 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
         >
           {post.title}
         </div>
+        {previewText && (
+          <div
+            style={{
+              fontSize: 12.5,
+              fontWeight: 500,
+              color: 'var(--z-600)',
+              lineHeight: 1.45,
+              marginTop: 4,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+            }}
+          >
+            {previewText}
+          </div>
+        )}
+        {Array.isArray(post.tags) && post.tags.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+            {post.tags.slice(0, 3).map((tag, idx) => (
+              <span
+                key={idx}
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: 'var(--m-accent)',
+                  background: 'rgba(0, 0, 0, 0.03)',
+                  padding: '1px 5px',
+                  borderRadius: 4,
+                }}
+              >
+                #{String(tag)}
+              </span>
+            ))}
+          </div>
+        )}
         <div
           style={{
             display: 'flex',
@@ -195,7 +236,7 @@ function PostCard({ post, onOpen }: { post: BoardListPost; onOpen: () => void })
               alignItems: 'center',
               gap: 3,
               color: commentCount > 0 ? 'var(--m-accent)' : 'var(--z-500)' }}
-          >
+            >
             <MIcon name="chat" size={11} />
             {commentCount}
           </span>

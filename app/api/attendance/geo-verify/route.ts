@@ -28,7 +28,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { calculateDistance } from '@/lib/geo';
 import { ALLOWED_DISTANCE_M, WORKPLACE_LOCATION } from '@/lib/location';
-import { logAudit } from '@/lib/audit';
+import { logAuditServer as logAudit } from '@/lib/audit-server';
 import { userId } from '@/lib/d1-api-helpers';
 import {
   normalizeSessionUser,

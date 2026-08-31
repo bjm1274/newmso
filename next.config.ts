@@ -1,10 +1,22 @@
 import type { NextConfig } from "next";
 import { createRequire } from "module";
-import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 
-// next dev에서 Cloudflare 바인딩(D1 등)을 사용 가능하게 함 (프로덕션 빌드 및 CI/E2E 테스트엔 무영향)
-if (typeof process !== 'undefined' && process.env.NODE_ENV === 'development' && !process.env.PLAYWRIGHT_TEST && !process.env.CI) {
-  initOpenNextCloudflareForDev();
+// Oracle/Node 로 이전한 뒤에는 wrangler 를 기본 기동하지 않는다.
+// Cloudflare D1 로컬 바인딩이 필요할 때만 USE_CLOUDFLARE_DEV=1 로 켠다.
+// (기본으로 켜 두면 getPlatformProxy 가 Node 빌트인을 패치해
+//  The "original" argument must be of type Function 으로 페이지가 죽는다.)
+if (
+  typeof process !== 'undefined' &&
+  process.env.USE_CLOUDFLARE_DEV === '1' &&
+  process.env.NODE_ENV === 'development' &&
+  !process.env.PLAYWRIGHT_TEST &&
+  !process.env.CI
+) {
+  import('@opennextjs/cloudflare')
+    .then((m) => m.initOpenNextCloudflareForDev())
+    .catch((err) => {
+      console.warn('[next.config] Cloudflare dev init skipped:', err?.message || err);
+    });
 }
 
 const r2PublicBaseUrl = (
@@ -56,12 +68,31 @@ const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
   reactStrictMode: true,
-  serverExternalPackages: ['better-sqlite3'],
+  output: 'standalone',
+  serverExternalPackages: [
+    'better-sqlite3',
+    '@aws-sdk/client-s3',
+    '@aws-sdk/s3-request-presigner',
+  ],
   experimental: {
     optimizeCss: false,
     scrollRestoration: true,
   },
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...(config.resolve.fallback || {}),
+        fs: false,
+        net: false,
+        tls: false,
+        path: false,
+        child_process: false,
+        'better-sqlite3': false,
+        sqlite3: false,
+        '@aws-sdk/client-s3': false,
+        '@aws-sdk/s3-request-presigner': false,
+      };
+    }
     config.watchOptions = {
       ...(config.watchOptions || {}),
       ignored: [

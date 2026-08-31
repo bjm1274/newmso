@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { db } from '@/lib/db-client';
-import { parseArchivedContent, extractApprovalDocNumberFromDocument } from '@/lib/approval-document-archive';
+import { parseArchivedContent, extractApprovalDocNumberFromDocument } from '@/lib/approval-document-shared';
 import { buildApprovalPrintHtml } from '../전자결재서브/approval-print-utils';
 import { DEFAULT_APPROVAL_TEMPLATE_DESIGN } from '../전자결재서브/approval-constants';
 import { BUILTIN_TEMPLATE_DEFAULTS } from '../관리자전용서브/전자결재양식관리/design-utils';

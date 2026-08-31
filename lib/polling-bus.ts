@@ -208,22 +208,11 @@ function isHidden(): boolean {
 
 /**
  * 실시간 연결 일시 중단 여부.
- * - 일반 브라우저: 탭 hidden / 5분 idle 시 중단 (D1·Workers 비용 절감)
- * - Electron(AllERP PC): X로 닫아 트레이에만 있어도 알림·채팅 배지가 와야 하므로
- *   hidden/idle 로 끊지 않는다. (main.js 가 close → hide 트레이 유지)
- *
- * 리더 선출용: 중단된 탭은 leader 후보에서 제외되어 전경 탭이 WS/폴링을 가져간다.
+ * - 오라클 전용 고성능 서버 환경: 24시간 상시 웹소켓 연결 유지하여 백그라운드에서도 즉각 알림 수신
  */
 function isSuspended(): boolean {
-  if (isElectronShell()) {
-    mySuspendedForLeader = false;
-    return false;
-  }
-  const suspended = isHidden() || isIdle;
-  if (mySuspendedForLeader !== suspended) {
-    mySuspendedForLeader = suspended;
-  }
-  return suspended;
+  mySuspendedForLeader = false;
+  return false;
 }
 
 function ensureActivityHandlers(): void {

@@ -7,11 +7,10 @@ import {
   buildRevisionDocNumber,
   getApprovalRevision,
   resolveApprovalDocNumberConfig } from '@/lib/approval-workflow';
-import { syncApprovalToDocumentRepository } from '@/lib/approval-document-archive';
 import { useApprovalHistoryEntry } from './useApprovalHistoryEntry';
 import { isMissingColumnError } from '@/lib/db-compat';
 import {
-  extractOfficialDocRequest } from '@/lib/official-document-approval';
+  extractOfficialDocRequest } from '@/lib/official-document-shared';
 import { getReportApprovalSummary, getReportApprovalValidationMessage } from '@/lib/approval-report-utils';
 import { extractLeaveRequestMeta } from '@/lib/leave-notice';
 import {
@@ -34,7 +33,7 @@ import {
   type SupplyInventoryReviewRow,
   type SupplyInventoryReviewState } from '../전자결재-types';
 import { normalizeApprovalCcUsers } from '../전자결재-utils';
-import { toUtcSqlTimestamp } from '@/lib/chat-read-cursors';
+import { toUtcSqlTimestamp } from '@/lib/chat-timestamp';
 
 type ApprovalRecord = Record<string, unknown>;
 type ApprovalHistoryEntry = Parameters<typeof appendApprovalHistory>[1];
@@ -702,12 +701,6 @@ export function useApprovalSubmit({
       console.error('기안 상신 실패:', error);
       toast(`기안이 올라가지 않았습니다.\n\n${error.message || ''}`, 'error');
       return;
-    }
-    try {
-      await syncApprovalToDocumentRepository((insertedApproval as ApprovalRecord | null) ?? row);
-    } catch (archiveError) {
-      console.error('결재 문서보관함 저장 실패:', archiveError);
-      toast('결재 문서는 상신됐지만 문서보관함 저장에는 실패했습니다.', 'warning');
     }
     await createApprovalReferenceNotifications((insertedApproval as ApprovalRecord | null) ?? row);
 

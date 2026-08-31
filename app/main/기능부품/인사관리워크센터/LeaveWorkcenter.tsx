@@ -32,7 +32,7 @@ import {
   WorkcenterShell,
   type WorkcenterKpi } from './workcenter-common';
 import { db } from '@/lib/db-client';
-import { calculateLeaveDays } from '@/lib/annual-leave-ledger';
+import { calculateLeaveDays } from '@/lib/annual-leave-calculator';
 import { logAudit, readClientAuditActor } from '@/lib/audit';
 import { LeaveBalanceTable } from './LeaveWorkcenter/LeaveBalanceTable';
 import LeaveQuickForm from './LeaveWorkcenter/LeaveQuickForm';

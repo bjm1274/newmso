@@ -1,139 +1,12 @@
-import { formatKoreanDateKey } from '@/lib/seoul-time';
-import { syncApprovedLeaveRequestsToLedger } from '@/lib/unified-leave-ledger';
+import 'server-only';
+export * from '@/lib/annual-leave-calculator';
 import {
-  getD1Binding,
-  getD1Drizzle,
-  leave_requests as leaveRequestsTable,
-  eq,
-  and,
-  desc,
-  inArray,
-} from '@/lib/db';
-import {
-  isAnnualLeaveType,
+  calculateLeaveDays,
+  isApprovedLeaveStatus,
   isHalfLeaveType,
-  getLeaveUnit,
   normalizeLeaveType,
   leaveTypeLookupAliases,
-} from '@/lib/leave-type';
-
-// leave_type SSOT: leave-type.ts — re-export for existing importers
-export { isAnnualLeaveType, isHalfLeaveType, getLeaveUnit };
-
-const APPROVED_STATUS_LABELS = new Set(['승인', 'approved']);
-
-export function isApprovedLeaveStatus(value: unknown): boolean {
-  const normalized = String(value ?? '').trim().toLowerCase();
-  if (!normalized) return false;
-  return APPROVED_STATUS_LABELS.has(normalized);
-}
-
-export function calculateLeaveDays(startDate: string | null | undefined, endDate: string | null | undefined) {
-  if (!startDate) return 0;
-
-  const start = new Date(startDate);
-  const end = new Date(endDate || startDate);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    return 0;
-  }
-
-  // 종료 < 시작(데이터 오류)이면 시작일 1일로 처리 — 음수 일수 방지
-  if (end.getTime() < start.getTime()) {
-    return 1;
-  }
-
-  const diff = end.getTime() - start.getTime();
-  return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1);
-}
-
-function clipDateRangeToYear(
-  startDate: string | null | undefined,
-  endDate: string | null | undefined,
-  year: number
-) {
-  if (!startDate) return null;
-
-  const start = new Date(startDate);
-  const end = new Date(endDate || startDate);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    return null;
-  }
-
-  const rangeStart = new Date(Math.max(start.getTime(), new Date(`${year}-01-01T00:00:00`).getTime()));
-  const rangeEnd = new Date(Math.min(end.getTime(), new Date(`${year}-12-31T23:59:59`).getTime()));
-
-  if (rangeStart.getTime() > rangeEnd.getTime()) {
-    return null;
-  }
-
-  return { start: rangeStart, end: rangeEnd };
-}
-
-export function calculateApprovedAnnualLeaveUsage(
-  rows: Array<Record<string, unknown>> | null | undefined,
-  year = new Date().getFullYear()
-) {
-  return (rows || []).reduce((sum, row) => {
-    if (!isApprovedLeaveStatus(row?.status)) {
-      return sum;
-    }
-
-    // '연차(부여)'는 사용이 아니라 신규 부여 — 서버 sync 와 동일
-    if (String(row?.leave_type ?? '').includes('부여')) {
-      return sum;
-    }
-
-    // 반차/반반차 연도 clip 및 dbDays 우선 적용 (과거 연도 반차 과대합산 방지 및 0.25일 지원)
-    if (isHalfLeaveType(row?.leave_type)) {
-      const halfClipped = clipDateRangeToYear(
-        row?.start_date as string | null | undefined,
-        row?.end_date as string | null | undefined,
-        year,
-      );
-      if (!halfClipped) return sum;
-      const dbDays = row?.days != null ? Number(row.days) : null;
-      if (dbDays != null && !Number.isNaN(dbDays) && dbDays > 0) {
-        return sum + dbDays;
-      }
-      return sum + 0.5;
-    }
-
-    if (!isAnnualLeaveType(row?.leave_type)) {
-      return sum;
-    }
-
-    const clippedRange = clipDateRangeToYear(
-      row?.start_date as string | null | undefined,
-      row?.end_date as string | null | undefined,
-      year
-    );
-
-    if (!clippedRange) {
-      return sum;
-    }
-
-    // 당해 연도 안 전부 포함이면 DB days 우선 (서버 sync 와 동일) — 클라이언트/서버 잔여 불일치 방지
-    const startY = String(row?.start_date || '').slice(0, 4);
-    const endY = String(row?.end_date || row?.start_date || '').slice(0, 4);
-    const dbDays = row?.days != null ? Number(row.days) : null;
-    if (
-      startY === String(year) &&
-      endY === String(year) &&
-      dbDays != null &&
-      !Number.isNaN(dbDays)
-    ) {
-      return sum + dbDays;
-    }
-
-    return (
-      sum +
-      calculateLeaveDays(
-        formatKoreanDateKey(clippedRange.start),
-        formatKoreanDateKey(clippedRange.end)
-      )
-    );
-  }, 0);
-}
+} from '@/lib/annual-leave-calculator';
 
 type EnsureApprovedAnnualLeaveRequestParams = {
   staffId: string;
@@ -183,6 +56,7 @@ export async function ensureApprovedAnnualLeaveRequest(params: EnsureApprovedAnn
   const { staffId, startDate, endDate } = params;
   const payload = buildLeaveRequestPayload({ ...params, leaveType });
 
+  const { getD1Binding, getD1Drizzle, leave_requests, eq, and, desc, inArray } = await import('@/lib/db');
   const d1 = await getD1Binding();
   if (!d1) throw new Error('[annual-leave-ledger] D1 binding not available (ensureApprovedAnnualLeaveRequest)');
   const db = getD1Drizzle(d1);
@@ -191,17 +65,17 @@ export async function ensureApprovedAnnualLeaveRequest(params: EnsureApprovedAnn
   // leave_type 은 정규 키 + 레거시 별칭 (연차 (1.0) 등) 으로 조회 — 대기 row 승격
   const typeAliases = leaveTypeLookupAliases(params.leaveType);
   const existingRows = await db
-    .select({ id: leaveRequestsTable.id, status: leaveRequestsTable.status })
-    .from(leaveRequestsTable)
+    .select({ id: leave_requests.id, status: leave_requests.status })
+    .from(leave_requests)
     .where(
       and(
-        eq(leaveRequestsTable.staff_id, staffId),
-        inArray(leaveRequestsTable.leave_type, typeAliases),
-        eq(leaveRequestsTable.start_date, startDate),
-        eq(leaveRequestsTable.end_date, endDate),
+        eq(leave_requests.staff_id, staffId),
+        inArray(leave_requests.leave_type, typeAliases),
+        eq(leave_requests.start_date, startDate),
+        eq(leave_requests.end_date, endDate),
       ),
     )
-    .orderBy(desc(leaveRequestsTable.created_at))
+    .orderBy(desc(leave_requests.created_at))
     .limit(1);
 
   const existingRow = existingRows[0] ?? null;
@@ -209,14 +83,14 @@ export async function ensureApprovedAnnualLeaveRequest(params: EnsureApprovedAnn
   if (existingRow?.id) {
     if (!isApprovedLeaveStatus(existingRow.status)) {
       await db
-        .update(leaveRequestsTable)
+        .update(leave_requests)
         .set({
           status: '승인',
           approved_at: payload.approved_at,
           // D1 스키마에 company_id 있음
           ...(params.companyId ? { company_id: params.companyId } : {}),
           days: payload.days ?? (isHalfLeaveType(payload.leave_type) ? 0.5 : calculateLeaveDays(payload.start_date, payload.end_date)) })
-        .where(eq(leaveRequestsTable.id, existingRow.id));
+        .where(eq(leave_requests.id, existingRow.id));
     }
     return existingRow.id;
   }
@@ -235,7 +109,7 @@ export async function ensureApprovedAnnualLeaveRequest(params: EnsureApprovedAnn
     company_id: params.companyId ?? null,
     created_at: new Date().toISOString(),
     days: payload.days ?? (isHalfLeaveType(payload.leave_type) ? 0.5 : calculateLeaveDays(payload.start_date, payload.end_date)) };
-  await db.insert(leaveRequestsTable).values(insertValues);
+  await db.insert(leave_requests).values(insertValues);
   return newId;
 }
 
@@ -277,6 +151,7 @@ export async function syncAnnualLeaveUsedForStaff(
   // leave_requests는 결재 workflow만 보관하고, 승인된 사용일수는 leave_ledger에만 반영한다.
   // options는 기존 호출부와의 호환을 위해 유지한다.
   void options;
+  const { syncApprovedLeaveRequestsToLedger } = await import('@/lib/unified-leave-ledger');
   const summary = await syncApprovedLeaveRequestsToLedger(staffId);
   return summary.used;
 }

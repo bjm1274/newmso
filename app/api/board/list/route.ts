@@ -85,6 +85,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
   }
 
+  const userCompany = String(session?.user?.company ?? session?.user?.company_name ?? '').trim();
+  const userCompanyId = String(session?.user?.company_id ?? '').trim();
+  const isAdmin = session?.user?.role === 'admin' || session?.user?.is_system_master === true;
+
   let body: Record<string, unknown> = {};
   try {
     body = ((await req.json()) as Record<string, unknown>) ?? {};
@@ -101,6 +105,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const cols = SELECT_COLUMNS.join(', ');
   const typePlaceholders = LIST_BOARD_TYPES.map(() => '?').join(', ');
 
+  // 테넌트 격리 조건 생성
+  let companyWhere = '';
+  const companyBindings: string[] = [];
+  if (!isAdmin && (userCompany || userCompanyId)) {
+    companyWhere = ' AND (company = ? OR company_id = ? OR company IS NULL OR company = \'\' OR company = \'전체\')';
+    companyBindings.push(userCompany, userCompanyId);
+  }
+
   try {
     if (mode === 'calendar') {
       const month = String(body.month ?? '').trim();
@@ -113,12 +125,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       const scheduleTypes = SCHEDULE_TYPE_GROUPS[category] ?? [...SCHEDULE_BOARD_TYPES];
 
       // 일정 글은 전부 읽어 정규화한 뒤 **해석된 날짜**로 거른다.
-      // (SQL 의 schedule_date 로 먼저 거르면 META 안에만 날짜가 있는 147건이 사라진다.)
       const rows = await d1
         .prepare(
-          `SELECT ${cols} FROM board_posts WHERE board_type IN (${scheduleTypes.map(() => '?').join(', ')})`,
+          `SELECT ${cols} FROM board_posts WHERE board_type IN (${scheduleTypes.map(() => '?').join(', ')})${companyWhere}`,
         )
-        .bind(...scheduleTypes)
+        .bind(...scheduleTypes, ...companyBindings)
         .all<Record<string, unknown>>();
 
       const posts = (rows.results ?? [])
@@ -129,22 +140,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     // mode === 'list'
-    /*
-     * 보드 타입마다 최신 N 건씩 가져온다.
-     *
-     * 처음에는 전체를 created_at DESC 로 100건 끊었는데, 최신 100건 중 77건이
-     * MRI·수술일정이라 공지사항이 0건이 됐다. 화면이 카테고리 탭 구조라
-     * 전역 최신순으로 끊으면 글이 적은 보드는 통째로 빈다. 보드별로 끊는다.
-     */
     const perBoard = clampPerBoard(body.perBoard);
     const rows = await d1
       .prepare(
         `SELECT ${cols} FROM (` +
           `SELECT ${cols}, ROW_NUMBER() OVER (PARTITION BY board_type ORDER BY created_at DESC) rn` +
-          ` FROM board_posts WHERE board_type IN (${typePlaceholders})` +
+          ` FROM board_posts WHERE board_type IN (${typePlaceholders})${companyWhere}` +
           `) WHERE rn <= ? ORDER BY created_at DESC`,
       )
-      .bind(...LIST_BOARD_TYPES, perBoard)
+      .bind(...LIST_BOARD_TYPES, ...companyBindings, perBoard)
       .all<Record<string, unknown>>();
 
     const raw = rows.results ?? [];

@@ -149,7 +149,7 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
     if (!canReadCat(cat)) {
       const fallback =
         BOARD_CATS.find((c) => c.id !== 'all' && c.boardType && canAccessBoard(user, c.boardType, 'read'))?.id
-        ?? 'all';
+        ?? 'notice';
       setCat(fallback as BoardCatId);
     }
   }, [cat, canReadCat, user]);
@@ -207,7 +207,7 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
   const handleBackToList = useCallback(() => {
     setView('list');
     setPostId(null);
-    setCat((c) => c || 'all');
+    setCat((c) => c || 'notice');
   }, []);
 
   const handleCreated = useCallback(
