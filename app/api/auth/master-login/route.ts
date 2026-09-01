@@ -20,17 +20,47 @@ import {
   eq,
   or } from '@/lib/db';
 
-async function successResponse(user: any, notice?: string) {
+function publicLoginUser(user: any) {
   const safeUser = normalizeSessionUser(user);
+  return {
+    id: safeUser.id ?? null,
+    employee_no: safeUser.employee_no ?? null,
+    name: safeUser.name ?? '',
+    role: safeUser.role ?? null,
+    department: safeUser.department ?? null,
+    company: safeUser.company ?? null,
+    company_id: safeUser.company_id ?? null,
+    position: safeUser.position ?? null,
+    photo_url: safeUser.photo_url ?? null,
+    avatar_url: safeUser.avatar_url ?? null,
+    profile_photo_path: safeUser.profile_photo_path ?? null,
+    profile_photo_updated_at: safeUser.profile_photo_updated_at ?? null,
+    email: safeUser.email ?? null,
+    phone: safeUser.phone ?? null,
+    is_system_master: safeUser.is_system_master === true,
+    login_id: (safeUser as { login_id?: string | null }).login_id ?? null,
+    permissions: safeUser.permissions || {},
+    password_reset_required: Boolean((user as { password_reset_required?: unknown })?.password_reset_required),
+  };
+}
+
+async function successResponse(user: any, notice?: string) {
+  const publicUser = publicLoginUser(user);
   const issuedAt = new Date().toISOString();
-  const token = await createSessionToken(safeUser);
+  const token = await createSessionToken(publicUser);
   const response = NextResponse.json({
     success: true,
-    user: safeUser,
+    user: publicUser,
     issuedAt,
     ...(notice ? { notice } : {}) });
 
-  response.cookies.set(SESSION_COOKIE_NAME, token, getSessionCookieOptions());
+  try {
+    response.cookies.set(SESSION_COOKIE_NAME, token, getSessionCookieOptions());
+  } catch (err) {
+    console.error('[master-login] Set-Cookie 실패, 최소 세션으로 재시도:', err);
+    const slim = await createSessionToken({ ...publicUser, permissions: {} });
+    response.cookies.set(SESSION_COOKIE_NAME, slim, getSessionCookieOptions());
+  }
   return response;
 }
 
@@ -526,7 +556,10 @@ export async function POST(request: NextRequest) {
     await resetAttempts(loginId); // 로그인 성공 시 실패 카운트 초기화
     return successResponse(userRow, notice);
   } catch (error) {
-    console.error('[master-login] 처리 중 예외 발생:', error);
+    console.error(
+      `[master-login] 처리 중 예외 발생 loginId=${loginId}:`,
+      error instanceof Error ? error.stack || error.message : error,
+    );
     return failureResponse('시스템 접속 중 오류가 발생했습니다.', 500);
   }
 }

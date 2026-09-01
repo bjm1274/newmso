@@ -1,4 +1,4 @@
-// SW_VERSION: 2026-05-15-v1-deep-link
+// SW_VERSION: 2026-08-31-v2-cache-bust
 importScripts('/push-notification-shared.js');
 
 // 새 버전 배포 시 즉시 구 SW를 교체 (탭 닫기 불필요)
@@ -40,17 +40,22 @@ try {
 
 // ── Web Share Target: 다른 앱에서 파일/텍스트 공유 시 처리 ──
 // 정적 자산 캐시 이름 (SW_VERSION과 연동)
-const STATIC_CACHE = 'erp-static-v1';
-const STATIC_EXTENSIONS = /\.(js|css|woff2?|ttf|png|jpg|svg|ico|webp)(\?|$)/;
+const STATIC_CACHE = 'erp-static-v20260831';
+const STATIC_EXTENSIONS = /\.(woff2?|ttf|png|jpg|svg|ico|webp)(\?|$)/;
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+
+  // Next.js 번들(/_next/) 및 API(/api/)는 ServiceWorker가 가로채지 않고 브라우저/서버에 직접 요청
+  if (url.pathname.startsWith('/_next/') || url.pathname.startsWith('/api/')) {
+    return;
+  }
 
   // Share target POST 처리
   if (url.pathname === '/share-target' && event.request.method === 'POST') {
     // 아래 share-target 코드로 계속
   }
-  // 정적 자산: stale-while-revalidate (캐시 우선, 백그라운드 갱신)
+  // 폰트 및 이미지 등 정적 자산: stale-while-revalidate
   else if (event.request.method === 'GET' && url.origin === self.location.origin && STATIC_EXTENSIONS.test(url.pathname)) {
     event.respondWith(
       caches.open(STATIC_CACHE).then(async (cache) => {
@@ -159,9 +164,9 @@ self.addEventListener('pushsubscriptionchange', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  const CURRENT_CACHES = ['erp-share-target-v1', 'erp-static-v1'];
+  const CURRENT_CACHES = ['erp-share-target-v1', 'erp-static-v20260831'];
   event.waitUntil(Promise.all([
-    // 오래된 캐시 정리
+    // 오래된 모든 캐시 즉시 완전 삭제
     caches.keys().then((names) =>
       Promise.all(
         names
@@ -171,6 +176,6 @@ self.addEventListener('activate', (event) => {
     ),
     // 모든 탭을 즉시 이 SW가 제어하도록 claim
     self.clients.claim(),
-    self.__erpPushShared.flushRetryQueue(),
+    self.__erpPushShared ? self.__erpPushShared.flushRetryQueue() : Promise.resolve(),
   ]));
 });

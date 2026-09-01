@@ -17,8 +17,8 @@ export async function GET(req: Request) {
   }
 
   try {
-    // 5분 cron: 배치 20건 상한 — CPU/FCM 비용 가드. 즉시 디스패치가 대부분 비우므로 큐는 얇음.
-    const result = await processPendingChatPushJobs(20);
+    // 15초 cron: 즉시 디스패치 실패분 회수. 배치 40건 — 병원 규모에서 FCM 부하 미미.
+    const result = await processPendingChatPushJobs(40);
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
     const message = err instanceof Error ? err.message : '채팅 푸시 처리 중 오류가 발생했습니다.';

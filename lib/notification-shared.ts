@@ -14,7 +14,7 @@ import {
   push_subscriptions as pushSubscriptionsTable,
   inArray,
   eq } from '@/lib/db';
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database } from '@/lib/db/types';
 
 /**
  * 임의 객체를 FCM data 페이로드(문자열 맵)로 변환.

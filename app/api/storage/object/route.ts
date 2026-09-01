@@ -4,13 +4,11 @@ import {
   getConfiguredR2ChatBucket,
   getS3ObjectStream,
   getLocalDiskStream,
-  fetchFromCloudflareR2Api,
 } from '@/lib/object-storage';
 import { readSessionFromRequest, isAdminSession } from '@/lib/server-session';
 import { assertChatRoomMember } from '@/lib/chat-room-membership';
 import { getD1Binding, getD1Drizzle } from '@/lib/db';
 import { sql } from 'drizzle-orm';
-import { isCloudflareWorkerRuntime } from '@/lib/cloudflare-runtime';
 import { buildObjectResponseHeaders } from './content-policy';
 import { normalizeUploadMimeType } from '@/lib/upload-mime';
 
@@ -243,51 +241,7 @@ export async function GET(request: NextRequest) {
       return new NextResponse(localFile.stream as any, { status: 200, headers });
     }
 
-    // 1. Direct Cloudflare R2 Worker Binding Attempt (Zero-latency direct stream)
-    if (isCloudflareWorkerRuntime()) {
-      try {
-        const { getCloudflareContext } = await import('@opennextjs/cloudflare');
-        const cfCtx = await getCloudflareContext({ async: true });
-        const r2Binding = (cfCtx?.env as any)?.R2;
-        if (!r2Binding || typeof r2Binding.get !== 'function') {
-          stages.push('binding:unavailable');
-        }
-        if (r2Binding && typeof r2Binding.get === 'function') {
-          const r2Object = await r2Binding.get(objectKey);
-          if (!r2Object) stages.push('binding:object-missing');
-          if (r2Object && r2Object.body) {
-            const headers = buildObjectResponseHeaders({
-              storedContentType: r2Object.httpMetadata?.contentType || 'application/octet-stream',
-              cacheControl: 'public, max-age=86400, immutable',
-              download,
-              fileName,
-              contentLength: r2Object.size ? String(r2Object.size) : null });
-            return new NextResponse(r2Object.body as ReadableStream, { status: 200, headers });
-          }
-        }
-      } catch (bindingErr) {
-        stages.push('binding:error');
-      }
-    }
-
-    // 1.2 Direct Cloudflare R2 REST API Stream & Auto-Cache (Node.js Standalone / Docker 환경)
-    try {
-      const r2ApiObj = await fetchFromCloudflareR2Api(objectKey, bucket);
-      if (r2ApiObj && r2ApiObj.stream) {
-        const headers = buildObjectResponseHeaders({
-          storedContentType: r2ApiObj.contentType,
-          cacheControl: isPublicAsset ? 'public, max-age=86400, immutable' : 'private, max-age=3600',
-          download,
-          fileName,
-          contentLength: r2ApiObj.contentLength,
-        });
-        return new NextResponse(r2ApiObj.stream, { status: 200, headers });
-      }
-    } catch {
-      stages.push('r2-rest-api:error');
-    }
-
-    // 1.5 Direct S3 SDK Stream Attempt (Node.js Standalone / Docker 환경)
+    // 1. Direct S3 SDK Stream Attempt (Node.js Standalone / Docker 환경)
     try {
       const s3Obj = await getS3ObjectStream(bucket, objectKey);
       if (s3Obj && s3Obj.stream) {

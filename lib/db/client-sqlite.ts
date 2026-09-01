@@ -7,12 +7,19 @@
 // ============================================================
 
 import 'server-only';
-import type { D1Database, D1PreparedStatement, D1Result, D1ExecResult } from '@cloudflare/workers-types';
+import type { D1Database, D1PreparedStatement, D1Result, D1ExecResult } from './types';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/d1';
 import { getSqliteDb } from './sqlite-manager';
 import * as schema from './schema';
 import * as relations from './relations';
+
+function statementReturnsRows(query: string): boolean {
+  const text = String(query || '');
+  if (/^\s*(SELECT|PRAGMA|WITH|EXPLAIN)\b/i.test(text)) return true;
+  // INSERT/UPDATE/DELETE ... RETURNING — better-sqlite3 는 .run() 이 행을 안 돌려준다.
+  return /\bRETURNING\b/i.test(text);
+}
 
 export class SqliteD1PreparedStatement {
   private db: Database.Database;
@@ -57,9 +64,9 @@ export class SqliteD1PreparedStatement {
 
   async run<T = Record<string, unknown>>(): Promise<D1Result<T>> {
     const startTime = Date.now();
-    const isSelect = /^\s*(SELECT|PRAGMA|WITH|EXPLAIN)\b/i.test(this.query);
+    const returnsRows = statementReturnsRows(this.query);
     const stmt = this.db.prepare(this.query);
-    if (isSelect) {
+    if (returnsRows) {
       const results = stmt.all(...this.params) as T[];
       const duration = Date.now() - startTime;
       return {
@@ -131,7 +138,7 @@ export class SqliteD1Adapter {
         const customStmt = stmt as unknown as SqliteD1PreparedStatement;
         const prep = (customStmt as any).db.prepare((customStmt as any).query);
         const params = (customStmt as any).params;
-        const isSelect = /^\s*(SELECT|PRAGMA|WITH|EXPLAIN)\b/i.test((customStmt as any).query);
+        const isSelect = statementReturnsRows((customStmt as any).query);
         if (isSelect) {
           const rows = prep.all(...params);
           results.push({

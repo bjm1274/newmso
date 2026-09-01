@@ -559,7 +559,7 @@ export function useChatTimelineItems({
       polls
         .filter((poll) => {
           if (poll.room_id !== selectedRoomId) return false;
-          const { isKickPoll, kickTargetId } = extractPollMetaFromQuestion(poll.question);
+          const { isKickPoll, kickTargetId } = extractPollMetaFromQuestion(poll.question, poll.poll_meta);
           if (isKickPoll && kickTargetId && String(kickTargetId) === String(effectiveChatUserId)) {
             return false;
           }

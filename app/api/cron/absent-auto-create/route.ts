@@ -1,11 +1,11 @@
 /**
- * 결근 자동 생성 Cron (KST 02:00 매일 — cloudflare-worker.ts 의 '0 17 * * *' 슬롯)
+ * 결근 자동 생성 Cron (KST 00:00 매일 — server.mjs '0 0 * * *')
  *
  * 전날 **근무표(shift_assignments)에 실근무가 배정됐는데** 근태 기록(attendance)이 없는
  * 재직 직원에 대해 attendance·attendances 양 테이블에 '결근(absent)' 행을 생성합니다.
- * 배정이 없는 날(오프)·휴무 배정·회사 지정 휴일은 대상이 아닙니다.
+ * 배정이 없는 날(오프)·휴무 배정·법정/회사 공휴일의 외래·상근 템플릿은 대상이 아닙니다.
  *
- * 호출: Cloudflare Worker scheduled() → GET /api/cron/absent-auto-create
+ * 호출: node-cron → GET /api/cron/absent-auto-create
  *
  * dry-run: `?dryRun=1` 을 붙이면 **아무것도 쓰지 않고** 대상자 명단만 돌려줍니다.
  * 판정 규칙을 바꿀 때 변경 전후 명단(absentTargets·notScheduled)을 대조하는 용도입니다.

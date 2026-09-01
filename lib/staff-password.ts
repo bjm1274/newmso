@@ -26,9 +26,13 @@ export async function verifyStoredPassword(storedPassword: string, inputPassword
   }
 
   if (storedPassword.startsWith('$2')) {
-    return {
-      ok: await bcrypt.compare(inputPassword, storedPassword),
-      needsHashUpgrade: false };
+    try {
+      return {
+        ok: await bcrypt.compare(inputPassword, storedPassword),
+        needsHashUpgrade: false };
+    } catch {
+      return { ok: false, needsHashUpgrade: false };
+    }
   }
 
   // Constant-time comparison for legacy plaintext passwords
@@ -142,8 +146,9 @@ export async function updateStaffPasswordWithFallback(
   const db = getD1Drizzle(d1);
   await db
     .update(staffMembersTable)
-    .set({ password: passwordHash })
-    .where(eq(staffMembersTable.id, staffId));
+    .set({ password: passwordHash, passwd: passwordHash })
+    .where(eq(staffMembersTable.id, staffId))
+    .run();
   return { error: null, updatedColumn: 'password', passwordHash };
 }
 
@@ -177,7 +182,8 @@ export async function markStaffSessionsLoggedOut(staffId: string): Promise<strin
   await db
     .update(staffMembersTable)
     .set({ force_logout_at: cutoffIso })
-    .where(eq(staffMembersTable.id, staffId));
+    .where(eq(staffMembersTable.id, staffId))
+    .run();
   return cutoffIso;
 }
 
@@ -188,6 +194,7 @@ export async function clearStaffPasswordWithFallback(staffId: string): Promise<C
   await db
     .update(staffMembersTable)
     .set({ password: null, passwd: null })
-    .where(eq(staffMembersTable.id, staffId));
+    .where(eq(staffMembersTable.id, staffId))
+    .run();
   return { error: null, clearedColumns: ['password', 'passwd'] };
 }

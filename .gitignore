@@ -185,3 +185,8 @@ electron-app/*-Windows-*/
 AllERP.key
 *.tar.gz
 allerp-deploy.tar.gz
+/data/
+/agent-claw/
+/.scratch-r/
+audit_result_temp.json
+tmp_*

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push-cloudflare';
+import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push';
 import { sendFcmBatch } from '@/lib/fcm-http';
 import { shouldDeferStaleChatPush } from '@/lib/push-quiet-hours';
 import { buildChatNotificationMetadata } from '@/lib/notification-metadata';

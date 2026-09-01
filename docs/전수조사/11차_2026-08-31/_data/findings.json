@@ -1,0 +1,16 @@
+{
+  "round": "11차",
+  "date": "2026-08-31",
+  "confirmed_p0": [
+    "AU-01", "MY-01", "AP-01", "AP-02", "INV-01", "CAL-01",
+    "BD-01", "EX-01", "EX-02", "EX-03", "HR-05", "AD-01",
+    "FN-01", "CH-01", "CH-02"
+  ],
+  "closed_from_10th": ["AUTH-01-new-login", "mobile-chat-5s-evaporate", "absent-cron-unscheduled"],
+  "reports": [
+    "01_내정보.md", "02_추가기능.md", "03_채팅.md", "04_게시판.md",
+    "05_공유캘린더.md", "06_전자결재.md", "07_인사관리.md", "08_재고관리.md",
+    "09_관리자.md", "10_재무회계.md", "11_알림로그인.md",
+    "12_연계점검.md", "13_검증게이트.md", "00_요약.md", "99_수정계획_승인요청.md"
+  ]
+}

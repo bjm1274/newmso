@@ -6,14 +6,17 @@
  * - 만 N년(N>=1): 입사 응당일마다 연차 부여. 일수 = min(25, 15 + floor((N-1)/2)).
  *     1년=15, 3년=16, 5년=17 … 21년+=25.  (1년 미만 누적분과 별개로 신규 부여)
  *
- * 멱등성: leave_accruals(staff_id, kind, period_key) UNIQUE.
+ * 멱등성: leave_ledger(staff_id, entry_type, period_key) UNIQUE.
  *   → 매일 도는 크론이 같은 기간을 중복 부여하지 않는다.
  *
- * 만근 판정: attendances(work_date) 에 status IN ('absent','결근') 기록이 1건이라도 있으면 만근 불인정.
- *   (지각·조퇴·승인된 연차/휴가는 출근 간주 — resolveAttendanceStatus 규칙과 동일하게 결근만 차감)
+ * 만근 판정: attendances(work_date) 에 status IN ('absent','결근') 이 있으면 만근 불인정.
+ *   지각·조퇴·승인된 연차/휴가는 출근 간주(결근만 차감).
+ *   법정공휴일·대체공휴일의 결근은 소정근로일이 아니라서 무시한다 —
+ *   근무표 템플릿이 휴일에 남아 결근 크론이 찍어도 월차를 빼앗지 않는다.
  */
 
 import { isGroupAccount } from '@/types';
+import { isKoreanPublicHoliday } from '@/lib/korean-public-holidays';
 import {
   getD1Binding,
   getD1Drizzle,
@@ -116,7 +119,17 @@ export function getDueAnnualYear(hireKey: string, todayKey: string): number | nu
 
 type DrizzleDb = ReturnType<typeof getD1Drizzle>;
 
-/** [startKey, endKey) 구간에 결근 기록이 없으면 true(만근). */
+/**
+ * 월차 만근을 깨는 결근인가.
+ * 법정·대체공휴일은 소정근로일이 아니라서 결근이 찍혀 있어도 개근으로 본다.
+ */
+export function isMonthlyLeaveBlockingAbsent(workDate: string): boolean {
+  const key = String(workDate || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return true;
+  return !isKoreanPublicHoliday(key);
+}
+
+/** [startKey, endKey) 구간에 (공휴일이 아닌) 결근이 없으면 true(만근). */
 async function isFullAttendanceMonth(
   db: DrizzleDb,
   staffId: string,
@@ -129,7 +142,7 @@ async function isFullAttendanceMonth(
   const isMonthEndClamped = Boolean(pStart && pEnd && pStart.d > pEnd.d);
 
   const rows = await db
-    .select({ id: attendancesTable.id })
+    .select({ work_date: attendancesTable.work_date })
     .from(attendancesTable)
     .where(
       and(
@@ -140,12 +153,11 @@ async function isFullAttendanceMonth(
           : lt(attendancesTable.work_date, endKey),
         inArray(attendancesTable.status, [...ABSENT_STATUSES]),
       ),
-    )
-    .limit(1);
-  return rows.length === 0;
+    );
+  return !rows.some((row) => isMonthlyLeaveBlockingAbsent(String(row.work_date || '')));
 }
 
-/** leave_accruals 멱등 INSERT. 이미 있으면 false(중복). */
+/** leave_ledger 멱등 INSERT. 이미 있으면 false(중복). */
 async function tryInsertAccrual(
   db: DrizzleDb,
   row: {

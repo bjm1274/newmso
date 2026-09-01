@@ -1073,11 +1073,17 @@ export default function NotificationSystem({
     };
   }, [normalizedUser?.id, normalizedUser?.name, normalizedUser?.employee_no, normalizedUser?.auth_user_id]);
 
-  // 탭 타이틀 배지
+  // 탭 타이틀 배지 — Windows/Electron 은 제목의 (숫자) 를 아이콘 옆에 그대로 그린다.
+  // 미읽음이 천 단위면 아이콘이 (1014) 처럼 깨지므로 99+ 로 자른다.
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    const base = document.title.replace(/^\(\d+\)\s*/, '') || 'AllERP';
-    document.title = unreadCount > 0 ? `(${unreadCount}) ${base}` : base;
+    const base = document.title.replace(/^\(\d+\+?\)\s*/, '') || 'AllERP';
+    if (unreadCount <= 0) {
+      document.title = base;
+      return;
+    }
+    const label = unreadCount > 99 ? '99+' : String(unreadCount);
+    document.title = `(${label}) ${base}`;
   }, [unreadCount]);
 
   // 배지 카운트 DB 동기화

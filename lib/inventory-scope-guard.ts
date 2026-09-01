@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database } from '@/lib/db/types';
 import type { SessionUser } from '@/lib/server-session';
 
 type ScopeResult = { ok: true } | { ok: false; response: NextResponse };

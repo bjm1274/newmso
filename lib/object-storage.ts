@@ -1,5 +1,6 @@
 import 'server-only';
-import { isCloudflareWorkerRuntime } from '@/lib/cloudflare-runtime';
+import fs from 'fs';
+import path from 'path';
 import {
   getS3Config,
   getS3Client,
@@ -13,8 +14,7 @@ import {
 } from './s3-storage';
 
 const INTERNAL_OBJECT_PROXY_PATH = '/api/storage/object';
-const DEFAULT_R2_CHAT_BUCKET = 'pchos-files';
-const DEFAULT_CACHE_CONTROL = 'public, max-age=3600';
+const DEFAULT_STORAGE_BUCKET = 'pchos-files';
 const DEFAULT_UPLOAD_EXPIRATION_SECONDS = 60 * 15;
 const DEFAULT_DOWNLOAD_EXPIRATION_SECONDS = 60 * 5;
 
@@ -104,9 +104,6 @@ export function isAllowedPublicStorageUrl(url: string): boolean {
   }
 }
 
-import fs from 'fs';
-import path from 'path';
-
 export function getLocalUploadsDir(): string {
   return path.join(process.cwd(), 'data', 'uploads');
 }
@@ -146,9 +143,9 @@ export async function saveToLocalDisk(
 
   await fs.promises.writeFile(targetPath, bufferBody);
   return {
-    bucket: 'pchos-files',
+    bucket: DEFAULT_STORAGE_BUCKET,
     path: objectKey,
-    url: buildObjectAccessUrl('pchos-files', objectKey),
+    url: buildObjectAccessUrl(DEFAULT_STORAGE_BUCKET, objectKey),
   };
 }
 
@@ -165,51 +162,8 @@ export function getLocalDiskStream(objectKey: string): { stream: NodeJS.Readable
   };
 }
 
-const CF_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || '462cf9a8da5cfd0edfdca833e2443e19';
-
-export async function fetchFromCloudflareR2Api(
-  objectKey: string,
-  bucket = DEFAULT_R2_CHAT_BUCKET,
-): Promise<{ stream: ReadableStream; contentType: string; contentLength: string | null } | null> {
-  const token = process.env.CLOUDFLARE_API_TOKEN || process.env.R2_API_TOKEN || '';
-  if (!token) return null;
-
-  try {
-    const url = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/r2/buckets/${bucket}/objects/${encodeURIComponent(objectKey)}`;
-    const res = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${token}` },
-      cache: 'no-store',
-    });
-    if (!res.ok || !res.body) return null;
-
-    const contentType = res.headers.get('content-type') || 'application/octet-stream';
-    const contentLength = res.headers.get('content-length');
-
-    // 비동기 로컬 캐싱 (다음 번 요청은 디스크에서 즉시 응답)
-    const clone = res.clone();
-    void (async () => {
-      try {
-        const buf = Buffer.from(await clone.arrayBuffer());
-        const uploadsDir = getLocalUploadsDir();
-        const safePath = path.normalize(objectKey).replace(/^(\.\.[\/\\])+/, '');
-        const targetPath = path.join(uploadsDir, safePath);
-        await fs.promises.mkdir(path.dirname(targetPath), { recursive: true });
-        await fs.promises.writeFile(targetPath, buf);
-      } catch {}
-    })();
-
-    return {
-      stream: res.body,
-      contentType,
-      contentLength,
-    };
-  } catch {
-    return null;
-  }
-}
-
 export function getConfiguredR2ChatBucket(): string | null {
-  return getS3Config()?.bucket ?? DEFAULT_R2_CHAT_BUCKET;
+  return getS3Config()?.bucket ?? DEFAULT_STORAGE_BUCKET;
 }
 
 export async function createChatAttachmentUploadPlan(
@@ -218,18 +172,18 @@ export async function createChatAttachmentUploadPlan(
 ): Promise<R2UploadPlan | null> {
   const config = getS3Config();
   if (config) {
-    const bucket = config.bucket || DEFAULT_R2_CHAT_BUCKET;
+    const bucket = config.bucket || DEFAULT_STORAGE_BUCKET;
     return createS3PresignedUploadPlan(objectKey, mimeType, bucket);
   }
 
   // S3 미설정 시 로컬 서버 릴레이 업로드 플랜 반환
   return {
     provider: 'r2',
-    bucket: DEFAULT_R2_CHAT_BUCKET,
+    bucket: DEFAULT_STORAGE_BUCKET,
     path: objectKey,
     signedUrl: '/api/chat/upload',
     headers: { 'content-type': mimeType },
-    url: buildObjectAccessUrl(DEFAULT_R2_CHAT_BUCKET, objectKey),
+    url: buildObjectAccessUrl(DEFAULT_STORAGE_BUCKET, objectKey),
   };
 }
 
@@ -239,7 +193,7 @@ export async function uploadChatAttachmentToR2(
   mimeType: string,
 ): Promise<Pick<R2UploadPlan, 'bucket' | 'path' | 'provider' | 'url'>> {
   const config = getS3Config();
-  const bucket = config?.bucket || DEFAULT_R2_CHAT_BUCKET;
+  const bucket = config?.bucket || DEFAULT_STORAGE_BUCKET;
   return uploadToR2(bucket, objectKey, body, mimeType);
 }
 
@@ -249,32 +203,7 @@ export async function uploadToR2(
   body: R2UploadBody,
   mimeType: string,
 ): Promise<Pick<R2UploadPlan, 'bucket' | 'path' | 'provider' | 'url'>> {
-  // 1. Cloudflare Workers Binding 시도 (실제 워커 런타임에서만)
-  if (isCloudflareWorkerRuntime()) {
-    try {
-      const { getCloudflareContext } = await import('@opennextjs/cloudflare');
-      const cfCtx = await getCloudflareContext({ async: true });
-      const r2Binding = (cfCtx?.env as any)?.R2;
-      if (r2Binding && typeof r2Binding.put === 'function') {
-        await r2Binding.put(objectKey, body, {
-          httpMetadata: {
-            contentType: mimeType,
-            cacheControl: DEFAULT_CACHE_CONTROL,
-          },
-        });
-        return {
-          provider: 'r2',
-          bucket,
-          path: objectKey,
-          url: buildR2AccessUrl(bucket, objectKey),
-        };
-      }
-    } catch {
-      // S3 SDK 폴백
-    }
-  }
-
-  // 2. 표준 S3 SDK 가 설정되어 있으면 S3 로 업로드
+  // 1. 표준 S3 SDK 가 설정되어 있으면 S3 로 업로드
   const s3Config = getS3Config();
   if (s3Config) {
     let bufferBody: any = body;
@@ -295,7 +224,7 @@ export async function uploadToR2(
     };
   }
 
-  // 3. Standalone / Docker 환경 로컬 영구 디스크 스토리지 폴백
+  // 2. Standalone / Docker 환경 로컬 영구 디스크 스토리지 폴백 (기본값)
   const localRes = await saveToLocalDisk(objectKey, body, mimeType);
   return {
     provider: 'r2',
@@ -306,29 +235,14 @@ export async function uploadToR2(
 }
 
 export async function deleteFromR2(bucket: string, objectKey: string): Promise<void> {
-  // 1. Cloudflare Workers Binding 시도 (실제 워커 런타임에서만)
-  if (isCloudflareWorkerRuntime()) {
-    try {
-      const { getCloudflareContext } = await import('@opennextjs/cloudflare');
-      const cfCtx = await getCloudflareContext({ async: true });
-      const r2Binding = (cfCtx?.env as any)?.R2;
-      if (r2Binding && typeof r2Binding.delete === 'function') {
-        await r2Binding.delete(objectKey);
-        return;
-      }
-    } catch {
-      // S3 SDK 폴백
-    }
-  }
-
-  // 2. 표준 S3 SDK 삭제
+  // 1. 표준 S3 SDK 삭제
   const s3Config = getS3Config();
   if (s3Config) {
     await deleteFromS3(bucket, objectKey);
     return;
   }
 
-  // 3. 로컬 디스크 파일 삭제
+  // 2. 로컬 디스크 파일 삭제
   try {
     const uploadsDir = getLocalUploadsDir();
     const safePath = path.normalize(objectKey).replace(/^(\.\.[\/\\])+/, '');

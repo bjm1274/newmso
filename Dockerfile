@@ -20,18 +20,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY package.json package-lock.json ./
 RUN npm ci --include=dev
 
-# 2. 빌드 단계
-FROM base AS builder
+# 2. 빌드 단계 (deps 상속으로 컴파일 도구 및 node_modules 즉시 재사용)
+FROM deps AS builder
 WORKDIR /app
-
-# 빌드 시 better-sqlite3가 네이티브 모듈로 필요할 수 있으므로 컴파일 도구 유지
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 \
-    make \
-    g++ \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Next.js Standalone 빌드

@@ -35,7 +35,6 @@ export {
   broadcastNoticeIfNeeded,
   resolveAuthorStaffId,
   normalizePoll,
-  isVoiceBoardType,
   type PostImportance,
   type BoardPollInput,
   type ScheduleMetaInput,

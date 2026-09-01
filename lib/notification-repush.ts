@@ -1,4 +1,4 @@
-import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push-cloudflare';
+import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push';
 import { sendFcmBatch } from '@/lib/fcm-http';
 import { isWithinPushQuietHours } from '@/lib/push-quiet-hours';
 import { parseDbTimestampMs } from '@/lib/date-formatter';

@@ -19,7 +19,6 @@ import { z } from 'zod';
 import { sql, getTableColumns, type SQL } from 'drizzle-orm';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { emitRealtimeSignal } from '@/lib/realtime/server-signal';
-import { isCloudflareWorkerRuntime } from '@/lib/cloudflare-runtime';
 import {
   userId,
   buildClaimsFromSession,
@@ -820,25 +819,8 @@ export async function POST(request: Request) {
           }
         };
 
-        // Cloudflare Workers: waitUntil 로 응답 후 작업 보장. 로컬/미지원 시 fire-and-forget.
-        // (클라이언트 triggerChatPush + 5분 cron 이 최종 폴백)
-        let scheduled = false;
-        if (isCloudflareWorkerRuntime()) {
-          try {
-            const { getCloudflareContext } = await import('@opennextjs/cloudflare');
-            const cf = getCloudflareContext();
-            const waitUntil = (cf as { ctx?: { waitUntil?: (p: Promise<unknown>) => void } })?.ctx?.waitUntil;
-            if (typeof waitUntil === 'function') {
-              waitUntil(dispatchInsertedPushes());
-              scheduled = true;
-            }
-          } catch {
-            // getCloudflareContext 불가(로컬 next dev 등)
-          }
-        }
-        if (!scheduled) {
-          void dispatchInsertedPushes();
-        }
+        // Node.js Standalone / Docker 환경: 비동기 fire-and-forget 디스패치
+        void dispatchInsertedPushes();
       }
 
       // notifications INSERT — 인앱 행만 만들고 푸시가 나가지 않던 문제 수정.
@@ -902,23 +884,8 @@ export async function POST(request: Request) {
           }
         };
 
-        let notiScheduled = false;
-        if (isCloudflareWorkerRuntime()) {
-          try {
-            const { getCloudflareContext } = await import('@opennextjs/cloudflare');
-            const cf = getCloudflareContext();
-            const waitUntil = (cf as { ctx?: { waitUntil?: (p: Promise<unknown>) => void } })?.ctx?.waitUntil;
-            if (typeof waitUntil === 'function') {
-              waitUntil(dispatchInsertedNotificationPushes());
-              notiScheduled = true;
-            }
-          } catch {
-            // getCloudflareContext 불가(로컬 next dev 등)
-          }
-        }
-        if (!notiScheduled) {
-          void dispatchInsertedNotificationPushes();
-        }
+        // Node.js Standalone / Docker 환경: 비동기 fire-and-forget 디스패치
+        void dispatchInsertedNotificationPushes();
       }
 
       // RETURNING 결과의 JSON 컬럼 역직렬화 (수정 2)

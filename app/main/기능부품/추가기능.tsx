@@ -226,14 +226,6 @@ export default function ExtraFeatures({
             staffs={activeStaffs}
             posts={posts}
             onSelect={(type, id) => {
-              if (type === 'handover') {
-                if (canAccessExtraFeature(user, '인계노트')) {
-                  startTransition(() => {
-                    setSubView('인계노트');
-                  });
-                }
-                return;
-              }
               onSearchSelect(type, id);
             }}
             variant="icon"

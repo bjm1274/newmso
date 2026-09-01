@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
   // ── 3. Web Push (VAPID) 테스트 ──
   if (vapidPrivate && vapidPublic) {
     try {
-      const { sendWebPushNotification } = await import('@/lib/web-push-cloudflare');
+      const { sendWebPushNotification } = await import('@/lib/web-push');
 
       const testPayload = JSON.stringify({
         title: '🔔 푸시 연결 테스트',

@@ -191,7 +191,10 @@ export function useApprovalSubmit({
                 approval_role: 'reference',
                 approval_view: '참조 문서함',
                 sender_name: item.sender_name || null,
-                document_type: item.type || null } },
+                document_type: item.type || null,
+                // JM: 알림시스템 getNotificationDisplayKey 의 dedupe_key 와 연동 —
+                // 동일 문서 참조 알림이 중복 표시되지 않도록 고유키 주입.
+                dedupe_key: `approval-reference:${item.id}` } },
           ])
       ).values()
     );
@@ -725,7 +728,9 @@ export function useApprovalSubmit({
             type: 'approval',
             approval_role: 'approver',
             sender_name: user.name || null,
-            document_type: formType || null } };
+            document_type: formType || null,
+            // JM: 알림시스템 getNotificationDisplayKey 의 dedupe_key 와 연동.
+            dedupe_key: `approval-request:${submittedApproval.id}` } };
         const { error: approverNotifError } = await d1.from('notifications')
           .insert([firstApproverNotification]);
         if (approverNotifError) {

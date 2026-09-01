@@ -93,10 +93,21 @@ export function compareStaffMembers(a: StaffMember, b: StaffMember) {
   return (a.department || '').localeCompare(b.department || '') || (a.name || '').localeCompare(b.name || '');
 }
 
-export function extractWardMessageMeta(value: unknown): {
+export function extractWardMessageMeta(value: unknown, wardMeta?: string | null): {
   displayContent: string;
   meta: WardMessageMeta | null;
 } {
+  // 정규 컬럼(ward_meta) 우선 — 구 content 인코딩 폴백.
+  if (wardMeta != null && String(wardMeta).trim()) {
+    try {
+      return {
+        displayContent: stripHiddenMessageMetaBlocks(String(value || '')),
+        meta: JSON.parse(String(wardMeta).trim()) as WardMessageMeta };
+    } catch {
+      // 폴백 아래로
+    }
+  }
+
   const raw = String(value || '');
   const start = raw.indexOf(WARD_MESSAGE_META_PREFIX);
   const end = raw.indexOf(WARD_MESSAGE_META_SUFFIX);
@@ -558,6 +569,33 @@ export type PollMeta = {
   kickTargetId?: string | null;
 };
 
+export function buildPollMetaJson(meta?: PollMeta | null): string | null {
+  const hasMeta =
+    (meta?.deadlineAt && String(meta.deadlineAt).trim()) ||
+    meta?.anonymous ||
+    meta?.prize ||
+    meta?.prizeWinners ||
+    meta?.isKickPoll ||
+    meta?.kickTargetId;
+
+  if (!hasMeta) return null;
+
+  const metaObj: PollMeta = {};
+  const deadlineAt = String(meta?.deadlineAt || '').trim();
+  if (deadlineAt) metaObj.deadlineAt = deadlineAt;
+  if (meta?.anonymous) metaObj.anonymous = true;
+  if (meta?.prize) metaObj.prize = meta.prize;
+  if (meta?.prizeWinners) metaObj.prizeWinners = meta.prizeWinners;
+  if (meta?.isKickPoll) metaObj.isKickPoll = meta.isKickPoll;
+  if (meta?.kickTargetId) metaObj.kickTargetId = meta.kickTargetId;
+
+  try {
+    return JSON.stringify(metaObj);
+  } catch {
+    return null;
+  }
+}
+
 export function buildPollQuestionContent(
   question: string,
   meta?: PollMeta | null,
@@ -585,7 +623,7 @@ export function buildPollQuestionContent(
   return `${normalizedQuestion}${normalizedQuestion ? '\n' : ''}${POLL_META_PREFIX}${JSON.stringify(metaObj)}${POLL_META_SUFFIX}`;
 }
 
-export function extractPollMetaFromQuestion(value: unknown): {
+export function extractPollMetaFromQuestion(value: unknown, pollMeta?: unknown): {
   displayQuestion: string;
   deadlineAt: string;
   anonymous: boolean;
@@ -594,6 +632,23 @@ export function extractPollMetaFromQuestion(value: unknown): {
   isKickPoll: boolean;
   kickTargetId: string | null;
 } {
+  // 정규 컬럼(poll_meta) 우선 — 구 question 인코딩 폴백.
+  if (pollMeta != null && String(pollMeta).trim()) {
+    try {
+      const parsed = JSON.parse(String(pollMeta).trim()) as PollMeta;
+      return {
+        displayQuestion: String(value || '').trim(),
+        deadlineAt: String(parsed?.deadlineAt || '').trim(),
+        anonymous: Boolean(parsed?.anonymous),
+        prize: parsed?.prize ?? null,
+        prizeWinners: parsed?.prizeWinners ?? null,
+        isKickPoll: parsed?.isKickPoll ?? false,
+        kickTargetId: parsed?.kickTargetId ?? null };
+    } catch {
+      // 폴백 아래로
+    }
+  }
+
   const raw = String(value || '');
   const start = raw.indexOf(POLL_META_PREFIX);
   const end = raw.indexOf(POLL_META_SUFFIX);

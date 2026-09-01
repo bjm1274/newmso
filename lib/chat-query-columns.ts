@@ -29,6 +29,7 @@ const CHAT_MESSAGE_COLUMNS = [
   'sender_id',
   'sender_name',
   'content',
+  'ward_meta',
   'file_url',
   'file_name',
   'file_kind',
@@ -44,6 +45,7 @@ const CHAT_MESSAGE_COLUMNS = [
 
 export const CHAT_MESSAGE_OPTIONAL_COLUMNS = [
   'sender_name',
+  'ward_meta',
   'file_url',
   'file_name',
   'file_kind',
@@ -69,4 +71,5 @@ export const POLL_SELECT = [
   'question',
   'options',
   'created_at',
+  'poll_meta',
 ].join(', ');

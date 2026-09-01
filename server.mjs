@@ -129,11 +129,12 @@ function initSqliteDatabase() {
       return { results, success: true, meta: { changes: 0 } };
     }
     async run() {
-      const isSelect = /^\s*(SELECT|PRAGMA|WITH|EXPLAIN)\b/i.test(this.query);
+      const returnsRows =
+        /^\s*(SELECT|PRAGMA|WITH|EXPLAIN)\b/i.test(this.query) || /\bRETURNING\b/i.test(this.query);
       const stmt = this.db.prepare(this.query);
-      if (isSelect) {
+      if (returnsRows) {
         const results = stmt.all(...this.params);
-        return { results, success: true, meta: { changes: 0, rows_read: results.length } };
+        return { results, success: true, meta: { changes: results.length, rows_read: results.length } };
       }
       const info = stmt.run(...this.params);
       return { results: [], success: true, meta: { changes: info.changes, last_row_id: Number(info.lastInsertRowid) } };
@@ -167,8 +168,9 @@ function initSqliteDatabase() {
       this.db.transaction(() => {
         for (const stmt of statements) {
           const prep = this.db.prepare(stmt.query);
-          const isSelect = /^\s*(SELECT|PRAGMA|WITH|EXPLAIN)\b/i.test(stmt.query);
-          if (isSelect) {
+          const returnsRows =
+            /^\s*(SELECT|PRAGMA|WITH|EXPLAIN)\b/i.test(stmt.query) || /\bRETURNING\b/i.test(stmt.query);
+          if (returnsRows) {
             results.push({ results: prep.all(...stmt.params), success: true });
           } else {
             const info = prep.run(...stmt.params);
@@ -375,8 +377,9 @@ function initWebSocketHub(server, db) {
         }
 
         if (payload.type === 'signal') {
-          const channels = Array.isArray(payload.channels) ? payload.channels : [];
-          broadcastChange(channels, payload.payload, ws);
+          // 클라가 임의 채널 change 를 주입하지 못하게 한다.
+          // 실제 메시지/알림 브로드캐스트는 mutate → emitRealtimeSignal 만 탄다.
+          return;
         }
       } catch (err) {
         console.error('[WebSocket] Message error:', err);
@@ -433,8 +436,8 @@ function initCronScheduler(serverPort) {
   const baseUrl = `http://127.0.0.1:${serverPort}`;
 
   const CRONS = {
-    // 1분마다: 채팅 푸시 고속 디스패치
-    '*/1 * * * *': ['/api/cron/chat-push-dispatch'],
+    // 15초마다: 채팅 푸시 회수 (즉시 디스패치 실패분). 6필드 = 초 단위.
+    '*/15 * * * * *': ['/api/cron/chat-push-dispatch'],
     // KST 00:00 (자정): DB 백업, 결근 자동 생성, 채팅 보존 주기 정리
     '0 0 * * *': ['/api/cron/backup', '/api/cron/absent-auto-create', '/api/cron/chat-retention'],
     // KST 03:00 (새벽): 푸시 구독 정리

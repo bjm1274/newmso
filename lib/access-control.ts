@@ -47,20 +47,9 @@ const EXTRA_FEATURE_PERMISSION_KEYS: Record<string, string> = {
   조직도: 'extra_조직도',
   부서별재고: 'extra_부서별재고',
   근무현황: 'extra_근무현황',
-  인계노트: 'extra_인계노트',
-  퇴원심사: 'extra_퇴원심사',
-  마감보고: 'extra_마감보고',
-  직원평가: 'extra_직원평가',
-  입금실시간조회: 'extra_입금실시간조회',
-  수술상담: 'extra_수술상담',
-  OP체크: 'extra_OP체크',
-  ESL관리: 'extra_ESL관리' };
+  직원평가: 'extra_직원평가' };
 
-const STRICT_EXTRA_FEATURE_PERMISSION_KEYS = new Set([
-  'extra_입금실시간조회',
-  'extra_수술상담',
-  'extra_OP체크',
-]);
+const STRICT_EXTRA_FEATURE_PERMISSION_KEYS = new Set<string>([]);
 
 /** 공유캘린더 세부 기능 id → permissions 키 */
 const CALENDAR_PERMISSION_KEYS: Record<string, string> = {
@@ -688,21 +677,11 @@ export function canAccessExtraFeature(
   if (!canAccessMainMenu(user, '추가기능')) return false;
   const permissionKey = resolvePermissionKey(featureIdOrPermissionKey, EXTRA_FEATURE_PERMISSION_KEYS);
 
-  if (permissionKey === 'extra_마감보고' && isAdminUser(user)) {
-    return true;
-  }
-
   // Gemini: 추가기능 접근 가능 시 기본 허용, 명시 false 만 차단
   if (permissionKey === 'extra_Gemini비서') {
     const explicitGemini = getExplicitPermissionState(user, 'extra_Gemini비서');
     if (explicitGemini !== null) return explicitGemini;
     return true;
-  }
-
-  if (permissionKey === 'extra_ESL관리') {
-    const explicitESL = getExplicitPermissionState(user, 'extra_ESL관리');
-    if (explicitESL !== null) return explicitESL;
-    return isAdminUser(user);
   }
 
   if (STRICT_EXTRA_FEATURE_PERMISSION_KEYS.has(permissionKey)) {

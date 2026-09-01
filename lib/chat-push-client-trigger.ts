@@ -3,7 +3,7 @@
  *
  * - fire-and-forget: 전송 UX를 막지 않는다.
  * - keepalive: 전송 직후 앱이 백그라운드로 전환돼도 요청이 끊기지 않도록 한다.
- * - 실패 시 5분 cron(/api/cron/chat-push-dispatch)이 최종 회수하므로 별도 flush 호출 불필요.
+ * - 실패 시 15초 cron(/api/cron/chat-push-dispatch)이 최종 회수하므로 별도 flush 호출 불필요.
  *
  * D1 비용 절감: 기존에는 chat-push + chat-push-flush 2회 호출했으나,
  * chat-push 응답 안에 flush 로직이 포함되어 있으므로 1회만 호출한다.
@@ -24,6 +24,6 @@ export async function triggerChatPush(roomId: string, messageId: string): Promis
     });
     // chat-push API 내부에서 flush(나머지 큐)도 함께 처리하므로 별도 flush 호출 불필요
   } catch {
-    // fetch 실패 시 5분 cron(/api/cron/chat-push-dispatch)이 큐 회수
+    // fetch 실패 시 15초 cron(/api/cron/chat-push-dispatch)이 큐 회수
   }
 }

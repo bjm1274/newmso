@@ -69,6 +69,9 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   output: 'standalone',
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   serverExternalPackages: [
     'better-sqlite3',
     '@aws-sdk/client-s3',

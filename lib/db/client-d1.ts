@@ -10,7 +10,7 @@
 // Workers 외 환경(Node.js)에서는 client-local.ts 사용.
 // ============================================================
 
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database } from './types';
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import * as schema from './schema';
 import * as relations from './relations';

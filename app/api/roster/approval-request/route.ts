@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readSessionFromRequest, type SessionUser } from '@/lib/server-session';
 import { sendFcmBatch } from '@/lib/fcm-http';
-import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push-cloudflare';
+import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push';
 import { insertNotificationsOrThrow, type NotificationRow } from '@/lib/notification-utils';
 import { deleteExpiredWebPushSubscriptions } from '@/lib/notification-shared';
 import {

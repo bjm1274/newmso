@@ -83,14 +83,7 @@ export const EXTRA_FEATURE_PERMISSION_ITEMS: FeaturePermissionItem[] = [
   { key: 'extra_조직도', label: '조직도', hint: '기본 공개. 명시 거부 시에만 숨김.' },
   { key: 'extra_부서별재고', label: '부서별 재고' },
   { key: 'extra_근무현황', label: '근무현황' },
-  { key: 'extra_인계노트', label: '인계노트' },
   { key: 'extra_직원평가', label: '직원평가' },
-  { key: 'extra_퇴원심사', label: '퇴원심사' },
-  { key: 'extra_수술상담', label: '수술상담', tone: 'warning' },
-  { key: 'extra_OP체크', label: 'OP체크', tone: 'warning' },
-  { key: 'extra_입금실시간조회', label: '입금 실시간 조회', tone: 'warning' },
-  { key: 'extra_마감보고', label: '마감보고' },
-  { key: 'extra_ESL관리', label: 'ESL 관리' },
 ];
 
 /**

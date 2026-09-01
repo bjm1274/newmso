@@ -549,7 +549,7 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
     const channelKey = `mobile-chat-polls-${room.id}`;
     const tables: TableFilter[] = [
       { table: 'polls', filter: `room_id=eq.${room.id}` },
-      { table: 'poll_votes', filter: `room_id=eq.${room.id}` }
+      { table: 'poll_votes' }
     ];
 
     const unsubscribe = subscribeRealtime(
@@ -1166,7 +1166,7 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
         {(() => {
           const lastMessage = messages[messages.length - 1];
           const wardMeta = lastMessage && lastMessage.is_deleted !== true && lastMessage.sender_id !== userId
-            ? extractWardMessageMeta(lastMessage.content)
+            ? extractWardMessageMeta(lastMessage.content, (lastMessage as { ward_meta?: string | null }).ward_meta)
             : null;
           const showWardQuickReplies = wardMeta?.meta?.type === 'op_ward_request';
           

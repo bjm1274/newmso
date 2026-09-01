@@ -23,7 +23,7 @@ import { db } from '@/lib/db-client';
 import { pokeChannel } from '@/lib/realtime-bus';
 import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
 import { patchChatRoom } from '@/lib/chat-rooms-client';
-import { buildPollQuestionContent, type PollMeta } from '@/app/main/기능부품/메신저유틸';
+import { buildPollMetaJson, type PollMeta } from '@/app/main/기능부품/메신저유틸';
 import type { ChatMessage } from '@/types';
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -173,7 +173,7 @@ export async function removeMobileRoomMember(input: {
 
 // ─────────────────────────────────────────────
 // 투표 — PC 메신저입력워크플로훅 미러
-//   polls.insert({ room_id, creator_id, question(=buildPollQuestionContent), options })
+//   polls.insert({ room_id, creator_id, question, poll_meta, options })
 //   poll_votes.upsert({ poll_id, user_id, option_index }, onConflict 'poll_id,user_id')
 // ─────────────────────────────────────────────
 
@@ -184,9 +184,10 @@ export type MobilePoll = {
   question: string;
   options: string[];
   created_at: string | null;
+  poll_meta?: string | null;
 };
 
-const POLL_SELECT = 'id, room_id, creator_id, question, options, created_at';
+const POLL_SELECT = 'id, room_id, creator_id, question, options, created_at, poll_meta';
 
 function normalizePollOptions(value: unknown): string[] {
   if (Array.isArray(value)) return value.map((v) => String(v));
@@ -221,7 +222,8 @@ export async function createMobilePoll(input: {
       {
         room_id: input.roomId,
         creator_id: input.creatorId,
-        question: buildPollQuestionContent(question, meta),
+        question,
+        poll_meta: buildPollMetaJson(meta),
         options },
     ]);
     if (error) return { ok: false, error: errMessage(error, '투표 생성에 실패했습니다.') };
@@ -321,7 +323,8 @@ export async function fetchRoomPolls(
       creator_id: String(row.creator_id || ''),
       question: String(row.question || ''),
       options: normalizePollOptions(row.options),
-      created_at: (row.created_at as string | null | undefined) ?? null }));
+      created_at: (row.created_at as string | null | undefined) ?? null,
+      poll_meta: (row.poll_meta as string | null | undefined) ?? null }));
 
     const pollIds = polls.map((p) => p.id).filter(Boolean);
     if (pollIds.length === 0) return { polls, voteCounts: {}, myVotes: {}, voters: {} };

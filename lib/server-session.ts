@@ -312,7 +312,7 @@ type StaffSessionRow = {
   permissions: string | null;
 };
 
-function parseSessionRowPermissions(row: StaffSessionRow): Record<string, unknown> {
+function parseSessionRowPermissions(row: Record<string, unknown>): Record<string, unknown> {
   if (typeof row.permissions === 'string' && row.permissions.length > 0) {
     try {
       const parsed = JSON.parse(row.permissions) as unknown;
@@ -323,14 +323,21 @@ function parseSessionRowPermissions(row: StaffSessionRow): Record<string, unknow
       // 파싱 실패 시 빈 객체
     }
   }
+  if (row.permissions && typeof row.permissions === 'object' && !Array.isArray(row.permissions)) {
+    return row.permissions as Record<string, unknown>;
+  }
   return {};
 }
 
-function normalizeD1SessionRow(row: StaffSessionRow) {
+function normalizeD1SessionRow(row: Record<string, unknown>) {
   return {
     ...row,
-    is_system_master: row.is_system_master === 1,
-    permissions: parseSessionRowPermissions(row) };
+    id: String(row.id ?? ''),
+    name: String(row.name ?? ''),
+    employee_no: String(row.employee_no ?? ''),
+    is_system_master: row.is_system_master === 1 || row.is_system_master === true,
+    permissions: parseSessionRowPermissions(row),
+  };
 }
 
 export async function resolveLatestSessionUser(sessionUser: unknown): Promise<SessionUser> {
@@ -352,24 +359,7 @@ export async function resolveLatestSessionUser(sessionUser: unknown): Promise<Se
   if (sessionName) conditions.push(eq(staffMembersTable.name, sessionName));
 
   const rows = await db
-    .select({
-      id: staffMembersTable.id,
-      employee_no: staffMembersTable.employee_no,
-      name: staffMembersTable.name,
-      role: staffMembersTable.role,
-      department: staffMembersTable.department,
-      company: staffMembersTable.company,
-      company_id: staffMembersTable.company_id,
-      position: staffMembersTable.position,
-      photo_url: staffMembersTable.photo_url,
-      avatar_url: staffMembersTable.avatar_url,
-      profile_photo_path: staffMembersTable.profile_photo_path,
-      profile_photo_updated_at: staffMembersTable.profile_photo_updated_at,
-      email: staffMembersTable.email,
-      phone: staffMembersTable.phone,
-      auth_user_id: staffMembersTable.auth_user_id,
-      is_system_master: staffMembersTable.is_system_master,
-      permissions: staffMembersTable.permissions })
+    .select()
     .from(staffMembersTable)
     .where(or(...conditions))
     .limit(10);
@@ -380,17 +370,17 @@ export async function resolveLatestSessionUser(sessionUser: unknown): Promise<Se
   const byId = sessionUserId
     ? rows.find((r) => String(r.id) === sessionUserId)
     : null;
-  if (byId) return normalizeSessionUser({ ...normalizedUser, ...normalizeD1SessionRow(byId as StaffSessionRow) });
+  if (byId) return normalizeSessionUser({ ...normalizedUser, ...normalizeD1SessionRow(byId as Record<string, unknown>) });
 
   const byEmpNo = sessionEmployeeNo
     ? rows.find((r) => String(r.employee_no) === sessionEmployeeNo)
     : null;
-  if (byEmpNo) return normalizeSessionUser({ ...normalizedUser, ...normalizeD1SessionRow(byEmpNo as StaffSessionRow) });
+  if (byEmpNo) return normalizeSessionUser({ ...normalizedUser, ...normalizeD1SessionRow(byEmpNo as Record<string, unknown>) });
 
   const byName = sessionName
     ? rows.filter((r) => String(r.name) === sessionName)
     : [];
-  if (byName.length === 1) return normalizeSessionUser({ ...normalizedUser, ...normalizeD1SessionRow(byName[0] as StaffSessionRow) });
+  if (byName.length === 1) return normalizeSessionUser({ ...normalizedUser, ...normalizeD1SessionRow(byName[0] as Record<string, unknown>) });
 
   return normalizedUser;
 }
@@ -424,7 +414,7 @@ function createSessionUserSnapshot(input: any): SerializedSessionUser {
  * 쿠키 하나가 담을 수 있는 최대 크기(이름+값). 브라우저 공통 한도가 4096 이다.
  * 쿠키 이름·속성이 함께 세므로 여유를 두고 토큰 자체를 이 값으로 제한한다.
  */
-const MAX_SESSION_TOKEN_BYTES = 3600;
+const MAX_SESSION_TOKEN_BYTES = 3000;
 
 /**
  * 세션 토큰을 만든다. **쿠키 한도를 넘기지 않는 것이 최우선이다.**
@@ -562,13 +552,12 @@ export async function isStaffForceLoggedOutInDb(d1: unknown, staffId: string, to
   for (let attempt = 0; attempt <= FORCE_LOGOUT_CHECK_RETRIES; attempt += 1) {
     try {
       const row = await bind
-        .prepare('SELECT force_logout_at, status, role, is_active, resigned_at, resign_date FROM staff_members WHERE id = ? LIMIT 1')
+        .prepare('SELECT force_logout_at, status, role, resigned_at, resign_date FROM staff_members WHERE id = ? LIMIT 1')
         .bind(staffId)
         .first<{
           force_logout_at?: string | null;
           status?: string | null;
           role?: string | null;
-          is_active?: number | boolean | null;
           resigned_at?: string | null;
           resign_date?: string | null;
         }>();
@@ -576,8 +565,7 @@ export async function isStaffForceLoggedOutInDb(d1: unknown, staffId: string, to
       if (row) {
         const st = String(row.status || '').trim();
         const rl = String(row.role || '').trim();
-        const act = row.is_active;
-        if (st === '퇴사' || st === '퇴직' || st === 'resigned' || rl === 'inactive' || act === 0 || act === false) {
+        if (st === '퇴사' || st === '퇴직' || st === 'resigned' || rl === 'inactive') {
           return true; // 퇴사/비활성 계정 세션 즉시 무효화
         }
 

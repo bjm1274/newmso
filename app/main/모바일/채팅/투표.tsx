@@ -276,7 +276,7 @@ export type PollCardProps = {
 };
 
 export function PollCard({ poll, voteCounts, myVote, voters, voting, onVote }: PollCardProps) {
-  const { displayQuestion, deadlineAt, anonymous } = extractPollMetaFromQuestion(poll.question);
+  const { displayQuestion, deadlineAt, anonymous } = extractPollMetaFromQuestion(poll.question, poll.poll_meta);
   const totalVotes = Object.values(voteCounts).reduce((sum, n) => sum + n, 0);
   const hasVoterNames = Object.values(voters ?? {}).some((names) => names.length > 0);
   const deadlinePassed = (() => {

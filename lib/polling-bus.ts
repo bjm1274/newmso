@@ -254,8 +254,25 @@ function ensureVisibilityHandler(): void {
 
   document.addEventListener('visibilitychange', () => {
     logger.debug(`[polling-bus] visibilitychange: ${document.visibilityState}`);
+    if (document.visibilityState === 'visible') {
+      wsErrorCount = 0;
+    }
     syncRealtimeConnections();
     if (!isSuspended()) {
+      triggerImmediateSync();
+    }
+  });
+
+  window.addEventListener('online', () => {
+    wsErrorCount = 0;
+    syncRealtimeConnections();
+    triggerImmediateSync();
+  });
+
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+      wsErrorCount = 0;
+      syncRealtimeConnections();
       triggerImmediateSync();
     }
   });
@@ -486,7 +503,7 @@ function syncWebSocketConnectionInternal() {
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: 'ping', at: Date.now() }));
         }
-      }, 30000);
+      }, 20000);
     };
 
     ws.onmessage = (event) => {
@@ -519,7 +536,8 @@ function syncWebSocketConnectionInternal() {
       
       if (!isSuspended() && isLeader) {
         wsErrorCount++;
-        const delay = Math.min(30000, 1000 * Math.pow(2, wsErrorCount));
+        // 첫 재시도 250ms — 네트워크 순단 후 카카오톡처럼 바로 붙는다.
+        const delay = Math.min(8000, 250 * Math.pow(2, Math.max(0, wsErrorCount - 1)));
         logger.debug(`[polling-bus] Retrying WebSocket connection in ${delay}ms`);
         wsReconnectTimer = setTimeout(() => {
           syncRealtimeConnections();

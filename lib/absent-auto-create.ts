@@ -1,7 +1,7 @@
 /**
  * absent-auto-create.ts
  *
- * 매일 새벽(KST 02:00) 크론으로 전날 근태를 마감한다.
+ * 매일 자정(KST 00:00) 크론으로 전날 근태를 마감한다.
  *
  * ── 1단계: 결근 자동 생성 ──
  * **근무표(shift_assignments)에 실근무가 배정됐는데 근태 기록이 없는 직원**만 결근이다.
@@ -27,7 +27,7 @@
  * - attendances (복수): work_date, check_in_time/out, status
  *
  * 크론 호출: /api/cron/absent-auto-create
- * (cloudflare-worker.ts 의 '0 17 * * *' 슬롯 = KST 02:00 매일)
+ * (server.mjs '0 0 * * *' = KST 00:00 매일)
  */
 
 import { getD1Binding } from '@/lib/db';
@@ -298,25 +298,37 @@ function isCompanyHoliday(companyName: string, ctx: ScheduleContext): boolean {
 }
 
 /**
+ * 외래 근무(평일 클리닉)인가.
+ * work_shifts.is_shift 가 1이어도 이름은 외래A/외래B/외래B(토) 다.
+ * 공휴일에 월~금 템플릿이 남아 있으면 결근이 찍히고 월차 만근이 깨진다.
+ */
+export function isOutpatientClinicShift(shift: Pick<ScheduledShift, 'shiftName' | 'shiftType'>): boolean {
+  return /외래/.test(shift.shiftName) || /외래/.test(shift.shiftType);
+}
+
+/**
  * 전날이 이 직원의 소정근로일이었는가 (판정 규칙 단위 테스트 대상)
  *
  * 배정이 유일한 근거다. 배정이 없으면 결근이 아니다.
  *
- * 주말·공휴일 제외를 **교대(is_shift=1) 배정에는 적용하지 않는다.** 이 병원은 주말·공휴일에도
- * 병동이 돈다 — 운영 실측(2026-06~08)에서 토·일·공휴일 배정 220여 건 중 대부분이 실제
- * 체크인으로 이어졌고(예: 2026-08-15 광복절 배정 12건 중 10건 체크인), 주말을 통째로
- * 빼면 **정말 결근인 교대 근무자가 빠진다**. 같은 실측에서 주말·공휴일에 잡힌
- * 비교대(is_shift=0, 상근·비상근) 배정은 **0건**이라, 아래 분기는 지금 데이터에서
- * 동작을 바꾸지 않으면서 LV-04 시나리오(회사가 휴일을 선포했는데 상근 배정이 근무표에
- * 남아 있는 경우)만 막는다.
+ * 주말: 교대(is_shift=1)는 근무일, 상근은 아님. 토요 외래는 실제 진료라 유지.
+ * 법정·회사 공휴일: 병동 교대만 근무일. 외래·상근 템플릿이 휴일에 남은 것은
+ * 소정근로가 아니다 — 광복절 대체에 외래B 가 남아 결근이 찍히면 월차가 나가지 않는다.
  */
 export function wasScheduledToWork(staffId: string, ctx: ScheduleContext): boolean {
   const shift = ctx.scheduledYesterday.get(staffId);
   if (!shift) return false;
+
+  const closedDay =
+    ctx.yesterdayIsPublicHoliday || isCompanyHoliday(shift.companyName, ctx);
+  if (closedDay) {
+    if (isOutpatientClinicShift(shift)) return false;
+    if (!shift.isShiftWork) return false;
+    return true;
+  }
+
   if (shift.isShiftWork) return true;
   if (ctx.yesterdayIsWeekend) return false;
-  if (ctx.yesterdayIsPublicHoliday) return false;
-  if (isCompanyHoliday(shift.companyName, ctx)) return false;
   return true;
 }
 

@@ -16,7 +16,7 @@
  *   - FCM 만료 토큰은 fcm_token=null로 무효화.
  *   - 푸시 실패 row가 있어도 전체를 중단하지 않고 로그만 남긴다.
  */
-import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push-cloudflare';
+import { ensureWebPushConfigured, sendWebPushNotification } from '@/lib/web-push';
 import { sendFcmBatch } from '@/lib/fcm-http';
 import { isWithinPushQuietHours } from '@/lib/push-quiet-hours';
 import {
@@ -30,7 +30,7 @@ import {
   getD1Drizzle,
   push_subscriptions as pushSubscriptionsTable,
   inArray } from '@/lib/db';
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database } from '@/lib/db/types';
 
 export type NotificationPushRow = {
   /**

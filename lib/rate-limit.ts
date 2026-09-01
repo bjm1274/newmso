@@ -27,7 +27,7 @@
  * 로그인 실패 제한: checkRateLimit(읽기) + recordFailedAttempt(원자 upsert)
  */
 
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database } from '@/lib/db/types';
 import { getD1Binding } from '@/lib/db';
 
 // ---------------------------------------------------------------------------

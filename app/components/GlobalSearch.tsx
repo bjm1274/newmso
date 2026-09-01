@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { db } from '@/lib/db-client';
-import { formatPatientBedLabel, normalizeHandoverNote, type HandoverNoteRow } from '@/lib/handover-notes';
 import { escapeLikePattern } from '@/lib/like-escape';
 
-type SearchType = 'staff' | 'post' | 'approval' | 'message' | 'handover';
+type SearchType = 'staff' | 'post' | 'approval' | 'message';
 
 type SearchResult = {
   type: SearchType;
@@ -220,29 +219,6 @@ export default function GlobalSearch({
           }
         }
 
-        if (user?.department === '병동팀') {
-          const { data: notes } = await db
-            .from('handover_notes')
-            .select('id, content, author_name, created_at')
-            .ilike('content', likeTerm)
-            .order('created_at', { ascending: false })
-            .limit(5)
-            .returns<any[]>();
-
-          (notes || []).forEach((note: any) => {
-            const normalized = normalizeHandoverNote(note as HandoverNoteRow);
-            if (normalized.handover_kind === 'room_config') return;
-            nextResults.push({
-              type: 'handover',
-              id: String(normalized.id),
-              title: normalized.content.slice(0, 60) || '인계노트',
-              subtitle: normalized.note_scope === 'patient'
-                ? formatPatientBedLabel(normalized)
-                : (normalized.author_name ? `[인계] ${normalized.author_name}` : '인계노트'),
-              meta: normalized.handover_date || (normalized.created_at ? String(normalized.created_at).slice(0, 10) : '') });
-          });
-        }
-
         setResults(nextResults);
         setActiveIndex(0);
       } catch (error) {
@@ -294,8 +270,7 @@ export default function GlobalSearch({
     staff: '직원',
     post: '게시글',
     approval: '결재',
-    message: '채팅',
-    handover: '인계' };
+    message: '채팅' };
 
   const dropdown = open ? (
     <div

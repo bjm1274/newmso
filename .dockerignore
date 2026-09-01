@@ -7,6 +7,9 @@
 .jscpd-report
 .venv
 .vscode
+electron-app
+*.exe
+*.zip
 agent-claw
 node_modules
 .next

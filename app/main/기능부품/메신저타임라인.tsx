@@ -719,7 +719,7 @@ function MessengerTimelineComponent({
                 const pollItem = item as PollItem;
                 const votes = pollVotes[pollItem.id] || {};
                 const totalVotes = (Object.values(votes) as number[]).reduce((a: number, b: number) => a + b, 0);
-                const { displayQuestion, prize, prizeWinners } = extractPollMetaFromQuestion(pollItem.question);
+                const { displayQuestion, prize, prizeWinners } = extractPollMetaFromQuestion(pollItem.question, pollItem.poll_meta);
                 const isCreator = String(pollItem.creator_id) === String(effectiveChatUserId);
                 return (
                   <div data-testid={`chat-poll-${pollItem.id}`} key={`poll-${pollItem.id}`} className="max-w-[85%] md:max-w-[70%] bg-blue-500/10 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 rounded-2xl p-4 shadow-soft">
@@ -929,7 +929,7 @@ function MessengerTimelineComponent({
               const systemText = isSystemInvite ? String(msg.content || '').replace(/^\[초대\]\s*/, '') : '';
               const isContinuous = !showDateDivider && !isSystemInvite && String(msg.sender_id) === lastSenderId;
               const senderPhotoUrl = senderProfile ? getProfilePhotoUrl(senderProfile as StaffMember) : null;
-              const wardMessageMeta = !isDeletedMessage ? extractWardMessageMeta(msg.content) : { displayContent: '', meta: null };
+              const wardMessageMeta = !isDeletedMessage ? extractWardMessageMeta(msg.content, (msg as { ward_meta?: string | null }).ward_meta) : { displayContent: '', meta: null };
               const showWardQuickReplies =
                 !isMine &&
                 !isDeletedMessage &&

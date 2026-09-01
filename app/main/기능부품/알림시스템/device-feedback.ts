@@ -15,8 +15,12 @@ export function isMissingTodoReminderSchema(error: unknown) {
 export function setAppBadge(count: number) {
   try {
     if (typeof navigator === 'undefined') return;
-    if (count > 0 && 'setAppBadge' in navigator) (navigator as any).setAppBadge(count).catch(() => { });
-    else if (count === 0 && 'clearAppBadge' in navigator) (navigator as any).clearAppBadge().catch(() => { });
+    const n = Math.max(0, Math.floor(Number(count) || 0));
+    if (n > 0 && 'setAppBadge' in navigator) {
+      (navigator as any).setAppBadge(Math.min(n, 99)).catch(() => { });
+    } else if (n === 0 && 'clearAppBadge' in navigator) {
+      (navigator as any).clearAppBadge().catch(() => { });
+    }
   } catch { /* ignore */ }
 }
 

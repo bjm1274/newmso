@@ -311,8 +311,3 @@ export async function createBoardPost(input: CreateBoardPostInput): Promise<Boar
     return null;
   }
 }
-
-/** @deprecated 익명소리함 보드 폐지 — 항상 false */
-export function isVoiceBoardType(_boardType?: string | null): boolean {
-  return false;
-}

@@ -64,7 +64,18 @@ export default function LoginPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ loginId, password }) });
-      const payload = await loginRes.json();
+      let payload: { success?: boolean; user?: unknown; error?: string; issuedAt?: string; notice?: string } | null = null;
+      try {
+        payload = await loginRes.json();
+      } catch {
+        setError(
+          loginRes.ok
+            ? '시스템 접속 중 오류가 발생했습니다.'
+            : `로그인 서버 응답 오류 (${loginRes.status})`,
+        );
+        setLoading(false);
+        return;
+      }
 
       if (!loginRes.ok || !payload?.success || !payload?.user) {
         setError(payload?.error || '로그인에 실패했습니다.');
@@ -72,14 +83,13 @@ export default function LoginPage() {
         return;
       }
 
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(payload.user));
-      // 서버 발급 시각 우선 사용, 없으면 클라이언트 시각 폴백
-      localStorage.setItem(STORAGE_KEYS.LOGIN_AT, payload.issuedAt ?? new Date().toISOString());
+      try {
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(payload.user));
+        localStorage.setItem(STORAGE_KEYS.LOGIN_AT, payload.issuedAt ?? new Date().toISOString());
+      } catch (persistErr) {
+        console.error('[login] localStorage 저장 실패 (세션 쿠키는 발급됨):', persistErr);
+      }
 
-      // 로그인 시점에도 화면 캐시(IndexedDB)를 비운다.
-      // 로그아웃을 거치지 않고 앱을 강제 종료한 단말에는 이전 사용자의 대화가
-      // 그대로 남는다. 키가 사용자별이라 앱에서 읽히지는 않지만, 공용 단말에
-      // 환자명·차트번호가 남아 있을 이유가 없다.
       try {
         const { clearViewCache } = await import('@/lib/view-cache');
         await clearViewCache();

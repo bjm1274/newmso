@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readSessionFromRequest } from '@/lib/server-session';
-import { dispatchChatPushForMessage } from '@/lib/chat-push-dispatch';
+import { dispatchChatPushForMessage, processPendingChatPushJobs } from '@/lib/chat-push-dispatch';
 import { consumeRateLimit } from '@/lib/rate-limit';
 
 
@@ -39,6 +39,14 @@ export async function POST(request: NextRequest) {
       roomId,
       messageId,
       expectedSenderId: String(session.user.id) });
+
+    const flushRest = new URL(request.url).searchParams.get('flush') === 'rest';
+    if (flushRest) {
+      // 송신 UX를 막지 않는다. 같은 프로세스에서 남은 큐를 바로 비운다.
+      void processPendingChatPushJobs(15).catch((err) => {
+        console.error('[chat-push] flush=rest failed:', err);
+      });
+    }
 
     return NextResponse.json(result);
   } catch (error: any) {

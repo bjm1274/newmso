@@ -19,21 +19,14 @@ export type AddonModuleKey =
   | 'org'
   | 'inventory'
   | 'worknow'
-  | 'handoff'
   | 'eval'
-  | 'discharge'
-  | 'consult'
-  | 'opboard'
-  | 'deposit'
-  | 'closing'
   | 'parking'
   | 'webfax'
   | 'mri'
   | 'share'
   | 'guide'
   | 'calendar'
-  | 'gemini'
-  | 'esl';
+  | 'gemini';
 
 /**
  * 모듈 키 → canAccessExtraFeature featureId 매핑.
@@ -44,15 +37,8 @@ export const ADDON_EXTRA_FEATURE_ID: Partial<Record<AddonModuleKey, string>> = {
   org: '조직도',
   inventory: '부서별재고',
   worknow: '근무현황',
-  handoff: '인계노트',
   eval: '직원평가',
-  discharge: '퇴원심사',
-  consult: '수술상담',
-  opboard: 'OP체크',
-  deposit: '입금실시간조회',
-  closing: '마감보고',
   gemini: 'Gemini비서',
-  esl: 'ESL관리',
 };
 
 /** 허브 카드 노출 / onOpen 게이트 공용 */
@@ -77,20 +63,13 @@ const ADDON_THEMES: Record<AddonModuleKey, { bg: string; icon: string }> = {
   worknow:   { bg: 'linear-gradient(135deg, #FF9500, #FF5E3A)', icon: 'clock' },
   inventory: { bg: 'linear-gradient(135deg, #FF3B30, #C2160C)', icon: 'box' },
   parking:   { bg: 'linear-gradient(135deg, #8E8E93, #636366)', icon: 'shield' },
-  deposit:   { bg: 'linear-gradient(135deg, #BF5AF2, #8F22D0)', icon: 'won' },
-  closing:   { bg: 'linear-gradient(135deg, #30B0C7, #007A8D)', icon: 'fileText' },
   eval:      { bg: 'linear-gradient(135deg, #FF2D55, #D81B43)', icon: 'star' },
   webfax:    { bg: 'linear-gradient(135deg, #5856D6, #3B39C1)', icon: 'send' },
-  handoff:   { bg: 'linear-gradient(135deg, #5AC8FA, #2CA4DE)', icon: 'fileText' },
-  consult:   { bg: 'linear-gradient(135deg, #34C759, #119F35)', icon: 'chat' },
-  opboard:   { bg: 'linear-gradient(135deg, #FFCC00, #D2A600)', icon: 'checkCircle' },
-  discharge: { bg: 'linear-gradient(135deg, #8A8A8F, #5C5C60)', icon: 'fileText' },
   mri:       { bg: 'linear-gradient(135deg, #00C7BE, #00968F)', icon: 'calendar' },
   share:     { bg: 'linear-gradient(135deg, #34C759, #119F35)', icon: 'fileText' },
   guide:     { bg: 'linear-gradient(135deg, #FF9500, #FF5E3A)', icon: 'fileText' },
   calendar:  { bg: 'linear-gradient(135deg, #5856D6, #AF52DE)', icon: 'calendar' },
   gemini:    { bg: 'linear-gradient(135deg, #4285F4, #9B72CB)', icon: 'star' },
-  esl:       { bg: 'linear-gradient(135deg, #636366, #48484A)', icon: 'box' },
 };
 
 type QuickItem = {
@@ -104,14 +83,6 @@ type QuickGroup = {
 };
 
 const GROUPS: QuickGroup[] = [
-  {
-    title: '진료 지원',
-    items: [
-      { id: 'handoff',   label: '인계노트' },
-      { id: 'consult',   label: '수술상담' },
-      { id: 'opboard',   label: 'OP체크' },
-      { id: 'discharge', label: '퇴원심사' },
-    ] },
   {
     title: '운영',
     items: [
@@ -130,13 +101,10 @@ const GROUPS: QuickGroup[] = [
       { id: 'eval',    label: '직원평가' },
     ] },
   {
-    title: '정산·외부',
+    title: '외부 연동',
     items: [
-      { id: 'deposit', label: '입금조회' },
-      { id: 'closing', label: '마감보고' },
       { id: 'webfax',  label: '웹팩스' },
       { id: 'gemini',  label: 'Gemini (PC)' },
-      { id: 'esl',     label: 'ESL (PC)' },
     ] },
 ];
 

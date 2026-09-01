@@ -138,6 +138,12 @@ async function main() {
     '--exclude=.wrangler*',
     '--exclude=node_modules*',
     '--exclude=.next*',
+    '--exclude=electron-app*',
+    '--exclude=.venv*',
+    '--exclude=.claude*',
+    '--exclude=.scratch*',
+    '--exclude=*.exe',
+    '--exclude=*.zip',
     '--exclude=data/*.sqlite*',
     '--exclude=data/uploads*',
     '--exclude=backups*',
@@ -194,9 +200,10 @@ async function main() {
   runScp(tempEnv, `${remoteDir}/.env.production`);
   try { fs.unlinkSync(tempEnv); } catch {}
 
-  // uploads 디렉토리 전송 (로컬에 캐시된 첨부파일이 있을 경우)
+  // uploads 디렉토리 전송 (--sync-uploads 플래그 시에만 실행)
+  const shouldSyncUploads = args.includes('--sync-uploads');
   const localUploads = path.join(rootDir, 'data', 'uploads');
-  if (fs.existsSync(localUploads) && fs.readdirSync(localUploads).length > 0) {
+  if (shouldSyncUploads && fs.existsSync(localUploads) && fs.readdirSync(localUploads).length > 0) {
     console.log('[deploy] Packaging cached uploads directory...');
     const uploadsArchive = path.join(rootDir, 'uploads-deploy.tar.gz');
     if (fs.existsSync(uploadsArchive)) fs.unlinkSync(uploadsArchive);
@@ -208,9 +215,10 @@ async function main() {
     console.log('✔ Uploads directory synced to AllERP server.');
   }
 
-  // SQLite DB 데이터 파일 전송 (로컬에 덤프된 데이터가 있을 경우)
+  // SQLite DB 데이터 파일 전송 (--sync-db 플래그 시에만 실행)
+  const shouldSyncDb = args.includes('--sync-db');
   const localDb = path.join(rootDir, 'data', 'allerp.sqlite');
-  if (fs.existsSync(localDb)) {
+  if (shouldSyncDb && fs.existsSync(localDb)) {
     console.log(`[SCP] Uploading SQLite production data (${(fs.statSync(localDb).size / 1024 / 1024).toFixed(2)} MB)...`);
     runScp(localDb, `${remoteDir}/data/allerp.sqlite`);
   }
@@ -229,9 +237,14 @@ async function main() {
     console.log('✔ Homepage bundle transferred to AllERP server.');
   }
 
-  // remote-deploy.sh 스크립트 전송
+  // remote-deploy.sh 스크립트 전송 (CRLF 개행 자동 제거)
   const remoteDeployScript = path.join(rootDir, 'scripts', 'remote-deploy.sh');
-  runScp(remoteDeployScript, `${remoteDir}/remote-deploy.sh`);
+  const deployScriptContent = fs.readFileSync(remoteDeployScript, 'utf8').replace(/\r\n/g, '\n');
+  const tempDeployScript = path.join(rootDir, '.remote-deploy.tmp.sh');
+  fs.writeFileSync(tempDeployScript, deployScriptContent, 'utf8');
+  runScp(tempDeployScript, `${remoteDir}/remote-deploy.sh`);
+  try { fs.unlinkSync(tempDeployScript); } catch {}
+  runSsh(`sed -i 's/\\r$//' ${remoteDir}/remote-deploy.sh && chmod +x ${remoteDir}/remote-deploy.sh`);
 
   // 로컬 임시 아카이브 삭제
   try {

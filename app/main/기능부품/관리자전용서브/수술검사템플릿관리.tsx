@@ -3,8 +3,7 @@ import { useActionDialog } from '@/app/components/useActionDialog';
 import { toast } from '@/lib/toast';
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/db-client';
-import dynamic from 'next/dynamic';
-const OperationCheckView = dynamic(() => import('../OP체크'), { ssr: false, loading: () => <div className="flex items-center justify-center py-8"><div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" /></div> });
+
 
 type Template = {
   id: string;
@@ -34,7 +33,6 @@ type SurgeryExamTemplateManagerProps = {
 
 export default function SurgeryExamTemplateManager({ user }: SurgeryExamTemplateManagerProps) {
   const { dialog, openConfirm } = useActionDialog();
-  const [activeTab, setActiveTab] = useState<'catalogs' | 'opCheck'>('catalogs');
   const [surgeryTemplates, setSurgeryTemplates] = useState<Template[]>([]);
   const [mriTemplates, setMriTemplates] = useState<Template[]>([]);
   const [newSurgeryName, setNewSurgeryName] = useState('');
@@ -141,35 +139,7 @@ export default function SurgeryExamTemplateManager({ user }: SurgeryExamTemplate
   return (
     <div className="space-y-4">
       {dialog}
-      <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--card)] p-3 shadow-sm">
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            type="button"
-            onClick={() => setActiveTab('catalogs')}
-            className={`rounded-[var(--radius-md)] px-4 py-2 text-[11px] font-bold transition-all ${
-              activeTab === 'catalogs'
-                ? 'bg-[var(--accent)] text-white shadow-sm'
-                : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
-            }`}
-          >
-            수술 · 검사명 템플릿
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('opCheck')}
-            className={`rounded-[var(--radius-md)] px-4 py-2 text-[11px] font-bold transition-all ${
-              activeTab === 'opCheck'
-                ? 'bg-[var(--accent)] text-white shadow-sm'
-                : 'bg-[var(--muted)] text-[var(--toss-gray-4)] hover:bg-[var(--toss-blue-light)] hover:text-[var(--foreground)]'
-            }`}
-          >
-            OP체크 템플릿
-          </button>
-        </div>
-      </div>
-
-      {activeTab === 'catalogs' ? (
-        <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 shadow-sm space-y-4">
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] p-4 shadow-sm space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <section className="space-y-3">
               <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
@@ -338,9 +308,6 @@ export default function SurgeryExamTemplateManager({ user }: SurgeryExamTemplate
             </section>
           </div>
         </div>
-      ) : (
-        <OperationCheckView user={user as any} viewMode="templates" title="OP체크 템플릿" />
-      )}
     </div>
   );
 }

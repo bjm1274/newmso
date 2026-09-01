@@ -4,7 +4,7 @@ import { useCallback, useState, type Dispatch, type SetStateAction } from 'react
 import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
 import type { StaffMember } from '@/types';
-import { buildPollQuestionContent, extractPollMetaFromQuestion, normalizeMemberIds } from './메신저유틸';
+import { buildPollMetaJson, extractPollMetaFromQuestion, normalizeMemberIds } from './메신저유틸';
 import type { PollPrizeWinner } from './메신저유틸';
 import { insertChatMessageWithFallback } from '@/lib/chat-message-write';
 
@@ -143,7 +143,8 @@ export function useChatWorkflowDrafts({
       const pollPayload = {
         room_id: selectedRoomId,
         creator_id: effectiveChatUserId || user?.id,
-        question: buildPollQuestionContent(pollQuestion, {
+        question: pollQuestion.trim(),
+        poll_meta: buildPollMetaJson({
           deadlineAt: pollDeadlineAt,
           anonymous: pollAnonymous,
           prize: prizeMeta,
@@ -171,7 +172,8 @@ export function useChatWorkflowDrafts({
       const optimisticPoll: PollItem = {
         id: Date.now().toString(),
         room_id: selectedRoomId,
-        question: buildPollQuestionContent(pollQuestion, {
+        question: pollQuestion.trim(),
+        poll_meta: buildPollMetaJson({
           deadlineAt: pollDeadlineAt,
           anonymous: pollAnonymous,
           prize: prizeMeta,
@@ -245,7 +247,7 @@ export function useChatWorkflowDrafts({
 
       const poll = polls.find((p) => p.id === pollId);
       if (poll) {
-        const { isKickPoll, kickTargetId } = extractPollMetaFromQuestion(poll.question);
+        const { isKickPoll, kickTargetId } = extractPollMetaFromQuestion(poll.question, poll.poll_meta);
         if (isKickPoll && kickTargetId && poll.options[optionIndex] === '찬성') {
           const { data: voteRows } = await db.from('poll_votes').select('user_id').eq('poll_id', pollId).eq('option_index', optionIndex);
           const agreeCount = voteRows?.length || 0;
@@ -292,7 +294,7 @@ export function useChatWorkflowDrafts({
       return;
     }
 
-    const { prize, prizeWinners } = extractPollMetaFromQuestion(poll.question);
+    const { prize, prizeWinners } = extractPollMetaFromQuestion(poll.question, poll.poll_meta);
     if (!prize) return;
     if (prizeWinners && prizeWinners.length > 0) {
       toast('이미 추첨이 완료된 투표입니다.', 'warning');
@@ -333,29 +335,27 @@ export function useChatWorkflowDrafts({
         return { id, name: String(found?.name || '알 수 없음') } as PollPrizeWinner;
       });
 
-      const { deadlineAt } = extractPollMetaFromQuestion(poll.question);
-      const newQuestion = buildPollQuestionContent(
-        extractPollMetaFromQuestion(poll.question).displayQuestion,
-        { deadlineAt, prize, prizeWinners: winners },
-      );
+      const { deadlineAt } = extractPollMetaFromQuestion(poll.question, poll.poll_meta);
+      const displayQuestion = extractPollMetaFromQuestion(poll.question, poll.poll_meta).displayQuestion;
+      const newMetaJson = buildPollMetaJson({ deadlineAt, prize, prizeWinners: winners });
 
       const { error: updateError } = await db
         .from('polls')
-        .update({ question: newQuestion })
+        .update({ question: displayQuestion, poll_meta: newMetaJson })
         .eq('id', pollId);
 
       if (updateError) throw updateError;
 
       // 낙관적 갱신
       setPolls((prev) =>
-        prev.map((p) => (p.id === pollId ? { ...p, question: newQuestion } : p)),
+        prev.map((p) => (p.id === pollId ? { ...p, question: displayQuestion, poll_meta: newMetaJson } : p)),
       );
 
       // 추첨 결과를 해당 채팅방에 일반 메시지로 게시 (JM3: 추첨 성공과 격리)
       const roomId = String(poll.room_id || selectedRoomId || '');
       if (roomId) {
         const senderId = String(effectiveChatUserId || user?.id || '');
-        const { displayQuestion } = extractPollMetaFromQuestion(poll.question);
+        const { displayQuestion } = extractPollMetaFromQuestion(poll.question, poll.poll_meta);
         const winnerNames = winners.map((w) => w.name).join(', ');
         const resultContent = `🎉 추첨 결과\n[${displayQuestion}]\n🎁 상품: ${prize.name}\n🏆 당첨: ${winnerNames}`;
 

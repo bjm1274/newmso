@@ -9,7 +9,7 @@ import {
   getSessionCookieOptions,
   SESSION_COOKIE_NAME,
   verifySessionToken,
-} from '@/lib/server-session';
+} from '@/lib/session-edge';
 
 export async function middleware(request: NextRequest) {
   if (!request.nextUrl.pathname.startsWith('/main')) {

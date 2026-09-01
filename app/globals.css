@@ -3405,20 +3405,25 @@ body.ios-safe-root > div[class*="min-h-screen"] {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 14px;
-  /* 툴바가 입력 칸 왼쪽에 있으면 한 줄짜리 입력에도 세로 정렬이 흔들렸다.
-     입력 → 툴바 순서로 쌓아 박스 안에 넣는다. */
-  padding: 0;
-  display: block;
+  /* 클립·이모지·입력·전송을 한 줄에 둔다. */
+  padding: 4px 8px;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
   box-shadow: var(--shadow-xs);
 }
 .chat-comp-actions {
   display: flex;
-  gap: 4px;
-  padding: 4px 8px 8px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
 }
 .chat-comp-actions button {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border: 0;
   background: transparent;
   cursor: pointer;
@@ -3432,29 +3437,36 @@ body.ios-safe-root > div[class*="min-h-screen"] {
   background: var(--muted);
   color: var(--foreground);
 }
+.chat-comp-input {
+  flex: 1;
+  min-width: 0;
+}
 .chat-comp-input textarea {
   width: 100%;
   resize: none;
   border: 0;
   outline: 0;
   font-size: 13.5px;
-  line-height: 1.5;
-  padding: 10px 14px;
+  line-height: 1.4;
+  padding: 6px 8px;
+  min-height: 32px;
+  max-height: 36px;
   color: var(--foreground);
   background: transparent;
 }
 .chat-comp-input textarea::placeholder { color: var(--zinc-400); }
 .chat-comp-send {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   border: 0;
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--accent);
   color: #fff;
   cursor: pointer;
   display: grid;
   place-items: center;
   transition: background 120ms;
+  flex-shrink: 0;
 }
 .chat-comp-send:hover { background: var(--accent-hover); }
 .chat-comp-send:disabled {
