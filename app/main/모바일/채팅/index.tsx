@@ -35,6 +35,8 @@ export type 채팅Props = {
   initialRoomId?: string | null;
   /** 딥링크: 특정 메시지 스크롤 */
   initialMessageId?: string | null;
+  /** 딥링크 소비 완료 콜백 */
+  onConsumeInitialRoomId?: () => void;
 };
 
 function MobileChat({
@@ -47,10 +49,11 @@ function MobileChat({
   onOpenBoardPost,
   initialRoomId,
   initialMessageId,
+  onConsumeInitialRoomId,
 }: 채팅Props) {
-  const [view, setView] = useState<ChatView>('list');
-  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
-  const [searchMessageId, setSearchMessageId] = useState<string | null>(null);
+  const [view, setView] = useState<ChatView>(() => (initialRoomId ? 'room' : 'list'));
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(() => initialRoomId || null);
+  const [searchMessageId, setSearchMessageId] = useState<string | null>(() => initialMessageId || null);
   const [selectedRoom, setSelectedRoom] = useState<ChatRoom | null>(null);
 
   const userId =
@@ -89,6 +92,14 @@ function MobileChat({
     });
   }, [view, selectedRoomId, rooms]);
 
+  // 방 목록이 비어 있다가 나중에 채워진 경우(콜드 스타트) 동기화
+  useEffect(() => {
+    if (view === 'room' && selectedRoomId && !selectedRoom && rooms.length > 0) {
+      const found = rooms.find((r) => String(r.id) === selectedRoomId);
+      if (found) setSelectedRoom(found);
+    }
+  }, [view, selectedRoomId, selectedRoom, rooms]);
+
   // rooms가 없을 때 방 진입 시 폴백 — rooms 로드 전 최소 객체로 렌더
   useEffect(() => {
     if (view !== 'room' || !selectedRoomId) return;
@@ -113,7 +124,8 @@ function MobileChat({
     setSelectedRoomId(null);
     setSearchMessageId(null);
     setSelectedRoom(null);
-  }, []);
+    onConsumeInitialRoomId?.();
+  }, [onConsumeInitialRoomId]);
 
   useSheetHistory(view === 'room' || view === 'new', backToList);
 
@@ -121,8 +133,9 @@ function MobileChat({
   useEffect(() => {
     if (initialRoomId) {
       openRoom(initialRoomId, initialMessageId || undefined);
+      onConsumeInitialRoomId?.();
     }
-  }, [initialRoomId, initialMessageId, openRoom]);
+  }, [initialRoomId, initialMessageId, openRoom, onConsumeInitialRoomId]);
 
   useEffect(() => {
     if (resetToken !== undefined && resetToken > 0) {

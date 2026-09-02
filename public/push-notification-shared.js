@@ -805,7 +805,7 @@ async function erpHandleNotificationClick(event) {
       } catch {
         // postMessage 실패는 무시 — 아래 navigate 폴백
       }
-      if ('navigate' in client) {
+      if ('navigate' in client && !client.url.includes('/main')) {
         const navigated = await client.navigate(targetUrl).catch(() => null);
         if (navigated && 'focus' in navigated) {
           return navigated.focus();

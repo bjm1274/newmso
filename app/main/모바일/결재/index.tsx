@@ -32,6 +32,9 @@ export type ApprovalView = 'inbox' | 'docs' | 'sent' | 'ref' | 'write' | 'compos
 export type 결재Props = {
   user: ErpUser;
   sub?: string;
+  initialApprovalId?: string | null;
+  initialViewMode?: string | null;
+  onConsumeApprovalIntent?: () => void;
 };
 
 // id 기준 중복 제거(분류 버킷 합산 시 동일 문서 1회만)
@@ -47,16 +50,35 @@ function dedupeById(list: ApprovalRow[]): ApprovalRow[] {
   return out;
 }
 
-export default function 결재({ user, sub }: 결재Props) {
+export default function 결재({ user, sub, initialApprovalId, initialViewMode, onConsumeApprovalIntent }: 결재Props) {
   const staffId = useResolvedStaffId(user as Record<string, unknown>);
   const staffName = typeof user.name === 'string' ? user.name : null;
   const company = typeof user.company === 'string' ? user.company : null;
 
-  const [view, setView] = useState<ApprovalView>('inbox');
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const [view, setView] = useState<ApprovalView>(() => {
+    if (initialApprovalId || (sub && sub.startsWith('detail:'))) return 'detail';
+    const effectiveSub = sub || initialViewMode;
+    if (effectiveSub === 'sent' || effectiveSub === '기안함') return 'sent';
+    if (effectiveSub === 'ref' || effectiveSub === '참조함') return 'ref';
+    if (effectiveSub === 'docs' || effectiveSub === '문서조회') return 'docs';
+    if (effectiveSub === 'write' || effectiveSub === '작성하기') return 'write';
+    if (effectiveSub && effectiveSub.startsWith('compose:')) return 'compose';
+    return 'inbox';
+  });
+  const [detailId, setDetailId] = useState<string | null>(() => {
+    if (initialApprovalId) return initialApprovalId;
+    if (sub && sub.startsWith('detail:')) return sub.split(':')[1] || null;
+    return null;
+  });
   const [composeForm, setComposeForm] = useState<{ slug: string; name: string } | null>(null);
 
   useEffect(() => {
+    if (initialApprovalId) {
+      setDetailId(initialApprovalId);
+      setView('detail');
+      onConsumeApprovalIntent?.();
+      return;
+    }
     if (sub === 'compose:leave' || sub === 'compose:연차') {
       setComposeForm({ slug: 'leave', name: '연차/휴가' });
       setView('compose');
@@ -74,8 +96,18 @@ export default function 결재({ user, sub }: 결재Props) {
       }
     } else if (sub === 'inbox' || sub === 'docs' || sub === 'sent' || sub === 'ref' || sub === 'write') {
       setView(sub as ApprovalView);
+    } else if (sub === '결재함') {
+      setView('inbox');
+    } else if (sub === '기안함') {
+      setView('sent');
+    } else if (sub === '참조함') {
+      setView('ref');
+    } else if (sub === '문서조회') {
+      setView('docs');
+    } else if (sub === '작성하기') {
+      setView('write');
     }
-  }, [sub]);
+  }, [sub, initialApprovalId, onConsumeApprovalIntent]);
 
   const { rows, loading, refetch } = useApprovalList(staffId, company);
   const { inbox, progress, done, sent, ref } = useClassifiedApprovals(rows, staffId);

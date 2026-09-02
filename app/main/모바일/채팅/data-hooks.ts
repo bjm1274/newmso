@@ -424,7 +424,6 @@ export function useMobileChatReadCounts(
 
         // 발신자 제외 수신자 목록
         const recipientIds = memberIdsRef.current.filter((mId) => mId !== String(msg.sender_id));
-        const totalRecipients = recipientIds.length;
 
         let readers = 0;
         recipientIds.forEach((mId) => {
@@ -434,7 +433,8 @@ export function useMobileChatReadCounts(
           }
         });
 
-        counts[String(msg.id)] = Math.max(0, totalRecipients - readers);
+        // 발신자를 제외하고 메시지를 확인한 참여자 수
+        counts[String(msg.id)] = readers;
       });
       setReadCounts(counts);
     };

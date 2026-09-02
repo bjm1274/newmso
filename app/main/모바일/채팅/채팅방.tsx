@@ -1121,7 +1121,7 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
           userName={userName}
           staffs={staffs}
           readCounts={readCounts}
-          isGroupChat={isGroup}
+          isGroupChat={memberCount >= 3}
           searchMessageId={activeSearchMessageId}
           onJumpToMessage={jumpToMessage}
           onToggleReaction={handleToggleReaction}

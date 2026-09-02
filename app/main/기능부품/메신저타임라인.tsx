@@ -885,11 +885,8 @@ function MessengerTimelineComponent({
               const msgReacts = reactions[msg.id] || {};
               const hasReacts = Object.keys(msgReacts).some((emoji) => (msgReacts[emoji] || 0) > 0);
               const readersCount = readCounts[msg.id] || 0;
-              const totalRecipients = Math.max(
-                0,
-                roomMembers.filter((member) => String(member?.id ?? '') !== String(msg.sender_id || '')).length
-              );
-              const unreadRecipients = Math.max(0, totalRecipients - readersCount);
+              const isGroupChat = roomMembers.length >= 3;
+              const isSystemInvite = typeof msg.content === 'string' && msg.content.startsWith('[초대]');
               const deliveryStateInfo = deliveryStates[msg.id];
               const deliveryState = deliveryStateInfo?.status || (String(msg.id).startsWith('temp-') ? 'sending' : 'sent');
               const deliveryStateLabel = isMine && deliveryState === 'sending'
@@ -900,10 +897,8 @@ function MessengerTimelineComponent({
               const deliveryErrorText = isMine && deliveryState === 'failed'
                 ? String(deliveryStateInfo?.error || '').trim()
                 : '';
-              const readStatusSummary = totalRecipients > 0 && unreadRecipients > 0 ? `${unreadRecipients}` : null;
-              const canOpenReadStatus = deliveryState === 'sent' && totalRecipients > 0;
-              const isGroupChat = roomMembers.length >= 3;
-              const isSystemInvite = typeof msg.content === 'string' && msg.content.startsWith('[초대]');
+              const readStatusSummary = isGroupChat && readersCount > 0 ? `읽음 ${readersCount}` : null;
+              const canOpenReadStatus = isGroupChat && deliveryState === 'sent' && readersCount > 0;
               const senderProfile =
                 !isMine
                   ? resolveStaffProfile(
@@ -913,7 +908,7 @@ function MessengerTimelineComponent({
                   : null;
               const senderName = senderProfile?.name || (msg.staff as { name?: string } | null | undefined)?.name || msg.sender_name || '이름 없음';
               const isSystemSender = String(msg.sender_id) === 'system' || senderName === '시스템';
-              const displayedReadStatusSummary = (isMine || isGroupChat) && !isSystemInvite ? readStatusSummary : null;
+              const displayedReadStatusSummary = isGroupChat && !isSystemInvite ? readStatusSummary : null;
               const isAttachmentOnlyMessage = !String(msg.content || '').trim() && Boolean(msg.file_url);
               const created = toChatDate(msg.created_at);
               const dateLabel = created.toLocaleDateString('ko-KR', {

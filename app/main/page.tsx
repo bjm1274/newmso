@@ -1297,6 +1297,9 @@ function MainPageContent() {
                 setInitialOpenChatRoomId(null);
                 setInitialOpenMessageId(null);
               }}
+              initialApprovalIntent={initialApprovalIntent}
+              onConsumeApprovalIntent={() => setInitialApprovalIntent(null)}
+              initialInventoryWorkflowApprovalId={initialInventoryWorkflowApprovalId}
               shareTarget={shareTarget}
               onConsumeShareTarget={() => setShareTarget(null)}
             />

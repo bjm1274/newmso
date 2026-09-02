@@ -55,6 +55,14 @@ export type MobileShellProps = {
   initialOpenMessageId?: string | null;
   initialOpenChatRequestToken?: number;
   onConsumeOpenChatRoomId?: () => void;
+  initialApprovalIntent?: {
+    approvalId?: string | null;
+    viewMode?: string | null;
+    formType?: string | null;
+    extraData?: Record<string, unknown>;
+  } | null;
+  onConsumeApprovalIntent?: () => void;
+  initialInventoryWorkflowApprovalId?: string | null;
   shareTarget?: {
     id: string;
     fileCount: number;
@@ -75,6 +83,9 @@ export default function MobileShell({
   initialOpenMessageId = null,
   initialOpenChatRequestToken = 0,
   onConsumeOpenChatRoomId,
+  initialApprovalIntent = null,
+  onConsumeApprovalIntent,
+  initialInventoryWorkflowApprovalId = null,
   shareTarget = null,
   onConsumeShareTarget,
 }: MobileShellProps) {
@@ -95,13 +106,21 @@ export default function MobileShell({
     return menuMap[menu] || 'mypage';
   };
 
-  const [route, setRoute] = useState<MRoute>(() => ({
-    tab: getTabFromMenu(mainMenu)
-  }));
+  const [route, setRoute] = useState<MRoute>(() => {
+    if (initialOpenChatRoomId) {
+      const roomId = String(initialOpenChatRoomId).trim();
+      const msgId = initialOpenMessageId ? String(initialOpenMessageId).trim() : '';
+      return { tab: 'chat', sub: msgId ? `room:${roomId}:${msgId}` : `room:${roomId}` } as MRoute;
+    }
+    if (initialApprovalIntent?.approvalId) {
+      return { tab: 'approval', sub: `detail:${initialApprovalIntent.approvalId}` } as MRoute;
+    }
+    return { tab: getTabFromMenu(mainMenu) };
+  });
   const [dark, setDark] = useState(false);
   const [chatResetToken, setChatResetToken] = useState(0);
-  const [deepLinkRoomId, setDeepLinkRoomId] = useState<string | null>(null);
-  const [deepLinkMessageId, setDeepLinkMessageId] = useState<string | null>(null);
+  const [deepLinkRoomId, setDeepLinkRoomId] = useState<string | null>(() => (initialOpenChatRoomId ? String(initialOpenChatRoomId).trim() : null));
+  const [deepLinkMessageId, setDeepLinkMessageId] = useState<string | null>(() => (initialOpenMessageId ? String(initialOpenMessageId).trim() : null));
 
   // 푸시·알림 배너 딥링크 → 채팅 탭 + room 오픈
   useEffect(() => {
@@ -113,8 +132,36 @@ export default function MobileShell({
     setDeepLinkMessageId(msgId || null);
     setRoute({ tab: 'chat', sub: msgId ? `room:${roomId}:${msgId}` : `room:${roomId}` } as MRoute);
     if (setMainMenu) setMainMenu('채팅');
+    if (setSubView) setSubView(msgId ? `room:${roomId}:${msgId}` : `room:${roomId}`);
     onConsumeOpenChatRoomId?.();
-  }, [initialOpenChatRoomId, initialOpenMessageId, initialOpenChatRequestToken, onConsumeOpenChatRoomId, setMainMenu]);
+  }, [initialOpenChatRoomId, initialOpenMessageId, initialOpenChatRequestToken, onConsumeOpenChatRoomId, setMainMenu, setSubView]);
+
+  // 전자결재 딥링크 → approval 탭 + 상세 또는 작성 화면 오픈
+  useEffect(() => {
+    if (!initialApprovalIntent) return;
+    const { approvalId, viewMode, formType } = initialApprovalIntent;
+    if (approvalId) {
+      setRoute({ tab: 'approval', sub: `detail:${approvalId}` } as MRoute);
+    } else if (formType === '연차' || formType === 'leave') {
+      setRoute({ tab: 'approval', sub: 'compose:leave' } as MRoute);
+    } else if (formType === '연차계획서' || formType === 'annual_plan') {
+      setRoute({ tab: 'approval', sub: 'compose:annual_plan' } as MRoute);
+    } else if (formType === '연차촉진통보서' || formType === 'leave_promotion_notice') {
+      setRoute({ tab: 'approval', sub: 'compose:leave_promotion_notice' } as MRoute);
+    } else if (viewMode) {
+      const viewMap: Record<string, string> = {
+        결재함: 'inbox',
+        기안함: 'sent',
+        참조함: 'ref',
+        문서조회: 'docs',
+        작성하기: 'write',
+      };
+      setRoute({ tab: 'approval', sub: viewMap[viewMode] || viewMode } as MRoute);
+    } else {
+      setRoute({ tab: 'approval', sub: 'inbox' } as MRoute);
+    }
+    if (setMainMenu) setMainMenu('전자결재');
+  }, [initialApprovalIntent, setMainMenu]);
 
   // share-target: 채팅 탭으로 유도 (파일 공유는 채팅 목록에서 처리)
   useEffect(() => {
@@ -310,11 +357,15 @@ export default function MobileShell({
   useEffect(() => {
     const targetTab = getTabFromMenu(mainMenu);
     const routeSub = 'sub' in route ? (route as any).sub : undefined;
-    // 내정보(mypage/home) 탭의 sub은 모바일 전용 MHomeSub('attend'|'leave'|...) 네임스페이스로,
-    // PC용 전역 subView(기본값 '전체')와 무관하다. 전역 subView로 덮어쓰면 출퇴근 등
-    // 홈 하위화면 진입 직후 '전체'로 되돌아가 홈으로 튕기므로, mypage 탭은 sub 동기화에서 제외한다.
-    if (targetTab === 'mypage') {
-      if (targetTab !== route.tab) setRoute({ tab: targetTab });
+    // 내정보(mypage/home) 탭 및 채팅(chat) 탭의 sub은 모바일 전용 네임스페이스(room:..., attend 등)로,
+    // PC용 전역 subView(기본값 '전체' 등)와 무관하다. 전역 subView로 덮어쓰지 않도록 예외 처리.
+    if (targetTab === 'mypage' || targetTab === 'chat') {
+      if (targetTab !== route.tab) {
+        setRoute({
+          tab: targetTab,
+          sub: targetTab === 'chat' && subView && String(subView).startsWith('room:') ? subView : undefined,
+        } as any);
+      }
       return;
     }
     if (targetTab !== route.tab || (subView && subView !== routeSub)) {
@@ -464,6 +515,13 @@ export default function MobileShell({
                 onOpenBoardPost={onOpenBoardPost}
                 initialRoomId={initialRoomId}
                 initialMessageId={initialMessageId}
+                onConsumeInitialRoomId={() => {
+                  setDeepLinkRoomId(null);
+                  setDeepLinkMessageId(null);
+                  if (route.tab === 'chat' && (route as any).sub?.startsWith('room:')) {
+                    setRoute({ tab: 'chat' });
+                  }
+                }}
               />
             );
           })()}
@@ -479,7 +537,13 @@ export default function MobileShell({
           )}
           {route.tab === 'approval' && (
             <div data-testid="approval-view" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-              <결재 user={user} sub={(route as any).sub} />
+              <결재
+                user={user}
+                sub={(route as any).sub}
+                initialApprovalId={initialApprovalIntent?.approvalId}
+                initialViewMode={initialApprovalIntent?.viewMode}
+                onConsumeApprovalIntent={onConsumeApprovalIntent}
+              />
             </div>
           )}
           {route.tab === 'hr' && (

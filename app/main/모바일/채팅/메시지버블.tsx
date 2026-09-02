@@ -200,7 +200,7 @@ export default function MessageBubble({
           수정됨
         </span>
       )}
-      {displayedReadCount > 0 && (
+      {isGroupChat && displayedReadCount > 0 && (
         // 내 메시지면 눌러서 누가 읽었는지 본다. 예전에는 그냥 <span> 이라
         // 아무리 눌러도 반응이 없었고, 읽음 상세는 액션 메뉴 안에만 있었다.
         onReadDetail && mine ? (
