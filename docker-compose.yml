@@ -15,14 +15,6 @@ services:
     volumes:
       - ./data:/app/data
       - ./backups:/app/backups
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 8192M
-        reservations:
-          cpus: '0.5'
-          memory: 1024M
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
