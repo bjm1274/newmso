@@ -1,10 +1,12 @@
 import { sql } from 'drizzle-orm';
 import {
   buildSupplyRequestWorkflowItems,
-  fetchSupportInventoryRows,
   INVENTORY_SUPPORT_COMPANY,
   INVENTORY_SUPPORT_DEPARTMENT,
-  summarizeSupplyRequestWorkflow } from '@/app/main/inventory-utils';
+  normalizeSupportInventoryRows,
+  toLooseRecordArray,
+  summarizeSupplyRequestWorkflow,
+  type InventoryLike } from '@/app/main/inventory-utils';
 import { syncApprovalToDocumentRepository } from '@/lib/approval-document-archive';
 import { ensureApprovedAnnualLeaveRequest, isAnnualLeaveType, syncAnnualLeaveUsedForStaff } from '@/lib/annual-leave-ledger';
 import { extractLeaveRequestMeta } from '@/lib/leave-notice';
@@ -22,6 +24,7 @@ import {
   approvals as approvalsTable,
   approval_history as approvalHistoryTable,
   staff_members as staffMembersTable,
+  inventory as inventoryTable,
   eq,
   getD1Binding,
   getD1Drizzle,
@@ -141,6 +144,23 @@ async function upsertAttendanceCorrectionRows(
         requested_at: sql`excluded.requested_at` } });
 }
 
+async function fetchServerSupportInventoryRows(): Promise<InventoryLike[]> {
+  const d1 = await getD1Binding();
+  if (!d1) throw new Error('[server-approval-processing] D1 binding not available (supply:inventory.select)');
+  const db = getD1Drizzle(d1);
+  const { and: drizzleAnd, eq: drizzleEq } = await import('drizzle-orm');
+  const rows = await db
+    .select()
+    .from(inventoryTable)
+    .where(
+      drizzleAnd(
+        drizzleEq(inventoryTable.company, INVENTORY_SUPPORT_COMPANY),
+        drizzleEq(inventoryTable.department, INVENTORY_SUPPORT_DEPARTMENT),
+      ),
+    );
+  return normalizeSupportInventoryRows(toLooseRecordArray(rows) as InventoryLike[]);
+}
+
 async function prepareSupplyApprovalInventoryWorkflow(item: ApprovalRow) {
   const metaData = item.meta_data as Record<string, unknown> | null | undefined;
   const requestedItems = Array.isArray(metaData?.items) ? metaData.items : [];
@@ -148,8 +168,7 @@ async function prepareSupplyApprovalInventoryWorkflow(item: ApprovalRow) {
     return null;
   }
 
-  const { data: sourceInventoryRows, error: sourceInventoryError } = await fetchSupportInventoryRows();
-  if (sourceInventoryError) throw sourceInventoryError;
+  const sourceInventoryRows = await fetchServerSupportInventoryRows();
 
   const inventoryWorkflow = metaData?.inventory_workflow as Record<string, unknown> | null | undefined;
   const workflowItems = buildSupplyRequestWorkflowItems(

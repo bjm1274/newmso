@@ -7,7 +7,7 @@ import {
 import type { InventoryItem, StaffMember } from '@/types';
 
 type LooseRecord = Record<string, unknown>;
-type InventoryLike = Partial<InventoryItem> & LooseRecord;
+export type InventoryLike = Partial<InventoryItem> & LooseRecord;
 type InventoryUserLike = Partial<StaffMember> & LooseRecord;
 type SupabaseCompatResult<T> = {
   data: T | null;
