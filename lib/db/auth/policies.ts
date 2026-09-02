@@ -40,6 +40,8 @@ import {
   loadChatRoomMembership,
   parseMembersField,
 } from '@/lib/chat-room-membership';
+import { resolveApprovalCcUserIds, resolveApprovalCcDepartments } from '@/lib/approval-inbox';
+import { resolveApprovalLineIds } from '@/lib/approval-shared';
 import {
   type ErpClaims,
   erpIsAdmin,
@@ -48,6 +50,7 @@ import {
   erpCanManageFinance,
   erpCompanyId,
   erpCompanyName,
+  erpDepartmentName,
   erpCompanyMatches,
   erpCompanyNameMatches,
   erpInventoryScopeMatches,
@@ -2012,7 +2015,25 @@ async function evalPattern(
     const sender = getField<string>(row, fields.sender ?? 'sender_id');
     const approver = getField<string>(row, fields.approver ?? 'current_approver_id');
     const me = erpStaffId(claims);
-    if (me !== null && (sender === me || approver === me)) return true;
+    if (me !== null) {
+      if (sender === me || approver === me) return true;
+
+      // 결재선(approver_line / approval_line) 포함 여부 검사
+      const lineIds = resolveApprovalLineIds(row as Record<string, unknown>);
+      if (lineIds.includes(me)) return true;
+
+      // 참조자(cc_users / cc_line / references) 포함 여부 검사
+      const rawMeta = getField(row, 'meta_data');
+      const ccUserIds = resolveApprovalCcUserIds(rawMeta);
+      if (ccUserIds.includes(me)) return true;
+
+      // 부서 참조(cc_departments) 포함 여부 검사
+      const myDept = erpDepartmentName(claims);
+      if (myDept) {
+        const ccDepts = resolveApprovalCcDepartments(rawMeta);
+        if (ccDepts.includes(myDept)) return true;
+      }
+    }
     if (!erpCanManageCompany(claims)) return false;
     return rowCompanyMatches();
   }

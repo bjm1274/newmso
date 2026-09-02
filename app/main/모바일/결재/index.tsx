@@ -109,8 +109,10 @@ export default function 결재({ user, sub, initialApprovalId, initialViewMode, 
     }
   }, [sub, initialApprovalId, onConsumeApprovalIntent]);
 
+  const department = typeof user.department === 'string' ? user.department : null;
+
   const { rows, loading, refetch } = useApprovalList(staffId, company);
-  const { inbox, progress, done, sent, ref } = useClassifiedApprovals(rows, staffId);
+  const { inbox, progress, done, sent, ref } = useClassifiedApprovals(rows, staffId, department);
 
   // 문서 조회용 — 본인 관여 문서를 진행 중 / 처리 완료로 합산(중복 제거)
   const docProgress = useMemo(() => dedupeById([...inbox, ...progress]), [inbox, progress]);

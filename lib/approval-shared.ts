@@ -21,18 +21,27 @@ type ApprovalLike = Record<string, unknown>;
  * (trim 없음: server-approval-transition / format-utils / useApprovalRouting 의 다수 동작과 동일)
  */
 export function normalizeApprovalLineIds(line: unknown): string[] {
-  if (!Array.isArray(line)) return [];
-  const ids = line
+  if (!line) return [];
+  let arr = line;
+  if (typeof line === 'string') {
+    try {
+      arr = JSON.parse(line);
+    } catch {
+      arr = [line];
+    }
+  }
+  if (!Array.isArray(arr)) return [];
+  const ids = arr
     .map((entry) => {
       if (entry == null) return null;
-      if (typeof entry === 'string' || typeof entry === 'number') return String(entry);
+      if (typeof entry === 'string' || typeof entry === 'number') return String(entry).trim();
       if (
         typeof entry === 'object' &&
         entry !== null &&
         'id' in entry &&
         (entry as ApprovalLike).id != null
       ) {
-        return String((entry as ApprovalLike).id);
+        return String((entry as ApprovalLike).id).trim();
       }
       return null;
     })
@@ -45,10 +54,17 @@ export function normalizeApprovalLineIds(line: unknown): string[] {
  * approver_line(또는 meta_data.approver_line) 우선, 없으면 current_approver_id 단일 사용.
  */
 export function resolveApprovalLineIds(item: ApprovalLike): string[] {
-  const metaData = item?.meta_data as ApprovalLike | null | undefined;
+  let metaData = item?.meta_data as ApprovalLike | null | undefined;
+  if (typeof metaData === 'string') {
+    try {
+      metaData = JSON.parse(metaData);
+    } catch {
+      metaData = null;
+    }
+  }
   const explicitLineIds = normalizeApprovalLineIds(item?.approver_line ?? metaData?.approver_line);
   if (explicitLineIds.length > 0) return explicitLineIds;
-  if (item?.current_approver_id != null) return [String(item.current_approver_id)];
+  if (item?.current_approver_id != null) return [String(item.current_approver_id).trim()];
   return [];
 }
 

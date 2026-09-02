@@ -34,8 +34,19 @@ export function isPendingStatus(status: unknown): boolean {
 
 /** meta.cc_line | cc_users | references 에서 user id 목록 */
 export function resolveApprovalCcUserIds(meta: unknown): string[] {
-  if (!meta || typeof meta !== 'object') return [];
-  const m = meta as Record<string, unknown>;
+  if (!meta) return [];
+  let m: Record<string, unknown> | null = null;
+  if (typeof meta === 'string') {
+    try {
+      m = JSON.parse(meta);
+    } catch {
+      return [];
+    }
+  } else if (typeof meta === 'object') {
+    m = meta as Record<string, unknown>;
+  }
+  if (!m || typeof m !== 'object') return [];
+
   const sources = [m.cc_line, m.cc_users, m.references];
   const ids: string[] = [];
   for (const src of sources) {
@@ -73,6 +84,8 @@ export type ClassifyApprovalsOptions = {
   excludeOwnFromApproverBuckets?: boolean;
   /** 현재 결재자 해석 — 미지정 시 stored current || line[0] */
   resolveCurrentApproverId?: (row: ApprovalInboxItem) => string | null;
+  /** 사용자 부서 (부서 참조 cc_departments 매칭용) */
+  staffDepartment?: string | null;
 };
 
 /**
@@ -87,6 +100,7 @@ export function classifyApprovalsForStaff(
   const excludeOwn = options.excludeOwnFromApproverBuckets !== false;
   const resolveCurrent =
     options.resolveCurrentApproverId ?? defaultResolveStoredCurrentApproverId;
+  const myDept = options.staffDepartment ? String(options.staffDepartment).trim() : null;
 
   const result: Record<ApprovalInboxBucket, ApprovalInboxItem[]> = {
     inbox: [],
@@ -110,6 +124,8 @@ export function classifyApprovalsForStaff(
     const terminal = isTerminalStatus(status);
     const pending = isPendingStatus(status);
     const ccIds = resolveApprovalCcUserIds(row.meta_data);
+    const ccDepts = myDept ? resolveApprovalCcDepartments(row.meta_data) : [];
+    const isCc = ccIds.includes(me) || (myDept !== null && ccDepts.includes(myDept));
 
     if (mine) {
       result.sent.push(row);
@@ -121,7 +137,7 @@ export function classifyApprovalsForStaff(
         else if (pending && onLine) result.progress.push(row);
         else if (terminal && onLine) result.done.push(row);
       }
-      if (ccIds.includes(me) && !recalled) result.ref.push(row);
+      if (isCc && !recalled) result.ref.push(row);
       continue;
     }
 
@@ -135,7 +151,7 @@ export function classifyApprovalsForStaff(
       result.done.push(row);
     }
 
-    if (ccIds.includes(me)) {
+    if (isCc) {
       result.ref.push(row);
     }
   }
@@ -164,8 +180,18 @@ export function isInApproverScope(
 }
 
 export function resolveApprovalCcDepartments(meta: unknown): string[] {
-  if (!meta || typeof meta !== 'object') return [];
-  const m = meta as Record<string, unknown>;
+  if (!meta) return [];
+  let m: Record<string, unknown> | null = null;
+  if (typeof meta === 'string') {
+    try {
+      m = JSON.parse(meta);
+    } catch {
+      return [];
+    }
+  } else if (typeof meta === 'object') {
+    m = meta as Record<string, unknown>;
+  }
+  if (!m || typeof m !== 'object') return [];
   const depts = m.cc_departments;
   if (!Array.isArray(depts)) return [];
   return depts.map((d) => String(d || '').trim()).filter(Boolean);

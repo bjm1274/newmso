@@ -82,9 +82,10 @@ export function resolveCcUserIds(row: ApprovalRow): string[] {
 // 분류 — 받은 결재함 / 진행 / 완료 / 기안함 / 참조함
 // ─────────────────────────────────────────────
 
-export function classifyForStaff(rows: ApprovalRow[], staffId: string) {
+export function classifyForStaff(rows: ApprovalRow[], staffId: string, staffDepartment?: string | null) {
   const classified = classifyApprovalsForStaff(rows, staffId, {
     excludeOwnFromApproverBuckets: true,
+    staffDepartment,
   });
   return {
     inbox: classified.inbox as ApprovalRow[],
@@ -233,7 +234,11 @@ export async function postTransition(params: {
 // 메모 헬퍼
 // ─────────────────────────────────────────────
 
-export function useClassifiedApprovals(rows: ApprovalRow[], staffId: string | null) {
+export function useClassifiedApprovals(
+  rows: ApprovalRow[],
+  staffId: string | null,
+  staffDepartment?: string | null,
+) {
   const [approverMap, setApproverMap] = useState<Record<string, Record<string, unknown>>>({});
 
   useEffect(() => {
@@ -275,13 +280,14 @@ export function useClassifiedApprovals(rows: ApprovalRow[], staffId: string | nu
     // 대결 반영: 저장된 현재 결재자 → 실효 결재자
     return classifyApprovalsForStaff(rows as unknown as Parameters<typeof classifyApprovalsForStaff>[0], staffId, {
       excludeOwnFromApproverBuckets: true,
+      staffDepartment,
       resolveCurrentApproverId: (row) => {
         const stored = defaultResolveStoredCurrentApproverId(row);
         if (!stored) return null;
         return resolveEffectiveApproverIdCore(stored, approverMap[String(stored)] ?? null);
       },
     }) as ReturnType<typeof classifyForStaff>;
-  }, [rows, staffId, approverMap]);
+  }, [rows, staffId, staffDepartment, approverMap]);
 }
 
 // ─────────────────────────────────────────────

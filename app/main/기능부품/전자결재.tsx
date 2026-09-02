@@ -875,18 +875,26 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
   const referenceBaseList = useMemo(() => {
     const uid = user?.id != null ? String(user.id) : '';
     if (!uid) return [];
+    const dept = user?.department ? String(user.department).trim() : null;
     return visibleApprovals.filter((item) => {
       // 모바일과 동일: cc_line | cc_users | references 통합 (resolveApprovalCcUserIds)
-      const metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+      let metaData = item?.meta_data as Record<string, unknown> | null | undefined;
+      if (typeof metaData === 'string') {
+        try {
+          metaData = JSON.parse(metaData);
+        } catch {
+          metaData = null;
+        }
+      }
       const fromMeta = resolveApprovalCcUserIds(metaData);
       const ccUsers = normalizeApprovalCcUsers(metaData?.cc_users, approvalDirectoryStaffs);
       const ids = [
         ...fromMeta,
         ...ccUsers.map((ccUser) => String(ccUser.id)),
       ].filter(Boolean);
-      return isReferenceForStaff(item as ApprovalInboxItem, uid, ids);
+      return isReferenceForStaff(item as ApprovalInboxItem, uid, ids, dept);
     });
-  }, [approvalDirectoryStaffs, user?.id, visibleApprovals]);
+  }, [approvalDirectoryStaffs, user?.department, user?.id, visibleApprovals]);
 
   const documentTypeOptions = useMemo(() => {
     const source =
