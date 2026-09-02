@@ -20,6 +20,7 @@
 
 import { useMemo } from 'react';
 import type { StaffMember } from '@/types';
+import { formatKoreanClock } from '@/lib/date-formatter';
 import {
   formatIsoDate,
   isWeekendDate,
@@ -64,12 +65,10 @@ const STATUS_TONE: Record<AttendanceStatus, string> = {
   holiday: 'text-[var(--toss-gray-4)]',
   missing: 'text-[var(--toss-gray-4)]' };
 
-/** 표시용 시각 — 'HH:MM' 만 남긴다. */
+/** 표시용 시각 — KST 기준 'HH:mm' */
 function formatTime(value?: string | null): string {
-  const raw = String(value ?? '').trim();
-  if (!raw) return '-';
-  const match = raw.match(/(\d{2}):(\d{2})/);
-  return match ? `${match[1]}:${match[2]}` : raw;
+  const clock = formatKoreanClock(value);
+  return clock || '-';
 }
 
 /**

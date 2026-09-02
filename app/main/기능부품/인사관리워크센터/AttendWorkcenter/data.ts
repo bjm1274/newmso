@@ -10,6 +10,7 @@ import type { StaffMember } from '@/types';
 import type { WorkcenterKpi } from '../workcenter-common';
 import { isActive } from '../MemberWorkcenter/data';
 import { buildShiftBandText, hasWorkingHours } from '@/lib/shift-resolution';
+import { formatKoreanClock } from '@/lib/date-formatter';
 
 // ─── 근태 상태 ─────────────────────────────────────────────────
 export type AttendanceStatus =
@@ -117,29 +118,20 @@ export function aggregateDailyCounts({ staffs, rows, today }: AttendKpiInput): A
   return { present, late, absent, onLeave, lateDetails };
 }
 
-/** check_in_time(예: '2026-05-26T09:18:42+09:00' 또는 'HH:MM:SS')에서 'HH:MM'만 추출 */
+/** check_in_time 에서 KST 'HH:MM' 추출 */
 function formatLateTime(value: string | null): string {
   if (!value) return '';
-  const isoMatch = /T(\d{2}:\d{2})/.exec(value);
-  if (isoMatch) return isoMatch[1];
-  const hmsMatch = /^(\d{2}:\d{2})/.exec(value);
-  return hmsMatch ? hmsMatch[1] : '';
+  return formatKoreanClock(value);
 }
 
-/** check_in/out 시각 → 시간(0~23). 파싱 실패 시 null. */
+/** check_in/out 시각 → KST 기준 시간(0~23). 파싱 실패 시 null. */
 function pickHour(value: string | null | undefined): number | null {
   if (!value) return null;
-  const isoMatch = /T(\d{2}):/.exec(value);
-  if (isoMatch) {
-    const h = parseInt(isoMatch[1], 10);
-    return Number.isFinite(h) ? h : null;
-  }
-  const hmsMatch = /^(\d{2}):/.exec(value);
-  if (hmsMatch) {
-    const h = parseInt(hmsMatch[1], 10);
-    return Number.isFinite(h) ? h : null;
-  }
-  return null;
+  const clock = formatKoreanClock(value);
+  if (!clock) return null;
+  const [hStr] = clock.split(':');
+  const h = parseInt(hStr, 10);
+  return Number.isFinite(h) ? h : null;
 }
 
 /** 07~20시 범위 시간대별 입·퇴근 인원 집계 — reference §868~899 시간대 차트용 */

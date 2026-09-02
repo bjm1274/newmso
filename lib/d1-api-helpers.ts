@@ -159,7 +159,8 @@ export function buildClaimsFromSession(user: SessionUser | null | undefined): Er
   const id = userId(user);
   const perms = (user.permissions ?? {}) as Record<string, unknown>;
   const isMasterOrAdmin = Boolean(user.is_system_master || user.role === 'admin' || perms.admin || perms.mso || perms.system_master);
-  const canManageHr = Boolean(isMasterOrAdmin || hasHrPermission(perms));
+  const isMsoOrg = user.company === 'SY INC.' || user.company === 'SY' || user.company === 'SYINC';
+  const canManageHr = Boolean(isMasterOrAdmin || isMsoOrg || hasHrPermission(perms));
 
   return {
     erp_staff_id: id,
@@ -168,9 +169,9 @@ export function buildClaimsFromSession(user: SessionUser | null | undefined): Er
     erp_department_name: (user.department as string | undefined) ?? null,
     erp_is_admin: isMasterOrAdmin,
     erp_can_manage_company: canManageHr,
-    erp_can_manage_finance: Boolean(isMasterOrAdmin || hasFinancePermission(perms)),
-    erp_can_view_all_inventory_companies: Boolean(perms.admin || perms.mso),
-    erp_can_manage_all_inventory_companies: Boolean(perms.admin || perms.mso),
+    erp_can_manage_finance: Boolean(isMasterOrAdmin || isMsoOrg || hasFinancePermission(perms)),
+    erp_can_view_all_inventory_companies: Boolean(isMasterOrAdmin || isMsoOrg || perms.admin || perms.mso),
+    erp_can_manage_all_inventory_companies: Boolean(isMasterOrAdmin || isMsoOrg || perms.admin || perms.mso),
     erp_can_view_all_department_inventory: Boolean(canManageHr),
     erp_can_manage_department_inventory: Boolean(canManageHr) };
 }

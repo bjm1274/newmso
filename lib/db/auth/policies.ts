@@ -1987,10 +1987,12 @@ async function evalPattern(
 
   if (pattern === 'SAME_COMPANY_TEAM_VISIBLE') {
     // 단건 판정 — 실제 select 는 filterByPolicy 의 배치 경로가 처리한다.
-    // erpCanManageCompany 게이트가 없다는 점만 SELF_OR_SAME_COMPANY 와 다르다.
     const rowStaff = getField<string>(row, staffField);
     if (rowStaff === null) return false;
     if (rowStaff === erpStaffId(claims)) return true;
+    const myCompany = String(erpCompanyName(claims) ?? '').trim();
+    if (erpCanManageCompany(claims) || myCompany === 'SY INC.' || myCompany === 'SY' || erpIsAdmin(claims)) return true;
+    if (cfg.table === 'attendances' || cfg.table === 'attendance') return true;
     return erpTargetStaffSameCompany(db, claims, rowStaff);
   }
 
@@ -2498,6 +2500,8 @@ async function filterTeamVisibleRows<T extends Record<string, unknown>>(
   const staffField = cfg.staffIdField ?? 'staff_id';
   const me = erpStaffId(claims);
   const canManageCompany = erpCanManageCompany(claims);
+  const myCompany = String(erpCompanyName(claims) ?? '').trim();
+  const isMso = myCompany === 'SY INC.' || myCompany === 'SY' || erpIsAdmin(claims);
 
   const otherStaffIds: string[] = [];
   for (const row of rows) {
@@ -2517,12 +2521,20 @@ async function filterTeamVisibleRows<T extends Record<string, unknown>>(
       out.push(row);
       continue;
     }
-    if (!sameCompany.has(rowStaff)) continue;
-    // 인사·관리자는 기존 SELF_OR_SAME_COMPANY 와 같은 범위를 그대로 본다.
-    if (canManageCompany) {
-      out.push(row);
+    // 1. 인사관리자(canManageCompany) 또는 MSO본부(SY INC.)인 경우 전체 회사 직원 레코드 허용
+    // 2. 출퇴근 현황/달력(attendances, attendance) 조회 시 전사 출근 상태 가시성 제공 (비관리자는 notes 마스킹)
+    if (canManageCompany || isMso || table === 'attendances' || table === 'attendance') {
+      const masked = { ...row };
+      if (!canManageCompany && rule?.maskedColumnsForOthers) {
+        for (const col of rule.maskedColumnsForOthers) {
+          if (col in masked) delete masked[col];
+        }
+      }
+      out.push(masked);
       continue;
     }
+
+    if (!sameCompany.has(rowStaff)) continue;
     if (!rule) continue;
     if (rule.allowedStatusesForOthers) {
       const status = String(getField<string>(row, 'status') ?? '').trim();

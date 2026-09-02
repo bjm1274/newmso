@@ -22,6 +22,7 @@ import {
   resolveAttendanceStatus,
   type AttendanceRow } from './data';
 import AttendHourlyChart from './AttendHourlyChart';
+import { formatKoreanClock } from '@/lib/date-formatter';
 
 interface AttendDashboardProps {
   staffs: StaffMember[];
@@ -102,7 +103,7 @@ export default function AttendDashboard({ staffs, selectedCo, rowsOverride }: At
         id: String(row.staff_id),
         name: staff.name ?? '직원',
         status,
-        checkIn: row.check_in_time });
+        checkIn: formatKoreanClock(row.check_in_time) });
     }
     return list;
   }, [scopedStaffs, effectiveRows]);

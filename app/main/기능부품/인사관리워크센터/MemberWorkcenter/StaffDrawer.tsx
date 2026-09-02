@@ -20,6 +20,7 @@ import {
 import { computeLicenseStatus } from '@/lib/license-renewal-policy';
 import { toast } from '@/lib/toast';
 import { getKoreanTodayString } from '@/lib/seoul-time';
+import { formatKoreanClock } from '@/lib/date-formatter';
 import { readClientAuditActor, logAudit, buildAuditDiff } from '@/lib/audit';
 import RiskActionDialog from '../../인사관리서브/RiskActionDialog';
 
@@ -531,7 +532,7 @@ function RecentActivitySection({ staffId }: { staffId: string }) {
             label: '근태',
             meta:
               `${formatDateShort(att.work_date)} · ${att.status || '기록'}` +
-              (att.check_in_time ? ` · ${String(att.check_in_time).slice(0, 5)}` : ''),
+              (att.check_in_time ? ` · ${formatKoreanClock(att.check_in_time)}` : ''),
             tone: (att.status === '지각' ? 'warn' : att.status === '결근' ? 'warn' : 'success') as ChipTone }
         : null;
 
