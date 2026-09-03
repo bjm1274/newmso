@@ -10,7 +10,7 @@
  * JM(단일 책임 — 분기만), JM2(rooms 1회 fetch), JM4(any 금지).
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatRoom, ErpUser } from '@/types';
 import SChatList from './채팅목록';
 import SChatRoom from './채팅방';
@@ -110,22 +110,28 @@ function MobileChat({
     }
   }, [view, selectedRoomId, rooms, refreshRooms]);
 
+  const roomsRef = useRef<MobileChatRoom[]>(rooms);
+  roomsRef.current = rooms;
+
+  const onConsumeRef = useRef(onConsumeInitialRoomId);
+  onConsumeRef.current = onConsumeInitialRoomId;
+
   const openRoom = useCallback((roomId: string, messageId?: string) => {
-    const found = rooms.find((r) => String(r.id) === roomId) ?? null;
+    const found = roomsRef.current.find((r) => String(r.id) === roomId) ?? null;
     setSelectedRoomId(roomId);
     setSearchMessageId(messageId || null);
     // 즉시 동기화 — 이전 방 selectedRoom이 한 프레임 남는 것 방지
     setSelectedRoom(found);
     setView('room');
-  }, [rooms]);
+  }, []);
 
   const backToList = useCallback(() => {
     setView('list');
     setSelectedRoomId(null);
     setSearchMessageId(null);
     setSelectedRoom(null);
-    onConsumeInitialRoomId?.();
-  }, [onConsumeInitialRoomId]);
+    onConsumeRef.current?.();
+  }, []);
 
   useSheetHistory(view === 'room' || view === 'new', backToList);
 
@@ -133,9 +139,9 @@ function MobileChat({
   useEffect(() => {
     if (initialRoomId) {
       openRoom(initialRoomId, initialMessageId || undefined);
-      onConsumeInitialRoomId?.();
+      onConsumeRef.current?.();
     }
-  }, [initialRoomId, initialMessageId, openRoom, onConsumeInitialRoomId]);
+  }, [initialRoomId, initialMessageId, openRoom]);
 
   useEffect(() => {
     if (resetToken !== undefined && resetToken > 0) {

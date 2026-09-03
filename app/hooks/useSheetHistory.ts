@@ -21,6 +21,8 @@ type SheetHistoryState = { __sheet?: boolean };
 export function useSheetHistory(open: boolean, onClose: () => void): void {
   const pushedRef = useRef(false);
   const closedByPopRef = useRef(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -41,7 +43,7 @@ export function useSheetHistory(open: boolean, onClose: () => void): void {
       // 시트 entry가 pop되어 들어오는 경우 — 닫기만 수행, back() 호출 금지
       closedByPopRef.current = true;
       pushedRef.current = false;
-      onClose();
+      onCloseRef.current();
     }
 
     window.addEventListener('popstate', handlePopState);
@@ -58,5 +60,5 @@ export function useSheetHistory(open: boolean, onClose: () => void): void {
         pushedRef.current = false;
       }
     };
-  }, [open, onClose]);
+  }, [open]);
 }

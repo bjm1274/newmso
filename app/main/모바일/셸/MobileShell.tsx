@@ -136,6 +136,25 @@ export default function MobileShell({
     onConsumeOpenChatRoomId?.();
   }, [initialOpenChatRoomId, initialOpenMessageId, initialOpenChatRequestToken, onConsumeOpenChatRoomId, setMainMenu, setSubView]);
 
+  const handleActiveRoomChange = useCallback((id: string | null) => {
+    setActiveRoomId(id);
+    if (id) {
+      setDeepLinkRoomId(null);
+      setDeepLinkMessageId(null);
+    }
+  }, []);
+
+  const handleConsumeInitialRoomId = useCallback(() => {
+    setDeepLinkRoomId(null);
+    setDeepLinkMessageId(null);
+    setRoute((prev) => {
+      if (prev.tab === 'chat' && (prev as any).sub?.startsWith('room:')) {
+        return { tab: 'chat' } as MRoute;
+      }
+      return prev;
+    });
+  }, []);
+
   // 전자결재 딥링크 → approval 탭 + 상세 또는 작성 화면 오픈
   useEffect(() => {
     if (!initialApprovalIntent) return;
@@ -504,24 +523,12 @@ export default function MobileShell({
                 rooms={rooms}
                 roomsLoading={roomsLoading}
                 refreshRooms={refreshRooms}
-                onActiveRoomChange={(id) => {
-                  setActiveRoomId(id);
-                  if (id) {
-                    setDeepLinkRoomId(null);
-                    setDeepLinkMessageId(null);
-                  }
-                }}
+                onActiveRoomChange={handleActiveRoomChange}
                 resetToken={chatResetToken}
                 onOpenBoardPost={onOpenBoardPost}
                 initialRoomId={initialRoomId}
                 initialMessageId={initialMessageId}
-                onConsumeInitialRoomId={() => {
-                  setDeepLinkRoomId(null);
-                  setDeepLinkMessageId(null);
-                  if (route.tab === 'chat' && (route as any).sub?.startsWith('room:')) {
-                    setRoute({ tab: 'chat' });
-                  }
-                }}
+                onConsumeInitialRoomId={handleConsumeInitialRoomId}
               />
             );
           })()}
