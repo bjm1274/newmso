@@ -1295,15 +1295,30 @@ export default function SalarySettlement({
 
   // 엑셀 업로드 결과 급여정산 State 반영
   const handleApplyExcelPension = (matchedMap: Record<string, number>, _unmatchedStaffIds: string[]) => {
+    let appliedCount = 0;
+    let totalAppliedAmount = 0;
+
     setSettlementData((prev) => {
       const next = { ...prev };
       Object.entries(matchedMap).forEach(([staffId, amount]) => {
-        if (next[staffId]) {
-          next[staffId] = {
-            ...next[staffId],
+        const parsedAmount = Math.max(0, Number(amount) || 0);
+        const targetStaff = selectedStaffs.find((s) => String(s.id) === String(staffId));
+        const key = targetStaff ? targetStaff.id : staffId;
+        const fallbackKey = String(key);
+
+        const currentEntry = next[key] || next[fallbackKey] || (targetStaff ? buildSettlementEntry(targetStaff, 0, {}) : null);
+        if (currentEntry) {
+          const updatedEntry: SettlementEntry = {
+            ...currentEntry,
             national_pension_mode: 'excel',
-            national_pension_amount: amount,
+            national_pension_amount: parsedAmount,
           };
+          next[key] = updatedEntry;
+          if (fallbackKey !== key) {
+            next[fallbackKey] = updatedEntry;
+          }
+          appliedCount++;
+          totalAppliedAmount += parsedAmount;
         }
       });
       return next;
@@ -1317,11 +1332,14 @@ export default function SalarySettlement({
 
     if (eligibleUnmatchedCount > 0) {
       toast(
-        `국민연금 공제액 엑셀 반영 완료!\n엑셀에 없는 직원 ${eligibleUnmatchedCount}명은 [요율 자동계산] 또는 [결정세액 직접기입]을 선택해 주세요.`,
+        `국민연금 공제액 ${appliedCount}명(총 ₩${totalAppliedAmount.toLocaleString()}) 엑셀 반영 완료!\n엑셀에 없는 직원 ${eligibleUnmatchedCount}명은 [요율 자동계산] 또는 [결정세액 직접기입]을 선택해 주세요.`,
         'info'
       );
     } else {
-      toast('모든 정산 대상 직원의 국민연금 공제액이 엑셀과 일치하여 반영되었습니다.', 'success');
+      toast(
+        `모든 정산 대상 직원(${appliedCount}명 / 총 ₩${totalAppliedAmount.toLocaleString()})의 국민연금 공제액이 엑셀과 일치하여 반영되었습니다.`,
+        'success'
+      );
     }
   };
 
