@@ -127,7 +127,11 @@ export function SettlementStaffCard({
   const deductionTotal = Math.round(Number(res?.deduction || 0));
   const deductionDetail = (res?.deductionDetail || {}) as Record<string, unknown>;
 
-  const insSettings = (s.permissions?.insurance as Record<string, unknown>) || {};
+  const permissions = (typeof s.permissions === 'string'
+    ? (() => { try { return JSON.parse(s.permissions); } catch { return {}; } })()
+    : s.permissions || {}) as Record<string, any>;
+  const insSettings = (permissions?.insurance as Record<string, unknown>) || {};
+  const isDuruNuriActive = Boolean(deductionDetail.is_duru_nuri);
   const residentNo = String(s.resident_no || '').replace(/[^0-9]/g, '');
   const isOver60 = useMemo(() => {
     if (residentNo.length >= 7) {
@@ -156,12 +160,16 @@ export function SettlementStaffCard({
           : pensionMode === 'manual'
           ? '결정세액'
           : pensionMode === 'rate'
-          ? '요율'
+          ? (isDuruNuriActive ? '요율(두루누리 20%)' : '요율')
           : '미선택⚠️',
     },
     { label: '건강보험', value: Number(deductionDetail.health_insurance || 0) },
     { label: '장기요양', value: Number(deductionDetail.long_term_care || 0) },
-    { label: '고용보험', value: Number(deductionDetail.employment_insurance || 0) },
+    {
+      label: '고용보험',
+      value: Number(deductionDetail.employment_insurance || 0),
+      badge: isDuruNuriActive ? '두루누리(20%)' : undefined,
+    },
     { label: '소득세', value: Number(deductionDetail.income_tax || 0) },
     { label: '지방소득세', value: Number(deductionDetail.local_tax || 0) },
   ].filter((item) => item.value > 0 || (item.label === '국민연금' && isMissingPensionMode));
@@ -182,7 +190,7 @@ export function SettlementStaffCard({
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-full bg-[var(--toss-blue-light)] flex items-center justify-center text-xs font-bold text-[var(--accent)]">{s.name[0]}</div>
           <div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               <p className="text-sm font-bold text-[var(--foreground)] leading-none">{s.name}</p>
               {data.saved_status && (
                 <span className={`inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-bold ${data.saved_status === '확정' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
@@ -190,6 +198,11 @@ export function SettlementStaffCard({
                 </span>
               )}
               {hasAdvanceDeduction && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 text-[9px] font-bold rounded">선지급 차감</span>}
+              {isDuruNuriActive && (
+                <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-[9px] font-extrabold rounded-full flex items-center gap-1 border border-blue-200">
+                  <span>💎</span> 두루누리 80% 지원 (20% 부과)
+                </span>
+              )}
               {isMissingPensionMode && (
                 <span className="px-2 py-0.5 bg-red-600 text-white text-[9px] font-extrabold rounded-full animate-pulse">
                   국민연금 미선택 ⚠️
@@ -247,7 +260,7 @@ export function SettlementStaffCard({
             )}
             {pensionMode === 'rate' && (
               <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 text-[10px] font-bold flex items-center gap-1">
-                <span>⚡</span> 요율 자동계산 (2026년 요율 4.75% = ₩{Number(deductionDetail.national_pension || 0).toLocaleString()})
+                <span>⚡</span> 요율 자동계산 ({isDuruNuriActive ? '2026년 요율 4.75% × 두루누리 20% 지원 = ₩' : '2026년 요율 4.75% = ₩'}{Number(deductionDetail.national_pension || 0).toLocaleString()})
               </span>
             )}
             {isMissingPensionMode && (
@@ -561,6 +574,8 @@ export function SettlementStaffCard({
                         ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                         : item.badge === '결정세액'
                         ? 'bg-indigo-100 text-indigo-800 border border-indigo-300'
+                        : item.badge.includes('두루누리')
+                        ? 'bg-blue-100 text-blue-800 border border-blue-300'
                         : item.badge === '요율'
                         ? 'bg-sky-100 text-sky-800 border border-sky-300'
                         : item.badge.includes('미선택')

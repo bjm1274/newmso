@@ -251,7 +251,16 @@ export async function fetchPayrollWorkcenterData({
         const dbResignedAt = row.resigned_at == null ? null : str(row.resigned_at);
         const resolvedResignDate = dbResignDate || dbResignedAt;
 
-        const permissions = (row.permissions ?? null) as Record<string, any>;
+        let permissions: Record<string, any> = {};
+        if (typeof row.permissions === 'string') {
+          try {
+            permissions = JSON.parse(row.permissions);
+          } catch {
+            permissions = {};
+          }
+        } else if (row.permissions && typeof row.permissions === 'object') {
+          permissions = row.permissions as Record<string, any>;
+        }
         const allowances = (permissions?.payroll_allowances ?? {}) as Record<string, any>;
 
         return {

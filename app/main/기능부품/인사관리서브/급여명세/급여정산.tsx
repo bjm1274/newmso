@@ -1163,8 +1163,11 @@ export default function SalarySettlement({
 
     // 직원별 보험/복지 설정 가져오기 (Duru-nuri, Medical Benefit 등)
     const staff = staffs.find((s: StaffMember) => String(s.id) === String(id));
-    const insSettings = (staff?.permissions?.insurance as Record<string, unknown>) || {};
-    const isMedicalBenefit = Boolean(staff?.permissions?.is_medical_benefit) || false;
+    const staffPermissions = (typeof staff?.permissions === 'string'
+      ? (() => { try { return JSON.parse(staff.permissions); } catch { return {}; } })()
+      : staff?.permissions || {}) as Record<string, any>;
+    const insSettings = (staffPermissions?.insurance as Record<string, unknown>) || {};
+    const isMedicalBenefit = Boolean(staffPermissions?.is_medical_benefit) || false;
 
     const dependentCount = Math.max(0, Number(data.dependent_count) || 0);
     const qualifyingChildCount = Math.min(dependentCount, Math.max(0, Number(data.child_count_8_20) || 0));

@@ -100,12 +100,25 @@ export function isNationalPensionAgeEligible(staff?: StaffLike | null, asOf: Dat
   return age >= NATIONAL_PENSION_MIN_AGE && age < NATIONAL_PENSION_MAX_EXCLUSIVE_AGE;
 }
 
+function parseRecord(value: unknown): Record<string, unknown> {
+  if (isPlainRecord(value)) return value;
+  if (typeof value === 'string' && value.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(value);
+      if (isPlainRecord(parsed)) return parsed;
+    } catch {
+      // ignore
+    }
+  }
+  return {};
+}
+
 export function getPayrollInsuranceSettings(
   staff?: StaffLike | null,
   asOf: Date = new Date(),
 ): PayrollInsuranceSettings {
-  const permissions = isPlainRecord(staff?.permissions) ? (staff?.permissions as Record<string, unknown>) : {};
-  const source = isPlainRecord(permissions.insurance) ? permissions.insurance : {};
+  const permissions = parseRecord(staff?.permissions);
+  const source = parseRecord(permissions.insurance);
   const nationalPensionAgeEligible = isNationalPensionAgeEligible(staff, asOf);
 
   return {
@@ -114,7 +127,7 @@ export function getPayrollInsuranceSettings(
     employment: source.employment !== false,
     injury: source.injury !== false,
     incomeTax: source.income_tax !== false,
-    duruNuri: Boolean(source.duru_nuri),
+    duruNuri: Boolean(source.duru_nuri || source.ins_duru_nuri),
     duruNuriStart: String(source.duru_nuri_start || '').slice(0, 7),
     duruNuriEnd: String(source.duru_nuri_end || '').slice(0, 7),
     medicalBenefit: Boolean(permissions.is_medical_benefit),
@@ -138,19 +151,25 @@ function parseYearMonthIndex(value: unknown): number | null {
 export function isDuruNuriActiveForYearMonth(
   settings: PayrollInsuranceSettings,
   yearMonth: string,
-  monthlyPay?: number,
+  _monthlyPay?: number,
 ) {
   if (!settings.duruNuri) return false;
   const targetMonthIndex = parseYearMonthIndex(yearMonth);
+  if (targetMonthIndex === null) return false;
+
+  // 시작월이 설정된 경우에만 시작월 이전 여부 및 36개월 상한 검사
   const startMonthIndex = parseYearMonthIndex(settings.duruNuriStart);
-  if (targetMonthIndex === null || startMonthIndex === null) return false;
-  if (targetMonthIndex < startMonthIndex) return false;
+  if (startMonthIndex !== null) {
+    if (targetMonthIndex < startMonthIndex) return false;
+    if (targetMonthIndex - startMonthIndex >= 36) {
+      return false;
+    }
+  }
+
+  // 종료월이 설정된 경우에만 종료월 이후 여부 검사
   const endMonthIndex = parseYearMonthIndex(settings.duruNuriEnd);
   if (endMonthIndex !== null && targetMonthIndex > endMonthIndex) return false;
-  if (targetMonthIndex - startMonthIndex >= 36) {
-    return false;
-  }
-  if (monthlyPay !== undefined && Math.max(0, Number(monthlyPay) || 0) > DURU_NURI_MONTHLY_PAY_LIMIT) return false;
+
   return true;
 }
 
