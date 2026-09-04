@@ -3,7 +3,7 @@
 // - 수당/비과세/연장·상여를 개별 항목으로 세분화하여 편집(요청 #2)
 // - 선지급·기타추가차감·원천징수비율 입력은 제거(요청 #3·#4 — 원천징수는 회사 급여기준으로 이동)
 // - 박스를 절반 크기(컴팩트)로 축소해 한 화면 가독성 극대화(요청 #5)
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { StaffMember } from '@/types';
 import type { SettlementEntry, TaxableAllowanceBreakdown } from './급여정산-types';
 import { TenMinuteUnitAmountField } from './급여정산-TenMinuteUnitAmountField';
@@ -126,18 +126,57 @@ export function SettlementStaffCard({
   const hasAdvanceDeduction = advancePay > 0;
   const deductionTotal = Math.round(Number(res?.deduction || 0));
   const deductionDetail = (res?.deductionDetail || {}) as Record<string, unknown>;
+
+  const insSettings = (s.permissions?.insurance as Record<string, unknown>) || {};
+  const residentNo = String(s.resident_no || '').replace(/[^0-9]/g, '');
+  const isOver60 = useMemo(() => {
+    if (residentNo.length >= 7) {
+      const yearPrefix = parseInt(residentNo.slice(0, 2), 10);
+      const genderDigit = parseInt(residentNo.slice(6, 7), 10);
+      const birthYear = (genderDigit === 1 || genderDigit === 2) ? 1900 + yearPrefix : 2000 + yearPrefix;
+      const age = new Date().getFullYear() - birthYear;
+      return age >= 60;
+    }
+    return false;
+  }, [residentNo]);
+
+  const isNationalEligible = !isOver60 && insSettings.national !== false;
+  const pensionMode = isNationalEligible ? data.national_pension_mode : 'exempt';
+  const isMissingPensionMode = isNationalEligible && !pensionMode;
+
   const deductionBreakdownItems = [
-    { label: '국민연금', value: Number(deductionDetail.national_pension || 0) },
+    {
+      label: '국민연금',
+      value: Number(deductionDetail.national_pension || 0),
+      badge:
+        pensionMode === 'exempt'
+          ? '비대상'
+          : pensionMode === 'excel'
+          ? '엑셀'
+          : pensionMode === 'manual'
+          ? '결정세액'
+          : pensionMode === 'rate'
+          ? '요율'
+          : '미선택⚠️',
+    },
     { label: '건강보험', value: Number(deductionDetail.health_insurance || 0) },
     { label: '장기요양', value: Number(deductionDetail.long_term_care || 0) },
     { label: '고용보험', value: Number(deductionDetail.employment_insurance || 0) },
     { label: '소득세', value: Number(deductionDetail.income_tax || 0) },
     { label: '지방소득세', value: Number(deductionDetail.local_tax || 0) },
-  ].filter((item) => item.value > 0);
+  ].filter((item) => item.value > 0 || (item.label === '국민연금' && isMissingPensionMode));
   const expectedNet = getAdvanceAdjustedNet(Number(res?.net || 0), advancePay);
 
   return (
-    <div key={s.id} data-testid={`salary-settlement-card-${s.id}`} className="p-3.5 bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-lg)] shadow-sm space-y-3 hover:border-[var(--accent)] transition-all">
+    <div
+      key={s.id}
+      data-testid={`salary-settlement-card-${s.id}`}
+      className={`p-3.5 bg-[var(--card)] rounded-[var(--radius-lg)] shadow-sm space-y-3 transition-all ${
+        isMissingPensionMode
+          ? 'border-2 border-red-400 bg-red-50/15 ring-2 ring-red-400/20'
+          : 'border border-[var(--border)] hover:border-[var(--accent)]'
+      }`}
+    >
       {/* 헤더 */}
       <div className="flex flex-col gap-2 border-b border-[var(--muted)] pb-2.5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2.5">
@@ -151,6 +190,11 @@ export function SettlementStaffCard({
                 </span>
               )}
               {hasAdvanceDeduction && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 text-[9px] font-bold rounded">선지급 차감</span>}
+              {isMissingPensionMode && (
+                <span className="px-2 py-0.5 bg-red-600 text-white text-[9px] font-extrabold rounded-full animate-pulse">
+                  국민연금 미선택 ⚠️
+                </span>
+              )}
             </div>
             <p className="text-[10px] text-[var(--toss-gray-3)] mt-0.5">{s.company} · {s.department} · 통상시급 ₩{Math.round(hourlyRate).toLocaleString()}</p>
           </div>
@@ -164,6 +208,121 @@ export function SettlementStaffCard({
             <p className="text-[10px] text-[var(--toss-gray-3)] font-bold">합계 예상 실지급액</p>
             <p data-testid={`salary-settlement-expected-net-${s.id}`} className="text-base font-black text-[var(--accent)]">₩ {expectedNet.toLocaleString()}</p>
           </div>
+        </div>
+      </div>
+
+      {/* ── 국민연금 공제 방식 제어 바 ── */}
+      <div
+        className={`p-2.5 rounded-lg border transition-all ${
+          isMissingPensionMode
+            ? 'border-red-400 bg-red-50 text-red-900 shadow-xs'
+            : pensionMode === 'excel'
+            ? 'border-emerald-200 bg-emerald-50/40 text-emerald-900'
+            : pensionMode === 'manual'
+            ? 'border-indigo-200 bg-indigo-50/40 text-indigo-900'
+            : pensionMode === 'rate'
+            ? 'border-sky-200 bg-sky-50/40 text-sky-900'
+            : 'border-[var(--border)] bg-[var(--muted)]/20 text-[var(--foreground)]'
+        }`}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-black flex items-center gap-1">
+              <span>🏛️ 국민연금:</span>
+            </span>
+            {pensionMode === 'exempt' && (
+              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">
+                공제 비대상 (만 60세 이상 또는 미가입)
+              </span>
+            )}
+            {pensionMode === 'excel' && (
+              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center gap-1">
+                <span>📁</span> 엑셀 등록 공제액 ₩{Number(data.national_pension_amount || 0).toLocaleString()}
+              </span>
+            )}
+            {pensionMode === 'manual' && (
+              <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-[10px] font-bold flex items-center gap-1">
+                <span>✍️</span> 결정세액 직접입력 ₩{Number(data.national_pension_amount || 0).toLocaleString()}
+              </span>
+            )}
+            {pensionMode === 'rate' && (
+              <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 text-[10px] font-bold flex items-center gap-1">
+                <span>⚡</span> 요율 자동계산 (과세소득 4.5% = ₩{Number(deductionDetail.national_pension || 0).toLocaleString()})
+              </span>
+            )}
+            {isMissingPensionMode && (
+              <span className="px-2.5 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-black animate-pulse">
+                ⚠️ 공제 방식 미선택 (다음 단계 진행을 위해 필수 선택)
+              </span>
+            )}
+          </div>
+
+          {isNationalEligible && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {pensionMode === 'manual' ? (
+                <div className="flex items-center gap-1.5">
+                  <div className="flex items-center rounded border border-indigo-300 bg-white px-2 py-0.5 shadow-2xs">
+                    <span className="text-[10px] font-bold text-indigo-600 mr-1">₩</span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={data.national_pension_amount ?? ''}
+                      placeholder="결정세액 금액"
+                      onChange={(e) => {
+                        const val = e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value, 10) || 0);
+                        onUpdate(s.id, 'national_pension_amount', val);
+                      }}
+                      className="w-24 text-xs font-bold text-indigo-900 outline-none"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onUpdate(s.id, 'national_pension_mode', 'rate');
+                      onUpdate(s.id, 'national_pension_amount', '');
+                    }}
+                    className="px-2 py-1 rounded border border-sky-300 bg-white text-sky-700 hover:bg-sky-50 text-[10px] font-bold transition-colors"
+                  >
+                    요율 자동계산으로 전환
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  {pensionMode !== 'rate' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onUpdate(s.id, 'national_pension_mode', 'rate');
+                        onUpdate(s.id, 'national_pension_amount', '');
+                      }}
+                      className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all shadow-xs ${
+                        isMissingPensionMode
+                          ? 'bg-sky-600 text-white hover:bg-sky-700 ring-1 ring-sky-400'
+                          : 'border border-sky-300 bg-white text-sky-700 hover:bg-sky-50'
+                      }`}
+                    >
+                      ⚡ 요율 자동계산(4.5%) 적용
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onUpdate(s.id, 'national_pension_mode', 'manual');
+                      const fallbackAmount = Number((s.permissions?.insurance as any)?.national_amount || deductionDetail.national_pension || 0);
+                      onUpdate(s.id, 'national_pension_amount', fallbackAmount);
+                    }}
+                    className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all shadow-xs ${
+                      isMissingPensionMode
+                        ? 'bg-indigo-600 text-white hover:bg-indigo-700 ring-1 ring-indigo-400'
+                        : 'border border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50'
+                    }`}
+                  >
+                    ✍️ 결정세액 직접입력
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -393,8 +552,26 @@ export function SettlementStaffCard({
           <span className="text-[10px] font-black text-red-700 uppercase">공제 내역</span>
           {deductionBreakdownItems.length > 0 ? (
             deductionBreakdownItems.map((item) => (
-              <span key={item.label} className="text-[10px] font-bold text-red-700">
-                {item.label} ₩{item.value.toLocaleString()}
+              <span key={item.label} className="text-[10px] font-bold text-red-700 inline-flex items-center gap-1">
+                <span>{item.label}</span>
+                {item.badge && (
+                  <span
+                    className={`px-1 py-0.2 rounded text-[8px] font-black ${
+                      item.badge === '엑셀'
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : item.badge === '결정세액'
+                        ? 'bg-indigo-100 text-indigo-800 border border-indigo-300'
+                        : item.badge === '요율'
+                        ? 'bg-sky-100 text-sky-800 border border-sky-300'
+                        : item.badge.includes('미선택')
+                        ? 'bg-red-600 text-white animate-pulse'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+                <span>₩{item.value.toLocaleString()}</span>
               </span>
             ))
           ) : (

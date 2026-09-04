@@ -3,7 +3,7 @@ import { toast } from '@/lib/toast';
 import { getKoreanMonthString } from '@/lib/seoul-time';
 import { KOREAN_PUBLIC_HOLIDAY_DATES } from '@/lib/korean-public-holidays';
 import type { StaffMember } from '@/types';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { db } from '@/lib/db-client';
 import { withMissingColumnsFallback } from '@/lib/db-compat';
 import { STORAGE_KEYS } from '@/lib/storage-keys';
@@ -38,6 +38,7 @@ import type {
   SalaryAmountField,
   SalaryChangeHistoryRow,
   SalaryChangeProrationSummary,
+  NationalPensionDeductionMode,
   SavedPayrollRecord } from './급여정산-types';
 import {
   PAYROLL_RECORD_OPTIONAL_COLUMNS,
@@ -55,6 +56,7 @@ import { SettlementStaffCard } from './급여정산-SettlementStaffCard';
 import { VerificationReportPanel } from './급여정산-VerificationReportPanel';
 import { Step3Complete } from './급여정산-Step3Complete';
 import { BatchBonusModal } from './급여정산-BatchBonusModal';
+import ExcelUploadModal from './ExcelUploadModal';
 import { isActiveStaff } from '@/lib/active-staff';
 
 export default function SalarySettlement({
@@ -70,6 +72,8 @@ export default function SalarySettlement({
   const [step, setStep] = useState(initialStep);
   const [yearMonth, setYearMonth] = useState(getKoreanMonthString());
   const [showBatchBonusModal, setShowBatchBonusModal] = useState(false);
+  const [showExcelUploadModal, setShowExcelUploadModal] = useState(false);
+  const [filterOnlyMissingPension, setFilterOnlyMissingPension] = useState(false);
   const [selectedStaffs, setSelectedStaffs] = useState<StaffMember[]>([]);
   const [showFinalizeReview, setShowFinalizeReview] = useState(false);
   const [settlementData, setSettlementData] = useState<Record<string, SettlementEntry>>({});
@@ -447,6 +451,32 @@ export default function SalarySettlement({
 
     nextBreakdown.manual_extra_allowance = Math.max(0, persistedExtraAllowance - fixedAllowanceBase);
 
+    const insSettings = (staff.permissions?.insurance as Record<string, unknown>) || {};
+    const payrollIns = getPayrollInsuranceSettings(staff, resolvePayrollAsOfDate(yearMonth));
+    const isNationalExempt = !payrollIns.national;
+
+    let resolvedNationalMode: NationalPensionDeductionMode | undefined = undefined;
+    let resolvedNationalAmount: number | '' = '';
+
+    if (isNationalExempt) {
+      resolvedNationalMode = 'exempt';
+      resolvedNationalAmount = 0;
+    } else if (savedDeductionDetail.national_pension_mode) {
+      resolvedNationalMode = savedDeductionDetail.national_pension_mode as NationalPensionDeductionMode;
+      resolvedNationalAmount = savedRecord?.national_pension != null
+        ? Number(savedRecord.national_pension)
+        : (savedDeductionDetail.national_pension_amount != null ? Number(savedDeductionDetail.national_pension_amount) : '');
+    } else if (savedRecord?.national_pension != null && Number(savedRecord.national_pension) > 0) {
+      resolvedNationalMode = 'manual';
+      resolvedNationalAmount = Number(savedRecord.national_pension);
+    } else if (insSettings.national_amount != null && Number(insSettings.national_amount) > 0) {
+      resolvedNationalMode = 'manual';
+      resolvedNationalAmount = Number(insSettings.national_amount);
+    } else {
+      resolvedNationalMode = undefined;
+      resolvedNationalAmount = '';
+    }
+
     return {
       base_salary: baseSalary,
       meal_allowance: mealAllowance,
@@ -498,7 +528,9 @@ export default function SalarySettlement({
       auto_holiday_hours: autoHolidayHours,
       auto_night_pay: autoNightPay,
       auto_night_minutes: autoNightWorkMins,
-      calculated_hourly_rate: calculatedHourlyRate };
+      calculated_hourly_rate: calculatedHourlyRate,
+      national_pension_mode: resolvedNationalMode,
+      national_pension_amount: resolvedNationalAmount };
   };
 
   const handleNextStep = async () => {
@@ -1147,6 +1179,23 @@ export default function SalarySettlement({
     // 정본은 호출처 0건의 데드코드였던 탓에 이 상한들이 전역 미집행 상태였기 때문이다.
     const isDuruNuriActive = isDuruNuriActiveForYearMonth(resolvedIns, yearMonth, total_taxable);
 
+    // 국민연금 공제 방식(엑셀/직접결정세액/요율/면제)에 따른 공제액 결정
+    let finalNationalPensionAmount: number | null = null;
+    const pensionMode = data.national_pension_mode;
+
+    if (pensionMode === 'exempt' || !resolvedIns.national) {
+      finalNationalPensionAmount = 0;
+    } else if (pensionMode === 'excel' || pensionMode === 'manual') {
+      finalNationalPensionAmount = data.national_pension_amount !== '' && data.national_pension_amount != null
+        ? Number(data.national_pension_amount)
+        : 0;
+    } else if (pensionMode === 'rate') {
+      finalNationalPensionAmount = null; // 요율 자동계산
+    } else {
+      // 미선택 상태: 마스터 결정세액이 있으면 임시 활용, 없으면 임시 요율 계산
+      finalNationalPensionAmount = insSettings.national_amount != null ? Number(insSettings.national_amount) : null;
+    }
+
     // 서버가 같은 입력으로 재계산할 수 있도록 옵션을 한 번만 만들어 공유한다.
     // (예전에는 이 옵션이 이 함수 안에만 있어서 서버가 재현할 방법이 없었다 — D04-008)
     const statutoryOptions: StatutoryDeductionOptions = {
@@ -1157,10 +1206,10 @@ export default function SalarySettlement({
       dependentCount,
       qualifyingChildCount,
       withholdingRatePercent,
-      applyNationalPension: resolvedIns.national,
+      applyNationalPension: resolvedIns.national && pensionMode !== 'exempt',
       applyHealthInsurance: resolvedIns.health,
       applyEmploymentInsurance: resolvedIns.employment,
-      nationalPensionAmount: insSettings.national_amount != null ? Number(insSettings.national_amount) : null,
+      nationalPensionAmount: finalNationalPensionAmount,
       joinedAt: (staff?.joined_at || staff?.join_date || null) as string | null,
       yearMonth: yearMonth };
 
@@ -1212,7 +1261,10 @@ export default function SalarySettlement({
       taxable_allowance_breakdown: data.taxable_allowance_breakdown,
       salary_change_proration: data.salary_change_proration || [],
       tax_estimated: data.apply_tax && !hasExactWithholdingTable,
-      missing_monthly_withholding_table: data.apply_tax && !hasExactWithholdingTable };
+      missing_monthly_withholding_table: data.apply_tax && !hasExactWithholdingTable,
+      national_pension_mode: pensionMode,
+      national_pension_amount: data.national_pension_amount !== '' ? Number(data.national_pension_amount) : null,
+      is_national_mode_missing: resolvedIns.national && !pensionMode };
 
     return {
       taxable: total_taxable,
@@ -1226,7 +1278,93 @@ export default function SalarySettlement({
     };
   };
 
+  // 국민연금 공제 방식 미선택 검사 (엑셀에도 없고, 요율/직접입력도 안 한 직원)
+  const getUnselectedPensionStaffs = (): StaffMember[] => {
+    return selectedStaffs.filter((staff) => {
+      const staffId = String(staff.id);
+      const data = settlementData[staffId];
+      const resolvedIns = getPayrollInsuranceSettings(staff, resolvePayrollAsOfDate(yearMonth));
+      if (!resolvedIns.national) return false; // 만 60세 이상 또는 미가입자는 제외
+      if (!data?.national_pension_mode) return true; // 미선택
+      if (data.national_pension_mode === 'manual' && (data.national_pension_amount === '' || data.national_pension_amount == null)) {
+        return true; // 결정세액 직접입력인데 금액이 빈 경우
+      }
+      return false;
+    });
+  };
+
+  // 엑셀 업로드 결과 급여정산 State 반영
+  const handleApplyExcelPension = (matchedMap: Record<string, number>, _unmatchedStaffIds: string[]) => {
+    setSettlementData((prev) => {
+      const next = { ...prev };
+      Object.entries(matchedMap).forEach(([staffId, amount]) => {
+        if (next[staffId]) {
+          next[staffId] = {
+            ...next[staffId],
+            national_pension_mode: 'excel',
+            national_pension_amount: amount,
+          };
+        }
+      });
+      return next;
+    });
+
+    const eligibleUnmatchedCount = selectedStaffs.filter((s) => {
+      const id = String(s.id);
+      const resolvedIns = getPayrollInsuranceSettings(s, resolvePayrollAsOfDate(yearMonth));
+      return resolvedIns.national && !matchedMap[id];
+    }).length;
+
+    if (eligibleUnmatchedCount > 0) {
+      toast(
+        `국민연금 공제액 엑셀 반영 완료!\n엑셀에 없는 직원 ${eligibleUnmatchedCount}명은 [요율 자동계산] 또는 [결정세액 직접기입]을 선택해 주세요.`,
+        'info'
+      );
+    } else {
+      toast('모든 정산 대상 직원의 국민연금 공제액이 엑셀과 일치하여 반영되었습니다.', 'success');
+    }
+  };
+
+  // 엑셀에 없는 미선택 직원 일괄 요율 자동계산 적용
+  const handleBatchApplyRateForUnselected = () => {
+    const unselected = getUnselectedPensionStaffs();
+    if (unselected.length === 0) {
+      toast('공제 방식이 미선택된 직원이 없습니다.', 'info');
+      return;
+    }
+
+    setSettlementData((prev) => {
+      const next = { ...prev };
+      unselected.forEach((s) => {
+        const id = String(s.id);
+        if (next[id]) {
+          next[id] = {
+            ...next[id],
+            national_pension_mode: 'rate',
+            national_pension_amount: '',
+          };
+        }
+      });
+      return next;
+    });
+    setFilterOnlyMissingPension(false);
+    toast(`${unselected.length}명의 국민연금을 [요율 자동계산(4.5%)]으로 일괄 적용했습니다.`, 'success');
+  };
+
   const persistSettlement = async (targetStatus: '임시저장' | '확정') => {
+    // ⚠️ 국민연금 공제 방식 미선택 시 다음 단계 및 저장 차단
+    const unselectedPensionStaffs = getUnselectedPensionStaffs();
+    if (unselectedPensionStaffs.length > 0) {
+      const names = unselectedPensionStaffs.map((s) => s.name).slice(0, 5).join(', ');
+      const extra = unselectedPensionStaffs.length > 5 ? ` 외 ${unselectedPensionStaffs.length - 5}명` : '';
+      toast(
+        `국민연금 공제 방식이 선택되지 않은 직원(${unselectedPensionStaffs.length}명: ${names}${extra})이 있습니다.\n각 직원의 [요율 자동계산] 또는 [결정세액 직접기입]을 완료해야 진행할 수 있습니다.`,
+        'error'
+      );
+      setFilterOnlyMissingPension(true);
+      return;
+    }
+
     setLoading(true);
     try {
       const records = selectedStaffs.map((staff) => {
@@ -1641,6 +1779,45 @@ export default function SalarySettlement({
     requireExactTaxTable: selectedStaffs.some((staff: StaffMember) => settlementData[staff.id]?.apply_tax) });
   const hasBlockingVerificationIssues = verificationReport.errorCount > 0;
 
+  const pensionStats = useMemo(() => {
+    let excelCount = 0;
+    let rateCount = 0;
+    let manualCount = 0;
+    let exemptCount = 0;
+    let missingCount = 0;
+
+    selectedStaffs.forEach((staff) => {
+      const staffId = String(staff.id);
+      const data = settlementData[staffId];
+      const resolvedIns = getPayrollInsuranceSettings(staff, resolvePayrollAsOfDate(yearMonth));
+      if (!resolvedIns.national) {
+        exemptCount++;
+      } else if (!data?.national_pension_mode) {
+        missingCount++;
+      } else if (data.national_pension_mode === 'excel') {
+        excelCount++;
+      } else if (data.national_pension_mode === 'rate') {
+        rateCount++;
+      } else if (data.national_pension_mode === 'manual') {
+        if (data.national_pension_amount === '' || data.national_pension_amount == null) {
+          missingCount++;
+        } else {
+          manualCount++;
+        }
+      } else {
+        exemptCount++;
+      }
+    });
+
+    return { excelCount, rateCount, manualCount, exemptCount, missingCount };
+  }, [selectedStaffs, settlementData, yearMonth]);
+
+  const displayedStaffs = useMemo(() => {
+    if (!filterOnlyMissingPension) return selectedStaffs;
+    const unselectedIdSet = new Set(getUnselectedPensionStaffs().map((s) => String(s.id)));
+    return selectedStaffs.filter((s) => unselectedIdSet.has(String(s.id)));
+  }, [selectedStaffs, filterOnlyMissingPension, settlementData, yearMonth]);
+
   return (
     <div className="bg-[var(--card)] rounded-[var(--radius-md)] border border-[var(--border)] shadow-sm overflow-hidden animate-in fade-in duration-300" data-testid="salary-settlement-view">
       <div className="bg-[var(--page-bg)] border-b border-[var(--border)] px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -1695,6 +1872,22 @@ export default function SalarySettlement({
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
+                  onClick={() => setShowExcelUploadModal(true)}
+                  className="px-3 py-1.5 rounded-lg border border-emerald-500 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold transition-all flex items-center gap-1.5 shadow-xs active:scale-95"
+                >
+                  <span>📁</span> 국민연금 공제액 엑셀 등록
+                </button>
+                {pensionStats.missingCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleBatchApplyRateForUnselected}
+                    className="px-3 py-1.5 rounded-lg border border-sky-300 bg-sky-50 text-sky-800 text-xs font-bold hover:bg-sky-100 transition-colors flex items-center gap-1.5 shadow-xs"
+                  >
+                    <span>⚡</span> 미선택({pensionStats.missingCount}명) 일괄 요율 자동계산
+                  </button>
+                )}
+                <button
+                  type="button"
                   onClick={handleBatchWaiveAttendanceDeduction}
                   className="px-3 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors flex items-center gap-1.5 shadow-xs"
                 >
@@ -1710,6 +1903,59 @@ export default function SalarySettlement({
               </div>
             </div>
 
+            {/* 국민연금 공제 현황 배너 */}
+            <div
+              className={`p-3 rounded-xl border flex flex-wrap items-center justify-between gap-3 text-xs transition-all ${
+                pensionStats.missingCount > 0
+                  ? 'bg-red-50/70 border-red-300 text-red-900 shadow-2xs'
+                  : 'bg-emerald-50/40 border-emerald-200 text-emerald-900'
+              }`}
+            >
+              <div className="flex flex-wrap items-center gap-2 font-bold">
+                <span className="flex items-center gap-1">
+                  <span>🏛️</span>
+                  <span>국민연금 공제 현황:</span>
+                </span>
+                <span className="px-2 py-0.5 rounded bg-white border border-emerald-200 text-emerald-700 font-bold">
+                  엑셀 등록 {pensionStats.excelCount}명
+                </span>
+                <span className="px-2 py-0.5 rounded bg-white border border-sky-200 text-sky-700 font-bold">
+                  요율 계산 {pensionStats.rateCount}명
+                </span>
+                <span className="px-2 py-0.5 rounded bg-white border border-indigo-200 text-indigo-700 font-bold">
+                  직접 기입 {pensionStats.manualCount}명
+                </span>
+                {pensionStats.exemptCount > 0 && (
+                  <span className="px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-600 font-bold">
+                    비대상 {pensionStats.exemptCount}명
+                  </span>
+                )}
+                {pensionStats.missingCount > 0 ? (
+                  <span className="px-2.5 py-0.5 rounded-full bg-red-600 text-white font-black animate-pulse flex items-center gap-1">
+                    <span>⚠️</span> 미선택 {pensionStats.missingCount}명 (선택 필수)
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white font-bold">
+                    ✅ 전체 설정 완료
+                  </span>
+                )}
+              </div>
+
+              {pensionStats.missingCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setFilterOnlyMissingPension(!filterOnlyMissingPension)}
+                  className={`px-2.5 py-1 rounded text-xs font-bold transition-all border ${
+                    filterOnlyMissingPension
+                      ? 'bg-red-600 text-white border-red-700 shadow-sm'
+                      : 'bg-white text-red-700 border-red-300 hover:bg-red-50'
+                  }`}
+                >
+                  {filterOnlyMissingPension ? '전체 직원 다시 보기' : '⚠️ 미선택 직원만 모아보기'}
+                </button>
+              )}
+            </div>
+
             {!hasExactIncomeTaxBracket(taxInsuranceRates) && (
               <div data-testid="salary-settlement-finalize-block-warning" className="rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/10 px-4 py-3">
                 <p className="text-sm font-bold text-red-700">급여 확정 차단: 정확한 근로소득세표가 없습니다.</p>
@@ -1719,7 +1965,7 @@ export default function SalarySettlement({
               </div>
             )}
             <div className="max-h-[500px] overflow-y-auto space-y-4 p-2 custom-scrollbar">
-              {selectedStaffs.map((s: StaffMember) => {
+              {displayedStaffs.map((s: StaffMember) => {
                 const staffId = String(s.id);
                 const data = settlementData[staffId] || buildSettlementEntry(s, 0, {});
                 const res = calculateSalary(staffId);
@@ -1748,7 +1994,31 @@ export default function SalarySettlement({
               >
                 {loading ? '처리 중...' : '임시 저장'}
               </button>
-              <button data-testid="salary-settlement-finalize-button" onClick={() => setShowFinalizeReview(true)} disabled={loading || isLocked || !hasExactIncomeTaxBracket(taxInsuranceRates) || hasBlockingVerificationIssues} className="flex-[2] py-3 bg-[var(--accent)] text-white text-sm font-semibold rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50">
+              <button
+                data-testid="salary-settlement-finalize-button"
+                onClick={() => {
+                  const unselected = getUnselectedPensionStaffs();
+                  if (unselected.length > 0) {
+                    const names = unselected.map((s) => s.name).slice(0, 5).join(', ');
+                    const extra = unselected.length > 5 ? ` 외 ${unselected.length - 5}명` : '';
+                    toast(
+                      `국민연금 공제 방식이 선택되지 않은 직원(${unselected.length}명: ${names}${extra})이 있습니다.\n각 직원의 [요율 자동계산] 또는 [결정세액 직접기입]을 완료해야 진행할 수 있습니다.`,
+                      'error'
+                    );
+                    setFilterOnlyMissingPension(true);
+                    return;
+                  }
+                  setShowFinalizeReview(true);
+                }}
+                disabled={
+                  loading ||
+                  isLocked ||
+                  !hasExactIncomeTaxBracket(taxInsuranceRates) ||
+                  hasBlockingVerificationIssues ||
+                  pensionStats.missingCount > 0
+                }
+                className="flex-[2] py-3 bg-[var(--accent)] text-white text-sm font-semibold rounded-[var(--radius-md)] hover:opacity-90 disabled:opacity-50"
+              >
                 {loading ? '처리 중...' : '저장하기 · 정산 확정'}
               </button>
             </div>
@@ -1765,6 +2035,16 @@ export default function SalarySettlement({
         settlementData={settlementData}
         onApply={handleApplyBatchBonus}
       />
+
+      {showExcelUploadModal && (
+        <ExcelUploadModal
+          isOpen={showExcelUploadModal}
+          onClose={() => setShowExcelUploadModal(false)}
+          onSuccess={() => {}}
+          staffs={selectedStaffs}
+          onApplyToSettlement={handleApplyExcelPension}
+        />
+      )}
 
       <RiskActionDialog
         open={showFinalizeReview}

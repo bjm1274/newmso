@@ -70,7 +70,7 @@ function createEmptyStaffForm(selectedCompany?: string) {
     meal_allowance: 0, night_duty_allowance: 0, vehicle_allowance: 0, childcare_allowance: 0, research_allowance: 0, other_taxfree: 0, position_allowance: 0,
     overtime_allowance: 0, night_work_allowance: 0, holiday_work_allowance: 0, annual_leave_pay: 0,
     agreed_overtime_allowance: 0, agreed_night_allowance: 0,
-    ins_national: true, ins_health: true, ins_employment: true, ins_injury: true, is_basic_living: false, other_welfare: '',
+    ins_national: true, ins_national_amount: '' as number | '', ins_health: true, ins_employment: true, ins_injury: true, is_basic_living: false, other_welfare: '',
     ins_duru_nuri: false, duru_nuri_start: '', duru_nuri_end: '', is_medical_benefit: false,
     working_hours_per_week: 40, working_days_per_week: 5,
     allowance_hours: { ...EMPTY_ALLOWANCE_HOURS } };
@@ -1437,7 +1437,9 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           employment_type: 신규직원.고용형태 || '정규직',
           contract_end_date: 신규직원.고용형태 === '계약직' ? dateOrNull(신규직원.계약종료일) : null,
           insurance: {
+            ...((existingPermissions.insurance as Record<string, unknown>) || {}),
             national: 신규직원.ins_national,
+            national_amount: 신규직원.ins_national_amount !== '' && 신규직원.ins_national_amount != null ? Number(신규직원.ins_national_amount) : null,
             health: 신규직원.ins_health,
             employment: 신규직원.ins_employment,
             injury: 신규직원.ins_injury,
@@ -1763,6 +1765,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
       probation_months: getStaffProbationMonths(직원, 0),
       probation_percent: getStaffProbationPercent(직원, 90),
       ins_national: ins.national !== false,
+      ins_national_amount: ins.national_amount != null && ins.national_amount !== '' ? Number(ins.national_amount) : '',
       ins_health: ins.health !== false,
       ins_employment: ins.employment !== false,
       ins_injury: ins.injury !== false,
@@ -2938,33 +2941,61 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                         사회보험 및 복지 설정
                       </h4>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="grid grid-cols-2 gap-2 bg-[var(--muted)] p-4 rounded-[var(--radius-xl)]">
-                          {[
-                            { key: 'ins_national', label: '국민연금' },
-                            { key: 'ins_health', label: '건강보험' },
-                            { key: 'ins_employment', label: '고용보험' },
-                            { key: 'ins_injury', label: '산재보험' },
-                          ].map((item) => (
-                            <label key={item.key} className="flex items-center gap-3 p-3 bg-[var(--card)] rounded-[var(--radius-md)] shadow-sm cursor-pointer border-2 border-transparent hover:border-[var(--toss-blue-light)] transition-all">
-                              <input
-                                type="checkbox"
-                                checked={신규직원[item.key as keyof typeof 신규직원] as boolean}
-                                onChange={e => {
-                                  if (item.key === 'ins_national' && e.target.checked && 신규직원.주민번호.length >= 7) {
-                                    const raw = 신규직원.주민번호.replace('-', '');
-                                    const yearPrefix = parseInt(raw.slice(0, 2), 10);
-                                    const genderDigit = parseInt(raw.slice(6, 7), 10);
-                                    const birthYear = (genderDigit === 1 || genderDigit === 2) ? 1900 + yearPrefix : 2000 + yearPrefix;
-                                    const age = new Date().getFullYear() - birthYear;
-                                    if (age >= 60) return toast('만 60세 이상은 국민연금 가입 대상이 아닙니다.');
+                        <div className="bg-[var(--muted)] p-4 rounded-[var(--radius-xl)] space-y-3">
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { key: 'ins_national', label: '국민연금' },
+                              { key: 'ins_health', label: '건강보험' },
+                              { key: 'ins_employment', label: '고용보험' },
+                              { key: 'ins_injury', label: '산재보험' },
+                            ].map((item) => (
+                              <label key={item.key} className="flex items-center gap-3 p-3 bg-[var(--card)] rounded-[var(--radius-md)] shadow-sm cursor-pointer border-2 border-transparent hover:border-[var(--toss-blue-light)] transition-all">
+                                <input
+                                  type="checkbox"
+                                  checked={신규직원[item.key as keyof typeof 신규직원] as boolean}
+                                  onChange={e => {
+                                    if (item.key === 'ins_national' && e.target.checked && 신규직원.주민번호.length >= 7) {
+                                      const raw = 신규직원.주민번호.replace('-', '');
+                                      const yearPrefix = parseInt(raw.slice(0, 2), 10);
+                                      const genderDigit = parseInt(raw.slice(6, 7), 10);
+                                      const birthYear = (genderDigit === 1 || genderDigit === 2) ? 1900 + yearPrefix : 2000 + yearPrefix;
+                                      const age = new Date().getFullYear() - birthYear;
+                                      if (age >= 60) return toast('만 60세 이상은 국민연금 가입 대상이 아닙니다.');
+                                    }
+                                    신규직원설정({ ...신규직원, [item.key]: e.target.checked });
+                                  }}
+                                  className="w-4 h-4 rounded text-[var(--accent)]"
+                                />
+                                <span className="text-xs font-bold text-[var(--foreground)]">{item.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                          {신규직원.ins_national && (
+                            <div className="p-2.5 bg-[var(--card)] border border-blue-200 rounded-[var(--radius-md)] space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-bold text-blue-900 flex items-center gap-1">
+                                  <span>🏛️</span> 국민연금 결정세액 (고지금액)
+                                </span>
+                                <span className="text-[10px] text-[var(--toss-gray-3)]">미입력 시 요율(4.5%) 자동계산</span>
+                              </div>
+                              <div className="relative flex items-center">
+                                <span className="absolute left-2.5 text-xs text-[var(--toss-gray-3)] font-bold">₩</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  placeholder="공단 고지액 (예: 180000)"
+                                  value={신규직원.ins_national_amount}
+                                  onChange={(e) =>
+                                    신규직원설정({
+                                      ...신규직원,
+                                      ins_national_amount: e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value, 10) || 0)
+                                    })
                                   }
-                                  신규직원설정({ ...신규직원, [item.key]: e.target.checked });
-                                }}
-                                className="w-4 h-4 rounded text-[var(--accent)]"
-                              />
-                              <span className="text-xs font-bold text-[var(--foreground)]">{item.label}</span>
-                            </label>
-                          ))}
+                                  className="w-full h-8 pl-6 pr-2 text-xs font-bold rounded border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-blue-500/20"
+                                />
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         <div className="p-4 bg-blue-500/10 border border-blue-100 rounded-[var(--radius-xl)] space-y-3">

@@ -10,6 +10,7 @@ interface ExcelUploadModalProps {
   onClose: () => void;
   onSuccess: () => void;
   staffs: any[];
+  onApplyToSettlement?: (matchedMap: Record<string, number>, unmatchedStaffIds: string[]) => void;
 }
 
 interface ParsedRow {
@@ -25,7 +26,8 @@ export default function ExcelUploadModal({
   isOpen,
   onClose,
   onSuccess,
-  staffs
+  staffs,
+  onApplyToSettlement
 }: ExcelUploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
@@ -246,6 +248,17 @@ export default function ExcelUploadModal({
     }
 
     setLoading(false);
+    if (onApplyToSettlement) {
+      const matchedMap: Record<string, number> = {};
+      targets.forEach((t) => {
+        if (t.matchedStaffId) matchedMap[t.matchedStaffId] = t.amount;
+      });
+      const matchedIdSet = new Set(targets.map((t) => String(t.matchedStaffId)));
+      const unmatchedStaffIds = staffs
+        .filter((s) => !matchedIdSet.has(String(s.id)))
+        .map((s) => String(s.id));
+      onApplyToSettlement(matchedMap, unmatchedStaffIds);
+    }
     toast(`저장 완료: ${successCount}명 반영 완료, ${failCount}명 실패`, failCount > 0 ? 'warning' : 'success');
     onSuccess();
     onClose();
@@ -272,13 +285,13 @@ export default function ExcelUploadModal({
             onClick={() => fileInputRef.current?.click()}
             className="border-2 border-dashed border-[var(--toss-gray-6)] hover:border-emerald-500 rounded-[var(--radius-xl)] p-8 text-center cursor-pointer transition-all bg-[var(--muted)]/30 hover:bg-emerald-50/10 flex flex-col items-center justify-center gap-2"
           >
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".csv" className="hidden" />
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".csv,.xlsx,.xls" className="hidden" />
             <span className="text-3xl">📤</span>
             <p className="text-xs font-bold text-[var(--foreground)]">
-              {file ? file.name : '국민연금 결정세액 CSV 파일을 여기에 드래그하거나 클릭하여 업로드하세요.'}
+              {file ? file.name : '국민연금 결정세액 엑셀/CSV 파일(.xlsx, .xls, .csv)을 드래그하거나 클릭하여 업로드'}
             </p>
             <p className="text-[10px] text-[var(--toss-gray-4)]">
-              국민연금공단 등에서 내려받은 결정세액 산출내역서(CSV 형식)를 업로드해 주세요.
+              국민연금공단(사회보험 EDI)에서 내려받은 공제액 산출내역서를 업로드해 주세요.
             </p>
           </div>
 

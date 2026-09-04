@@ -1,5 +1,7 @@
 // 급여정산 도메인 타입 정의 (순수 추출 — 동작 보존)
 
+export type NationalPensionDeductionMode = 'excel' | 'rate' | 'manual' | 'exempt';
+
 export interface SettlementEntry {
   base_salary: number | '';
   meal_allowance: number | '';
@@ -30,6 +32,8 @@ export interface SettlementEntry {
   auto_night_pay?: number;
   auto_night_minutes?: number;
   calculated_hourly_rate?: number;
+  national_pension_mode?: NationalPensionDeductionMode;
+  national_pension_amount?: number | '';
 }
 
 export interface TaxableAllowanceBreakdown {
@@ -58,6 +62,7 @@ export interface SavedPayrollRecord {
   attendance_deduction_detail?: Record<string, unknown> | null;
   deduction_detail?: Record<string, unknown> | null;
   advance_pay?: number | null;
+  national_pension?: number | null;
   status?: string | null;
   record_type?: string | null;
 }
