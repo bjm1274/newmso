@@ -31,6 +31,7 @@ import {
   summarizeLicenses,
   type StaffLicenseRow } from './구성원현황/staff-license-link';
 import StaffHistoryTimeline from './인사이력타임라인';
+import SalaryChangeHistoryModal from './급여변경이력관리';
 import OnboardingChecklist from './급여명세/입퇴사온보딩';
 import CertTransferPanel from './교육자격인사이동패널';
 import RiskActionDialog from './RiskActionDialog';
@@ -235,6 +236,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
   const [팀목록캐시, 팀목록캐시설정] = useState<Record<string, string[]>>({});
   const [activeTab, setActiveTab] = useState('기본'); // '기본', '소속', '급여'
   const [신규직원, 신규직원설정] = useState(() => createEmptyStaffForm(선택사업체 ?? undefined));
+  const [showSalaryHistoryModal, setShowSalaryHistoryModal] = useState(false);
   const [targetSalaryInput, setTargetSalaryInput] = useState('');
   const [targetNightHoursInput, setTargetNightHoursInput] = useState('');
   const previewMinimumWageYear = Math.max(2025, new Date().getFullYear());
@@ -2810,10 +2812,21 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                     {/* (과세) 월 급여 및 고정 수당 */}
                     <div className="space-y-4">
                       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                        <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
-                          <span className="w-1.5 h-4 bg-[var(--accent)] rounded-full" />
-                          월 급여 및 고정 수당 (과세)
-                        </h4>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
+                            <span className="w-1.5 h-4 bg-[var(--accent)] rounded-full" />
+                            월 급여 및 고정 수당 (과세)
+                          </h4>
+                          {편집모드 && 선택된직원ID && (
+                            <button
+                              type="button"
+                              onClick={() => setShowSalaryHistoryModal(true)}
+                              className="px-2.5 py-1 rounded-lg bg-[var(--toss-blue-light)] text-[var(--accent)] text-[11px] font-bold hover:opacity-80 transition-opacity border border-[var(--accent)]/20 flex items-center gap-1 shadow-xs"
+                            >
+                              <span>💰</span> 급여 변동 이력 관리
+                            </button>
+                          )}
+                        </div>
                         <div className="grid grid-cols-2 gap-3 rounded-[var(--radius-xl)] bg-[var(--toss-blue-light)] px-4 py-3 md:min-w-[320px]">
                           <div>
                             <p className="text-[10px] font-bold text-[var(--toss-gray-3)]">총 급여</p>
@@ -3195,6 +3208,15 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
           setPendingDeleteStaff(null);
         }}
       />
+
+      {showSalaryHistoryModal && (
+        <SalaryChangeHistoryModal
+          open={showSalaryHistoryModal}
+          onClose={() => setShowSalaryHistoryModal(false)}
+          staff={직원목록.find((s: StaffMember) => s.id === 선택된직원ID) || null}
+          onRefresh={새로고침}
+        />
+      )}
     </div>
   );
 }

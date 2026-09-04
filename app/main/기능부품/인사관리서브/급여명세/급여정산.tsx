@@ -54,6 +54,7 @@ import { Step1TargetSelection } from './급여정산-Step1TargetSelection';
 import { SettlementStaffCard } from './급여정산-SettlementStaffCard';
 import { VerificationReportPanel } from './급여정산-VerificationReportPanel';
 import { Step3Complete } from './급여정산-Step3Complete';
+import { BatchBonusModal } from './급여정산-BatchBonusModal';
 import { isActiveStaff } from '@/lib/active-staff';
 
 export default function SalarySettlement({
@@ -68,6 +69,7 @@ export default function SalarySettlement({
 }) {
   const [step, setStep] = useState(initialStep);
   const [yearMonth, setYearMonth] = useState(getKoreanMonthString());
+  const [showBatchBonusModal, setShowBatchBonusModal] = useState(false);
   const [selectedStaffs, setSelectedStaffs] = useState<StaffMember[]>([]);
   const [showFinalizeReview, setShowFinalizeReview] = useState(false);
   const [settlementData, setSettlementData] = useState<Record<string, SettlementEntry>>({});
@@ -967,6 +969,32 @@ export default function SalarySettlement({
       const current = prev[id];
       if (!current) return prev;
 
+      // 마스터 기본급 복원 및 일할 해제
+      if (field === '__reset_base_salary_from_master') {
+        const matchedStaff = staffs.find((s) => String(s.id) === id);
+        const masterBase = Number(matchedStaff?.base_salary || 0);
+        return {
+          ...prev,
+          [id]: {
+            ...current,
+            base_salary: masterBase,
+            salary_change_proration: [],
+          },
+        };
+      }
+
+      // 기본급 수동 편집
+      if (field === 'base_salary') {
+        const numericBase = value === '' ? 0 : Math.max(0, Math.round(Number(value) || 0));
+        return {
+          ...prev,
+          [id]: {
+            ...current,
+            base_salary: numericBase,
+          },
+        };
+      }
+
       // 과세 수당 개별 항목 편집: taxable_allowance_breakdown 하위값 갱신 + extra_allowance(과세수당 합계) 재계산
       if (field.startsWith('taxable_allowance_breakdown.')) {
         const subField = field.slice('taxable_allowance_breakdown.'.length) as keyof TaxableAllowanceBreakdown;
@@ -1012,6 +1040,39 @@ export default function SalarySettlement({
         ...prev,
         [id]: nextEntry };
     });
+  };
+
+  // 전체 직원 근태차감 일괄 면제
+  const handleBatchWaiveAttendanceDeduction = () => {
+    if (selectedStaffs.length === 0) return;
+    setSettlementData((prev) => {
+      const next = { ...prev };
+      selectedStaffs.forEach((staff) => {
+        const sid = String(staff.id);
+        if (next[sid]) {
+          next[sid] = { ...next[sid], attendance_deduction: 0 };
+        }
+      });
+      return next;
+    });
+    toast(`선택된 전체 직원(${selectedStaffs.length}명)의 근태차감이 0원으로 일괄 면제되었습니다.`, 'success');
+  };
+
+  // 일괄/선택 상여금 적용
+  const handleApplyBatchBonus = (bonusMap: Record<string, number>) => {
+    const appliedIds = Object.keys(bonusMap);
+    if (appliedIds.length === 0) return;
+
+    setSettlementData((prev) => {
+      const next = { ...prev };
+      appliedIds.forEach((sid) => {
+        if (next[sid]) {
+          next[sid] = { ...next[sid], bonus: bonusMap[sid] };
+        }
+      });
+      return next;
+    });
+    toast(`${appliedIds.length}명에게 상여금이 성공적으로 반영되었습니다.`, 'success');
   };
 
   const getAdvanceAdjustedNet = (netAmount: number, advancePay: number) =>
@@ -1625,6 +1686,30 @@ export default function SalarySettlement({
 
         {step === 2 && (
           <div className="space-y-5">
+            {/* 상단 일괄 작업 툴바 */}
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-[var(--muted)]/40 border border-[var(--border)]">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-[var(--foreground)]">⚡ 일괄 작업 도구:</span>
+                <span className="text-xs text-[var(--toss-gray-3)]">선택된 {selectedStaffs.length}명 대상</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleBatchWaiveAttendanceDeduction}
+                  className="px-3 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-700 text-xs font-bold hover:bg-emerald-100 transition-colors flex items-center gap-1.5 shadow-xs"
+                >
+                  <span>🛡️</span> 전체 근태차감 일괄 면제
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBatchBonusModal(true)}
+                  className="px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 text-xs font-bold hover:bg-amber-100 transition-colors flex items-center gap-1.5 shadow-xs"
+                >
+                  <span>🎁</span> 일괄 상여금 지급
+                </button>
+              </div>
+            </div>
+
             {!hasExactIncomeTaxBracket(taxInsuranceRates) && (
               <div data-testid="salary-settlement-finalize-block-warning" className="rounded-[var(--radius-md)] border border-red-500/20 bg-red-500/10 px-4 py-3">
                 <p className="text-sm font-bold text-red-700">급여 확정 차단: 정확한 근로소득세표가 없습니다.</p>
@@ -1672,6 +1757,14 @@ export default function SalarySettlement({
 
         {step === 3 && <Step3Complete onRestart={() => setStep(1)} />}
       </div>
+
+      <BatchBonusModal
+        open={showBatchBonusModal}
+        onClose={() => setShowBatchBonusModal(false)}
+        staffs={selectedStaffs}
+        settlementData={settlementData}
+        onApply={handleApplyBatchBonus}
+      />
 
       <RiskActionDialog
         open={showFinalizeReview}

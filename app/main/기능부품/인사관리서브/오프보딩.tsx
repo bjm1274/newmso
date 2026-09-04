@@ -72,8 +72,32 @@ async function requestOffboardingTransition(
  * 수 없었다.
  */
 function describeOffboardingError(error: unknown, fallback: string) {
-  const message = error instanceof Error ? error.message.trim() : String(error ?? '').trim();
-  return message ? `${fallback}\n\n${message}` : fallback;
+  if (error instanceof Error) {
+    const message = error.message.trim();
+    return message ? `${fallback}\n\n${message}` : fallback;
+  }
+  if (typeof error === 'string' && error.trim()) {
+    return `${fallback}\n\n${error.trim()}`;
+  }
+  if (error && typeof error === 'object') {
+    const candidate =
+      (error as any).message ||
+      (error as any).error ||
+      (error as any).details ||
+      (error as any).hint;
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return `${fallback}\n\n${candidate.trim()}`;
+    }
+    try {
+      const json = JSON.stringify(error);
+      if (json && json !== '{}') {
+        return `${fallback}\n\n${json}`;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return fallback;
 }
 
 function getOriginalStatus(staff: StaffMember) {

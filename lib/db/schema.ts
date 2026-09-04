@@ -1317,6 +1317,7 @@ export const onboarding_checklists = sqliteTable("onboarding_checklists", {
 	created_at: text().default(sql`(CURRENT_TIMESTAMP)`) },
 (table) => [
 	index("idx_onboarding_staff").on(table.staff_id),
+	uniqueIndex("idx_onboarding_checklists_staff_type").on(table.staff_id, table.checklist_type),
 ]);
 
 export const op_check_templates = sqliteTable("op_check_templates", {

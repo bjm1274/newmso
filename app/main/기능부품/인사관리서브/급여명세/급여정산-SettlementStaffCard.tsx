@@ -168,13 +168,24 @@ export function SettlementStaffCard({
       </div>
 
       {(data.salary_change_proration || []).length > 0 && (
-        <div className="rounded-[var(--radius-md)] border border-sky-200 bg-sky-50 px-3 py-1.5 text-[11px] font-bold text-sky-800">
-          <span>급여 변동 일할: </span>
-          {(data.salary_change_proration || [])
-            .slice(0, 3)
-            .map((item) => `${item.label} ${item.effective_dates.join(', ')} · ₩${item.amount.toLocaleString()}`)
-            .join(' / ')}
-          {(data.salary_change_proration || []).length > 3 ? ` 외 ${(data.salary_change_proration || []).length - 3}건` : ''}
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] border border-sky-200 bg-sky-50 px-3 py-1.5 text-[11px] font-bold text-sky-800">
+          <div className="flex items-center gap-1.5">
+            <span>급여 변동 일할: </span>
+            <span>
+              {(data.salary_change_proration || [])
+                .slice(0, 3)
+                .map((item) => `${item.label} ${item.effective_dates.join(', ')} · ₩${item.amount.toLocaleString()}`)
+                .join(' / ')}
+              {(data.salary_change_proration || []).length > 3 ? ` 외 ${(data.salary_change_proration || []).length - 3}건` : ''}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => onUpdate(s.id, '__reset_base_salary_from_master', null)}
+            className="px-2 py-0.5 rounded bg-white text-sky-700 border border-sky-300 text-[10px] font-bold shadow-xs hover:bg-sky-100 transition-colors"
+          >
+            일할 해제 (마스터 ₩{(s.base_salary || 0).toLocaleString()} 복원)
+          </button>
         </div>
       )}
 
@@ -182,7 +193,13 @@ export function SettlementStaffCard({
       <div className="space-y-1">
         <p className="text-[9px] font-black text-[var(--toss-gray-3)] uppercase tracking-wide ml-0.5">과세 · 기본급</p>
         <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
-          <CompactAmountField label="기본급" value={Number(data.base_salary || 0)} tone="base" readOnly testId={`salary-settlement-base-${s.id}`} />
+          <CompactAmountField
+            label="기본급"
+            value={Number(data.base_salary || 0)}
+            tone="default"
+            onChange={(v) => onUpdate(s.id, 'base_salary', v)}
+            testId={`salary-settlement-base-${s.id}`}
+          />
           {TAXABLE_FIELDS.map((f) => (
             <CompactAmountField
               key={f.key}

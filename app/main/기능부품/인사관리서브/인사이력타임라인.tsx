@@ -2,10 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { fetchHrHistoryLedger, type HrLedgerEvent } from '@/lib/hr-history-ledger';
+import SalaryChangeHistoryModal from './급여변경이력관리';
+import type { StaffMember } from '@/types';
 
 type Props = {
   staffId: string | number;
   staffName: string;
+  staff?: StaffMember;
+  onRefresh?: () => void;
 };
 
 function formatOccurredAt(value: string) {
@@ -19,9 +23,23 @@ function formatOccurredAt(value: string) {
     day: 'numeric' });
 }
 
-export default function StaffHistoryTimeline({ staffId, staffName }: Props) {
+export default function StaffHistoryTimeline({ staffId, staffName, staff, onRefresh }: Props) {
   const [events, setEvents] = useState<HrLedgerEvent[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showSalaryHistoryModal, setShowSalaryHistoryModal] = useState(false);
+
+  const loadData = async () => {
+    const targetId = String(staffId || '').trim();
+    if (!targetId) {
+      setEvents([]);
+      return;
+    }
+
+    setLoading(true);
+    const nextEvents = await fetchHrHistoryLedger(targetId);
+    setEvents(nextEvents.slice(0, 18));
+    setLoading(false);
+  };
 
   useEffect(() => {
     let active = true;
@@ -53,22 +71,37 @@ export default function StaffHistoryTimeline({ staffId, staffName }: Props) {
     [events],
   );
 
+  const fallbackStaff: StaffMember = staff || {
+    id: String(staffId),
+    name: staffName,
+    company: '',
+    role: 'staff',
+    status: '재직',
+    base_salary: 0,
+    created_at: '',
+  };
+
   return (
     <section className="bg-[var(--card)] p-4 border border-[var(--border)] rounded-[var(--radius-md)] shadow-sm min-w-[320px] flex-1">
       <div className="flex items-start justify-between gap-3 mb-4">
         <div>
           <h3 className="text-base font-semibold text-[var(--foreground)]">{staffName} 인사 이력 원장</h3>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           <span className="px-2 py-1 rounded-full bg-blue-500/10 text-blue-700 text-[11px] font-semibold">
             발령 {summary.appointments}
           </span>
           <span className="px-2 py-1 rounded-full bg-violet-50 text-violet-700 text-[11px] font-semibold">
             계약 {summary.contracts}
           </span>
-          <span className="px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-semibold">
-            급여 {summary.salary}
-          </span>
+          <button
+            type="button"
+            onClick={() => setShowSalaryHistoryModal(true)}
+            className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-[11px] font-bold border border-emerald-200 transition-colors flex items-center gap-1 shadow-xs"
+            title="급여 변경 이력 관리 (수정/삭제/추가)"
+          >
+            <span>💰</span> 급여 이력 {summary.salary}건 관리
+          </button>
         </div>
       </div>
 
@@ -111,6 +144,16 @@ export default function StaffHistoryTimeline({ staffId, staffName }: Props) {
           ))}
         </div>
       )}
+
+      <SalaryChangeHistoryModal
+        open={showSalaryHistoryModal}
+        onClose={() => setShowSalaryHistoryModal(false)}
+        staff={fallbackStaff}
+        onRefresh={() => {
+          void loadData();
+          onRefresh?.();
+        }}
+      />
     </section>
   );
 }
