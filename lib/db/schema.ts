@@ -2176,7 +2176,7 @@ export const tax_insurance_rates = sqliteTable("tax_insurance_rates", {
 	id: text().primaryKey().notNull(),
 	effective_year: integer().notNull(),
 	company_name: text().default("전체"),
-	national_pension_rate: real().default(0.045),
+	national_pension_rate: real().default(0.0475),
 	health_insurance_rate: real().default(0.03545),
 	long_term_care_rate: real().default(0.00459),
 	employment_insurance_rate: real().default(0.009),

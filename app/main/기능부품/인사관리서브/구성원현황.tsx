@@ -2976,7 +2976,7 @@ export default function StaffListManager({ 직원목록 = [], 부서목록 = [],
                                 <span className="text-[11px] font-bold text-blue-900 flex items-center gap-1">
                                   <span>🏛️</span> 국민연금 결정세액 (고지금액)
                                 </span>
-                                <span className="text-[10px] text-[var(--toss-gray-3)]">미입력 시 요율(4.5%) 자동계산</span>
+                                <span className="text-[10px] text-[var(--toss-gray-3)]">미입력 시 2026년 요율(4.75%) 자동계산</span>
                               </div>
                               <div className="relative flex items-center">
                                 <span className="absolute left-2.5 text-xs text-[var(--toss-gray-3)] font-bold">₩</span>

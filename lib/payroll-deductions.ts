@@ -1,7 +1,7 @@
 import { calculateMonthlyIncomeTax, type TaxInsuranceRates, hasExactIncomeTaxBracket } from './use-tax-insurance-rates';
 import { getNpIncomeLimits, getHealthEmployeePremiumLimits } from './tax-free-limits';
 import { isMidMonthJoin } from './payroll-mid-month';
-import { floorPremium, LONG_TERM_CARE_HEALTH_RATIO_2026 } from './payroll-insurance-rates';
+import { floorPremium, LONG_TERM_CARE_HEALTH_RATIO_2026, EMPLOYEE_INSURANCE_RATES_2026 } from './payroll-insurance-rates';
 
 /**
  * 장기요양보험료율(= 건강보험료 대비 비율)을 요율 설정에서 되살린다.
@@ -95,7 +95,11 @@ export function calcStatutoryDeductions(
     } else {
       const npLimits = getNpIncomeLimits(opts.yearMonth);
       const npBase = Math.min(Math.max(taxableIncome, npLimits.floor), npLimits.ceiling);
-      const full_national = floorPremium(npBase * rates.national_pension_rate);
+      const targetYear = opts.yearMonth ? parseInt(opts.yearMonth.slice(0, 4), 10) : new Date().getFullYear();
+      const effectiveNpRate = targetYear >= 2026
+        ? Math.max(Number(rates.national_pension_rate || 0), EMPLOYEE_INSURANCE_RATES_2026.nationalPension)
+        : Number(rates.national_pension_rate || 0.045);
+      const full_national = floorPremium(npBase * effectiveNpRate);
       national_pension = isDuruNuriActive ? Math.floor(full_national * 0.2) : full_national;
     }
   }

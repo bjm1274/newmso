@@ -247,7 +247,7 @@ export function SettlementStaffCard({
             )}
             {pensionMode === 'rate' && (
               <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 text-[10px] font-bold flex items-center gap-1">
-                <span>⚡</span> 요율 자동계산 (과세소득 4.5% = ₩{Number(deductionDetail.national_pension || 0).toLocaleString()})
+                <span>⚡</span> 요율 자동계산 (2026년 요율 4.75% = ₩{Number(deductionDetail.national_pension || 0).toLocaleString()})
               </span>
             )}
             {isMissingPensionMode && (
@@ -301,7 +301,7 @@ export function SettlementStaffCard({
                           : 'border border-sky-300 bg-white text-sky-700 hover:bg-sky-50'
                       }`}
                     >
-                      ⚡ 요율 자동계산(4.5%) 적용
+                      ⚡ 요율 자동계산(4.75%) 적용
                     </button>
                   )}
                   <button

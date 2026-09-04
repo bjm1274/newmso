@@ -1348,7 +1348,7 @@ export default function SalarySettlement({
       return next;
     });
     setFilterOnlyMissingPension(false);
-    toast(`${unselected.length}명의 국민연금을 [요율 자동계산(4.5%)]으로 일괄 적용했습니다.`, 'success');
+    toast(`${unselected.length}명의 국민연금을 [요율 자동계산(4.75%)]으로 일괄 적용했습니다.`, 'success');
   };
 
   const persistSettlement = async (targetStatus: '임시저장' | '확정') => {
