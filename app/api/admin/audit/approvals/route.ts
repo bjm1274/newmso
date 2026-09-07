@@ -62,32 +62,14 @@ export async function GET(request: NextRequest) {
 
     const conditions: any[] = [];
 
-    // ── 1. 테넌트 격리 (Tenant Isolation) ───────────────────
-    if (!isMaster) {
-      const userCompanyId = session.user.company_id ? String(session.user.company_id).trim() : '';
-      const userCompanyName = session.user.company ? String(session.user.company).trim() : '';
-
-      if (userCompanyId && userCompanyName) {
-        conditions.push(
-          or(
-            eq(approvalsTable.company_id, userCompanyId),
-            eq(approvalsTable.sender_company, userCompanyName)
-          )
-        );
-      } else if (userCompanyId) {
-        conditions.push(eq(approvalsTable.company_id, userCompanyId));
-      } else if (userCompanyName) {
-        conditions.push(eq(approvalsTable.sender_company, userCompanyName));
-      } else {
-        // 소속 회사를 알 수 없는 비마스터 계정은 보안상 데이터 반환 금지
-        return NextResponse.json({ rows: [], total: 0 });
-      }
-    } else if (companyParam && companyParam !== '전체') {
-      // 시스템 마스터가 특정 회사를 필터링한 경우
+    // ── 1. 회사/테넌트 필터 ───────────────────────────────────
+    // 관리자(Admin/SystemMaster)는 전체 회사 또는 특정 회사(SY INC., 박철홍정형외과, 수연의원 등)를 선택하여 조회 가능
+    if (companyParam && companyParam !== '전체') {
       conditions.push(
         or(
           eq(approvalsTable.company_id, companyParam),
-          eq(approvalsTable.sender_company, companyParam)
+          eq(approvalsTable.sender_company, companyParam),
+          like(approvalsTable.sender_company, `%${companyParam}%`)
         )
       );
     }

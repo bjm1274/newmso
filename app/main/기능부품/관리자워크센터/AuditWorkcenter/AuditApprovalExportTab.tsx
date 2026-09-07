@@ -43,6 +43,8 @@ interface AuditApprovalExportTabProps {
   user?: unknown;
 }
 
+const COMPANY_OPTIONS = ['전체', 'SY INC.', '박철홍정형외과', '수연의원'] as const;
+
 const STATUS_OPTIONS = ['전체', '대기', '승인', '반려', '회수'] as const;
 
 const FORM_TYPE_OPTIONS = [
@@ -131,7 +133,7 @@ export default function AuditApprovalExportTab({ user }: AuditApprovalExportTabP
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [companyFilter, setCompanyFilter] = useState<string>(isMaster ? '전체' : userCompany);
+  const [companyFilter, setCompanyFilter] = useState<string>('전체');
 
   // 기간 프리셋 변경
   useEffect(() => {
@@ -167,7 +169,7 @@ export default function AuditApprovalExportTab({ user }: AuditApprovalExportTabP
       if (startDate) params.set('startDate', startDate);
       if (endDate) params.set('endDate', endDate);
       if (searchQuery.trim()) params.set('search', searchQuery.trim());
-      if (isMaster && companyFilter && companyFilter !== '전체') {
+      if (companyFilter && companyFilter !== '전체') {
         params.set('company', companyFilter);
       }
 
@@ -186,7 +188,7 @@ export default function AuditApprovalExportTab({ user }: AuditApprovalExportTabP
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, typeFilter, startDate, endDate, searchQuery, isMaster, companyFilter]);
+  }, [statusFilter, typeFilter, startDate, endDate, searchQuery, companyFilter]);
 
   useEffect(() => {
     void fetchData();
@@ -275,7 +277,7 @@ export default function AuditApprovalExportTab({ user }: AuditApprovalExportTabP
         body: JSON.stringify({
           count: targetRows.length,
           exportType: 'excel',
-          filterDescription: `상태: ${statusFilter}, 양식: ${typeFilter}, 기간: ${startDate || '시작'}~${endDate || '종료'}, 검색어: ${searchQuery || '없음'}`,
+          filterDescription: `회사: ${companyFilter}, 상태: ${statusFilter}, 양식: ${typeFilter}, 기간: ${startDate || '시작'}~${endDate || '종료'}, 검색어: ${searchQuery || '없음'}`,
         }),
       });
 
@@ -302,12 +304,12 @@ export default function AuditApprovalExportTab({ user }: AuditApprovalExportTabP
         exported_by: sessionUser.name || '관리자',
         total_records: targetRows.length,
         filter_meta: {
+          company: companyFilter,
           status: statusFilter,
           type: typeFilter,
           startDate,
           endDate,
           searchQuery,
-          company: isMaster ? companyFilter : userCompany,
         },
         records: targetRows,
       };
@@ -390,7 +392,24 @@ export default function AuditApprovalExportTab({ user }: AuditApprovalExportTabP
           새로고침
         </SmBtn>
       }>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5 text-[12px]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 text-[12px]">
+          {/* 소속 회사 필터 */}
+          <div>
+            <label className="block text-[10.5px] font-bold text-[var(--toss-gray-4)] mb-1">소속 회사</label>
+            <select
+              value={companyFilter}
+              onChange={(e) => setCompanyFilter(e.target.value)}
+              className="w-full h-8 px-2.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--input-bg)] text-[12px] font-bold text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)]"
+              aria-label="소속 회사 선택"
+            >
+              {COMPANY_OPTIONS.map((co) => (
+                <option key={co} value={co}>
+                  {co === '전체' ? '전체 회사 (통합)' : co}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* 상태 필터 */}
           <div>
             <label className="block text-[10.5px] font-bold text-[var(--toss-gray-4)] mb-1">결재 상태</label>
@@ -492,16 +511,10 @@ export default function AuditApprovalExportTab({ user }: AuditApprovalExportTabP
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-[var(--toss-gray-4)] font-bold">테넌트:</span>
-            {isMaster ? (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-700">
-                시스템마스터 (전사 조회 가능)
-              </span>
-            ) : (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/15 text-blue-700">
-                {userCompany || '본인 회사'} (데이터 격리 적용)
-              </span>
-            )}
+            <span className="text-[var(--toss-gray-4)] font-bold">적용 회사:</span>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-blue-500/15 text-blue-700">
+              {companyFilter === '전체' ? '전체 회사 (SY INC. · 박철홍정형외과 · 수연의원)' : companyFilter}
+            </span>
           </div>
         </div>
       </Card>
