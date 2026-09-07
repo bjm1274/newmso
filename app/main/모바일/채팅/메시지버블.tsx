@@ -357,7 +357,9 @@ export default function MessageBubble({
                 overflow: 'hidden',
                 minWidth: 0,
                 flexShrink: 1,
-                textWrap: 'pretty' }}
+                textWrap: 'pretty',
+                userSelect: 'text',
+                WebkitUserSelect: 'text' }}
             >
               {forwardInfo && (
                 <div

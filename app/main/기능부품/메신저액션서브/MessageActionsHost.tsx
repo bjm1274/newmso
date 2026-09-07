@@ -148,13 +148,20 @@ export default function MessageActionsHost({
         clearLongPressTimer();
         longPressTimerRef.current = setTimeout(() => {
           if (enableContextMenu) {
+            // 사용자가 이미 텍스트의 일부를 드래그/선택하고 있다면
+            // 인앱 퀵 액션바를 띄우지 않고 OS 선택 툴바만 유지한다.
+            const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+            if (sel && sel.toString().trim().length > 0) {
+              return;
+            }
+
             // 곧바로 바텀 시트를 올리면 화면 절반이 덮여 어느 메시지인지 안 보인다.
             // 말풍선 옆에 퀵 반응 바를 띄우고, 나머지는 거기 `⋯` 에서 연다.
             const node = localRef.current;
             if (node) {
               setQuickMode('full');
               setQuickRect(node.getBoundingClientRect());
-            } else {
+            } else if (typeof window !== 'undefined' && window.innerWidth > 768) {
               setCtxMenu({ x: touch.clientX, y: touch.clientY });
             }
             if (navigator.vibrate) {
@@ -169,6 +176,15 @@ export default function MessageActionsHost({
       if (!touchStartRef.current) return;
       const touch = e.touches[0];
       if (!touch) return;
+
+      // 텍스트 선택 중인 경우 롱프레스 취소 및 스와이프 차단
+      const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+      if (sel && sel.toString().trim().length > 0) {
+        clearLongPressTimer();
+        setSwipeOffset(0);
+        return;
+      }
+
       touchMoveRef.current = { x: touch.clientX, y: touch.clientY };
 
       const diffX = touch.clientX - touchStartRef.current.x;
@@ -193,7 +209,10 @@ export default function MessageActionsHost({
       if (!touchStartRef.current) return;
       setSwipeOffset(0);
 
-      if (touchMoveRef.current) {
+      const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+      const isTextSelected = sel && sel.toString().trim().length > 0;
+
+      if (touchMoveRef.current && !isTextSelected) {
         const diffX = touchMoveRef.current.x - touchStartRef.current.x;
         const diffY = touchMoveRef.current.y - touchStartRef.current.y;
 
@@ -243,13 +262,36 @@ export default function MessageActionsHost({
     };
   }, [enableContextMenu]);
 
+  // 사용자가 텍스트를 드래그/선택하기 시작하면 열려 있던 QuickActionBar를 닫음 (이중 노출 방지)
+  useEffect(() => {
+    if (!quickRect) return;
+    const onSelectionChange = () => {
+      const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+      if (sel && sel.toString().trim().length > 0) {
+        setQuickRect(null);
+      }
+    };
+    document.addEventListener('selectionchange', onSelectionChange);
+    return () => {
+      document.removeEventListener('selectionchange', onSelectionChange);
+    };
+  }, [quickRect]);
+
   const handleContextMenu = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
       if (!enableContextMenu) return;
       event.preventDefault();
       event.stopPropagation();
+      // 모바일(<= 768px) 환경에서는 바텀시트 컨텍스트 메뉴를 띄우지 않는다 (QuickActionBar로 단일화).
+      // (MessageContextMenu 는 PC 데스크톱 우클릭 전용)
+      if (typeof window !== 'undefined' && window.innerWidth <= 768) return;
       // 터치 롱프레스가 만든 contextmenu 는 퀵 바가 이미 처리했다.
       if (touchActiveRef.current) return;
+      // 텍스트 선택 중인 경우 컨텍스트 메뉴 억제
+      if (typeof window !== 'undefined') {
+        const sel = window.getSelection();
+        if (sel && sel.toString().trim().length > 0) return;
+      }
       setCtxMenu({ x: event.clientX, y: event.clientY });
     },
     [enableContextMenu],

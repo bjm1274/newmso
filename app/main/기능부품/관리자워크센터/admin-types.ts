@@ -46,8 +46,8 @@ export const ADMIN_WORKCENTERS: Record<AdminWorkcenterId, AdminWorkcenterMeta> =
   audit: {
     id: 'audit',
     label: '감사·백업',
-    mergedCount: 4,
-    mergedTitles: ['감사센터 a', '감사센터 b', '백업·복원', '급여 이상치 검사'] } };
+    mergedCount: 5,
+    mergedTitles: ['감사센터 a', '감사센터 b', '백업·복원', '급여 이상치 검사', '전자결재 백업'] } };
 
 // ─── 권한 매트릭스 값 union (JM4) ───────────────────────
 export type RolePermissionValue = '전체' | '부서' | '본인' | '요청' | null;

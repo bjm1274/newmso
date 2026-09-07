@@ -52,8 +52,9 @@ const AuditLogViewer = dynamic(() => import('../관리자전용서브/감사로�
 import AuditAnomalyTab from './AuditWorkcenter/AuditAnomalyTab';
 import AuditPayrollOutlierTab from './AuditWorkcenter/AuditPayrollOutlierTab';
 import AuditBackupTab from './AuditWorkcenter/AuditBackupTab';
+import AuditApprovalExportTab from './AuditWorkcenter/AuditApprovalExportTab';
 
-type AuditTabId = 'access' | 'anomaly' | 'salary' | 'backup';
+type AuditTabId = 'access' | 'anomaly' | 'salary' | 'backup' | 'approval_export';
 
 // ─── KPI fallback ─────────────────────────────────────────────
 const FALLBACK_KPI: AdminKpi[] = [
@@ -209,6 +210,7 @@ export default function AuditWorkcenter({ user }: { user?: unknown }) {
     { id: 'anomaly', label: '이상 감지', count: FALLBACK_ANOMALIES.length },
     { id: 'salary', label: '급여 이상치', count: FALLBACK_PAYROLL_OUTLIERS.length },
     { id: 'backup', label: '백업·복원' },
+    { id: 'approval_export', label: '전자결재 백업' },
   ];
 
   useEffect(() => {
@@ -235,13 +237,16 @@ export default function AuditWorkcenter({ user }: { user?: unknown }) {
     <>
       <WorkcenterHeader
         title={meta.label}
-        subtitle="감사 로그 · 이상 감지 · 급여 이상치 · 백업/DR 통합"
+        subtitle="감사 로그 · 이상 감지 · 급여 이상치 · 백업/DR · 전자결재 백업"
         mergedCount={meta.mergedCount}
         mergedTitles={meta.mergedTitles}
         actions={
           <>
             <SmBtn onClick={() => setTab('access')} ariaLabel="감사 로그 탭으로 이동">
               감사 로그
+            </SmBtn>
+            <SmBtn onClick={() => setTab('approval_export')} ariaLabel="전자결재 백업 탭으로 이동">
+              전자결재 백업
             </SmBtn>
             <SmBtn primary onClick={() => setTab('backup')} ariaLabel="백업·복원 탭으로 이동">
               백업 즉시 실행
@@ -259,6 +264,7 @@ export default function AuditWorkcenter({ user }: { user?: unknown }) {
       {tab === 'anomaly' && <AuditAnomalyTab />}
       {tab === 'salary' && <AuditPayrollOutlierTab />}
       {tab === 'backup' && <AuditBackupTab />}
+      {tab === 'approval_export' && <AuditApprovalExportTab user={user} />}
     </>
   );
 }
