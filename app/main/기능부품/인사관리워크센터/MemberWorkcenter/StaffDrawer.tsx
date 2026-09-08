@@ -209,16 +209,23 @@ function StaffDrawerInner({
           {initial}
         </div>
         <div className="min-w-0 flex-1">
-          <h3 id={labelId} className="truncate text-[15px] font-bold text-[var(--foreground)]">
-            {staff.name}
-            {staff.employee_no && (
-              <span className="ml-2 text-[11px] font-medium text-[var(--toss-gray-4)]">
-                · {staff.employee_no}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <h3 id={labelId} className="truncate text-[15px] font-bold text-[var(--foreground)]">
+              {staff.name}
+            </h3>
+            {staff.company && (
+              <span className="rounded bg-[var(--muted)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--foreground)]">
+                {staff.company}
               </span>
             )}
-          </h3>
+            {staff.employee_no && (
+              <span className="text-[11px] font-medium text-[var(--toss-gray-4)]">
+                · 사번 {staff.employee_no}
+              </span>
+            )}
+          </div>
           <p className="mt-0.5 truncate text-[12px] font-medium text-[var(--toss-gray-4)]">
-            {staff.department || '부서 미지정'} · {staff.position || '직급 미지정'}
+            {staff.company ? `${staff.company} · ` : ''}{staff.department || '부서 미지정'} · {staff.position || '직급 미지정'}
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1">
             <Chip tone={status === '퇴사' ? 'warn' : 'success'}>{status}</Chip>
@@ -265,10 +272,11 @@ function StaffDrawerInner({
         {activeTab === 'info' && (
           <div className="space-y-4 animate-in fade-in duration-200">
             {/* 기본 소속 정보 */}
-            <dl className="grid grid-cols-3 gap-3 rounded-[var(--radius-md)] bg-[var(--page-bg)] px-3 py-2.5">
+            <dl className="grid grid-cols-4 gap-2 rounded-[var(--radius-md)] bg-[var(--page-bg)] px-3 py-2.5">
+              <MetaCell label="회사" value={staff.company || '-'} />
+              <MetaCell label="부서" value={staff.department || '-'} />
               <MetaCell label="입사일" value={formatJoinDate(hire)} />
               <MetaCell label="근속" value={formatTenure(hire)} />
-              <MetaCell label="소속" value={staff.department || '-'} />
             </dl>
 
             {/* 인적 사항 상세 노출 (PC 공간 활용) */}

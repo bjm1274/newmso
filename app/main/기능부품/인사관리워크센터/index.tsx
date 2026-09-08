@@ -94,6 +94,8 @@ interface HrWorkcenterRouterProps {
   linkedTarget?: { id?: string; name?: string };
   canManageDocuments?: boolean;
   initialMenu?: string | null;
+  onCompanyChange?: (company: string) => void;
+  companies?: string[];
 }
 
 /**
@@ -113,7 +115,9 @@ export default function HrWorkcenterRouter({
   onOpenDocumentRepoForStaff,
   linkedTarget,
   canManageDocuments = false,
-  initialMenu }: HrWorkcenterRouterProps) {
+  initialMenu,
+  onCompanyChange,
+  companies }: HrWorkcenterRouterProps) {
   const view = useMemo(() => {
     switch (workcenterId) {
       case 'member':
@@ -127,6 +131,8 @@ export default function HrWorkcenterRouter({
             canRegisterNewStaff={canRegisterNewStaff}
             onOpenNewStaff={onOpenNewStaff}
             onOpenDocumentRepoForStaff={onOpenDocumentRepoForStaff}
+            onCompanyChange={onCompanyChange}
+            companies={companies}
           />
         );
       case 'attend':
@@ -199,6 +205,8 @@ export default function HrWorkcenterRouter({
     canManageDocuments,
     statusFilter,
     initialMenu,
+    onCompanyChange,
+    companies,
   ]);
 
   return view;

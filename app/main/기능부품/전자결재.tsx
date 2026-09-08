@@ -114,10 +114,10 @@ const [approvals, setApprovals] = useState<Record<string, unknown>[]>([]);
   const [suppliesLoadKey, setSuppliesLoadKey] = useState(0);
   const [composeSeedApproval, setComposeSeedApproval] = useState<Record<string, unknown> | null>(null);
   const [selectedApprovalId, setSelectedApprovalId] = useState<string | null>(null);
-const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대기' | '승인' | '반려' | '회수'>('대기');
+  const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대기' | '승인' | '반려' | '회수'>('전체');
   const [approvalDocumentFilter, setApprovalDocumentFilter] = useState(ALL_DOCUMENT_FILTER);
   const [approvalKeyword, setApprovalKeyword] = useState('');
-  const [approvalDateMode, setApprovalDateMode] = useState<'month' | 'week' | 'range'>('week');
+  const [approvalDateMode, setApprovalDateMode] = useState<'month' | 'week' | 'range'>('month');
   const [approvalMonth, setApprovalMonth] = useState(getCurrentMonthValue);
   const [approvalWeekDate, setApprovalWeekDate] = useState(getCurrentDateValue);
   const [approvalDateFrom, setApprovalDateFrom] = useState('');
@@ -969,7 +969,7 @@ const [approvalStatusFilter, setApprovalStatusFilter] = useState<'전체' | '대
   const hasApprovalFilterOverrides =
     approvalDocumentFilter !== ALL_DOCUMENT_FILTER ||
     Boolean(approvalKeyword) ||
-    approvalDateMode !== 'week' ||
+    approvalDateMode !== 'month' ||
     approvalMonth !== defaultApprovalMonth ||
     approvalWeekDate !== defaultApprovalWeekDate ||
     Boolean(approvalDateFrom) ||

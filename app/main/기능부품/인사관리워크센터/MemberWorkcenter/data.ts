@@ -153,7 +153,22 @@ export function computeMemberKpis({ staffs, selectedCo, now = Date.now() }: Memb
   if (employTypeCounts.기타 > 0) employSubParts.push(`기타 ${employTypeCounts.기타}`);
   const employSub = employSubParts.length > 0 ? employSubParts.join(' · ') : '데이터 없음';
 
-  const totalSubPrefix = selectedCo && selectedCo !== '전체' ? `${selectedCo} · ` : '';
+  let companySub = '';
+  if (!selectedCo || selectedCo === '전체') {
+    const coCounts: Record<string, number> = {};
+    for (const s of active) {
+      const co = String((s as Record<string, unknown>).company ?? '').trim() || '미지정';
+      coCounts[co] = (coCounts[co] || 0) + 1;
+    }
+    const parts = Object.entries(coCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([co, count]) => `${co.replace('정형외과', '')} ${count}`);
+    if (parts.length > 0) {
+      companySub = `전사 (${parts.join(' · ')}) · `;
+    }
+  } else {
+    companySub = `${selectedCo} · `;
+  }
 
   return [
     {
@@ -161,7 +176,7 @@ export function computeMemberKpis({ staffs, selectedCo, now = Date.now() }: Memb
       label: '전체 인원',
       value: String(total),
       unit: '명',
-      sub: `${totalSubPrefix}${employSub}` },
+      sub: `${companySub}${employSub}` },
     {
       key: 'new',
       label: '신규 입사 (3개월)',

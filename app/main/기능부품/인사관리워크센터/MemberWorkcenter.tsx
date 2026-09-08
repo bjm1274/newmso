@@ -68,6 +68,8 @@ interface MemberWorkcenterProps {
   canRegisterNewStaff?: boolean;
   onOpenNewStaff?: () => void;
   onOpenDocumentRepoForStaff?: (staff: StaffMember) => void;
+  onCompanyChange?: (company: string) => void;
+  companies?: string[];
 }
 
 export default function MemberWorkcenter({
@@ -78,10 +80,24 @@ export default function MemberWorkcenter({
   canRegisterNewStaff = false,
   onOpenNewStaff,
   onOpenDocumentRepoForStaff,
-  onRefresh }: MemberWorkcenterProps) {
+  onRefresh,
+  onCompanyChange,
+  companies }: MemberWorkcenterProps) {
+  const [currentCompany, setCurrentCompany] = useState<string>(selectedCo || '전체');
   const [tab, setTab] = useState<MemberTabId>('list');
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (selectedCo) {
+      setCurrentCompany(selectedCo);
+    }
+  }, [selectedCo]);
+
+  const handleCompanyChange = (co: string) => {
+    setCurrentCompany(co);
+    onCompanyChange?.(co);
+  };
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -96,24 +112,24 @@ export default function MemberWorkcenter({
   }, []);
 
   const filteredStaffs = useMemo(() => {
-    if (!selectedCo || selectedCo === '전체') return staffs;
+    if (!currentCompany || currentCompany === '전체') return staffs;
     return staffs.filter((s) => {
       const co = (s as Record<string, unknown>)?.company;
-      return typeof co === 'string' && co.trim() === selectedCo.trim();
+      return typeof co === 'string' && co.trim() === currentCompany.trim();
     });
-  }, [staffs, selectedCo]);
+  }, [staffs, currentCompany]);
 
   // Clear selected staff if they don't belong to the newly selected company
   useEffect(() => {
-    if (selectedStaff && selectedCo && selectedCo !== '전체') {
-      const belongs = String((selectedStaff as Record<string, unknown>).company ?? '').trim() === selectedCo.trim();
+    if (selectedStaff && currentCompany && currentCompany !== '전체') {
+      const belongs = String((selectedStaff as Record<string, unknown>).company ?? '').trim() === currentCompany.trim();
       if (!belongs) setSelectedStaff(null);
     }
-  }, [selectedCo, selectedStaff]);
+  }, [currentCompany, selectedStaff]);
 
   const kpis = useMemo(
-    () => computeMemberKpis({ staffs: filteredStaffs, selectedCo }),
-    [filteredStaffs, selectedCo],
+    () => computeMemberKpis({ staffs: filteredStaffs, selectedCo: currentCompany }),
+    [filteredStaffs, currentCompany],
   );
 
   const [isEditing, setIsEditing] = useState(false);
@@ -198,6 +214,9 @@ export default function MemberWorkcenter({
                 statusFilter={statusFilter}
                 selectedIds={selectedIds}
                 onSelectIds={setSelectedIds}
+                selectedCo={currentCompany}
+                onCompanyChange={handleCompanyChange}
+                companies={companies}
               />
               <StaffDrawer
                 staff={selectedStaff}

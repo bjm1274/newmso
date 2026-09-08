@@ -9,7 +9,7 @@
  * - 엑셀 다운로드 기능
  */
 
-import { memo, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import type { StaffMember } from '@/types';
 import * as XLSX from 'xlsx';
 import { Download } from 'lucide-react';
@@ -33,6 +33,34 @@ const EMPLOY_CHIP: Record<string, string> = {
   계약직: 'bg-amber-500/15 text-amber-700',
   수습: 'bg-[var(--accent-soft)] text-[var(--accent)]' };
 
+export const COMPANY_BADGE_STYLE: Record<string, { bg: string; text: string; label?: string }> = {
+  'SY INC.': {
+    bg: 'bg-indigo-500/15 dark:bg-indigo-950/40 border border-indigo-500/30',
+    text: 'text-indigo-600 dark:text-indigo-400',
+    label: 'SY INC.',
+  },
+  '박철홍정형외과': {
+    bg: 'bg-sky-500/15 dark:bg-sky-950/40 border border-sky-500/30',
+    text: 'text-sky-700 dark:text-sky-300',
+    label: '박철홍정형외과',
+  },
+  '수연의원': {
+    bg: 'bg-emerald-500/15 dark:bg-emerald-950/40 border border-emerald-500/30',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    label: '수연의원',
+  },
+};
+
+export function getCompanyBadge(company?: string | null) {
+  const name = (company || '').trim();
+  if (!name) return null;
+  return COMPANY_BADGE_STYLE[name] || {
+    bg: 'bg-zinc-500/15 dark:bg-zinc-800 border border-zinc-500/30',
+    text: 'text-zinc-700 dark:text-zinc-300',
+    label: name,
+  };
+}
+
 interface StaffTableProps {
   staffs: StaffMember[];
   selectedId: string | null;
@@ -43,9 +71,12 @@ interface StaffTableProps {
   statusFilter?: '재직' | '퇴사';
   selectedIds: string[];
   onSelectIds: (ids: string[]) => void;
+  selectedCo?: string;
+  onCompanyChange?: (company: string) => void;
+  companies?: string[];
 }
 
-type SortKey = 'name' | 'department' | 'position' | 'joined_at' | 'employment_type';
+type SortKey = 'name' | 'company' | 'department' | 'position' | 'joined_at' | 'employment_type';
 
 function StaffTableBase({
   staffs,
@@ -56,7 +87,11 @@ function StaffTableBase({
   canRegisterNewStaff = false,
   statusFilter = '재직',
   selectedIds,
-  onSelectIds }: StaffTableProps) {
+  onSelectIds,
+  selectedCo,
+  onCompanyChange,
+  companies }: StaffTableProps) {
+  const [currentCompany, setCurrentCompany] = useState<string>(selectedCo || '전체');
   const [deptFilter, setDeptFilter] = useState<string>('전체');
   const [employFilter, setEmployFilter] = useState<string>('전체');
   const [query, setQuery] = useState('');
@@ -64,6 +99,17 @@ function StaffTableBase({
   // 정렬 상태
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  useEffect(() => {
+    if (selectedCo) {
+      setCurrentCompany(selectedCo);
+    }
+  }, [selectedCo]);
+
+  const handleCompanySelect = (co: string) => {
+    setCurrentCompany(co);
+    onCompanyChange?.(co);
+  };
 
   const filteredByStatus = useMemo(() => {
     return staffs.filter((staff) => {
@@ -75,6 +121,18 @@ function StaffTableBase({
     });
   }, [staffs, statusFilter]);
 
+  // 회사 목록
+  const availableCompanies = useMemo(() => {
+    if (companies && companies.length > 0) return companies;
+    const set = new Set<string>(['전체']);
+    filteredByStatus.forEach((s) => {
+      const co = (s as Record<string, unknown>)?.company;
+      if (typeof co === 'string' && co.trim()) set.add(co.trim());
+    });
+    set.add('SY INC.');
+    return Array.from(set);
+  }, [companies, filteredByStatus]);
+
   // 부서 목록
   const departments = useMemo(() => aggregateDepartments(filteredByStatus), [filteredByStatus]);
 
@@ -82,6 +140,11 @@ function StaffTableBase({
   const filtered = useMemo(() => {
     const trimmed = query.trim().toLowerCase();
     return filteredByStatus.filter((staff) => {
+      // 회사 필터
+      if (currentCompany !== '전체') {
+        const co = String((staff as Record<string, unknown>)?.company ?? '').trim();
+        if (co !== currentCompany.trim()) return false;
+      }
       // 부서 필터
       if (deptFilter !== '전체') {
         const dept = (staff.department ?? '').trim() || '미지정';
@@ -97,14 +160,28 @@ function StaffTableBase({
       const name = (staff.name ?? '').toLowerCase();
       const empNo = (staff.employee_no ?? '').toLowerCase();
       const position = (staff.position ?? '').toLowerCase();
-      return name.includes(trimmed) || empNo.includes(trimmed) || position.includes(trimmed);
+      const company = (staff.company ?? '').toLowerCase();
+      return (
+        name.includes(trimmed) ||
+        empNo.includes(trimmed) ||
+        position.includes(trimmed) ||
+        company.includes(trimmed)
+      );
     });
-  }, [filteredByStatus, deptFilter, employFilter, query]);
+  }, [filteredByStatus, currentCompany, deptFilter, employFilter, query]);
 
   // 정렬 처리
   const sortedAndFiltered = useMemo(() => {
     const list = [...filtered];
-    if (!sortKey) return list;
+    if (!sortKey) {
+      // 기본 정렬: 사번 숫자 오름차순 (1, 2, 3...)
+      return list.sort((a, b) => {
+        const noA = Number(a.employee_no) || 999999;
+        const noB = Number(b.employee_no) || 999999;
+        if (noA !== noB) return noA - noB;
+        return (a.name || '').localeCompare(b.name || '', 'ko');
+      });
+    }
 
     list.sort((a, b) => {
       let valA: any = '';
@@ -116,6 +193,9 @@ function StaffTableBase({
       } else if (sortKey === 'employment_type') {
         valA = (a as any).employment_type || '정규직';
         valB = (b as any).employment_type || '정규직';
+      } else if (sortKey === 'company') {
+        valA = a.company || '';
+        valB = b.company || '';
       } else {
         valA = a[sortKey] || '';
         valB = b[sortKey] || '';
@@ -167,6 +247,7 @@ function StaffTableBase({
   const handleExcelDownload = () => {
     const dataToExport = sortedAndFiltered.map((staff, idx) => ({
       'No': idx + 1,
+      '회사': staff.company || '',
       '이름': staff.name || '',
       '사번': staff.employee_no || '',
       '부서': staff.department || '',
@@ -230,9 +311,24 @@ function StaffTableBase({
         </div>
 
         {/* 상단 통합 필터 및 검색 바 */}
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-bold text-[var(--toss-gray-4)] shrink-0 min-w-[32px]">부서</span>
+            <span className="text-[11px] font-bold text-[var(--toss-gray-4)] shrink-0 min-w-[28px]">회사</span>
+            <select
+              value={currentCompany}
+              onChange={(e) => handleCompanySelect(e.target.value)}
+              className="min-w-0 flex-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+            >
+              {availableCompanies.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-bold text-[var(--toss-gray-4)] shrink-0 min-w-[28px]">부서</span>
             <select
               value={deptFilter}
               onChange={(e) => setDeptFilter(e.target.value)}
@@ -248,7 +344,7 @@ function StaffTableBase({
           </div>
 
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-bold text-[var(--toss-gray-4)] shrink-0 min-w-[32px]">고용</span>
+            <span className="text-[11px] font-bold text-[var(--toss-gray-4)] shrink-0 min-w-[28px]">고용</span>
             <select
               value={employFilter}
               onChange={(e) => setEmployFilter(e.target.value)}
@@ -266,7 +362,7 @@ function StaffTableBase({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="이름·사번·직급 검색..."
+              placeholder="이름·사번·직급·회사 검색..."
               aria-label="직원 검색"
               className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--page-bg)] px-2.5 py-1.5 text-[11px] outline-none focus:border-[var(--accent)]"
             />
@@ -299,6 +395,13 @@ function StaffTableBase({
                   className="cursor-pointer px-2 py-2 text-left hover:text-[var(--foreground)] select-none"
                 >
                   이름 {sortKey === 'name' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                </th>
+                <th
+                  scope="col"
+                  onClick={() => handleSort('company')}
+                  className="cursor-pointer px-2 py-2 text-left hover:text-[var(--foreground)] select-none"
+                >
+                  회사 {sortKey === 'company' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
                 </th>
                 <th
                   scope="col"
@@ -373,6 +476,7 @@ const StaffRow = memo(function StaffRow({
   const employText = typeof employ === 'string' ? employ : '정규직';
   const employCls = EMPLOY_CHIP[employText] ?? 'bg-[var(--muted)] text-[var(--toss-gray-4)]';
   const initial = (staff.name ?? '?').charAt(0);
+  const companyBadge = getCompanyBadge(staff.company);
 
   return (
     <tr
@@ -405,6 +509,17 @@ const StaffRow = memo(function StaffRow({
         <div className="font-bold text-[var(--foreground)]">{staff.name}</div>
         {staff.employee_no && (
           <div className="text-[10px] text-[var(--toss-gray-4)]">{staff.employee_no}</div>
+        )}
+      </td>
+      <td className="px-2 py-2">
+        {companyBadge ? (
+          <span
+            className={`inline-flex items-center rounded-[var(--radius-xs)] px-1.5 py-0.5 text-[10px] font-bold ${companyBadge.bg} ${companyBadge.text} whitespace-nowrap`}
+          >
+            {companyBadge.label}
+          </span>
+        ) : (
+          <span className="text-[10px] text-[var(--toss-gray-3)]">-</span>
         )}
       </td>
       <td className="px-2 py-2 text-[var(--toss-gray-4)]">{staff.department || '-'}</td>

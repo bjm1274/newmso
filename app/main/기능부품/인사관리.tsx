@@ -541,6 +541,8 @@ export default function HRMainView({
               linkedTarget={문서연결대상}
               canManageDocuments={isAdminUser(user)}
               initialMenu={initialMenu}
+              onCompanyChange={handleCompanyChange}
+              companies={사업체목록}
             />
         </section>
       </main>
