@@ -1,4 +1,16 @@
 import { defineConfig, devices } from '@playwright/test';
+import path from 'node:path';
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3100';
+const url = new URL(baseURL);
+if (!['127.0.0.1', 'localhost'].includes(url.hostname)) throw new Error('E2E는 격리된 로컬 서버에서만 실행합니다.');
+const port = url.port || '80';
+process.env.DATABASE_PATH = path.resolve('.scratch-r/e2e/allerp.sqlite');
+process.env.DB_PATH = process.env.DATABASE_PATH;
+process.env.SESSION_SECRET = 'isolated-e2e-session-secret-not-for-production-2026';
+process.env.CRON_SECRET = 'isolated-e2e-cron-secret';
+process.env.DISABLE_CRON = 'true';
+process.env.E2E_TEST_USER_ID = 'E2E-001';
+process.env.E2E_TEST_PASSWORD = 'E2ePassw0rd!';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -10,7 +22,7 @@ export default defineConfig({
   },
   reporter: 'list',
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3000',
+    baseURL: baseURL,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -18,11 +30,11 @@ export default defineConfig({
   },
   webServer: {
     command: process.env.CI
-      ? 'npm run start -- --hostname 127.0.0.1 --port 3000'
-      : 'npm run dev -- --webpack --hostname 127.0.0.1 --port 3000',
-    url: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3000',
-    reuseExistingServer: true,
-    timeout: 120_000,
+      ? `npm run start -- --hostname 127.0.0.1 --port ${port}`
+      : `npm run dev -- --hostname 127.0.0.1 --port ${port}`,
+    url: baseURL,
+    reuseExistingServer: false,
+    timeout: 240_000,
   },
   projects: [
     {

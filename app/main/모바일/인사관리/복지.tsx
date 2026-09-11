@@ -1,4 +1,5 @@
 'use client';
+import HrLoadError from './HrLoadError';
  
 
 /**
@@ -50,7 +51,7 @@ export default function 복지({ company, user, onBack }: SHrWelfareProps) {
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [selectedWelfareItem, setSelectedWelfareItem] = useState<any>(null);
 
-  const { data, loading } = useWelfareBundle(company, reloadKey);
+  const { data, loading, error, reload } = useWelfareBundle(company, reloadKey);
   const { staffs } = useStaffList({ company, includeResigned: false });
 
   const isHrAdmin = useMemo(() => canMutateTeamAbnormal(user), [user]);
@@ -69,6 +70,7 @@ export default function 복지({ company, user, onBack }: SHrWelfareProps) {
 
   return (
     <div className="m-screen">
+      <HrLoadError error={error} reload={reload} />
       <MobileHeader
         title="복지"
         sub={company ?? '복지·교육'}

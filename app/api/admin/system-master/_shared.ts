@@ -23,11 +23,13 @@ import { NOTICE_ROOM_ID } from '@/lib/constants';
  *   표기 시각은 KST 기준이며 wrangler 의 UTC 표현식을 환산한 값이다.
  */
 export const OPERATION_CRONS = [
-  { path: '/api/cron/chat-push-dispatch', schedule: '5분마다', label: '채팅 푸시 큐 처리' },
+  { path: '/api/cron/todo-reminders', schedule: '매분', label: '할일 리마인더 처리' },
+  { path: '/api/cron/auto-report', schedule: '매월 1일 10:00', label: '자동 보고서 생성' },
+  { path: '/api/cron/chat-push-dispatch', schedule: '15초마다', label: '채팅 푸시 큐 처리' },
   { path: '/api/cron/backup', schedule: '매일 00:00', label: '정기 전체 백업' },
-  { path: '/api/cron/chat-retention', schedule: '매일 02:00', label: '채팅 보관정책 정리' },
-  { path: '/api/cron/absent-auto-create', schedule: '매일 02:00', label: '전날 결근 자동 생성' },
-  { path: '/api/cron/push-subscription-cleanup', schedule: '매일 12:00', label: '푸시 구독 정리 (+ 면허 만료·계약 만료 알림)' },
+  { path: '/api/cron/chat-retention', schedule: '매일 00:00', label: '채팅 보관정책 정리' },
+  { path: '/api/cron/absent-auto-create', schedule: '매일 00:00', label: '전날 결근 자동 생성' },
+  { path: '/api/cron/push-subscription-cleanup', schedule: '매일 03:00', label: '푸시 구독 정리 (+ 면허 만료·계약 만료 알림)' },
   { path: '/api/cron/unread-notification-repush', schedule: '매일 09:00', label: '미열람 알림 재발송' },
   { path: '/api/cron/leave-notice-announcements', schedule: '매일 09:00', label: '연차 휴무 공지메시지 발송' },
   { path: '/api/cron/birthday-announcements', schedule: '매일 09:00', label: '생일 및 경조사 축하 공지 발송' },
@@ -45,8 +47,6 @@ export const OPERATION_CRONS = [
  * 자동화하려면 wrangler [triggers] 와 CRON_ROUTES_BY_SCHEDULE 양쪽에 함께 추가해야 한다.
  */
 export const UNSCHEDULED_CRONS = [
-  { path: '/api/cron/todo-reminders', label: '할일 리마인더 처리' },
-  { path: '/api/cron/auto-report', label: '자동 보고서 생성' },
   { path: '/api/cron/inapp-notifications', label: '인앱 알림 보강' },
   { path: '/api/cron/license-expiry-check', label: '면허 만료 점검 (push-subscription-cleanup 에 통합 실행됨)' },
 ] as const;

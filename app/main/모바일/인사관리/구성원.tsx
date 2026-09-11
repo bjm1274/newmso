@@ -1,4 +1,5 @@
 'use client';
+import HrLoadError from './HrLoadError';
 
 /**
  * SHrMember — 모바일 인사관리: 구성원
@@ -46,7 +47,7 @@ export type SHrMemberProps = {
 export default function 구성원({ company, user, onBack, onOpenForm, onEditStaff }: SHrMemberProps) {
   const [tab, setTab] = useState<SHrMemberTab>('list');
   const [search, setSearch] = useState('');
-  const { staffs, loading } = useStaffList({ company, includeResigned: true });
+  const { staffs, loading, error, reload } = useStaffList({ company, includeResigned: true });
 
   // 부서 그룹핑
   const grouped = useMemo(() => {
@@ -66,6 +67,7 @@ export default function 구성원({ company, user, onBack, onOpenForm, onEditSta
 
   return (
     <div className="m-screen">
+      <HrLoadError error={error} reload={reload} />
       <MobileHeader
         title="구성원"
         sub={`총 ${staffs.length}명${company && company !== '전체' ? ` · ${company}` : ''}`}

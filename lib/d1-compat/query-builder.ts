@@ -97,6 +97,12 @@ export class QueryBuilder<T = any> extends WhereClauseBuilder implements Promise
     return this;
   }
 
+  filterTree(node: FilterNode): this {
+    if (!this.state.orFilters) this.state.orFilters = [];
+    this.state.orFilters.push(node);
+    return this;
+  }
+
   order(field: string, options?: { ascending?: boolean; nullsFirst?: boolean }): this {
     this.state.order.push({
       field,

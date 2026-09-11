@@ -15,6 +15,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { messageCursorFilter } from '@/lib/chat-message-cursor';
 import { db } from '@/lib/db-client';
 import { readViewCache, writeViewCache } from '@/lib/view-cache';
 import { pickAvatarTone as pickAvatarToneLib, type AvatarTone } from '@/lib/avatar-tone';
@@ -557,7 +558,7 @@ export function useChatMessagesForRoom(
   const [hasMore, setHasMore] = useState(true);
   const roomIdRef = useRef(roomId);
   roomIdRef.current = roomId;
-  const oldestRef = useRef<string | null>(null);
+  const oldestRef = useRef<{ createdAt: string; id: string } | null>(null);
   const loadingOlderRef = useRef(false);
   /** refresh 가 확정한 "같은 대화" 방 id — loadOlder·커서 갱신이 같은 범위를 쓴다. */
   const conversationRoomIdsRef = useRef<string[]>([]);
@@ -624,7 +625,7 @@ export function useChatMessagesForRoom(
             .select(selectClause)
             .in('room_id', conversationRoomIds)
             .eq('is_deleted', false)
-            .order('created_at', { ascending: false })
+            .order('created_at', { ascending: false }).order('id', { ascending: false })
             .limit(MESSAGES_LIMIT) as PromiseLike<{
               data: ChatMessage[] | null;
               error: unknown;
@@ -632,9 +633,7 @@ export function useChatMessagesForRoom(
       );
       if (isStaleRoom(currentRoomId, gen)) return;
       if (error || !Array.isArray(data)) {
-        setMessages([]);
-        setHasMore(false);
-        oldestRef.current = null;
+        throw new Error('대화를 불러오지 못했습니다.');
       } else {
         // 화면은 오래된 -> 최신 순으로 정렬. 메시지는 먼저 그리고, 반응은 2차 패스.
         const ordered = [...data].reverse();
@@ -650,7 +649,7 @@ export function useChatMessagesForRoom(
           setHasMore(data.length >= MESSAGES_LIMIT);
         }
         oldestRef.current = merged.length > 0
-          ? (merged[0].created_at as string | null) || null
+          ? { createdAt: String(merged[0].created_at || ''), id: String(merged[0].id) }
           : null;
         if (!isStaleRoom(currentRoomId, gen)) {
           setLoading(false);
@@ -738,11 +737,9 @@ export function useChatMessagesForRoom(
           cacheList.map((message) => reactionById.get(String(message.id || '')) || message),
         );
       }
-    } catch {
+    } catch (error) {
       if (isStaleRoom(currentRoomId, gen)) return;
-      setMessages([]);
-      setHasMore(false);
-      oldestRef.current = null;
+      console.error('[chat] 메시지 갱신 실패: 기존 대화를 유지합니다.', error);
     } finally {
       if (!isStaleRoom(currentRoomId, gen)) {
         setLoading(false);
@@ -761,22 +758,6 @@ export function useChatMessagesForRoom(
     loadingOlderRef.current = true;
     setLoadingOlder(true);
     try {
-      // 커서는 DB 원문 created_at 을 그대로 쓴다.
-      //
-      // 예전에는 toUtcSqlTimestamp 로 공백형('YYYY-MM-DD HH:MM:SS')으로 바꿔 넘겼는데,
-      // 비교 대상 컬럼은 정규화되지 않은 원문이고 운영 messages.created_at 에는 T형
-      // ('...T11:53:25.917617+00:00')이 절반 가까이 섞여 있다. 10번째 문자가
-      // 'T'(0x54) > ' '(0x20) 이라 **같은 날짜의 T형 행은 시각과 무관하게 항상 커서보다
-      // 크고**, `.lt` 에서 전부 탈락하고 페이지가 그 날짜를 통째로 건너뛰었다.
-      // (운영 실측: 21건 이상 방 102개 중 81개에서 2,821건이 스크롤로 도달 불가.
-      //  건너뛴 페이지가 20건 미만이면 아래 setHasMore(false) 로 스크롤이 조기 종료됐다.)
-      //
-      // ORDER BY 도 원문 컬럼 기준이므로, 원문 커서로 비교해야 "정렬상 이 행 다음"이라는
-      // keyset 페이지네이션이 성립한다 — 누락도 중복도 생기지 않는다.
-      // 같은 방·같은 날짜에 두 형식이 섞인 경우(운영 실측 6쌍)의 표시 순서 문제는
-      // 정렬 자체의 문제라 여기서 커서를 정규화해도 고쳐지지 않는다.
-      // jumpToMessage(:1015, :1027)도 원문 created_at 으로 비교한다.
-      const cursorSql = cursor;
       // 최신 페이지와 같은 범위를 봐야 한다 — 형제 방을 빼면 위로 올릴수록
       // 대화가 반쪽만 나온다.
       const conversationRoomIds =
@@ -791,21 +772,22 @@ export function useChatMessagesForRoom(
             .select(selectClause)
             .in('room_id', conversationRoomIds)
             .eq('is_deleted', false)
-            .lt('created_at', cursorSql)
-            .order('created_at', { ascending: false })
+            .filterTree(messageCursorFilter(cursor.createdAt, cursor.id, 'lt'))
+            .order('created_at', { ascending: false }).order('id', { ascending: false })
             .limit(MESSAGES_LIMIT) as PromiseLike<{
               data: ChatMessage[] | null;
               error: unknown;
             }>,
       );
       if (isStaleRoom(currentRoomId, gen)) return;
-      if (error || !Array.isArray(data) || data.length === 0) {
+      if (error || !Array.isArray(data)) throw new Error('이전 대화를 불러오지 못했습니다.');
+      if (data.length === 0) {
         setHasMore(false);
       } else {
         const ordered = [...data].reverse();
         setMessages((prev) => [...ordered, ...prev]);
         oldestRef.current = ordered.length > 0
-          ? (ordered[0].created_at as string | null) || null
+          ? { createdAt: String(ordered[0].created_at || ''), id: String(ordered[0].id) }
           : oldestRef.current;
         if (data.length < MESSAGES_LIMIT) setHasMore(false);
         const withReactions = await fetchAndMergeReactions(ordered);
@@ -945,7 +927,7 @@ export function useChatMessagesForRoom(
             .eq('user_id', userId)
             .in('type', ['message', 'mention'])
             .is('read_at', null)
-            .order('created_at', { ascending: false })
+            .order('created_at', { ascending: false }).order('id', { ascending: false })
             .limit(100);
           const roomSet = new Set(targetRoomIds.map(String));
           const ids: string[] = [];
@@ -1019,40 +1001,42 @@ export function useChatMessagesForRoom(
           ? conversationRoomIdsRef.current
           : [currentRoomId];
 
-      const { data: beforeRows } = await selectChatMessagesWithFallback<ChatMessage[]>(
+      const { data: beforeRows, error: beforeError } = await selectChatMessagesWithFallback<ChatMessage[]>(
         ({ selectClause }) =>
           db
             .from('messages')
             .select(selectClause)
             .in('room_id', jumpRoomIds)
             .eq('is_deleted', false)
-            .lte('created_at', targetTime)
-            .order('created_at', { ascending: false })
+            .filterTree(messageCursorFilter(targetTime, String(targetMessage.id), 'lt'))
+            .order('created_at', { ascending: false }).order('id', { ascending: false })
             .limit(50) as PromiseLike<{ data: ChatMessage[] | null; error: unknown }>
       );
 
-      const { data: afterRows } = await selectChatMessagesWithFallback<ChatMessage[]>(
+      const { data: afterRows, error: afterError } = await selectChatMessagesWithFallback<ChatMessage[]>(
         ({ selectClause }) =>
           db
             .from('messages')
             .select(selectClause)
             .in('room_id', jumpRoomIds)
             .eq('is_deleted', false)
-            .gt('created_at', targetTime)
-            .order('created_at', { ascending: true })
+            .filterTree(messageCursorFilter(targetTime, String(targetMessage.id), 'gt'))
+            .order('created_at', { ascending: true }).order('id', { ascending: true })
             .limit(50) as PromiseLike<{ data: ChatMessage[] | null; error: unknown }>
       );
 
       if (isStaleRoom(currentRoomId, gen)) return;
 
+      if (beforeError || afterError) throw beforeError || afterError;
+      if (!jumpRoomIds.includes(String(targetMessage.room_id))) return;
       const beforeList = Array.isArray(beforeRows) ? [...beforeRows].reverse() : [];
       const afterList = Array.isArray(afterRows) ? afterRows : [];
-      const merged = [...beforeList, ...afterList];
+      const merged = [...beforeList, targetMessage, ...afterList];
 
       setMessages(merged);
       setHasMore(beforeList.length >= 50);
       oldestRef.current = merged.length > 0
-        ? (merged[0].created_at as string | null) || null
+        ? { createdAt: String(merged[0].created_at || ''), id: String(merged[0].id) }
         : null;
       setSearchMessageId(messageId);
       if (!isStaleRoom(currentRoomId, gen)) {
@@ -1207,7 +1191,7 @@ export function useChatMessageSearch(
                 .select(selectClause)
                 .in('room_id', chunk)
                 .ilike('content', pattern)
-                .order('created_at', { ascending: false })
+                .order('created_at', { ascending: false }).order('id', { ascending: false })
                 .limit(MESSAGE_SEARCH_LIMIT);
               if (!omittedColumns.has('is_deleted')) {
                 q = q.eq('is_deleted', false);

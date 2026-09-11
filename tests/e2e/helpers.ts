@@ -36,7 +36,7 @@ function hydrateEnvFromLocalFile() {
   }
 }
 
-hydrateEnvFromLocalFile();
+// 테스트 실행에서 운영 .env.local 자격증명을 가져오지 않습니다.
 
 const defaultYearMonth = new Date().toISOString().slice(0, 7);
 const noticeRoomId = '00000000-0000-0000-0000-000000000000';

@@ -18,7 +18,7 @@
 
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   calculateApprovedAnnualLeaveUsage,
   calculateLeaveDays,
@@ -252,7 +252,20 @@ export function useAnnualLeaveSummary(staffId: string | null | undefined): Annua
     return EMPTY;
   });
 
+  const [stateStaffId, setStateStaffId] = useState(staffId);
+  const requestSeq = useRef(0);
+  const scopeRef = useRef(staffId);
+  const lastStateScope = useRef(staffId);
+  useEffect(() => {
+    scopeRef.current = staffId;
+    return () => { requestSeq.current += 1; };
+  }, [staffId]);
   const reload = useCallback(async (force = false) => {
+    const seq = ++requestSeq.current;
+    const isCurrent = () => seq === requestSeq.current && scopeRef.current === staffId;
+    const sameScope = lastStateScope.current === staffId;
+    lastStateScope.current = staffId;
+    setStateStaffId(staffId);
     if (!staffId) {
       setState({ ...EMPTY, loading: false, year: currentLeaveYear() });
       return;
@@ -265,7 +278,7 @@ export function useAnnualLeaveSummary(staffId: string | null | undefined): Annua
       return;
     }
 
-    setState((prev) => (prev.loading ? prev : { ...prev, loading: true, error: null }));
+    setState((prev) => ({ ...(sameScope ? prev : EMPTY), loading: true, error: null }));
     const year = currentLeaveYear();
     try {
       const response = await fetch(`/api/annual-leave/summary?staffId=${encodeURIComponent(staffId)}`, {
@@ -291,6 +304,7 @@ export function useAnnualLeaveSummary(staffId: string | null | undefined): Annua
       };
       if (!response.ok || !payload.summary) throw new Error(payload.error || 'Could not load annual leave.');
 
+      if (!isCurrent()) return;
       const summary = payload.summary;
       // 개인 연차·휴가 내역: 사용 + 수동부여 + 법정 발생(월차/연차) 모두 표시
       const history = (summary.entries || [])
@@ -353,19 +367,19 @@ export function useAnnualLeaveSummary(staffId: string | null | undefined): Annua
       };
 
       leaveSummaryCache.set(staffId, { data: nextState, timestamp: Date.now() });
-      setState(nextState);    } catch (err) {
+      setState(nextState);
+    } catch (err) {
+      if (!isCurrent()) return;
       console.error('[useAnnualLeaveSummary]', err);
       // 실패를 error 에 남긴다.
       //
       // 예전에는 catch 에서 `error: null` 로 두고 전량 0 인 EMPTY 를 그대로 세팅했다.
       // 화면은 "연차 0일"을 정상 값처럼 보여줬고, 직원은 자기 연차가 소멸된 줄 알고,
       // 인사담당자는 조회가 실패한 사실 자체를 알 수 없었다. 오류는 오류로 보여야 한다.
-      setState({
-        ...EMPTY,
-        loading: false,
-        year,
+      setState(prev => ({
+        ...prev, loading: false, year,
         error: err instanceof Error ? err.message : '연차 정보를 불러오지 못했습니다.',
-      });
+      }));
     }
   }, [staffId]);
 
@@ -387,5 +401,5 @@ export function useAnnualLeaveSummary(staffId: string | null | undefined): Annua
     };
   }, [staffId, reload]);
 
-  return { ...state, reload };
+  return { ...(stateStaffId === staffId ? state : { ...EMPTY, loading: Boolean(staffId) }), reload };
 }

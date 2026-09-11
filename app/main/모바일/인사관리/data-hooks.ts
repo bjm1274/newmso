@@ -12,12 +12,13 @@
  * - usePayrollRecords: 본인 발송된 급여명세서 + 알림 기반 필터
  *
  * JM2: 식별자 primitive로만 deps 잡고 AbortController로 race 보호.
- * JM3: try/catch + silent fallback. UI는 빈배열로 노출.
+ * JM3: 조회 실패는 오류 상태로 표시하고 동일 범위의 마지막 성공값을 유지.
  * JM4: any 금지. Supabase row → Record<string, unknown>으로 받고 좁힘.
  * JM5: staff_id 필터를 client에도 명시 (RLS에 더해).
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useHrQuery } from '@/lib/use-hr-query';
 import { db, d1 } from '@/lib/db-client';
 import type { ErpUser, StaffMember } from '@/types';
 import { isActiveStaff } from '@/lib/active-staff';
@@ -41,47 +42,16 @@ export type StaffListOptions = {
 };
 
 export function useStaffList(options: StaffListOptions = {}) {
-  const { company, limit = 200, includeResigned = false } = options;
-  const [staffs, setStaffs] = useState<StaffMember[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      setLoading(true);
-      try {
-        let query = db
-          .from('staff_members')
-          .select(
-            'id, name, company, department, position, role, status, employee_no, hire_date, resign_date, phone, email, extension, photo_url',
-          )
-          .order('name')
-          .limit(limit);
-        if (company && company !== '전체') {
-          query = query.eq('company', company);
-        }
-        const { data, error } = await query;
-        if (error) throw error;
-        if (cancelled) return;
-        const list = (data ?? []) as StaffMember[];
-        const filtered = includeResigned ? list : list.filter(isActiveStaff);
-        setStaffs(filtered);
-      } catch (err) {
-        if (!cancelled) {
-          console.error('[mobile-hr] staff list load failed', err);
-          setStaffs([]);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [company, limit, includeResigned]);
-
-  return { staffs, loading };
+  const { company, limit = 1000, includeResigned = false } = options;
+  const result = useHrQuery<StaffMember[]>(JSON.stringify(['staffs', company, limit, includeResigned]), async () => {
+    let query = db.from('staff_members').select('id, name, company, department, position, role, status, employee_no, hire_date, resign_date, phone, email, extension, photo_url').order('name').limit(limit);
+    if (company && company !== '전체') query = query.eq('company', company);
+    const { data, error } = await query;
+    if (error) throw error;
+    const rows = (data ?? []) as StaffMember[];
+    return includeResigned ? rows : rows.filter(isActiveStaff);
+  }, []);
+  return { staffs: result.data, loading: result.loading, error: result.error, reload: result.reload };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -124,7 +94,7 @@ export function useMyLeaveBalance(staffId: string | null) {
       days: h.days,
     })),
   };
-  return { data, loading: s.loading, reload: s.reload };
+  return { data, loading: s.loading, error: s.error, reload: s.reload };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -139,57 +109,16 @@ export type AttendanceDailyRow = {
 };
 
 export function useMyAttendanceMonth(staffId: string | null, monthKey: string) {
-  // monthKey: 'YYYY-MM'
-  const [rows, setRows] = useState<AttendanceDailyRow[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      if (!staffId) {
-        setRows([]);
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      try {
-        // KST 월 경계 — 내정보 useMonthlyAttendance / PC 홈과 동일
-        const { getMonthBoundaries } = await import('@/lib/date-utils');
-        const { startDate: first, endDate: last } = getMonthBoundaries(monthKey);
-        if (!first || !last) {
-          setRows([]);
-          return;
-        }
-        const { data, error } = await db
-          .from('attendance')
-          .select('date, check_in, check_out, status')
-          .eq('staff_id', staffId)
-          .gte('date', first)
-          .lte('date', last);
-        if (error) throw error;
-        if (cancelled) return;
-        const list = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
-          date: String(r.date ?? ''),
-          check_in: typeof r.check_in === 'string' ? r.check_in : null,
-          check_out: typeof r.check_out === 'string' ? r.check_out : null,
-          status: typeof r.status === 'string' ? r.status : null }));
-        setRows(list);
-      } catch (err) {
-        if (!cancelled) {
-          console.error('[mobile-hr] attend month load failed', err);
-          setRows([]);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [staffId, monthKey]);
-
-  return { rows, loading };
+  const result = useHrQuery<AttendanceDailyRow[]>(JSON.stringify(['attendance', staffId, monthKey]), async () => {
+    if (!staffId) return [];
+    const { getMonthBoundaries } = await import('@/lib/date-utils');
+    const { startDate: first, endDate: last } = getMonthBoundaries(monthKey);
+    if (!first || !last) throw new Error('잘못된 조회 월');
+    const { data, error } = await db.from('attendance').select('date, check_in, check_out, status').eq('staff_id', staffId).gte('date', first).lte('date', last);
+    if (error) throw error;
+    return ((data ?? []) as Record<string, unknown>[]).map((r) => ({ date: String(r.date ?? ''), check_in: typeof r.check_in === 'string' ? r.check_in : null, check_out: typeof r.check_out === 'string' ? r.check_out : null, status: typeof r.status === 'string' ? r.status : null }));
+  }, []);
+  return { rows: result.data, loading: result.loading, error: result.error, reload: result.reload };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -248,19 +177,9 @@ export type MyDocRow = {
 };
 
 export function useMyContractDocs(staffId: string | null) {
-  const [docs, setDocs] = useState<MyDocRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const result = useHrQuery<MyDocRow[]>(JSON.stringify(['documents', staffId]), async () => {
+    if (!staffId) return [];
 
-  useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      if (!staffId) {
-        setDocs([]);
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      try {
         const { data, error } = await db
           .from('document_repository')
           .select('id, title, category, file_url, created_at')
@@ -268,32 +187,19 @@ export function useMyContractDocs(staffId: string | null) {
           .order('created_at', { ascending: false })
           .limit(50);
         if (error) throw error;
-        if (cancelled) return;
-        setDocs(
+
+        return (
           ((data ?? []) as Record<string, unknown>[]).map((r) => ({
             id: String(r.id ?? ''),
             title: String(r.title ?? '제목 없음'),
             doc_type: typeof r.category === 'string' ? r.category : null,
             file_url: typeof r.file_url === 'string' ? r.file_url : null,
             file_size: null,
-            created_at: typeof r.created_at === 'string' ? r.created_at : null })),
+            created_at: typeof r.created_at === 'string' ? r.created_at : null }))
         );
-      } catch (err) {
-        if (!cancelled) {
-          console.error('[mobile-hr] my docs load failed', err);
-          setDocs([]);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [staffId]);
 
-  return { docs, loading };
+  }, []);
+  return { docs: result.data, loading: result.loading, error: result.error, reload: result.reload };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -347,19 +253,10 @@ type WelfareBundle = {
   device: MedicalDeviceRow[];
 };
 
-export function useWelfareBundle(company: string | undefined, reloadKey?: number) {
-  const [data, setData] = useState<WelfareBundle>({
-    family: [],
-    checkup: [],
-    license: [],
-    device: [] });
-  const [loading, setLoading] = useState(true);
+export function useWelfareBundle(company: string | undefined, reloadKey = 0) {
+  const result = useHrQuery<WelfareBundle>(JSON.stringify(['welfare', company]), async () => {
 
-  useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      setLoading(true);
-      try {
+
         const useCompany = Boolean(company) && company !== '전체';
 
         let familyQ = db
@@ -400,9 +297,11 @@ export function useWelfareBundle(company: string | undefined, reloadKey?: number
           licenseQ,
           deviceQ,
         ]);
-        if (cancelled) return;
 
-        setData({
+
+        const failed = [familyRes, checkupRes, licenseRes, deviceRes].find(result => result.error);
+        if (failed?.error) throw failed.error;
+        return ({
           family: ((familyRes.data ?? []) as Record<string, unknown>[]).map((r) => ({
             id: String(r.id ?? ''),
             staff_id: typeof r.staff_id === 'string' ? r.staff_id : null,
@@ -439,22 +338,9 @@ export function useWelfareBundle(company: string | undefined, reloadKey?: number
             next_check_date: typeof r.next_inspection_date === 'string' ? r.next_inspection_date : null,
             cycle: typeof r.cycle === 'number' ? `${r.cycle}개월` : (typeof r.cycle === 'string' ? r.cycle : null),
             status: '정상' })) });
-      } catch (err) {
-        if (!cancelled) {
-          console.error('[mobile-hr] welfare bundle load failed', err);
-          setData({ family: [], checkup: [], license: [], device: [] });
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [company, reloadKey]);
 
-  return { data, loading };
+  }, { family: [], checkup: [], license: [], device: [] }, reloadKey);
+  return { data: result.data, loading: result.loading, error: result.error, reload: result.reload };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -493,19 +379,9 @@ function numField(row: Record<string, unknown>, key: string): number {
 }
 
 export function usePayrollSlips(staffId: string | null) {
-  const [slips, setSlips] = useState<PayrollSlipRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const result = useHrQuery<PayrollSlipRow[]>(JSON.stringify(['payroll', staffId]), async () => {
+    if (!staffId) return [];
 
-  useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      if (!staffId) {
-        setSlips([]);
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      try {
         const [recordRes, notifRes] = await Promise.all([
           db
             .from('payroll_records')
@@ -517,10 +393,11 @@ export function usePayrollSlips(staffId: string | null) {
             .eq('user_id', staffId)
             .ilike('title', '%급여명세%'),
         ]);
-        if (cancelled) return;
+
+        if (recordRes.error || notifRes.error) throw recordRes.error || notifRes.error;
         const records = (recordRes.data ?? []) as Record<string, unknown>[];
         const issued = resolveIssuedPayrollRecords(records, (notifRes.data ?? []) as Record<string, unknown>[]);
-        setSlips(
+        return (
           issued.map((r) => ({
             year_month: String(r.year_month ?? ''),
             base_salary: numField(r, 'base_salary'),
@@ -544,24 +421,11 @@ export function usePayrollSlips(staffId: string | null) {
             local_tax: numField(r, 'local_tax'),
             net_pay: numField(r, 'net_pay'),
             status: typeof r.status === 'string' ? r.status : null,
-            record_type: typeof r.record_type === 'string' ? r.record_type : null })),
+            record_type: typeof r.record_type === 'string' ? r.record_type : null }))
         );
-      } catch (err) {
-        if (!cancelled) {
-          console.error('[mobile-hr] payroll slips load failed', err);
-          setSlips([]);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [staffId]);
 
-  return { slips, loading };
+  }, []);
+  return { slips: result.data, loading: result.loading, error: result.error, reload: result.reload };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -875,18 +739,8 @@ function pickNumberSafe(v: unknown): number {
   return 0;
 }
 
-export function useTeamAbnormalByDay(
-  company: string | undefined,
-  reloadKey: number,
-): { rows: DailyAbnormalRow[]; loading: boolean } {
-  const [rows, setRows] = useState<DailyAbnormalRow[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      setLoading(true);
-      try {
+export function useTeamAbnormalByDay(company: string | undefined, reloadKey: number) {
+  const result = useHrQuery<DailyAbnormalRow[]>(JSON.stringify(['team-abnormal', company]), async () => {
         // PC 4주 윈도우와 동일 — lib/attendance-abnormal SSOT
         const sinceStr = getAbnormalLookbackSince(ABNORMAL_LOOKBACK_DAYS);
 
@@ -898,7 +752,8 @@ export function useTeamAbnormalByDay(
         if (company && company !== '전체') staffQ = staffQ.eq('company', company);
 
         const staffRes = await staffQ;
-        if (cancelled) return;
+        if (staffRes.error) throw staffRes.error;
+
 
         const staffMap = new Map<string, { name: string; dept: string }>();
         for (const row of (staffRes.data ?? []) as Record<string, unknown>[]) {
@@ -911,8 +766,7 @@ export function useTeamAbnormalByDay(
 
         const staffIds = Array.from(staffMap.keys());
         if (staffIds.length === 0) {
-          if (!cancelled) setRows([]);
-          return;
+          return [];
         }
 
         // 정본 attendances 에는 late_minutes/early_leave_minutes 컬럼이 없다.
@@ -923,7 +777,7 @@ export function useTeamAbnormalByDay(
           .in('staff_id', staffIds)
           .gte('work_date', sinceStr);
         if (attErr) throw attErr;
-        if (cancelled) return;
+
 
         const list: DailyAbnormalRow[] = [];
         for (const raw of (attRows ?? []) as Record<string, unknown>[]) {
@@ -966,23 +820,10 @@ export function useTeamAbnormalByDay(
           if (a.date !== b.date) return a.date < b.date ? 1 : -1;
           return a.staffName.localeCompare(b.staffName, 'ko');
         });
-        setRows(list);
-      } catch (err) {
-        if (!cancelled) {
-          console.error('[mobile-hr] team abnormal by day load failed', err);
-          setRows([]);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [company, reloadKey]);
 
-  return { rows, loading };
+    return list;
+  }, [], reloadKey);
+  return { rows: result.data, loading: result.loading, error: result.error, reload: result.reload };
 }
 
 /**

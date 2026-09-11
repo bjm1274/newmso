@@ -1,4 +1,5 @@
 'use client';
+import HrLoadError from './HrLoadError';
 
 /**
  * SHrAttend — 모바일 인사관리: 근태
@@ -45,7 +46,7 @@ export default function 근태({ staffId, company, user, onBack }: SHrAttendProp
   const [cursor, setCursor] = useState(() => new Date());
   const [adjustDate, setAdjustDate] = useState<string | null>(null);
   const monthKey = useDerivedMonthKey(cursor);
-  const { rows, loading } = useMyAttendanceMonth(staffId, monthKey);
+  const { rows, loading, error, reload } = useMyAttendanceMonth(staffId, monthKey);
   const { staffs } = useStaffList({ company, includeResigned: false });
 
   const summary = useMemo(() => deriveMonthSummary(rows), [rows]);
@@ -69,6 +70,7 @@ export default function 근태({ staffId, company, user, onBack }: SHrAttendProp
 
   return (
     <div className="m-screen">
+      <HrLoadError error={error} reload={reload} />
       <MobileHeader
         title={mode === 'admin' ? '전사 근태 관리' : '근태'}
         sub={`${company ?? ''}${company ? ' · ' : ''}${cursor.getFullYear()}.${String(

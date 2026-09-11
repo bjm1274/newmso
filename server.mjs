@@ -14,6 +14,7 @@ import next from 'next';
 import Database from 'better-sqlite3';
 import { WebSocketServer, WebSocket } from 'ws';
 import cron from 'node-cron';
+import { CRON_SCHEDULES } from './lib/cron-schedules.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -432,31 +433,13 @@ function initWebSocketHub(server, db) {
 // 3. Cron 스케줄러 (KST 타임존 고정)
 // ============================================================
 function initCronScheduler(serverPort) {
-  const secret = String(process.env.CRON_SECRET || 'dev-only-cron-secret-change-this').trim();
+  const secret = String(process.env.CRON_SECRET || '').trim();
+  if (!secret) throw new Error('자동 작업 실행에 필요한 CRON_SECRET이 없습니다.');
   const baseUrl = `http://127.0.0.1:${serverPort}`;
 
-  const CRONS = {
-    // 15초마다: 채팅 푸시 회수 (즉시 디스패치 실패분). 6필드 = 초 단위.
-    '*/15 * * * * *': ['/api/cron/chat-push-dispatch'],
-    // KST 00:00 (자정): DB 백업, 결근 자동 생성, 채팅 보존 주기 정리
-    '0 0 * * *': ['/api/cron/backup', '/api/cron/absent-auto-create', '/api/cron/chat-retention'],
-    // KST 03:00 (새벽): 푸시 구독 정리
-    '0 3 * * *': ['/api/cron/push-subscription-cleanup'],
-    // KST 09:00 (아침): 생일/연차/급여/인사발령/미읽음 알림 발송
-    '0 9 * * *': [
-      '/api/cron/unread-notification-repush',
-      '/api/cron/leave-notice-announcements',
-      '/api/cron/birthday-announcements',
-      '/api/cron/annual-leave-accrual',
-      '/api/cron/annual-leave-promotion',
-      '/api/cron/annual-leave-expiry',
-      '/api/cron/substitute-holiday',
-      '/api/cron/payroll-notice',
-      '/api/cron/appointment-apply',
-    ],
-  };
 
-  for (const [expr, routes] of Object.entries(CRONS)) {
+
+  for (const [expr, routes] of Object.entries(CRON_SCHEDULES)) {
     cron.schedule(
       expr,
       async () => {
@@ -465,7 +448,11 @@ function initCronScheduler(serverPort) {
             const startTime = Date.now();
             const res = await fetch(`${baseUrl}${route}`, {
               headers: { authorization: `Bearer ${secret}`, 'x-scheduled-cron': expr },
+              signal: AbortSignal.timeout(120_000),
             });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const result = await res.json().catch(() => ({}));
+            if (result.ok === false || Object.keys(result).some(key => /Error$/.test(key) && result[key])) throw new Error('하위 자동 작업 실패');
             const duration = Date.now() - startTime;
             console.log(`[cron ${expr}] ✔ ${route} (${res.status} in ${duration}ms)`);
           } catch (err) {
@@ -473,10 +460,10 @@ function initCronScheduler(serverPort) {
           }
         }
       },
-      { timezone: 'Asia/Seoul' }
+      { timezone: 'Asia/Seoul', noOverlap: true }
     );
   }
-  console.log('[server] Cron Scheduler registered (4 active schedules, timezone: Asia/Seoul).');
+  console.log(`[server] 자동 작업 ${Object.keys(CRON_SCHEDULES).length}개 스케줄 등록 (Asia/Seoul)`);
 }
 
 // ============================================================

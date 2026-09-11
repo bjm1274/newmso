@@ -16,6 +16,7 @@
 // ============================================================
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core';
 import { sql, getTableColumns, type SQL } from 'drizzle-orm';
 import { readSessionFromRequest } from '@/lib/server-session';
 import { emitRealtimeSignal } from '@/lib/realtime/server-signal';
@@ -541,6 +542,9 @@ export async function POST(request: Request) {
     const db = getD1Drizzle(d1);
     const claims = buildClaimsFromSession(session?.user);
 
+    if (payload.op === 'insert' && payload.table === 'payroll_records' && payload.onConflict === 'replace') {
+      return NextResponse.json({ ok: false, error: '급여 저장은 충돌 기준을 지정한 upsert를 사용하세요.' }, { status: 400 });
+    }
     if (payload.op === 'insert') {
       // upsert 는 이 분기로 들어오지만 실제로는 **기존 행을 UPDATE** 한다.
       // 그런데 예전에는 op='insert' 정책만 검사하고 onConflict/conflict 를
@@ -686,6 +690,8 @@ export async function POST(request: Request) {
       }
 
       const allResults: Record<string, unknown>[] = [];
+      const statements = [];
+      const dialect = new SQLiteSyncDialect();
 
       for (const chunk of chunks) {
         const valuesSql = sql.join(
@@ -724,9 +730,14 @@ export async function POST(request: Request) {
           stmt = sql`${verb} INTO ${tableSql} (${colsSql}) VALUES ${valuesSql}${returningSql}`;
         }
 
-        const result = await db.run(stmt);
-        const rows = ((result as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
-        allResults.push(...rows);
+        const compiled = dialect.sqlToQuery(stmt);
+        statements.push(d1.prepare(compiled.sql).bind(...compiled.params));
+      }
+
+      // 후반 청크 실패 시 앞 청크도 롤백한다. SQLite 어댑터의 batch는 트랜잭션이다.
+      const batchResults = await d1.batch(statements);
+      for (const result of batchResults) {
+        allResults.push(...((result.results ?? []) as Record<string, unknown>[]));
       }
 
       // 채팅 메시지 INSERT 시:
@@ -1049,6 +1060,15 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: false, error: 'Unsupported op' }, { status: 400 });
   } catch (err) {
+    let cause: unknown = err;
+    const visited = new Set<unknown>();
+    while (cause instanceof Error && !visited.has(cause)) {
+      visited.add(cause);
+      if (cause.message.includes('PAYROLL_MONTH_LOCKED')) {
+        return NextResponse.json({ ok: false, code: 'PAYROLL_MONTH_LOCKED', error: '마감된 급여는 변경할 수 없습니다. 마감 해제 후 다시 시도하세요.' }, { status: 409 });
+      }
+      cause = cause.cause;
+    }
     if (err instanceof PolicyDenied || err instanceof PolicyMissing) {
       return NextResponse.json({ ok: false, error: err.message }, { status: 403 });
     }

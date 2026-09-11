@@ -206,6 +206,9 @@ export async function fetchLeaveData({
     throw new DOMException('aborted', 'AbortError');
   }
 
+  const failed = [balanceRes, requestRes, ledgerRes, hireRes].find((result) => result.error);
+  if (failed) throw new Error('연차 원본을 조회하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+
   const rawBalances = Array.isArray(balanceRes.data) ? balanceRes.data : [];
   const rawRequests = Array.isArray(requestRes.data) ? requestRes.data : [];
   const rawLedgers = Array.isArray(ledgerRes.data) ? ledgerRes.data : [];

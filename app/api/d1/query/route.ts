@@ -35,6 +35,7 @@ import {
   FilterNodeSchema,
   assertFilterTreeValid,
   type FilterNode } from '@/lib/d1-compat/filter';
+import { orderedColumn, comparisonValue } from '@/lib/d1-time-sql';
 import { JSON_COLUMNS } from '@/lib/db/json-columns';
 import { consumeRateLimit } from '@/lib/rate-limit';
 import {
@@ -94,11 +95,13 @@ type Payload = z.infer<typeof PayloadSchema>;
  * FilterNode 트리를 재귀적으로 SQL로 변환.
  * 모든 값은 drizzle sql 템플릿 파라미터 바인딩으로 처리.
  */
-function buildFilterNodeSql(node: FilterNode): SQL {
+function buildFilterNodeSql(node: FilterNode, table?: string): SQL {
   if (node.kind === 'cond') {
-    const col = sql.identifier(node.field);
     const { op } = node;
-    const value = normalizeBindValue(node.value);
+    const compareTime = ['eq', 'neq', 'lt', 'gt', 'lte', 'gte'].includes(op);
+    const col = compareTime ? orderedColumn(table, node.field) : sql.identifier(node.field);
+    const normalized = normalizeBindValue(node.value);
+    const value = compareTime ? comparisonValue(table, node.field, normalized) : normalized;
     if (op === 'eq') return sql`(${col} = ${value})`;
     if (op === 'neq') return sql`(${col} != ${value})`;
     if (op === 'lt') return sql`(${col} < ${value})`;
@@ -118,7 +121,7 @@ function buildFilterNodeSql(node: FilterNode): SQL {
     if (op === 'in') {
       const arr = Array.isArray(value) ? value : [];
       if (arr.length === 0) return sql`(1 = 0)`;
-      return sql`(${col} IN (${sql.join(arr.map((v) => sql`${v}`), sql`, `)}))`;
+      return sql`(${col} IN (SELECT value FROM json_each(${JSON.stringify(arr)})))`;
     }
     if (op === 'contains') {
       const jsonStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
@@ -130,12 +133,12 @@ function buildFilterNodeSql(node: FilterNode): SQL {
   }
 
   if (node.kind === 'and') {
-    const parts = node.children.map(buildFilterNodeSql);
+    const parts = node.children.map((child) => buildFilterNodeSql(child, table));
     return sql`(${sql.join(parts, sql` AND `)})`;
   }
 
   // kind === 'or'
-  const parts = node.children.map(buildFilterNodeSql);
+  const parts = node.children.map((child) => buildFilterNodeSql(child, table));
   return sql`(${sql.join(parts, sql` OR `)})`;
 }
 
@@ -143,11 +146,11 @@ function buildFilterNodeSql(node: FilterNode): SQL {
  * orFilters 배열을 검증하고 WHERE 절에 추가할 SQL 조각 목록 반환.
  * 각 원소를 assertFilterTreeValid로 검증 후 buildFilterNodeSql로 변환.
  */
-function buildOrFilterParts(orFilters: FilterNode[] | undefined): SQL[] {
+function buildOrFilterParts(orFilters: FilterNode[] | undefined, table?: string): SQL[] {
   if (!orFilters || orFilters.length === 0) return [];
   return orFilters.map((node) => {
     assertFilterTreeValid(node); // 깊이/노드 수 초과 시 throw → 500 처리
-    return buildFilterNodeSql(node);
+    return buildFilterNodeSql(node, table);
   });
 }
 
@@ -231,8 +234,8 @@ function buildSelectSql(payload: Payload): SQL {
     ? sql.join(payload.columns.map((c) => sql.identifier(c)), sql`, `)
     : sql.raw('*');
   const whereParts = [
-    ...buildWhereSql(payload.where),
-    ...buildOrFilterParts(payload.orFilters),
+    ...buildWhereSql(payload.where, payload.table),
+    ...buildOrFilterParts(payload.orFilters, payload.table),
   ];
   const whereSql =
     whereParts.length > 0
@@ -249,7 +252,7 @@ function buildSelectSql(payload: Payload): SQL {
                 : o.nullsFirst === false
                 ? ' NULLS LAST'
                 : '';
-            return sql`${sql.identifier(o.field)} ${sql.raw(dir + nulls)}`;
+            return sql`${orderedColumn(payload.table, o.field)} ${sql.raw(dir + nulls)}`;
           }),
           sql`, `,
         )}`
@@ -329,8 +332,8 @@ export async function POST(request: Request) {
       const policy = POLICY_REGISTRY[payload.table];
       const selectPattern = policy?.select;
       const whereParts = [
-        ...buildWhereSql(payload.where),
-        ...buildOrFilterParts(payload.orFilters),
+        ...buildWhereSql(payload.where, payload.table),
+        ...buildOrFilterParts(payload.orFilters, payload.table),
       ];
       const whereSql =
         whereParts.length > 0
@@ -401,68 +404,16 @@ export async function POST(request: Request) {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // D1 바인딩 파라미터 한도(100) 초과 시 IN절 자동 청킹.
-    // WHERE에 IN절이 있고 전체 파라미터가 100을 넘으면 IN절 값을 분할하여
-    // 여러 쿼리로 실행한 뒤 결과를 합친다.
-    // ─────────────────────────────────────────────────────────────
-    const D1_MAX_PARAMS = 100;
-
-    function countBindParams(p: Payload): number {
-      let count = 0;
-      for (const cond of p.where ?? []) {
-        if (cond.op === 'in' && Array.isArray(cond.value)) {
-          count += (cond.value as unknown[]).length;
-        } else {
-          count += 1;
-        }
-      }
-      return count;
-    }
-
-    async function executeWithAutoChunk(p: Payload): Promise<Record<string, unknown>[]> {
-      const totalParams = countBindParams(p);
-      if (totalParams <= D1_MAX_PARAMS) {
-        // 한도 이내 — 단일 쿼리 실행
-        const result = await db.run(buildSelectSql(p));
-        return ((result as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
-      }
-
-      // IN절 중 가장 큰 것을 찾아 분할
-      const inConditions = (p.where ?? [])
-        .map((cond, idx) => ({ cond, idx }))
-        .filter((c) => c.cond.op === 'in' && Array.isArray(c.cond.value));
-
-      if (inConditions.length === 0) {
-        // IN절이 없는데 파라미터가 많은 경우 — 그냥 실행 (에러는 caller에서 처리)
-        const result = await db.run(buildSelectSql(p));
-        return ((result as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
-      }
-
-      // 가장 큰 IN절을 찾아 분할
-      const largest = inConditions.reduce((a, b) =>
-        (a.cond.value as unknown[]).length >= (b.cond.value as unknown[]).length ? a : b,
-      );
-      const otherParams = totalParams - (largest.cond.value as unknown[]).length;
-      const chunkSize = Math.max(1, D1_MAX_PARAMS - otherParams);
-      const fullArray = largest.cond.value as unknown[];
-
-      const allRows: Record<string, unknown>[] = [];
-      for (let i = 0; i < fullArray.length; i += chunkSize) {
-        const chunk = fullArray.slice(i, i + chunkSize);
-        const chunkedWhere = [...(p.where ?? [])];
-        chunkedWhere[largest.idx] = { ...largest.cond, value: chunk };
-        const chunkedPayload = { ...p, where: chunkedWhere };
-        const result = await db.run(buildSelectSql(chunkedPayload));
-        const rows = ((result as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
-        allRows.push(...rows);
-      }
-      return allRows;
-    }
-
-    const rawRows = await executeWithAutoChunk(payload);
+    // IN 목록을 json_each의 단일 매개변수로 바인딩하므로 전역 정렬/페이지를 유지한다.
+    // 정책 판정에는 소유자 컬럼이 필요하다. 요청 컬럼 투영은 권한 필터 이후에 한다.
+    const result = await db.run(buildSelectSql({ ...payload, columns: undefined }));
+    const rawRows = ((result as { results?: unknown[] }).results ?? []) as Record<string, unknown>[];
     const filtered = await filterByPolicy(db, claims, payload.table, rawRows);
     // jsonb/배열 컬럼을 TEXT → 객체/배열로 역직렬화 (수정 1)
-    const deserialized = deserializeRows(payload.table, filtered);
+    const decoded = deserializeRows(payload.table, filtered);
+    const deserialized = payload.columns?.length
+      ? decoded.map((row) => Object.fromEntries(payload.columns!.filter((key) => Object.prototype.hasOwnProperty.call(row, key)).map((key) => [key, row[key]])))
+      : decoded;
 
     if (payload.single) {
       if (deserialized.length === 0) {

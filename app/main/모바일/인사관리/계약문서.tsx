@@ -1,4 +1,5 @@
 'use client';
+import HrLoadError from './HrLoadError';
  
 
 /**
@@ -124,7 +125,8 @@ export default function 계약문서({ staffId, company, user, onBack }: SHrDocs
 
 // ─── 내 문서 ───────────────────────────────────────────────────
 function MineTab({ staffId }: { staffId: string | null }) {
-  const { docs, loading } = useMyContractDocs(staffId);
+  const { docs, loading, error, reload } = useMyContractDocs(staffId);
+  if (error) return <HrLoadError error={error} reload={reload} />;
   if (loading) return <Loading />;
   if (docs.length === 0) {
     return <EmptyState text="보관된 문서가 없습니다." />;

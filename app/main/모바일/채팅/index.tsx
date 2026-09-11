@@ -111,10 +111,10 @@ function MobileChat({
   }, [view, selectedRoomId, rooms, refreshRooms]);
 
   const roomsRef = useRef<MobileChatRoom[]>(rooms);
-  roomsRef.current = rooms;
+  useEffect(() => { roomsRef.current = rooms; }, [rooms]);
 
   const onConsumeRef = useRef(onConsumeInitialRoomId);
-  onConsumeRef.current = onConsumeInitialRoomId;
+  useEffect(() => { onConsumeRef.current = onConsumeInitialRoomId; }, [onConsumeInitialRoomId]);
 
   const openRoom = useCallback((roomId: string, messageId?: string) => {
     const found = roomsRef.current.find((r) => String(r.id) === roomId) ?? null;

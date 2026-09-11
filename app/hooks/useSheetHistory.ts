@@ -22,7 +22,7 @@ export function useSheetHistory(open: boolean, onClose: () => void): void {
   const pushedRef = useRef(false);
   const closedByPopRef = useRef(false);
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

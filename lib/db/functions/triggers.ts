@@ -17,7 +17,7 @@
 // 라우트에서 INSERT/UPDATE 직후 호출.
 // ============================================================
 
-import { sql, eq, desc } from 'drizzle-orm';
+import { sql, eq, desc, and } from 'drizzle-orm';
 import type { D1Client } from '../client-d1';
 import { chat_rooms, messages } from '../schema';
 import { buildChatRoomPreview } from '@/lib/chat-room-preview';
@@ -50,7 +50,7 @@ export async function updateChatRoomLastMessage(
       last_message: contentText || fileNameText,
       last_message_at: args.created_at,
       last_message_preview: preview })
-    .where(eq(chat_rooms.id, args.room_id))
+    .where(and(eq(chat_rooms.id, args.room_id), sql`(${chat_rooms.last_message_at} IS NULL OR julianday(${chat_rooms.last_message_at}) <= julianday(${args.created_at}))`))
     .run();
 }
 
@@ -77,7 +77,7 @@ export async function refreshChatRoomLastMessage(
       is_deleted: messages.is_deleted })
     .from(messages)
     .where(eq(messages.room_id, roomId))
-    .orderBy(desc(messages.created_at), desc(messages.id))
+    .orderBy(desc(sql`julianday(${messages.created_at})`), desc(messages.id))
     .limit(1);
 
   const latest = rows[0];

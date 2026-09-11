@@ -5,6 +5,7 @@ import { db } from '@/lib/db-client';
 import type { StaffMember, ErpUser } from '@/types';
 import { toast } from '@/lib/toast';
 import { formatKoreanClock } from '@/lib/date-formatter';
+import HrLoadError from './HrLoadError';
 import MIcon from '../공통/MIcon';
 import MChip from '../공통/MChip';
 import MBtn from '../공통/MBtn';
@@ -99,7 +100,7 @@ export default function 근태관리자({ staffs, company, user }: AdminAttendPr
   }, [activeStaffs, todayAttendances]);
 
   // 2. 근태이상 감지 탭 데이터 연동
-  const { rows: abnormalRows, loading: abnormalLoading } = useTeamAbnormalByDay(company, reloadKey);
+  const { rows: abnormalRows, loading: abnormalLoading, error: abnormalError, reload: reloadAbnormal } = useTeamAbnormalByDay(company, reloadKey);
 
   const handleSendClarify = async (row: any) => {
     const result = await requestAttendanceClarificationDaily({
@@ -137,6 +138,7 @@ export default function 근태관리자({ staffs, company, user }: AdminAttendPr
 
   return (
     <div style={{ padding: '0 0 24px' }}>
+      <HrLoadError error={abnormalError} reload={reloadAbnormal} />
       {/* 서브 세그먼트 */}
       <div
         style={{

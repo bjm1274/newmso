@@ -1,11 +1,4 @@
 import { normalizeProfileUser } from './profile-photo';
-import {
-  getD1Binding,
-  getD1Drizzle,
-  staff_members as staffMembersTable,
-  eq,
-  or,
-} from '@/lib/db';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -348,6 +341,7 @@ export async function resolveLatestSessionUser(sessionUser: unknown): Promise<Se
 
   if (!sessionUserId && !sessionEmployeeNo && !sessionName) return normalizedUser;
 
+  const { getD1Binding, getD1Drizzle, staff_members: staffMembersTable, eq, or } = await import('@/lib/db');
   const d1 = await getD1Binding();
   if (!d1) return normalizedUser;
   const db = getD1Drizzle(d1);
@@ -631,6 +625,7 @@ export async function readSessionFromRequest(
 
   const staffId = String(session.user.id ?? '').trim();
   if (!staffId) return session;
+  const { getD1Binding, getD1Drizzle, staff_members: staffMembersTable, eq, or } = await import('@/lib/db');
   const d1 = await getD1Binding();
   if (!d1) return session;
   if (await isStaffForceLoggedOutInDb(d1, staffId, session.iat)) return null;

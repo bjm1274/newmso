@@ -75,7 +75,8 @@ async function fetchMaxCreatedAtD1(
     }
   }
   
-  query += ` ORDER BY "${column}" DESC LIMIT 1`;
+  const timeOrder = tableName === 'messages' || tableName === 'chat_rooms' ? `julianday("${column}")` : `"${column}"`;
+  query += ` ORDER BY ${timeOrder} DESC LIMIT 1`;
 
   try {
     const statement = d1.prepare(query);

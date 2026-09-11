@@ -23,7 +23,7 @@
  * JM, JM2, JM3, JM4, JM6 준수
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { StaffMember } from '@/types';
 import { toast } from '@/lib/toast';
 import {
@@ -67,6 +67,7 @@ export default function LeaveWorkcenter({
   selectedCo,
   user = null,
   onRefresh }: LeaveWorkcenterProps) {
+  const dataScopeRef = useRef('');
   const [data, setData] = useState<LeaveDataResult>(EMPTY_RESULT);
   const [loading, setLoading] = useState(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
@@ -357,6 +358,12 @@ export default function LeaveWorkcenter({
 
   // 데이터 로드 — AbortController (JM2/JM3)
   useEffect(() => {
+    const scope = String(user?.id || '') + ':' + (selectedCo || '전체');
+    if (dataScopeRef.current !== scope) {
+      dataScopeRef.current = scope;
+      setData(EMPTY_RESULT);
+      setPicked(null);
+    }
     const controller = new AbortController();
     let alive = true;
     setLoading(true);
@@ -373,7 +380,6 @@ export default function LeaveWorkcenter({
         if (controller.signal.aborted) return;
         console.error('연차 워크센터 데이터 로드 실패:', error);
         if (!alive) return;
-        setData(EMPTY_RESULT);
         setErrMsg('연차 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
       })
       .finally(() => {
@@ -383,7 +389,7 @@ export default function LeaveWorkcenter({
       alive = false;
       controller.abort();
     };
-  }, [staffs, selectedCo, reloadKey]);
+  }, [staffs, selectedCo, reloadKey, user?.id]);
 
   // KPI 계산 (memo — staffs/data 변경 시만)
   const kpis = useMemo<WorkcenterKpi[]>(() => {

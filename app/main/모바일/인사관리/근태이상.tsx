@@ -32,6 +32,7 @@ import {
 import AbnormalDailyCard, { type DailyRowStatus } from './근태이상카드';
 import { usePullToRefresh } from '../공통/usePullToRefresh';
 import PullRefreshIndicator from '../공통/PullRefreshIndicator';
+import HrLoadError from './HrLoadError';
 import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 
 export type SHrAbnormalTab = 'mine' | 'team';
@@ -47,7 +48,7 @@ export default function 근태이상({ user, onBack }: SHrAbnormalProps) {
   const monthKey = useDerivedMonthKey(cursor);
   const staffId = useResolvedStaffId(user as Record<string, unknown>);
   const company = typeof user.company === 'string' ? user.company : undefined;
-  const { rows } = useMyAttendanceMonth(staffId, monthKey);
+  const { rows, error, reload } = useMyAttendanceMonth(staffId, monthKey);
   const mine = useMemo(() => deriveAbnormalRows(rows), [rows]);
   const isManager = canSeeTeamAbnormal(user);
 
@@ -55,7 +56,7 @@ export default function 근태이상({ user, onBack }: SHrAbnormalProps) {
     onRefresh: async () => {
       // useMyAttendanceMonth는 monthKey 변경으로만 재조회가 가능.
       // PTR 시 짧은 딜레이로 시각 피드백만 제공 (이미 최신 데이터 표시 중)
-      await new Promise<void>((r) => setTimeout(r, 500));
+      reload();
     },
     enabled: !!staffId });
 
@@ -65,6 +66,7 @@ export default function 근태이상({ user, onBack }: SHrAbnormalProps) {
 
   return (
     <div className="m-screen">
+      <HrLoadError error={error} reload={reload} />
       <PullRefreshIndicator refreshing={refreshing} pullProgress={pullProgress} />
       <MobileHeader
         title="근태이상 감지"
@@ -273,7 +275,7 @@ function dailyRowKey(row: { staffId: string; date: string }): string {
 
 function TeamTab({ user, company }: { user: ErpUser; company?: string }) {
   const [reloadKey, setReloadKey] = useState(0);
-  const { rows, loading } = useTeamAbnormalByDay(company, reloadKey);
+  const { rows, loading, error, reload } = useTeamAbnormalByDay(company, reloadKey);
   const [statusByRow, setStatusByRow] = useState<Record<string, DailyRowStatus>>({});
 
   const canMutate = useMemo(() => canMutateTeamAbnormal(user), [user]);
@@ -339,6 +341,7 @@ function TeamTab({ user, company }: { user: ErpUser; company?: string }) {
     [canMutate, statusByRow, user],
   );
 
+  if (error) return <HrLoadError error={error} reload={reload} />;
   if (loading) {
     return (
       <div

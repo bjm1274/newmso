@@ -516,15 +516,20 @@ function CameraScanner(scannerProps: Record<string, unknown>) {
     }, []);
 
     useEffect(() => {
+        let disposed = false;
+        let cameraStream: MediaStream | null = null;
         async function startCamera() {
             try {
                 const s = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
                 });
+                if (disposed) { s.getTracks().forEach(track => track.stop()); return; }
+                cameraStream = s;
                 setStream(s);
                 if (videoRef.current) videoRef.current.srcObject = s;
                 setIsLoading(false);
             } catch (err) {
+                if (disposed) return;
                 console.error("Camera access denied:", err);
                 toast("카메라 권한이 필요합니다. 모바일 브라우저 설정을 확인해 주세요.", 'warning');
                 onClose();
@@ -532,7 +537,8 @@ function CameraScanner(scannerProps: Record<string, unknown>) {
         }
         startCamera();
         return () => {
-            stream?.getTracks().forEach(track => track.stop());
+            disposed = true;
+            cameraStream?.getTracks().forEach(track => track.stop());
         };
     }, []);
 

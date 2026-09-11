@@ -11,6 +11,7 @@ import type { D1Database, D1PreparedStatement, D1Result, D1ExecResult } from './
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/d1';
 import { getSqliteDb } from './sqlite-manager';
+import { runAutoMigration } from './auto-migrate';
 import * as schema from './schema';
 import * as relations from './relations';
 
@@ -182,7 +183,10 @@ export function getSqliteD1Adapter(customDb?: Database.Database): D1Database {
     return new SqliteD1Adapter(customDb) as unknown as D1Database;
   }
   if (!cachedAdapter) {
-    cachedAdapter = new SqliteD1Adapter();
+    const nativeDb = getSqliteDb();
+    const migration = runAutoMigration(nativeDb);
+    if (!migration.success) throw new Error('DB 마이그레이션 실패: ' + migration.errors.join('; '));
+    cachedAdapter = new SqliteD1Adapter(nativeDb);
     if (typeof globalThis !== 'undefined') {
       (globalThis as any).__allerp_sqlite_adapter = cachedAdapter;
     }

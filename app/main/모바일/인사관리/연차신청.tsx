@@ -1,4 +1,5 @@
 'use client';
+import HrLoadError from './HrLoadError';
 
 /**
  * SFormLeave — 모바일 인사관리: 연차 신청 폼
@@ -63,7 +64,7 @@ export default function 연차신청({
   staffName,
   user,
   onBack }: SFormLeaveProps) {
-  const { data, reload } = useMyLeaveBalance(staffId);
+  const { data, reload, error, loading } = useMyLeaveBalance(staffId);
   const fieldId = useFieldIdPrefix('form-leave');
   const company = typeof user.company === 'string' ? user.company.trim() : '';
 
@@ -89,6 +90,7 @@ export default function 연차신청({
     approver.approverLine.length > 0;
 
   const handleSubmit = async () => {
+    if (loading || error) return;
     if (!staffId) {
       toast('계정 정보를 확인할 수 없습니다.', 'error');
       return;
@@ -179,12 +181,13 @@ export default function 연차신청({
 
   return (
     <div className="m-screen">
+      <HrLoadError error={error} reload={() => { void reload(true); }} />
       <MFormHeader
         onCancel={onBack}
         title="연차 신청"
         saveLabel={submitting ? '제출 중...' : '결재 올림'}
         onSave={handleSubmit}
-        saveDisabled={!canSubmit || submitting}
+        saveDisabled={!canSubmit || submitting || loading || Boolean(error)}
       />
       <div className="m-scroll">
         {/* 잔여 hero */}

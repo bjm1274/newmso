@@ -1,5 +1,6 @@
 'use client';
 import { Component, ReactNode, ErrorInfo } from 'react';
+import { handleStaleBuild, isChunkLoadFailure } from '@/lib/stale-build-guard';
 
 type Props = { children: ReactNode };
 type State = {
@@ -49,29 +50,7 @@ export default class ErrorBoundary extends Component<Props, State> {
         log.push({ error: String(error), stack: error.stack, info: errorInfo.componentStack, time: new Date().toISOString() });
       }
 
-      // Chunk Load Error (배포 후 구버전 캐시로 인한 청크 유실) 감지 시 자동 1회 새로고침 시도
-      const errorMessage = error?.message || '';
-      const isChunkError = errorMessage.toLowerCase().includes('chunk') || errorMessage.toLowerCase().includes('loading css chunk');
-      if (isChunkError) {
-        try {
-          const chunkReloadKey = 'chunk-error-reloaded';
-          const hasReloaded = sessionStorage.getItem(chunkReloadKey);
-          if (!hasReloaded) {
-            sessionStorage.setItem(chunkReloadKey, 'true');
-            window.location.reload();
-          }
-        } catch (e) {
-          console.error('Failed to auto-reload on chunk error:', e);
-        }
-      }
-    }
-  }
-
-  componentDidMount() {
-    if (typeof window !== 'undefined') {
-      try {
-        sessionStorage.removeItem('chunk-error-reloaded');
-      } catch (e) {}
+      if (isChunkLoadFailure(error)) handleStaleBuild();
     }
   }
 

@@ -89,7 +89,9 @@ export type PolicyPattern =
    */
   | 'SAME_COMPANY_TEAM_VISIBLE'
   /** 채팅: room 멤버(또는 notice/admin)만 행 접근 — filterByPolicy 에서 배치 평가 */
-  | 'CHAT_ROOM_MEMBER';
+  | 'CHAT_ROOM_MEMBER'
+  | 'CHAT_MESSAGE_MEMBER'
+  | 'MANAGE_STAFF';
 
 export type Op = 'select' | 'insert' | 'update' | 'delete';
 
@@ -1891,6 +1893,58 @@ if (!POLICY_REGISTRY['onboarding_checklists']) {
   };
 }
 
+// 민감 직원 자료는 로그인만으로 공개하지 않는다.
+POLICY_REGISTRY.retirement_pensions = {
+  table: 'retirement_pensions', select: 'STAFF_IN_SCOPE',
+  insert: 'MANAGE_STAFF', update: 'MANAGE_STAFF', delete: 'MANAGE_STAFF',
+  asyncGuards: { insert: manageStaffGuard, update: manageStaffGuard },
+};
+POLICY_REGISTRY.payroll_records = {
+  ...POLICY_REGISTRY.payroll_records,
+  insert: 'MANAGE_STAFF', update: 'MANAGE_STAFF',
+  asyncGuards: { insert: manageStaffGuard, update: manageStaffGuard },
+};
+for (const table of ['tax_reports', 'freelancer_payments']) {
+  POLICY_REGISTRY[table] = {
+    ...POLICY_REGISTRY[table], select: 'FINANCE_SCOPE',
+    insert: 'FINANCE_SCOPE', update: 'FINANCE_SCOPE', companyNameField: 'company_name',
+  };
+}
+POLICY_REGISTRY.pinned_messages = {
+  table: 'pinned_messages', select: 'CHAT_MESSAGE_MEMBER',
+  insert: 'CHAT_MESSAGE_MEMBER', update: 'CHAT_MESSAGE_MEMBER', delete: 'CHAT_MESSAGE_MEMBER',
+  asyncGuards: { insert: messageMetadataGuard, update: messageMetadataGuard },
+};
+POLICY_REGISTRY.message_reactions = {
+  ...POLICY_REGISTRY.message_reactions, select: 'CHAT_MESSAGE_MEMBER',
+  asyncGuards: { insert: messageMetadataGuard, update: messageMetadataGuard },
+};
+POLICY_REGISTRY.room_read_cursors = {
+  ...POLICY_REGISTRY.room_read_cursors, select: 'CHAT_ROOM_MEMBER',
+  asyncGuards: { insert: roomMetadataGuard, update: roomMetadataGuard },
+};
+
+async function manageStaffGuard(db: D1Client, claims: ErpClaims, row: Record<string, unknown>) {
+  if (erpIsAdmin(claims)) return true;
+  const target = String(row.staff_id ?? '').trim();
+  return Boolean(target) && erpCanManageCompany(claims) && await erpTargetStaffSameCompany(db, claims, target);
+}
+async function roomMetadataGuard(db: D1Client, claims: ErpClaims, row: Record<string, unknown>) {
+  const roomId = String(row.room_id ?? '').trim();
+  if (!roomId) return false;
+  const room = await loadChatRoomMembership(db, roomId);
+  if (!room) return false;
+  return erpIsAdmin(claims) || canAccessChatRoom(room, erpStaffId(claims) || '');
+}
+async function messageMetadataGuard(db: D1Client, claims: ErpClaims, row: Record<string, unknown>) {
+  const messageId = String(row.message_id ?? '').trim();
+  if (!messageId) return false;
+  const [message] = await db.select({ room_id: messages.room_id }).from(messages).where(eq(messages.id, messageId)).limit(1);
+  if (!message?.room_id) return false;
+  if (row.room_id != null && String(row.room_id) !== message.room_id) return false;
+  return roomMetadataGuard(db, claims, { room_id: message.room_id });
+}
+
 // ─────────────────────────────────────────────────────────────
 // 패턴 평가
 // ─────────────────────────────────────────────────────────────
@@ -1906,6 +1960,8 @@ async function evalPattern(
   row: Record<string, unknown>,
   cfg: TablePolicy,
 ): Promise<boolean> {
+  if (pattern === 'MANAGE_STAFF') return manageStaffGuard(db, claims, row);
+  if (pattern === 'CHAT_MESSAGE_MEMBER') return messageMetadataGuard(db, claims, row);
   if (pattern === 'PUBLIC') return true;
   if (pattern === 'AUTHENTICATED') return erpStaffId(claims) !== null;
   if (pattern === 'ADMIN_ONLY') return erpIsAdmin(claims);

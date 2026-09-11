@@ -1,4 +1,5 @@
 'use client';
+import HrLoadError from './HrLoadError';
 
 /**
  * 오프보딩 (모바일) — 데스크톱 OffboardingView(인사관리서브/오프보딩)를
@@ -35,10 +36,11 @@ export type 오프보딩Props = {
 
 export default function 오프보딩({ company, onBack }: 오프보딩Props) {
   // 오프보딩 진행 탭은 재직자, 이력 탭은 퇴사자를 함께 다루므로 퇴사자 포함 조회.
-  const { staffs, loading } = useStaffList({ company, includeResigned: true });
+  const { staffs, loading, error, reload } = useStaffList({ company, includeResigned: true });
 
   return (
     <div className="m-screen">
+      <HrLoadError error={error} reload={reload} />
       <MobileHeader title="오프보딩" sub={company || '인사관리'} back={onBack} />
       <div className="m-scroll" style={{ overflowX: 'auto' }}>
         {loading ? (

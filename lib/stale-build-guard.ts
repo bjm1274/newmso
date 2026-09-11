@@ -25,7 +25,7 @@ const RELOAD_GUARD_KEY = 'erp_stale_build_reloaded_at';
 const RELOAD_COOLDOWN_MS = 60_000;
 
 /** 청크 로드 실패인지 — 브라우저·번들러마다 문구가 다르다. */
-function isChunkLoadFailure(reason: unknown): boolean {
+export function isChunkLoadFailure(reason: unknown): boolean {
   if (!reason) return false;
   const name = String((reason as { name?: string }).name ?? '');
   if (name === 'ChunkLoadError') return true;
@@ -44,7 +44,7 @@ function recentlyReloaded(): boolean {
     if (!raw) return false;
     return Date.now() - Number(raw) < RELOAD_COOLDOWN_MS;
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -56,7 +56,7 @@ function markReloaded() {
   }
 }
 
-function handleStaleBuild() {
+export function handleStaleBuild() {
   if (recentlyReloaded()) {
     // 이미 한 번 새로고침했는데 또 실패했다 — 배포 문제가 아니라 네트워크일 수 있다.
     // 무한 새로고침 대신 사용자에게 맡긴다.

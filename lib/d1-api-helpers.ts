@@ -4,6 +4,7 @@
  * userId / claims 빌드, bind value 정규화, WHERE SQL 생성.
  */
 import { sql, type SQL } from 'drizzle-orm';
+import { orderedColumn, comparisonValue } from './d1-time-sql';
 import type { SessionUser } from '@/lib/server-session';
 import type { ErpClaims } from '@/lib/db/auth/claims';
 
@@ -195,12 +196,14 @@ export type WhereCond = { field: string; op: string; value: unknown };
  * WHERE 조건 배열 → drizzle SQL 조각.
  * like/ilike 모두 ESCAPE '\' 적용 (query 경로의 더 완전한 처리 통합).
  */
-export function buildWhereSql(where: WhereCond[] | undefined | null): SQL[] {
+export function buildWhereSql(where: WhereCond[] | undefined | null, table?: string): SQL[] {
   if (!where || where.length === 0) return [];
   const out: SQL[] = [];
   for (const cond of where) {
-    const col = sql.identifier(cond.field);
-    const value = normalizeBindValue(cond.value);
+    const compareTime = ['eq', 'neq', 'lt', 'gt', 'lte', 'gte'].includes(cond.op);
+    const col = compareTime ? orderedColumn(table, cond.field) : sql.identifier(cond.field);
+    const normalized = normalizeBindValue(cond.value);
+    const value = compareTime ? comparisonValue(table, cond.field, normalized) : normalized;
     if (cond.op === 'eq') out.push(sql`${col} = ${value}`);
     else if (cond.op === 'neq') out.push(sql`${col} != ${value}`);
     else if (cond.op === 'lt') out.push(sql`${col} < ${value}`);
@@ -226,7 +229,7 @@ export function buildWhereSql(where: WhereCond[] | undefined | null): SQL[] {
       if (arr.length === 0) {
         out.push(sql`1 = 0`); // empty in → no match
       } else {
-        out.push(sql`${col} IN (${sql.join(arr.map((v) => sql`${v}`), sql`, `)})`);
+        out.push(sql`${col} IN (SELECT value FROM json_each(${JSON.stringify(arr)}))`);
       }
     } else if (cond.op === 'contains') {
       const jsonStr = typeof value === 'object' ? JSON.stringify(value) : String(value);

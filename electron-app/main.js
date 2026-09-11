@@ -11,6 +11,25 @@ const {
 const path = require('path');
 const fs = require('fs');
 
+// 본문·토큰 없이 프로세스 종료 원인만 사용자 데이터 폴더에 기록합니다.
+function logProcessFailure(kind, details) {
+  try {
+    const target = path.join(app.getPath('userData'), 'process-failures.log');
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    if (fs.existsSync(target) && fs.statSync(target).size > 1024 * 1024) fs.renameSync(target, target + '.previous');
+    fs.appendFileSync(target, JSON.stringify({ at: new Date().toISOString(), kind, ...details }) + '\n');
+  } catch { /* 로그 실패가 앱 종료를 유발하지 않게 합니다. */ }
+}
+app.on('render-process-gone', (_event, _contents, details) => {
+  logProcessFailure('renderer', { reason: details.reason, exitCode: details.exitCode });
+});
+app.on('child-process-gone', (_event, details) => {
+  logProcessFailure('child', { type: details.type, reason: details.reason, exitCode: details.exitCode });
+});
+process.on('uncaughtExceptionMonitor', (error, origin) => {
+  logProcessFailure('main', { origin, name: error.name });
+});
+
 // Windows 토스트: AppUserModelId 는 ready 이전에 설정해야 Action Center 에 앱 이름으로 표시되고
 // 클릭·포커스가 올바르게 연결된다. (ready 이후 설정 시 팝업이 안 뜨거나 익명 앱으로 뜨는 경우 있음)
 if (process.platform === 'win32') {

@@ -1,4 +1,5 @@
 'use client';
+import HrLoadError from './HrLoadError';
 
 /**
  * SHrLeave — 모바일 인사관리: 연차·휴가
@@ -38,7 +39,7 @@ export type SHrLeaveProps = {
 
 export default function 연차({ staffId, company, user, onBack, onApply }: SHrLeaveProps) {
   const [mode, setMode] = useState<'my' | 'admin'>('my');
-  const { data, loading } = useMyLeaveBalance(staffId);
+  const { data, loading, error, reload } = useMyLeaveBalance(staffId);
   const { staffs } = useStaffList({ company, includeResigned: false });
 
   const year = new Date().getFullYear();
@@ -55,6 +56,7 @@ export default function 연차({ staffId, company, user, onBack, onApply }: SHrL
 
   return (
     <div className="m-screen">
+      <HrLoadError error={error} reload={() => { void reload(true); }} />
       <MobileHeader title={mode === 'admin' ? '전사 연차 관리' : '연차·휴가'} sub={`${year}년 잔여`} back={onBack} />
       {isHrAdmin && (
         <div style={{ padding: '8px 16px', background: 'var(--m-card)', borderBottom: '1px solid var(--m-border)' }}>

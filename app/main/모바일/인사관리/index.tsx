@@ -1,4 +1,5 @@
 'use client';
+import HrLoadError from './HrLoadError';
  
 
 /**
@@ -218,7 +219,7 @@ function Hub({
   // 1. Gather all unique companies in the database
   // 2. Compute accurate stats locally
   // limit 높게: 회사 목록·KPI 집계 누락 방지
-  const { staffs: allStaffs, loading } = useStaffList({ includeResigned: true, limit: 1000 });
+  const { staffs: allStaffs, loading, error, reload } = useStaffList({ includeResigned: true, limit: 1000 });
   const [isCompanySheetOpen, setIsCompanySheetOpen] = useState(false);
 
   // Filter staff by currently selected company
@@ -303,6 +304,7 @@ function Hub({
 
   return (
     <div className="m-screen">
+      <HrLoadError error={error} reload={reload} />
       <MobileHeader
         title="인사관리"
         eyebrow="운영"

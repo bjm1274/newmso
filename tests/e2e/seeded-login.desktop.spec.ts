@@ -21,8 +21,8 @@ const PASSWORD = process.env.E2E_TEST_PASSWORD || 'E2ePassw0rd!';
 
 test.describe('로컬 D1 시드 기반 실제 로그인', () => {
   test.skip(
-    Boolean(process.env.CI) || Boolean(process.env.E2E_SKIP_SEED),
-    'CI(production build)에는 로컬 D1 바인딩이 없어 시드 기반 로그인을 검증할 수 없음'
+    Boolean(process.env.E2E_SKIP_SEED),
+    '명시적으로 시드 검사를 건너뜀'
   );
 
   test.beforeEach(async ({ page }) => {

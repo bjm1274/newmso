@@ -65,7 +65,7 @@ const eslintConfig = defineConfig([
   {
     // Electron 메인·프리로드 프로세스는 CommonJS 로 동작한다.
     // ESM import 로 바꾸면 Electron 이 로드하지 못하므로 require() 를 허용한다.
-    files: ["electron-app/**/*.js"],
+    files: ["electron-app/**/*.js", "scripts/**/*.js", "scripts/**/*.cjs"],
     rules: {
       "@typescript-eslint/no-require-imports": "off",
     },
@@ -93,6 +93,8 @@ const eslintConfig = defineConfig([
     "handoff/**",
     "backups/**",
     "scratch/**",
+    ".scratch-r/**",
+    "docs/audits/**",
     "scratch_zip/**",
     "tmp/**",
     "tmp_orphan/**",
