@@ -89,7 +89,7 @@ export default function SApprovalRef({
   }, [rows, readMap]);
 
   return (
-    <div className="m-screen" style={{ background: 'transparent' }}>
+    <div className="m-screen">
       <MobileHeader
         title="참조 문서함"
         sub={`내가 참조 · ${unreadCount}건 미열람`}

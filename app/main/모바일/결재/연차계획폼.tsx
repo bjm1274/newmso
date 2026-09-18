@@ -122,7 +122,7 @@ export default function SApprovalLeavePlanForm({
   }, [staffId, sortedDates, remaining, reason, approver, user, company, formSlug, formName, onSubmitted]);
 
   return (
-    <div className="m-screen" style={{ background: 'transparent' }}>
+    <div className="m-screen">
       <MFormHeader
         onCancel={onCancel}
         title={formName}
@@ -131,7 +131,7 @@ export default function SApprovalLeavePlanForm({
         onSave={handleSubmit}
         saveDisabled={!canSubmit || submitting}
       />
-      <div className="m-scroll" style={{ background: 'transparent' }}>
+      <div className="m-scroll">
         {/* 잔여 연차 요약 배너 */}
         <div
           className="macos-glass macos-squircle"

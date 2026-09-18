@@ -26,6 +26,9 @@ export const dynamic = 'force-dynamic';
 
 /** 한 요청에서 집계할 수 있는 방 수 상한 — 무제한 IN 절을 막는다. */
 const MAX_ROOMS = 300;
+/** D1 bound parameter 한도 100. 집계 SQL 은 userId 1개 + 방당 최대 2개. */
+const D1_MAX_PARAMS = 100;
+const UNREAD_COUNT_CHUNK = 40;
 
 type RoomRequest = { roomId: string; cursor: string | null };
 
@@ -74,24 +77,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   try {
     /*
-     * 멤버십은 한 번에 확인한다.
-     *
-     * 처음에는 방마다 loadChatRoomMembership 을 await 했다. 방이 40개면 워커
-     * 안에서 D1 왕복이 40번, 그것도 방 목록 폴링마다 5초 간격으로 — 행을
-     * 내려받던 예전보다 오히려 느려졌다. IN 한 문장으로 받는다.
+     * 멤버십은 IN 절로 확인하되 D1 bind 한도(100)를 넘지 않게 청크한다.
+     * 처음에는 방마다 loadChatRoomMembership 을 await 해서 방이 40개면 워커
+     * 안에서 D1 왕복이 40번이었다.
      */
     const roomIds = rooms.map((room) => room.roomId);
-    const placeholders = roomIds.map(() => '?').join(', ');
-    const membershipRows = await d1
-      .prepare(`SELECT id, type, members FROM chat_rooms WHERE id IN (${placeholders})`)
-      .bind(...roomIds)
-      .all<{ id: string; type: string | null; members: unknown }>();
-
     const membershipById = new Map<string, { type: string | null; members: string[] }>();
-    for (const row of membershipRows.results ?? []) {
-      membershipById.set(String(row.id), {
-        type: row.type ?? null,
-        members: parseMembersField(row.members) });
+    const membershipChunk = Math.max(1, D1_MAX_PARAMS - 1);
+    for (let i = 0; i < roomIds.length; i += membershipChunk) {
+      const slice = roomIds.slice(i, i + membershipChunk);
+      const placeholders = slice.map(() => '?').join(', ');
+      const membershipRows = await d1
+        .prepare(`SELECT id, type, members FROM chat_rooms WHERE id IN (${placeholders})`)
+        .bind(...slice)
+        .all<{ id: string; type: string | null; members: unknown }>();
+      for (const row of membershipRows.results ?? []) {
+        membershipById.set(String(row.id), {
+          type: row.type ?? null,
+          members: parseMembersField(row.members) });
+      }
     }
 
     const allowed = rooms.filter((room) => {
@@ -105,39 +109,43 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // 커서가 있는 방과 없는 방을 한 문장에서 함께 센다.
     //   (room_id = ? AND created_at > ?)  또는  (room_id = ?)
     // 파라미터 바인딩만 쓴다 — roomId·커서를 SQL 에 문자열로 붙이지 않는다.
-    const clauses: string[] = [];
-    const binds: string[] = [];
-    for (const room of allowed) {
-      if (room.cursor) {
-        clauses.push('(room_id = ? AND created_at > ?)');
-        binds.push(room.roomId, room.cursor);
-      } else {
-        clauses.push('(room_id = ?)');
-        binds.push(room.roomId);
-      }
-    }
-
     // sender_id 는 공지방 자동공지(휴가·생일·게시판 브로드캐스트)에서 NULL 이다.
     // SQL 3값 논리로 `NULL <> 'uid'` 는 참이 아니라 UNKNOWN 이라, 그냥 `sender_id <> ?`
     // 로 두면 자동공지가 안읽음 집계에서 통째로 빠진다(10차 CHAT-01 — 공지방 커서 보유
     // 45명 전원에서 누적 1,225건 누락). 내가 보낸 것이 아닌 것을 세는 것이 원래 의도이므로
     // NULL 발신자는 포함해야 한다.
-    const sql =
-      'SELECT room_id, COUNT(*) AS n FROM messages' +
-      ' WHERE is_deleted = 0 AND (sender_id IS NULL OR sender_id <> ?)' +
-      ` AND (${clauses.join(' OR ')})` +
-      ' GROUP BY room_id';
-
-    const result = await d1
-      .prepare(sql)
-      .bind(userId, ...binds)
-      .all<{ room_id: string; n: number }>();
-
+    //
+    // D1 은 bind 101개부터 `too many SQL variables`. 방 50개 이상(이나림·김이지 등)은
+    // 청크로 나눠 집계한다. 방당 최대 2 bind + userId 1 → 40방 = 81 bind.
     const counts: Record<string, number> = {};
     for (const room of allowed) counts[room.roomId] = 0;
-    for (const row of result.results ?? []) {
-      const roomId = String(row.room_id ?? '').trim();
-      if (roomId in counts) counts[roomId] = Number(row.n) || 0;
+
+    for (let i = 0; i < allowed.length; i += UNREAD_COUNT_CHUNK) {
+      const slice = allowed.slice(i, i + UNREAD_COUNT_CHUNK);
+      const clauses: string[] = [];
+      const binds: string[] = [];
+      for (const room of slice) {
+        if (room.cursor) {
+          clauses.push('(room_id = ? AND created_at > ?)');
+          binds.push(room.roomId, room.cursor);
+        } else {
+          clauses.push('(room_id = ?)');
+          binds.push(room.roomId);
+        }
+      }
+      const sql =
+        'SELECT room_id, COUNT(*) AS n FROM messages' +
+        ' WHERE is_deleted = 0 AND (sender_id IS NULL OR sender_id <> ?)' +
+        ` AND (${clauses.join(' OR ')})` +
+        ' GROUP BY room_id';
+      const result = await d1
+        .prepare(sql)
+        .bind(userId, ...binds)
+        .all<{ room_id: string; n: number }>();
+      for (const row of result.results ?? []) {
+        const roomId = String(row.room_id ?? '').trim();
+        if (roomId in counts) counts[roomId] = Number(row.n) || 0;
+      }
     }
 
     return NextResponse.json({ ok: true, counts });

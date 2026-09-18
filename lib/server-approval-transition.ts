@@ -3,6 +3,7 @@ import {
   getApprovalRevision,
   lockApprovalMeta } from '@/lib/approval-workflow';
 import { hasPermission } from '@/lib/access-control';
+import { isDepartmentHeadOrAbove } from '@/lib/active-staff';
 import { notificationMatchesApprovalId } from '@/lib/notification-metadata';
 import { processFinalApprovalEffects } from '@/lib/server-approval-processing';
 import {
@@ -29,11 +30,15 @@ type ActorContext = {
   name: string | null;
   company: string | null;
   isAdmin: boolean;
+  position?: string | null;
+  role?: string | null;
 };
 
 type StaffRow = {
   id: string;
   permissions?: Record<string, unknown> | null;
+  position?: string | null;
+  role?: string | null;
 };
 
 export type ApprovalTransitionResult = {
@@ -75,7 +80,11 @@ async function fetchStaffMap(staffIds: string[]) {
   if (!d1) throw new Error('[server-approval-transition] D1 binding not available (fetchStaffMap)');
   const db = getD1Drizzle(d1);
   const rows = await db
-    .select({ id: staffMembersTable.id, permissions: staffMembersTable.permissions })
+    .select({
+      id: staffMembersTable.id,
+      permissions: staffMembersTable.permissions,
+      position: staffMembersTable.position,
+      role: staffMembersTable.role })
     .from(staffMembersTable)
     .where(inArray(staffMembersTable.id, uniqueIds));
   // D1에서 permissions는 TEXT(JSON) → 파싱
@@ -92,7 +101,14 @@ async function fetchStaffMap(staffIds: string[]) {
           parsedPermissions = null;
         }
       }
-      return [String(row.id), { id: String(row.id), permissions: parsedPermissions }];
+      return [
+        String(row.id),
+        {
+          id: String(row.id),
+          permissions: parsedPermissions,
+          position: row.position ?? null,
+          role: row.role ?? null },
+      ];
     })
   );
 }
@@ -505,23 +521,21 @@ async function transitionSingleApproval(params: {
     resolveEffectiveApproverId(currentApproverLineId, staffMap) || currentApproverLineId;
 
   /**
-   * 자기가 올린 문서를 자기가 승인할 수 없다 (관리자 제외).
+   * 일반 직원이 자기 문서를 스스로 승인하면 급여인상·인사발령을 집행할 수 있다.
+   * 그래서 사원급 자기결재는 막는다.
    *
-   * 결재자 라우팅(current_approver_id·approver_line)은 클라이언트 위임 동기화가
-   * 실제로 쓰고 있어 게이트웨이 가드에서 막지 않는다. 그래서 기안자가 문서를
-   * 만들 때 **자기 id 를 결재자로 넣으면** 아래 결재선 검사를 그대로 통과해,
-   * 승인 → status '승인' → /api/approvals/process-final 로 자기 기본급 인상·
-   * 인사발령을 스스로 집행할 수 있었다(9차 P0-D05-001 의 잔여 경로).
-   *
-   * 운영 실측(2026-08-27): 자기결재로 승인된 문서 6건은 **전부 관리자 계정**이고,
-   * 급여인상평가서 13건은 예외 없이 기안자와 결재자가 다르다. 즉 비관리자
-   * 자기결재를 막아도 기존 동작이 바뀌지 않는다.
-   *
-   * 반려는 막지 않는다 — 자기 문서를 스스로 반려하는 것은 회수에 가깝고 피해가 없다.
+   * 과장급 이상(isDepartmentHeadOrAbove)은 전결권이 있으므로 결재선에 본인을
+   * 넣고 승인할 수 있다. role=admin 인 사원(김이지 등)은 직책 기준으로 막는다.
+   * 반려는 회수에 가까워 직급과 무관하게 허용.
    */
   const senderId = String(item.sender_id || '').trim();
+  const actorStaff = staffMap.get(String(actor.id));
+  const actorCanSelfApprove = isDepartmentHeadOrAbove({
+    position: actorStaff?.position ?? actor.position,
+    role: actorStaff?.role ?? actor.role,
+  });
   if (
-    !actor.isAdmin &&
+    !actorCanSelfApprove &&
     action !== 'reject' &&
     senderId !== '' &&
     senderId === String(actor.id)

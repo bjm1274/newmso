@@ -298,8 +298,12 @@ export default function 사고보고서탭({ staffs, company, user }: IncidentRe
           onClick={() => setShowFormModal(false)}
         >
           <div
-            className="w-full max-w-md macos-glass macos-squircle animate-in slide-in-from-bottom duration-250"
+            className="w-full max-w-md macos-squircle animate-in slide-in-from-bottom duration-250"
             style={{
+              background: 'var(--m-card)',
+              border: '1px solid var(--m-border)',
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
               padding: '20px 16px 24px',
               maxHeight: '85vh',
               display: 'flex',

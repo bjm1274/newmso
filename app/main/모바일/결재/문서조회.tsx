@@ -88,17 +88,19 @@ export default function SApprovalDocs({
   const doneList = useMemo(() => completed.filter(filterFn), [completed, filterFn]);
 
   return (
-    <div className="m-screen" style={{ background: 'transparent' }}>
+    <div className="m-screen">
       <MobileHeader
         title="전자결재"
         sub="문서 조회"
         back={onBack}
       />
 
-      {/* 조회 조건 아크릴 카드 */}
+      {/* 조회 조건 카드 */}
       <div
-        className="macos-glass macos-squircle"
+        className="macos-squircle"
         style={{
+          background: 'var(--m-card)',
+          border: '1px solid var(--m-border)',
           padding: '14px 16px',
           margin: '16px',
           display: 'flex',
@@ -121,9 +123,9 @@ export default function SApprovalDocs({
                 width: '100%',
                 height: 40,
                 appearance: 'none',
-                border: '1px solid rgba(0,0,0,0.06)',
+                border: '1px solid var(--m-border)',
                 borderRadius: 8,
-                background: 'rgba(255, 255, 255, 0.6)',
+                background: 'var(--m-card)',
                 padding: '0 38px 0 12px',
                 fontSize: 13,
                 fontWeight: 900,

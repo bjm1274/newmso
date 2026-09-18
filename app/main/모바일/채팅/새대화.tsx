@@ -15,6 +15,7 @@ import { createOrUpsertChatRoom } from '@/lib/chat-rooms-client';
 import { haveSameMembers, normalizeMemberIds } from '@/app/main/기능부품/메신저유틸';
 import { fetchAllChatRooms } from '@/app/main/기능부품/chatQueryService';
 import type { ChatRoom, ErpUser } from '@/types';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 import MIcon from '../공통/MIcon';
 import MAvatar from '../공통/MAvatar';
 import { pickAvatarTone, useChatStaffDirectory, type StaffDirectoryEntry } from './data-hooks';
@@ -30,7 +31,9 @@ export type SFormChatProps = {
 };
 
 export default function SFormChat({ user, onBack, onCreated }: SFormChatProps) {
-  const userId = typeof user.id === 'string' ? user.id : null;
+  const userId =
+    useResolvedStaffId(user as Record<string, unknown>) ||
+    (typeof user.id === 'string' ? user.id : null);
   const company = typeof user.company === 'string' ? user.company : null;
   const staffs = useChatStaffDirectory(company);
   const [tab, setTab] = useState<NewChatTab>('member');

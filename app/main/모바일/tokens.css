@@ -132,7 +132,7 @@
 /* safe-top 은 .mso-mobile 박스 top 으로만 처리 — 화면마다 padding 중복 금지 */
 .mso-mobile .m-screen {
   width: 100%; height: 100%; min-height: 100%;
-  background: var(--m-bg);
+  background: var(--m-bg) !important;
   display: flex; flex-direction: column;
   overflow: hidden;
   position: relative;
@@ -895,3 +895,31 @@
 .mso-mobile .msm-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .mso-mobile .msm-scroll::-webkit-scrollbar { width: 0; }
 .mso-mobile .msm-body { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+/*
+ * macos-glass 는 PC 에서 65% 흰 반투명 + blur 다. 모바일 시트/카드에 그대로 쓰면
+ * 뒤 화면이 비쳐 결재선 변경·채팅 시트·필터 창의 글자가 안 읽힌다.
+ * 모바일은 불투명 카드로 고정한다. !important — globals.css .macos-glass 보다
+ * 늦게 로드돼도 이긴다.
+ */
+.mso-mobile .macos-glass,
+.mso-mobile.dark .macos-glass,
+.mso-mobile .m-card.macos-glass {
+  background: var(--m-card) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid var(--m-border) !important;
+  box-shadow: var(--m-shadow-xs) !important;
+}
+
+/* 바텀시트 — 결재선 변경·채팅 시트·필터. 유리효과 금지. */
+.mso-mobile .m-sheet-panel {
+  background: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: var(--z-900);
+}
+.mso-mobile.dark .m-sheet-panel {
+  background: #18181B !important;
+  color: var(--z-900);
+}

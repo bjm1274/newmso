@@ -1014,10 +1014,8 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
   const isDepartmentHead = isBoardDepartmentHead(user);
 
   // 수정/삭제 판정은 lib/board-permissions 정본에 위임한다.
-  // - 수정: 작성자 본인 또는 부서장/시스템 마스터.
-  //   (일반 직원도 자신이 올린 수술/MRI일정은 '요청'할 수 있어야 해서 작성자 본인을 포함한다.)
-  //   시스템 마스터가 추가된 이유는 정본 헤더 (나) 참고 — 삭제는 되는데 수정은 못 하던 비대칭을 없앴다.
-  // - 삭제: 작성자 본인 또는 시스템 마스터만. 종전과 동일하다.
+  // - 수정: 오직 작성자 본인만 가능. 타인이 작성한 글은 임의로 수정할 수 없다.
+  // - 삭제: 작성자 본인 또는 시스템 마스터만.
   const canEditPost = (post: BoardPost) =>
     canEditBoardPost(user, post as BoardPostLike, effectiveBoardUserId, activeBoard);
 
@@ -1234,7 +1232,13 @@ export default function BoardView({ user, subView, selectedCo, selectedCompanyId
   }, [activeBoard]);
 
   const handleNewPost = async () => {
-    if (!canCreatePost) {
+    if (editingPostId) {
+      const targetPost = posts.find((p) => p.id === editingPostId);
+      if (targetPost && !canEditPost(targetPost)) {
+        toast('본인이 작성한 게시글만 수정할 수 있습니다.', 'error');
+        return;
+      }
+    } else if (!canCreatePost) {
       toast('이 게시판에 글을 작성할 권한이 없습니다.', 'error');
       return;
     }
@@ -1314,7 +1318,14 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
         author_name: useAnonymous ? '익명' : (user?.name || '익명'),
         author_id: useAnonymous ? null : user?.id,
         is_anonymous: useAnonymous };
-      if (!editingPostId) {
+      if (editingPostId) {
+        const originalPost = posts.find((p) => p.id === editingPostId);
+        if (originalPost) {
+          postData.author_id = originalPost.author_id;
+          postData.author_name = originalPost.author_name;
+          postData.is_anonymous = originalPost.is_anonymous;
+        }
+      } else {
         postData.likes_count = 0;
         postData.created_at = new Date().toISOString();
       }
@@ -1426,6 +1437,12 @@ ${familyEventDetail.trim() || '많은 축하와 위로 부탁드립니다.'}`;
 
       // 수정 모드인 경우 업데이트
       if (editingPostId) {
+        const targetPost = posts.find((p) => p.id === editingPostId);
+        if (targetPost && !canEditPost(targetPost)) {
+          toast('본인이 작성한 게시글만 수정할 수 있습니다.', 'error');
+          setLoading(false);
+          return;
+        }
         if (isScheduleBoard && !isDepartmentHead) {
           const confirmed = await openConfirm({
             title: '일정 수정 승인 결재를 상신할까요?',

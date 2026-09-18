@@ -152,5 +152,47 @@ loader=async()=>{throw Error('HTTP 500');};hr.reload();HrHarness();await flush()
 let resolveOld;loader=()=>new Promise(resolve=>{resolveOld=resolve;});hr.reload();HrHarness();
 key='B';loader=async()=>['B 자료'];const switched=HrHarness();assert.equal(switched.data.length,0);await flush();resolveOld(['늦은 A 자료']);await flush();hr=HrHarness();assert.deepEqual(hr.data,['B 자료']);
 record('HR-07',{passed:true,scenario:'인사 재조회 실패 시 성공값 유지, 회사 변경 시 이전 자료 즉시 숨김 및 늦은 응답 폐기'});
+
+const routing=load('lib/approval-routing.ts');
+const activeStaff=load('lib/active-staff.ts');
+const approverDirectory=[
+  {id:'kim-leeji',name:'김이지',role:'admin',position:'사원',company:'SY INC.',status:'재직'},
+  {id:'baek',name:'백정민',role:'admin',position:'이사',company:'SY INC.',status:'재직'},
+  {id:'park',name:'박철홍',role:'admin',position:'병원장',company:'박철홍정형외과',status:'재직'},
+  {id:'gwa',name:'김과장',role:'staff',position:'과장',company:'박철홍정형외과',status:'재직'},
+];
+const hospitalDefault=routing.selectDefaultApproverLine(approverDirectory,{selfId:'gwa',company:'박철홍정형외과',includeSyInc:true,maxCount:3,mode:'head_or_above'});
+assert.equal(hospitalDefault.some((s)=>s.name==='김이지'),false,'김이지는 결재선 기본값에서 빠져야 한다');
+assert.equal(hospitalDefault.some((s)=>s.id==='gwa'),false,'일반 기안 시 본인은 기본 결재선에 자동으로 넣지 않는다');
+assert.equal(hospitalDefault.some((s)=>s.name==='박철홍'),true);
+
+// 과장급 이상 allowSelf: true 지정 시 본인 결재선 포함 허용
+const selfAllowedLine=routing.selectDefaultApproverLine(approverDirectory,{selfId:'gwa',company:'박철홍정형외과',includeSyInc:true,maxCount:3,mode:'head_or_above',allowSelf:true});
+assert.equal(selfAllowedLine.some((s)=>s.id==='gwa'),true,'과장급 이상 allowSelf 시 본인이 결재선에 포함되어야 한다');
+
+// 상위 결재자가 없는 단독 과장 기안 시 자가 전결 자동 매핑
+const soloDirectory=[
+  {id:'kim-leeji',name:'김이지',role:'admin',position:'사원',company:'SY INC.',status:'재직'},
+  {id:'gwa',name:'김과장',role:'staff',position:'과장',company:'박철홍정형외과',status:'재직'},
+];
+const soloLine=routing.selectDefaultApproverLine(soloDirectory,{selfId:'gwa',company:'박철홍정형외과',includeSyInc:true,maxCount:3,mode:'head_or_above'});
+assert.equal(soloLine.length,1,'상위자가 없는 단독 과장은 본인이 전결자로 1명 포함');
+assert.equal(soloLine[0].id,'gwa');
+
+const syDefault=routing.selectDefaultApproverLine(approverDirectory,{selfId:'baek',company:'SY INC.',includeSyInc:true,maxCount:3,mode:'head_or_above'});
+assert.equal(syDefault.some((s)=>s.name==='김이지'),false,'SY INC. 기안에서도 김이지는 기본값에서 제외');
+assert.equal(activeStaff.isDepartmentHeadOrAbove({position:'과장',role:'staff'}),true);
+assert.equal(activeStaff.isDepartmentHeadOrAbove({position:'사원',role:'admin'}),false,'사원은 role=admin이어도 결재권자가 아님');
+
+// classifyApprovalsForStaff 결재함 inbox 노출 검증
+const inboxLib=load('lib/approval-inbox.ts');
+const buckets=inboxLib.classifyApprovalsForStaff([
+  {id:'app-self',status:'대기',sender_id:'gwa',current_approver_id:'gwa',meta_data:{approver_line:['gwa']}},
+],'gwa',{excludeOwnFromApproverBuckets:true});
+assert.equal(buckets.inbox.length,1,'과장 본인이 현재 결재자인 대기 문서는 inbox에 반드시 노출');
+assert.equal(buckets.sent.length,1,'sent에도 포함');
+
+record('APPROVAL-DEFAULT-SELF',{passed:true,scenario:'결재선 자동매핑에서 김이지·사원 제외, 과장급 셀프결재 및 inbox 노출 보장'});
+
 memory.close();
 console.log(`회귀 검사 ${results.length}개 그룹 통과 (운영 DB 접근 없음)`);

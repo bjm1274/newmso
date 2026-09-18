@@ -527,8 +527,12 @@ function mergeLatestMessagePage(
   prev: ChatMessage[],
   latest: ChatMessage[],
 ): { list: ChatMessage[]; keptOlder: boolean } {
-  if (prev.length === 0 || latest.length === 0) {
+  if (prev.length === 0) {
     return { list: latest, keptOlder: false };
+  }
+  // 폴링이 빈 배열을 주면(일시 오류·빈 IN) 이미 그린 대화를 지우지 않는다.
+  if (latest.length === 0) {
+    return { list: prev, keptOlder: true };
   }
   const windowStart = toUtcSqlTimestamp(latest[0].created_at);
   const latestIds = new Set(latest.map((m) => String(m.id || '')));

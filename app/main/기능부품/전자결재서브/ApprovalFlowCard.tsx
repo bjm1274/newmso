@@ -13,6 +13,7 @@ import type { ApprovalCcUser, ApproverTemplate } from '../전자결재-types';
 import { resolveApprovalStaffLine } from '../전자결재-utils';
 import { LucideIcon } from '../조직도서브/조직도측면창';
 import ApprovalLineTimeline from './ApprovalLineTimeline';
+import { isDepartmentHeadOrAbove } from '@/lib/active-staff';
 
 type ApprovalFlowCardProps = {
   user: StaffMember | null;
@@ -175,6 +176,26 @@ export default function ApprovalFlowCard({
     () => new Set(approverLine.map((staff) => String(staff.id))),
     [approverLine],
   );
+  const selfStaff = useMemo(() => {
+    const uid = String(user?.id || '');
+    if (!uid) return user;
+    return approvalDirectoryStaffs.find((staff) => String(staff.id) === uid) || user;
+  }, [approvalDirectoryStaffs, user]);
+  const canSelfApprove = Boolean(selfStaff && isDepartmentHeadOrAbove(selfStaff));
+  const selfAlreadyOnLine = Boolean(selfStaff?.id && approverExcludeIds.has(String(selfStaff.id)));
+  const pickerCandidates = useMemo(() => {
+    const uid = String(selfStaff?.id || user?.id || '');
+    const list = [...approverCandidates];
+    if (selfStaff && uid && canSelfApprove && !list.some((staff) => String(staff.id) === uid)) {
+      list.unshift(selfStaff);
+    }
+    if (!uid) return list;
+    return list.sort((a, b) => {
+      const aSelf = String(a.id) === uid ? 0 : 1;
+      const bSelf = String(b.id) === uid ? 0 : 1;
+      return aSelf - bSelf;
+    });
+  }, [approverCandidates, canSelfApprove, selfStaff, user?.id]);
   const ccExcludeIds = useMemo(() => new Set(ccLine.map((cc) => String(cc.id))), [ccLine]);
 
   const composePreviewItem = useMemo<Record<string, unknown>>(
@@ -229,6 +250,16 @@ export default function ApprovalFlowCard({
           )}
         </div>
         <div className="flex items-center gap-1.5">
+          {canSelfApprove && selfStaff && !selfAlreadyOnLine && (
+            <button
+              type="button"
+              data-testid="approval-self-approver"
+              onClick={() => handlePickApprover(selfStaff)}
+              className="inline-flex h-7 items-center gap-1 rounded-[var(--radius-md)] border border-[var(--accent)] bg-[var(--accent-selected-subtle)] px-2 text-[11px] font-bold text-[var(--accent)] hover:bg-[var(--accent-light)]"
+            >
+              본인 전결
+            </button>
+          )}
           <button
             type="button"
             data-testid="approval-template-save-open"
@@ -322,7 +353,7 @@ export default function ApprovalFlowCard({
         <StaffPicker
           open={approverPickerOpen}
           onClose={() => setApproverPickerOpen(false)}
-          candidates={approverCandidates}
+          candidates={pickerCandidates}
           excludeIds={approverExcludeIds}
           onPick={handlePickApprover}
           placeholder="이름·직책·부서로 결재자 검색"
@@ -333,7 +364,7 @@ export default function ApprovalFlowCard({
           data-testid="approval-approver-select"
           value=""
           onChange={(event) => {
-            const staff = approverCandidates.find((candidate) => candidate.id === event.target.value);
+            const staff = pickerCandidates.find((candidate) => String(candidate.id) === event.target.value);
             if (staff) handlePickApprover(staff);
           }}
           aria-label="결재자 선택 (보조)"
@@ -341,9 +372,10 @@ export default function ApprovalFlowCard({
           tabIndex={-1}
         >
           <option value="">결재자 추가...</option>
-          {approverCandidates.map((staff) => (
+          {pickerCandidates.map((staff) => (
             <option key={staff.id} value={staff.id}>
               {staff.name} {staff.position || ''} {staff.company ? `(${staff.company})` : ''}
+              {selfStaff?.id && String(staff.id) === String(selfStaff.id) ? ' (본인 전결)' : ''}
             </option>
           ))}
         </select>

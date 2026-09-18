@@ -73,7 +73,7 @@ export type SApprovalWriteProps = {
 
 export default function SApprovalWrite({ onBack, onPick }: SApprovalWriteProps) {
   return (
-    <div className="m-screen" style={{ background: 'transparent' }}>
+    <div className="m-screen">
       <MobileHeader
         title="결재 작성"
         sub="양식을 선택하세요"

@@ -35,7 +35,9 @@ export async function POST(request: Request) {
         id: String(session.user.id || '').trim() || null,
         name: String(session.user.name || '').trim() || null,
         company: String(session.user.company || '').trim() || null,
-        isAdmin: isAdminSession(session.user) },
+        isAdmin: isAdminSession(session.user),
+        position: session.user.position != null ? String(session.user.position) : null,
+        role: session.user.role != null ? String(session.user.role) : null },
       action,
       rejectReason: action === 'reject' ? reason : null,
       approveComment: action === 'approve' ? reason : null });

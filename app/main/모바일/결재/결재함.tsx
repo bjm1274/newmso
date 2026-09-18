@@ -143,7 +143,7 @@ export default function SApproval({
   );
 
   return (
-    <div className="m-screen" style={{ background: 'transparent' }}>
+    <div className="m-screen">
       <MobileHeader
         title="전자결재"
         sub={`내 결재 대기 ${inbox.length}건`}
@@ -313,9 +313,9 @@ export default function SApproval({
             padding: '6px 12px',
             fontSize: 12,
             fontWeight: 900,
-            background: seg === 'inbox' ? 'var(--m-accent)' : 'rgba(255, 255, 255, 0.5)',
+            background: seg === 'inbox' ? 'var(--m-accent)' : 'var(--m-card)',
             color: seg === 'inbox' ? '#fff' : 'var(--z-700)',
-            border: seg === 'inbox' ? 'none' : '1px solid rgba(255, 255, 255, 0.4)',
+            border: seg === 'inbox' ? 'none' : '1px solid var(--m-border)',
             cursor: 'pointer',
             whiteSpace: 'nowrap',
             boxShadow: seg === 'inbox' ? '0 2px 8px var(--m-accent-soft)' : 'none' }}
@@ -331,9 +331,9 @@ export default function SApproval({
             padding: '6px 12px',
             fontSize: 12,
             fontWeight: 900,
-            background: 'rgba(255, 255, 255, 0.5)',
+            background: 'var(--m-card)',
             color: 'var(--z-700)',
-            border: '1px solid rgba(255, 255, 255, 0.4)',
+            border: '1px solid var(--m-border)',
             cursor: 'pointer',
             whiteSpace: 'nowrap' }}
         >
@@ -348,9 +348,9 @@ export default function SApproval({
             padding: '6px 12px',
             fontSize: 12,
             fontWeight: 900,
-            background: 'rgba(255, 255, 255, 0.5)',
+            background: 'var(--m-card)',
             color: 'var(--z-700)',
-            border: '1px solid rgba(255, 255, 255, 0.4)',
+            border: '1px solid var(--m-border)',
             cursor: 'pointer',
             whiteSpace: 'nowrap' }}
         >
@@ -365,9 +365,9 @@ export default function SApproval({
             padding: '6px 12px',
             fontSize: 12,
             fontWeight: 900,
-            background: 'rgba(255, 255, 255, 0.5)',
+            background: 'var(--m-card)',
             color: 'var(--z-700)',
-            border: '1px solid rgba(255, 255, 255, 0.4)',
+            border: '1px solid var(--m-border)',
             cursor: 'pointer',
             whiteSpace: 'nowrap' }}
         >
@@ -382,9 +382,9 @@ export default function SApproval({
             padding: '6px 12px',
             fontSize: 12,
             fontWeight: 900,
-            background: 'rgba(255, 255, 255, 0.5)',
+            background: 'var(--m-card)',
             color: 'var(--z-700)',
-            border: '1px solid rgba(255, 255, 255, 0.4)',
+            border: '1px solid var(--m-border)',
             cursor: 'pointer',
             whiteSpace: 'nowrap' }}
         >

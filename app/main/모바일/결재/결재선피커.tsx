@@ -14,12 +14,13 @@
  *
  * JM(파일당 500줄, 단일 책임), JM2(staff fetch는 첫 open 시 1회 lazy),
  * JM3(try/catch + 빈 결과 폴백), JM4(any 금지, ApproverPick 타입),
- * JM5(본인은 자동 제외, RLS 의존), JM6(input label 연결, button aria-label)
+ * JM5(사원은 본인 제외, 과장급 이상은 본인 전결 선택 가능), JM6(input label 연결, button aria-label)
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { StaffMember } from '@/types';
 import { isDepartmentHeadOrAbove } from '@/lib/active-staff';
+import { DEFAULT_APPROVER_EXCLUDED_NAMES } from '@/lib/approval-routing';
 import MSheet from '../공통/MSheet';
 import MIcon from '../공통/MIcon';
 import MAvatar from '../공통/MAvatar';
@@ -76,18 +77,27 @@ export default function SApprovalApproverPicker({
     }
   }, [open, current]);
 
-  const selectedIds = useMemo(() => new Set(line.map((p) => p.id)), [line]);
+  const selectedIds = useMemo(() => new Set(line.map((p) => String(p.id))), [line]);
 
-  // 검색 + 본인·기선택 제외 + 부서장 이상
+  const selfStaff = useMemo(
+    () => (staffRows ?? []).find((s) => String(s.id) === String(selfId || '')) ?? null,
+    [staffRows, selfId],
+  );
+  const allowSelf = Boolean(selfStaff && isDepartmentHeadOrAbove(selfStaff));
+
+  // 검색 + 기선택 제외 + 부서장 이상. 과장급 이상은 본인(전결)도 후보에 둔다.
   const filtered: StaffMember[] = useMemo(
     () =>
       filterStaffByQuery(staffRows ?? [], {
         query,
         selfId,
+        allowSelf,
         excludeIds: selectedIds,
-        extra: (s) => isDepartmentHeadOrAbove(s),
+        extra: (s) =>
+          !DEFAULT_APPROVER_EXCLUDED_NAMES.has(String(s.name || '').trim().normalize('NFC')) &&
+          isDepartmentHeadOrAbove(s),
       }),
-    [staffRows, query, selfId, selectedIds]
+    [staffRows, query, selfId, allowSelf, selectedIds]
   );
 
   const groups = useMemo(() => groupStaffByDepartment(filtered, _company), [filtered, _company]);
@@ -129,23 +139,24 @@ export default function SApprovalApproverPicker({
 
   return (
     <MSheet open={open} onClose={onClose} title="결재선 변경">
-      <div style={{ padding: '0 16px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ padding: '0 16px 12px', display: 'flex', flexDirection: 'column', gap: 12, background: 'var(--m-card)' }}>
         {/* 현재 결재선 */}
         <section>
           <SectionLabel>현재 결재선 ({line.length})</SectionLabel>
           {line.length === 0 ? (
             <div
-              className="macos-glass macos-squircle-sm"
+              className="macos-squircle-sm"
               style={{
                 padding: '12px 14px',
                 fontSize: 12,
-                color: 'var(--z-600)',
-                background: 'rgba(255, 159, 10, 0.08)',
-                border: '1px solid rgba(255, 159, 10, 0.2)',
+                color: 'var(--z-700)',
+                background: 'var(--m-warning-soft)',
+                border: '1px solid var(--m-warning)',
                 fontWeight: 800,
               }}
             >
               결재자를 한 명 이상 추가해 주세요.
+              {allowSelf ? ' 과장급 이상은 본인을 전결자로 지정할 수 있습니다.' : ''}
             </div>
           ) : (
             <ol style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -159,13 +170,15 @@ export default function SApprovalApproverPicker({
                 return (
                   <li
                     key={a.id}
-                    className="macos-glass macos-squircle-sm"
+                    className="macos-squircle-sm"
                     style={{
                       display: 'grid',
                       gridTemplateColumns: '32px 1fr auto',
                       gap: 10,
                       alignItems: 'center',
                       padding: '8px 10px',
+                      background: 'var(--m-card)',
+                      border: '1px solid var(--m-border)',
                     }}
                   >
                     <MAvatar tone="violet" size="sm">
@@ -234,6 +247,40 @@ export default function SApprovalApproverPicker({
         {/* 검색 + 후보 */}
         <section>
           <SectionLabel>결재자 추가</SectionLabel>
+          {allowSelf && selfStaff && !selectedIds.has(String(selfStaff.id)) && (
+            <button
+              type="button"
+              className="macos-squircle-sm transition-all active:scale-[0.98]"
+              onClick={() => addMember(selfStaff)}
+              aria-label="본인을 전결자로 지정"
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '12px 12px',
+                marginBottom: 8,
+                background: 'var(--m-accent-soft)',
+                border: '1px solid var(--m-accent)',
+                color: 'var(--m-accent)',
+                fontSize: 13,
+                fontWeight: 900,
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              <MAvatar tone="violet" size="sm">
+                {(selfStaff.name || '?').charAt(0)}
+              </MAvatar>
+              <span style={{ flex: 1 }}>
+                나를 전결자로 지정
+                <span style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--z-600)' }}>
+                  {selfStaff.name} · {selfStaff.position || '과장급'} (본인)
+                </span>
+              </span>
+              <MIcon name="plus" size={14} color="var(--m-accent)" />
+            </button>
+          )}
           <PickerSearchField
             id="m-approver-pick-q"
             label="결재자 검색"
@@ -253,13 +300,16 @@ export default function SApprovalApproverPicker({
                 className="transition-all duration-150 active:bg-black/[0.04]"
                 onClick={() => addMember(s)}
                 style={memberRowStyle}
-                aria-label={`${s.name} 결재선에 추가`}
+                aria-label={`${s.name}${String(s.id) === String(selfId || '') ? ' (본인 전결)' : ''} 결재선에 추가`}
               >
                 <MAvatar tone="blue" size="sm">
                   {(s.name || '?').charAt(0)}
                 </MAvatar>
                 <div style={{ flex: 1, minWidth: 0, textAlign: 'left', marginLeft: 10 }}>
-                  <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--z-900)' }}>{s.name}</div>
+                  <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--z-900)' }}>
+                    {s.name}
+                    {String(s.id) === String(selfId || '') ? ' (본인 · 전결)' : ''}
+                  </div>
                   <div style={{ fontSize: 11, color: 'var(--z-500)', fontWeight: 700 }}>
                     {[s.department, s.position].filter(Boolean).join(' / ') || ' '}
                   </div>

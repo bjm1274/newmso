@@ -186,7 +186,7 @@ export default function SApprovalOvertimeForm({
   }, [staffId, selectedRows, totalMinutes, approver, attachments, user, company, formSlug, formName, onSubmitted]);
 
   return (
-    <div className="m-screen" style={{ background: 'transparent' }}>
+    <div className="m-screen">
       <MFormHeader
         onCancel={onCancel}
         title={formName}
@@ -195,9 +195,9 @@ export default function SApprovalOvertimeForm({
         onSave={handleSubmit}
         saveDisabled={!canSubmit || submitting}
       />
-      <div className="m-scroll" style={{ background: 'transparent' }}>
+      <div className="m-scroll">
         {/* 조회 */}
-        <div className="m-section" style={{ background: 'transparent' }}>
+        <div className="m-section">
           <div className="m-section-h" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'transparent', padding: '8px 16px 4px' }}>
             <div className="lbl" style={{ flex: 1, fontSize: 13, fontWeight: 900, color: 'var(--z-700)' }}>연장근무 이력</div>
             <button

@@ -115,13 +115,13 @@ export default function SApprovalCcPicker({
           <SectionLabel>선택된 참조자 ({picked.length})</SectionLabel>
           {picked.length === 0 ? (
             <div
-              className="macos-glass macos-squircle-sm"
+              className="macos-squircle-sm"
               style={{
                 padding: '12px 14px',
                 fontSize: 12,
                 color: 'var(--z-600)',
-                background: 'rgba(0, 0, 0, 0.02)',
-                border: '1px solid rgba(0, 0, 0, 0.04)',
+                background: 'var(--z-50)',
+                border: '1px solid var(--m-border)',
                 fontWeight: 800,
               }}
             >
@@ -139,13 +139,15 @@ export default function SApprovalCcPicker({
               {picked.map((c, i) => (
                 <li
                   key={c.id}
-                  className="macos-glass transition-all duration-150"
+                  className="transition-all duration-150"
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 6,
                     padding: '6px 8px 6px 10px',
                     borderRadius: 999,
+                    background: 'var(--m-card)',
+                    border: '1px solid var(--m-border)',
                   }}
                 >
                   <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--z-900)' }}>{c.name}</span>

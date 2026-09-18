@@ -34,13 +34,15 @@ export function PickerSearchField({
         {label}
       </label>
       <div
-        className="macos-glass"
+        className="macos-squircle-sm"
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: 8,
           padding: '8px 12px',
           borderRadius: 10,
+          background: 'var(--m-card)',
+          border: '1px solid var(--m-border)',
         }}
       >
         <MIcon name="search" size={14} color="var(--z-500)" />
@@ -54,7 +56,7 @@ export function PickerSearchField({
             flex: 1,
             border: 'none',
             outline: 'none',
-            background: 'transparent',
+            background: 'var(--m-card)',
             fontSize: 13,
             fontWeight: 700,
             color: 'var(--z-900)',
@@ -134,14 +136,14 @@ export function PickerFooter({
 }) {
   return (
     <div
-      className="macos-glass"
       style={{
         position: 'sticky',
         bottom: 0,
         display: 'flex',
         gap: 8,
         padding: '10px 16px 14px',
-        borderTop: '1px solid rgba(255,255,255,0.4)',
+        background: 'var(--m-card)',
+        borderTop: '1px solid var(--m-border)',
       }}
     >
       <button

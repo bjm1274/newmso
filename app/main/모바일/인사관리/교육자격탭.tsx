@@ -222,9 +222,11 @@ export default function 교육자격탭({ staffs = [], company, user }: EduTabPr
           }}
         >
           <div
-            className="animate-in slide-in-from-bottom duration-250 macos-glass macos-squircle"
+            className="animate-in slide-in-from-bottom duration-250 macos-squircle"
             style={{
               width: '100%',
+              background: 'var(--m-card)',
+              border: '1px solid var(--m-border)',
               borderTopLeftRadius: 20,
               borderTopRightRadius: 20,
               padding: '20px 16px 24px',

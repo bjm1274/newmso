@@ -38,20 +38,21 @@ export default function MSheet({ open, onClose, title, children }: MSheetProps) 
         display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
     >
       <div
-        style={{ flex: 1, background: 'rgba(0,0,0,0.4)' }}
+        style={{ flex: 1, background: 'rgba(0,0,0,0.55)' }}
         aria-hidden="true"
         onClick={onClose}
       />
       <div
-        className="macos-glass"
+        className="m-sheet-panel macos-squircle"
         style={{
+          background: '#ffffff',
           borderTopLeftRadius: 20,
           borderTopRightRadius: 20,
           borderBottomLeftRadius: 0,
           borderBottomRightRadius: 0,
-          borderLeft: 'none',
-          borderRight: 'none',
+          border: '1px solid var(--m-border, #E9E9EC)',
           borderBottom: 'none',
+          boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.18)',
           maxHeight: '85vh',
           display: 'flex', flexDirection: 'column',
           paddingBottom: 'env(safe-area-inset-bottom)' }}

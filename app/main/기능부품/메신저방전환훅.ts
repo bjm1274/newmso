@@ -101,11 +101,14 @@ export function useChatRoomNavigation({
       const readAt = toUtcSqlTimestamp();
       const targetRoomIds = conversationRoomIds.length > 0 ? conversationRoomIds : [String(roomId)];
 
+      const previousUnread: Record<string, number> = {};
       setRoomUnreadCounts((prev) => {
         let changed = false;
         const next = { ...prev };
         targetRoomIds.forEach((targetRoomId) => {
-          if (!next[targetRoomId]) return;
+          const current = Number(next[targetRoomId] || 0);
+          if (current <= 0) return;
+          previousUnread[targetRoomId] = current;
           next[targetRoomId] = 0;
           changed = true;
         });
@@ -120,10 +123,19 @@ export function useChatRoomNavigation({
           ]);
           if (cursorWriteOk) {
             broadcastChatSync('message-read', roomId);
+            return;
           }
         } catch {
-          // ignore
+          // restore below
         }
+        if (Object.keys(previousUnread).length === 0) return;
+        setRoomUnreadCounts((prev) => {
+          const next = { ...prev };
+          for (const [id, count] of Object.entries(previousUnread)) {
+            if (!next[id]) next[id] = count;
+          }
+          return next;
+        });
       })();
     }
 

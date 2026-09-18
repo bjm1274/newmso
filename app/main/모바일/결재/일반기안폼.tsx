@@ -157,7 +157,7 @@ export default function SApprovalGenericForm({
   ]);
 
   return (
-    <div className="m-screen" style={{ background: 'transparent' }}>
+    <div className="m-screen">
       <MFormHeader
         onCancel={onCancel}
         title={formName}
@@ -166,11 +166,13 @@ export default function SApprovalGenericForm({
         onSave={handleSubmit}
         saveDisabled={!canSubmit || submitting}
       />
-      <div className="m-scroll" style={{ background: 'transparent' }}>
-        {/* 양식 입력란 macos-glass 위젯화 */}
+      <div className="m-scroll">
+        {/* 양식 입력란 카드 */}
         <div
-          className="macos-glass macos-squircle"
+          className="macos-squircle"
           style={{
+            background: 'var(--m-card)',
+            border: '1px solid var(--m-border)',
             margin: '16px',
             overflow: 'hidden' }}
         >

@@ -53,8 +53,8 @@ export function IconBtn({
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 8,
-        background: 'rgba(0, 0, 0, 0.03)',
-        border: '1px solid rgba(0, 0, 0, 0.05)',
+        background: 'var(--z-100)',
+        border: '1px solid var(--m-border)',
         color,
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.5 : 1,
@@ -70,10 +70,11 @@ export const memberRowStyle: CSSProperties = {
   width: '100%',
   alignItems: 'center',
   padding: '10px 8px',
-  background: 'transparent',
+  background: 'var(--m-card)',
   border: 'none',
-  borderBottom: '1px solid rgba(0, 0, 0, 0.04)',
+  borderBottom: '1px solid var(--m-border)',
   cursor: 'pointer',
+  color: 'var(--z-900)',
 };
 
 export const emptyStyle: CSSProperties = {
@@ -102,5 +103,5 @@ export function actionStyle(kind: 'primary' | 'ghost'): CSSProperties {
       boxShadow: 'none',
     };
   }
-  return { ...base, background: 'rgba(255, 255, 255, 0.6)', color: 'var(--z-700)' };
+  return { ...base, background: 'var(--z-100)', color: 'var(--z-700)' };
 }

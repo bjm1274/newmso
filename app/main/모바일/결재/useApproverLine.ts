@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { db } from '@/lib/db-client';
 import type { StaffMember } from '@/types';
+import { isDepartmentHeadOrAbove } from '@/lib/active-staff';
 import { selectDefaultApproverLine } from '@/lib/approval-routing';
 import { toApproverPick, type ApproverPick } from './결재선피커';
 
@@ -45,12 +46,16 @@ export function useApproverLine(staffId: string | null, company: string): UseApp
           .select('id, name, company, department, position, status, hire_date, resign_date, email, phone, role, permissions');
         if (error) throw error;
         if (cancelled) return;
-        const candidates = selectDefaultApproverLine((data ?? []) as StaffMember[], {
+        const allStaffs = (data ?? []) as StaffMember[];
+        const selfStaff = allStaffs.find((s) => String(s.id) === staffId);
+        const allowSelf = Boolean(selfStaff && isDepartmentHeadOrAbove(selfStaff));
+        const candidates = selectDefaultApproverLine(allStaffs, {
           selfId: staffId,
           company,
           includeSyInc: true,
           maxCount: 3,
           mode: 'head_or_above',
+          allowSelf,
         });
         const picks = candidates.map(toApproverPick);
         setApproverDefaults(picks);

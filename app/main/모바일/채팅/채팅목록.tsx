@@ -40,6 +40,7 @@ import PullRefreshIndicator from '../공통/PullRefreshIndicator';
 import { createOrUpsertChatRoom } from '@/lib/chat-rooms-client';
 import { sanitizeChatPreview } from '@/lib/chat-room-preview';
 import { toast } from '@/lib/toast';
+import { useResolvedStaffId } from '@/lib/use-resolved-staff-id';
 
 const SEARCH_DEBOUNCE_MS = 150;
 /** 모바일 방 카드 행 높이 (padding 포함) — FixedSize 가상화 */
@@ -72,7 +73,9 @@ export default function SChatList({ user, rooms, roomsLoading = false, onOpen, o
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const userId = typeof user.id === 'string' ? user.id : null;
+  const userId =
+    useResolvedStaffId(user as Record<string, unknown>) ||
+    (typeof user.id === 'string' ? user.id : null);
   const company = typeof user.company === 'string' ? user.company : null;
 
   const staffs = useChatStaffDirectory(company);
@@ -119,7 +122,7 @@ export default function SChatList({ user, rooms, roomsLoading = false, onOpen, o
   const matchedStaffs = useMemo(() => {
     if (!searchQuery) return [];
     return staffs.filter((s) => {
-      if (s.id === userId) return false;
+      if (String(s.id) === String(userId || '')) return false;
       const name = (s.name || '').toLowerCase();
       const dept = (s.department || '').toLowerCase();
       const pos = (s.position || '').toLowerCase();

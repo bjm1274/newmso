@@ -15,7 +15,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ErpUser } from '@/types';
 import { canAccessBoard, isAdminUser, isPrivilegedUser } from '@/lib/access-control';
-import { isBoardDeleteAdmin, isBoardEditAdmin } from '@/lib/board-permissions';
+import { isBoardDeleteAdmin } from '@/lib/board-permissions';
 import SBoard from './게시판목록';
 import SBoardDetail from './게시판상세';
 import SFormPost from './글작성';
@@ -91,12 +91,10 @@ function MobileBoard({ user, onBack, subView, setSubView, initialPostId, onConsu
   const [editPost, setEditPost] = useState<BoardListPost | null>(null);
 
   // 권한: 관리자 또는 시스템 마스터 → 고정·예약 옵션 노출.
-  // 이 bool 은 '글 작성 옵션(고정/예약 발행)' 전용이다. 예전에는 이걸 수정·삭제 판정에도
-  // 그대로 돌려썼고, 그래서 PC(수정=부서장 / 삭제=시스템마스터)와 결과가 갈라졌다(D09-016).
-  // 수정·삭제는 아래 두 bool 을 쓴다 — 판정 기준은 lib/board-permissions 헤더 참고.
+  // 이 bool 은 '글 작성 옵션(고정/예약 발행)' 전용이다.
   const canAdmin = useMemo(() => isAdminUser(user) || isPrivilegedUser(user), [user]);
-  /** 남의 글 수정 관리자 — 부서장 또는 시스템 마스터 (PC canEditPost 와 동일 기준) */
-  const canAdminEditPost = useMemo(() => isBoardEditAdmin(user), [user]);
+  /** 남의 글 수정은 관리자 포함 전면 불가 (오직 작성자 본인만 수정 가능) */
+  const canAdminEditPost = false;
   /** 남의 글·댓글 삭제 관리자 — 시스템 마스터만 (PC canDeletePost 와 동일 기준) */
   const canAdminDeletePost = useMemo(() => isBoardDeleteAdmin(user), [user]);
 

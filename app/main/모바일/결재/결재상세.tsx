@@ -218,7 +218,11 @@ export default function SApprovalDetail({
     return resolveEffectiveApproverIdCore(stored, matched ?? null);
   }, [row, staffMap]);
   const canApprove = Boolean(
-    row && String(row.status) === '대기' && staffId && currentApproverId === staffId
+    row &&
+      String(row.status) === '대기' &&
+      staffId &&
+      currentApproverId != null &&
+      String(currentApproverId) === String(staffId)
   );
   // 회수 가능: 기안자 본인 + 대기 상태 + 결재 승인 전
   const canRecall = Boolean(
@@ -311,9 +315,9 @@ export default function SApprovalDetail({
 
   if (!row) {
     return (
-      <div className="m-screen" style={{ background: 'transparent' }}>
+      <div className="m-screen">
         <MobileHeader title="결재 상세" back={onBack} />
-        <div className="m-scroll" style={{ background: 'transparent' }}>
+        <div className="m-scroll">
           <div style={{ textAlign: 'center', padding: '40px 16px', fontSize: 13, color: 'var(--z-500)', fontWeight: 800 }}>
             결재 문서를 불러오는 중…
           </div>
@@ -326,7 +330,7 @@ export default function SApprovalDetail({
   const title = String(row.title || formName);
 
   return (
-    <div className="m-screen" style={{ background: 'transparent' }}>
+    <div className="m-screen">
       <MobileHeader
         title="결재 상세"
         sub={title}
@@ -400,7 +404,7 @@ export default function SApprovalDetail({
         </div>
       </div>
 
-      <div className="m-scroll" style={{ background: 'transparent', paddingBottom: 'calc(120px + env(safe-area-inset-bottom, 12px))' }}>
+      <div className="m-scroll" style={{ paddingBottom: 'calc(120px + env(safe-area-inset-bottom, 12px))' }}>
         {tab === 'form' && (
           <FormTab row={row} title={title} formName={formName} staffMap={staffMap} />
         )}
@@ -416,7 +420,7 @@ export default function SApprovalDetail({
       <div
         className="m-sticky-foot macos-glass"
         style={{
-          borderTop: '1px solid rgba(255,255,255,0.4)',
+          borderTop: '1px solid var(--m-border)',
           boxShadow: '0 -4px 16px rgba(0,0,0,0.03)',
           // safe-area / sticky-foot-pb 는 tokens .m-sticky-foot 패딩 유지 (덮어쓰지 않음)
         }}
@@ -505,8 +509,8 @@ export default function SApprovalDetail({
             style={{
               width: '100%',
               padding: '10px 12px',
-              background: 'rgba(0, 0, 0, 0.02)',
-              border: '1px solid rgba(0, 0, 0, 0.05)',
+              background: 'var(--z-50)',
+              border: '1px solid var(--m-border)',
               borderRadius: 10,
               fontSize: 14,
               fontWeight: 600,

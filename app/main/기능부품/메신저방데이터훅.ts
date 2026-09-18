@@ -38,6 +38,31 @@ import {
   DATE_JUMP_CONTEXT_AFTER,
   DATE_JUMP_CONTEXT_BEFORE,
   MESSAGE_PAGE_SIZE } from './메신저방데이터-types';
+
+/** poll_votes 는 SELF_ONLY 라 클라 집계가 내 표만 센다. 서버 집계를 쓴다. */
+async function loadPollVoteCounts(pollIds: string[]): Promise<Record<string, Record<number, number>>> {
+  if (pollIds.length === 0) return {};
+  try {
+    const res = await fetch('/api/chat/poll-votes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ pollIds }),
+    });
+    if (!res.ok) return {};
+    const json = (await res.json().catch(() => null)) as
+      | { ok: true; polls: Record<string, { counts?: Record<number, number> }> }
+      | null;
+    if (!json || json.ok !== true || !json.polls) return {};
+    const voteMap: Record<string, Record<number, number>> = {};
+    for (const [pollId, result] of Object.entries(json.polls)) {
+      voteMap[pollId] = result.counts ?? {};
+    }
+    return voteMap;
+  } catch {
+    return {};
+  }
+}
 import { defaultLegacySelectChatMessagesWithFallback, describeQueryError } from './메신저방데이터-utils';
 import { shouldApplyRoomSummary } from '@/lib/chat-room-summary';
 import { selectMessageBookmarkRows, selectMessageReactionRows } from './메신저방데이터-queries';
@@ -641,21 +666,7 @@ export function useChatRoomDataSync({
         return;
       }
 
-      const { data: votes, error: pollVotesError } = await db
-        .from('poll_votes')
-        .select('poll_id, option_index')
-        .in('poll_id', pollIds);
-      if (pollVotesError) throw pollVotesError;
-
-      const voteMap: Record<string, Record<number, number>> = {};
-      votes?.forEach((vote: Record<string, unknown>) => {
-        const pollId = String(vote.poll_id || '');
-        const optionIndex = Number(vote.option_index);
-        if (!pollId || !Number.isFinite(optionIndex)) return;
-        if (!voteMap[pollId]) voteMap[pollId] = {};
-        voteMap[pollId][optionIndex] = (voteMap[pollId][optionIndex] || 0) + 1;
-      });
-      setPollVotes(voteMap);
+      setPollVotes(await loadPollVoteCounts(pollIds));
     } catch (error) {
       console.error('poll query failed:', error);
     }
@@ -1105,21 +1116,8 @@ export function useChatRoomDataSync({
             if (pollIds.length === 0) {
               setPollVotes({});
             } else {
-              const { data: votes, error: pollVotesError } = await db
-                .from('poll_votes')
-                .select('poll_id, option_index')
-                .in('poll_id', pollIds);
-              if (pollVotesError) throw pollVotesError;
+              const voteMap = await loadPollVoteCounts(pollIds);
               if (!isCurrentRequest()) return;
-
-              const voteMap: Record<string, Record<number, number>> = {};
-              votes?.forEach((vote: Record<string, unknown>) => {
-                const pollId = String(vote.poll_id || '');
-                const optionIndex = Number(vote.option_index);
-                if (!pollId || !Number.isFinite(optionIndex)) return;
-                if (!voteMap[pollId]) voteMap[pollId] = {};
-                voteMap[pollId][optionIndex] = (voteMap[pollId][optionIndex] || 0) + 1;
-              });
               setPollVotes(voteMap);
             }
           } catch (error) {

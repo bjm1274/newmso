@@ -99,7 +99,7 @@ export default function SApprovalSent({
   );
 
   return (
-    <div className="m-screen" style={{ background: 'transparent' }}>
+    <div className="m-screen">
       <MobileHeader
         title="기안함"
         sub={`내가 올린 결재 · 총 ${rows.length}건`}
@@ -147,9 +147,9 @@ export default function SApprovalSent({
                 padding: '6px 12px',
                 fontSize: 12,
                 fontWeight: 900,
-                background: on ? 'var(--m-accent)' : 'rgba(255, 255, 255, 0.5)',
+                background: on ? 'var(--m-accent)' : 'var(--m-card)',
                 color: on ? '#fff' : 'var(--z-700)',
-                border: on ? 'none' : '1px solid rgba(255, 255, 255, 0.4)',
+                border: on ? 'none' : '1px solid var(--m-border)',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
                 boxShadow: on ? '0 2px 8px var(--m-accent-soft)' : 'none' }}

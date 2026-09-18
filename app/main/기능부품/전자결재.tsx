@@ -11,6 +11,7 @@ import {
   resolveApprovalCcUserIds,
   type ApprovalInboxItem,
 } from '@/lib/approval-inbox';
+import { DEFAULT_APPROVER_EXCLUDED_NAMES } from '@/lib/approval-routing';
 import { db, d1 } from '@/lib/db-client';
 import { subscribeRealtime } from '@/lib/realtime-bus';
 import { withMissingColumnsFallback, isMissingColumnError } from '@/lib/db-compat';
@@ -326,6 +327,7 @@ const [approvals, setApprovals] = useState<Record<string, unknown>[]>([]);
           .filter((staff) => {
             return (
               isActiveStaff(staff) &&
+              isDepartmentHeadOrAbove(staff) &&
               matchesInventorySupportCompanyName(staff?.company) &&
               String(staff?.department || '').trim() === '경영지원팀'
             );
@@ -505,7 +507,12 @@ const [approvals, setApprovals] = useState<Record<string, unknown>[]>([]);
   const allCompaniesApproverCandidates = useMemo(() => {
     const list = Array.isArray(staffs) ? staffs : [];
     return list
-      .filter((staff) => isActiveStaff(staff) && isDepartmentHeadOrAbove(staff))
+      .filter((staff) => {
+        if (!isActiveStaff(staff)) return false;
+        const name = String(staff.name || '').trim();
+        if (DEFAULT_APPROVER_EXCLUDED_NAMES.has(name)) return false;
+        return isDepartmentHeadOrAbove(staff);
+      })
       .sort((a, b) => {
         const order = getPositionOrder(a.position, a.role) - getPositionOrder(b.position, b.role);
         if (order !== 0) return order;

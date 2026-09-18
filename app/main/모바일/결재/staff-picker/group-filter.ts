@@ -3,6 +3,11 @@ import type { StaffMember } from '@/types';
 export type StaffFilterOptions = {
   query: string;
   selfId?: string | null;
+  /**
+   * true 이면 selfId 를 목록에 남긴다.
+   * 과장급 이상 전결권자가 결재선에 본인을 넣을 때 쓴다. 기본은 본인 제외.
+   */
+  allowSelf?: boolean;
   /** 이미 선택된 id 등 제외 */
   excludeIds?: Set<string>;
   /**
@@ -24,9 +29,10 @@ export function filterStaffByQuery(
   opts: StaffFilterOptions
 ): StaffMember[] {
   const q = opts.query.trim().toLowerCase();
+  const selfId = opts.selfId != null ? String(opts.selfId) : '';
   return list.filter((s) => {
     const id = String(s.id || '');
-    if (opts.selfId && id === opts.selfId) return false;
+    if (selfId && !opts.allowSelf && id === selfId) return false;
     if (opts.excludeIds?.has(id)) return false;
     if (opts.extra && !opts.extra(s)) return false;
     if (!q) return true;

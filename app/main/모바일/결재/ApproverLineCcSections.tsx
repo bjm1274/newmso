@@ -40,7 +40,13 @@ const SECTION_ACTION_STYLE: React.CSSProperties = {
   border: 'none',
   cursor: 'pointer' };
 
-const CARD_STYLE: React.CSSProperties = { overflow: 'hidden', margin: '0 16px', padding: 0 };
+const CARD_STYLE: React.CSSProperties = {
+  overflow: 'hidden',
+  margin: '0 16px',
+  padding: 0,
+  background: 'var(--m-card)',
+  border: '1px solid var(--m-border)',
+};
 
 const EMPTY_TEXT_STYLE: React.CSSProperties = {
   padding: '14px 16px',
@@ -75,7 +81,7 @@ export function ApproverLinePreviewSection({
           변경
         </button>
       </div>
-      <MCard className="macos-glass macos-squircle" style={CARD_STYLE}>
+      <MCard className="macos-squircle" style={CARD_STYLE}>
         {approverLoading ? (
           <div
             style={{
@@ -175,7 +181,7 @@ export function CcSection({
           {ccUsers.length > 0 ? '변경' : '추가'}
         </button>
       </div>
-      <MCard className="macos-glass macos-squircle" style={CARD_STYLE}>
+      <MCard className="macos-squircle" style={CARD_STYLE}>
         {ccUsers.length === 0 ? (
           <div style={EMPTY_TEXT_STYLE}>{emptyText}</div>
         ) : (
@@ -188,7 +194,7 @@ export function CcSection({
               return (
                 <li
                   key={c.id}
-                  className="macos-glass"
+                  className="macos-squircle-sm"
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',

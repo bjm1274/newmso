@@ -254,7 +254,7 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
   }, [staffId, start, end, kind, days, reason, delegateId, leaveDelegateOptions, manualCcUsers, approverLine, user, company, onSubmitted, submitApproval, setSubmitting, queuedAttachmentCount]);
 
   return (
-    <div className="m-screen" style={{ background: 'transparent' }}>
+    <div className="m-screen">
       <MFormHeader
         onCancel={onCancel}
         title="연차/휴가 신청"
@@ -292,8 +292,8 @@ export default function SApprovalLeaveForm({ user, onCancel, onSubmitted }: SApp
                   fontSize: 14,
                   fontWeight: 600,
                   color: 'var(--z-900)',
-                  backgroundColor: 'rgba(255, 255, 255, 0.45)',
-                  border: '1px solid rgba(255, 255, 255, 0.35)',
+                  backgroundColor: 'var(--m-card)',
+                  border: '1px solid var(--m-border)',
                   outline: 'none' }}
               >
                 <option value="">대행자 선택 안함</option>

@@ -132,9 +132,12 @@ export function classifyApprovalsForStaff(
       if (recalled) continue;
       if (pending) result.progress.push(row);
       if (terminal) result.done.push(row);
-      if (!excludeOwn && (onLine || isCurrent) && !recalled) {
-        if (pending && isCurrent) result.inbox.push(row);
-        else if (pending && onLine) result.progress.push(row);
+      // 본인이 현재 결재자면 결재함에도 넣는다. 과장급 전결(자기 기안을 스스로 승인)이
+      // 기안함에만 있으면 모바일에서 승인 버튼을 못 찾는 일이 생긴다.
+      if (pending && isCurrent) {
+        result.inbox.push(row);
+      } else if (!excludeOwn && (onLine || isCurrent) && !recalled) {
+        if (pending && onLine) result.progress.push(row);
         else if (terminal && onLine) result.done.push(row);
       }
       if (isCc && !recalled) result.ref.push(row);

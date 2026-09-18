@@ -1935,7 +1935,7 @@ export default function ChatView({
       try {
         // 로컬 캐시가 있으면 먼저 그려 빈 목록 체감을 줄인다.
         if (active && chatRoomsRef.current.length === 0) {
-          const cached = readCachedChatRooms();
+          const cached = readCachedChatRooms(effectiveChatUserId);
           if (cached.length > 0) {
             await syncChatRoomsState(cached);
           }
@@ -1977,7 +1977,7 @@ export default function ChatView({
         const roomsWithSelf = await ensureSelfChatRoom(roomResult.data);
         if (!active) return;
         const syncedRooms = await syncChatRoomsState(roomsWithSelf);
-        writeCachedChatRooms(syncedRooms);
+        writeCachedChatRooms(syncedRooms, effectiveChatUserId);
       } catch (error) {
         logger.error('채팅방 목록 로드 실패:', error);
         if (!active) return;
@@ -1985,7 +1985,7 @@ export default function ChatView({
           await syncChatRoomsState(chatRoomsRef.current);
           return;
         }
-        const cached = readCachedChatRooms();
+        const cached = readCachedChatRooms(effectiveChatUserId);
         if (cached.length > 0) {
           await syncChatRoomsState(cached);
         }
@@ -1995,7 +1995,7 @@ export default function ChatView({
     return () => {
       active = false;
     };
-  }, [ensureSelfChatRoom, noticeRoomMemberIds, syncChatRoomsState]);
+  }, [ensureSelfChatRoom, noticeRoomMemberIds, syncChatRoomsState, effectiveChatUserId]);
 
   useEffect(() => {
     if (!chatRooms.some((room: ChatRoom) => String(room.id) === NOTICE_ROOM_ID)) return;

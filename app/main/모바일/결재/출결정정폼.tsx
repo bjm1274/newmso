@@ -333,7 +333,7 @@ export default function SApprovalAttendanceFixForm({
   };
 
   return (
-    <div className="m-screen" style={{ background: 'transparent' }}>
+    <div className="m-screen">
       <MFormHeader
         onCancel={onCancel}
         title="출결정정 신청"
@@ -343,9 +343,9 @@ export default function SApprovalAttendanceFixForm({
         saveDisabled={!canSubmit || submitting}
       />
 
-      <div className="m-scroll" style={{ background: 'transparent' }}>
-        <div className="m-section" style={{ background: 'transparent' }}>
-          <div className="m-section-h" style={{ display: 'flex', alignItems: 'center', background: 'transparent', padding: '8px 16px 4px' }}>
+      <div className="m-scroll">
+        <div className="m-section">
+          <div className="m-section-h" style={{ display: 'flex', alignItems: 'center', padding: '8px 16px 4px' }}>
             <div className="lbl" style={{ flex: 1, fontSize: 13, fontWeight: 900, color: 'var(--z-700)' }}>정정 필요 날짜 (최근 60일)</div>
             {hasQueried && !problemDatesLoading && problemDates.length > 0 && (
               <div style={{ display: 'flex', gap: 10 }}>
@@ -465,10 +465,10 @@ export default function SApprovalAttendanceFixForm({
                       borderRadius: 12,
                       border: isSelected
                         ? '2px solid var(--m-accent)'
-                        : '1px solid rgba(255, 255, 255, 0.35)',
+                        : '1px solid var(--m-border)',
                       background: isSelected
                         ? 'var(--m-accent-soft)'
-                        : 'rgba(255, 255, 255, 0.45)',
+                        : 'var(--m-card)',
                       boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
                       textAlign: 'left',
                       cursor: 'pointer' }}

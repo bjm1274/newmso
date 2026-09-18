@@ -4,7 +4,8 @@
  */
 
 import type { StaffMember } from '@/types';
-import { isActiveStaff } from '@/lib/active-staff';
+import { isActiveStaff, isJuniorStaffPosition } from '@/lib/active-staff';
+import { isExcludedFromDefaultLine } from '@/lib/approval-routing';
 import { SYSTEM_MASTER_ACCOUNT_ID, hasSystemMasterPermission } from '@/lib/system-master';
 
 export type LeaveAdminCandidate = {
@@ -44,6 +45,7 @@ export function isLeaveAdminCandidate(staff: LeaveAdminCandidate | null | undefi
   if (hasSystemMasterPermission({ permissions: perms, is_system_master: perms?.is_system_master })) {
     return true;
   }
+  if (isExcludedFromDefaultLine(staff) || isJuniorStaffPosition(staff.position)) return false;
   // permissions.admin 만으로는 너무 넓음(일반 직원 다수 보유) — role/직책 기준
   const role = String(staff.role ?? '').trim().toLowerCase();
   if (role === 'admin' || role === 'system_master' || role === 'master') return true;

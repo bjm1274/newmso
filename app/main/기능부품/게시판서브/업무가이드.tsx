@@ -177,7 +177,17 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
   const currentCompanyId = normalizeText(user?.company_id);
   const currentCompanyName = normalizeText(user?.company);
 
-  const canManagePost = useCallback(
+  /** 수정 권한 — 오직 작성자 본인만 가능 (관리자라도 타인 자료 수정 불가) */
+  const canEditItem = useCallback(
+    (item?: Pick<GuideRow, 'author_id'> | null) => {
+      if (!item) return false;
+      return normalizeText(item.author_id) === currentUserId;
+    },
+    [currentUserId],
+  );
+
+  /** 삭제 권한 — 작성자 본인 또는 관리자 */
+  const canDeleteItem = useCallback(
     (item?: Pick<GuideRow, 'author_id'> | null) => {
       if (!item) return false;
       if (isPrivileged || isAdminUser(user)) return true;
@@ -185,6 +195,8 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
     },
     [currentUserId, isPrivileged, user],
   );
+
+  const canManagePost = canDeleteItem;
 
   const resetComposer = useCallback((nextTeam?: TeamScope | null) => {
     setEditingResourceId(null);
@@ -539,7 +551,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
 
       if (editingResourceId) {
         const original = resources.find((resource) => resource.id === editingResourceId) || null;
-        if (!canManagePost(original)) {
+        if (!canEditItem(original)) {
           toast('본인이 작성한 자료만 수정할 수 있습니다.', 'warning');
           return;
         }
@@ -591,7 +603,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
   }, [
     activeTeam,
     audience,
-    canManagePost,
+    canEditItem,
     canWrite,
     companyTeams,
     currentUserId,
@@ -693,7 +705,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
 
       if (editingTaskId) {
         const original = teamTasks.find((task) => task.id === editingTaskId) || null;
-        if (!canManagePost(original)) {
+        if (!canEditItem(original)) {
           toast('본인이 작성한 팀 할일만 수정할 수 있습니다.', 'warning');
           return;
         }
@@ -746,7 +758,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
     }
   }, [
     activeTeam,
-    canManagePost,
+    canEditItem,
     canWrite,
     currentUserId,
     editingTaskId,
@@ -824,7 +836,7 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
     }
   }, [canManagePost, editingTaskId, resetTaskComposer]);
 
-  const canEditSelected = canManagePost(selectedResource);
+  const canEditSelected = canEditItem(selectedResource);
 
   // 모달 에러 계산
   const titleErr = touched && !title.trim();
@@ -1284,21 +1296,21 @@ export default function GuideLibrary({ user, selectedCo, selectedCompanyId }: Pr
                                 {task.isDone ? '되돌리기' : '완료'}
                               </button>
                             )}
-                            {canManagePost(task) && (
-                              <>
-                                <button
-                                  onClick={() => startTaskEdit(task)}
-                                  className="px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--muted)]/50"
-                                >
-                                  수정
-                                </button>
-                                <button
-                                  onClick={() => void deleteTask(task)}
-                                  className="px-2.5 py-1.5 rounded-lg border border-red-200 text-[11px] font-bold text-red-600 hover:bg-red-50"
-                                >
-                                  삭제
-                                </button>
-                              </>
+                            {canEditItem(task) && (
+                              <button
+                                onClick={() => startTaskEdit(task)}
+                                className="px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[11px] font-bold text-[var(--foreground)] hover:bg-[var(--muted)]/50"
+                              >
+                                수정
+                              </button>
+                            )}
+                            {canDeleteItem(task) && (
+                              <button
+                                onClick={() => void deleteTask(task)}
+                                className="px-2.5 py-1.5 rounded-lg border border-red-200 text-[11px] font-bold text-red-600 hover:bg-red-50"
+                              >
+                                삭제
+                              </button>
                             )}
                           </div>
                         </div>

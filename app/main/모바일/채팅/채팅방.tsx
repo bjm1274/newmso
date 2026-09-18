@@ -165,7 +165,7 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
   const [attachmentsLoading, setAttachmentsLoading] = useState(false);
 
   const loadedAttachments = useMemo(
-    () => messages.filter((m) => !!m.file_url).reverse(),
+    () => messages.filter((m) => !!m.file_url && !m.is_deleted).reverse(),
     [messages],
   );
   // 조회 전이거나 실패했을 때는 최소한 로드된 창에서 걸러낸 것이라도 보여준다.
@@ -193,6 +193,7 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
         .select('id, room_id, sender_id, sender_name, content, file_url, file_name, file_kind, created_at')
         .in('room_id', conversationRoomIds)
         .not('file_url', 'is', null)
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false })
         .limit(ROOM_ATTACHMENTS_LIMIT);
       if (error) throw error;
@@ -253,7 +254,8 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
   const canLeaveRoom = !isNotice && !selfRoom;
   // 이름 수정·멤버 관리는 그룹 대화방에만 노출(1:1·공지·나와의채팅은 PC와 동일하게 제외)
   const canRenameRoom = isGroup && !isNotice && !selfRoom;
-  const canManageMembers = isGroup && !isNotice && !selfRoom;
+  const canManageMembers =
+    isGroup && !isNotice && !selfRoom && String(room.created_by || '') === String(userId || '');
 
   const handleLeaveRoom = useCallback(async () => {
     if (leaving) return;
@@ -694,6 +696,9 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
   const handleRemoveMember = useCallback(
     async (member: StaffDirectoryEntry) => {
       if (memberMutating) return;
+      if (typeof window !== 'undefined' && !window.confirm(`${member.name}님을 채팅방에서 제외할까요?`)) {
+        return;
+      }
       setMemberMutating(true);
       try {
         const result = await removeMobileRoomMember({
@@ -1405,7 +1410,7 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
             style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '16px', borderRadius: 16,
-              background: 'rgba(0, 0, 0, 0.04)', border: '1px solid rgba(0, 0, 0, 0.02)',
+              background: 'var(--z-100)', border: '1px solid var(--m-border)',
               color: 'var(--z-900)', fontSize: 16, fontWeight: 800,
               textAlign: 'left'
             }}
@@ -1422,7 +1427,7 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
             style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '16px', borderRadius: 16,
-              background: 'rgba(0, 0, 0, 0.04)', border: '1px solid rgba(0, 0, 0, 0.02)',
+              background: 'var(--z-100)', border: '1px solid var(--m-border)',
               color: 'var(--z-900)', fontSize: 16, fontWeight: 800,
               textAlign: 'left'
             }}
@@ -1439,7 +1444,7 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
             style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '16px', borderRadius: 16,
-              background: 'rgba(0, 0, 0, 0.04)', border: '1px solid rgba(0, 0, 0, 0.02)',
+              background: 'var(--z-100)', border: '1px solid var(--m-border)',
               color: 'var(--z-900)', fontSize: 16, fontWeight: 800,
               textAlign: 'left'
             }}
@@ -1456,7 +1461,7 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
             style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '16px', borderRadius: 16,
-              background: 'rgba(0, 0, 0, 0.04)', border: '1px solid rgba(0, 0, 0, 0.02)',
+              background: 'var(--z-100)', border: '1px solid var(--m-border)',
               color: 'var(--z-900)', fontSize: 16, fontWeight: 800,
               textAlign: 'left'
             }}
@@ -1532,11 +1537,11 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
                 flex: 1,
                 padding: '12px',
                 borderRadius: 10,
-                background: 'rgba(0, 0, 0, 0.04)',
+                background: 'var(--z-100)',
                 color: 'var(--z-700)',
                 fontSize: 13,
                 fontWeight: 800,
-                border: '1px solid rgba(0, 0, 0, 0.02)',
+                border: '1px solid var(--m-border)',
                 cursor: leaving ? 'not-allowed' : 'pointer' }}
             >
               취소
@@ -1704,11 +1709,11 @@ export default function SChatRoom({ user, room, membersReady = true, onBack, rec
                 flex: 1,
                 padding: '12px',
                 borderRadius: 10,
-                background: 'rgba(0, 0, 0, 0.04)',
+                background: 'var(--z-100)',
                 color: 'var(--z-700)',
                 fontSize: 13,
                 fontWeight: 800,
-                border: '1px solid rgba(0, 0, 0, 0.02)',
+                border: '1px solid var(--m-border)',
                 cursor: renameSaving ? 'not-allowed' : 'pointer' }}
             >
               취소

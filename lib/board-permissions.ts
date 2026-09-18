@@ -41,27 +41,18 @@
  *       댓글 삭제도 PC(`게시판.tsx` handleDeleteComment)가 `isPrivilegedUser` 만
  *       허용하므로 같은 기준으로 맞춘다.
  *
- *  (나) **수정 관리자 = 부서장(`isBoardDepartmentHead`) 또는 시스템 마스터.**
- *       - 부서장을 넣은 건 PC 운영 기준 복원이다. 표의 2·5행처럼 부서장이 PC 에서는
- *         팀원 글을 고칠 수 있는데 모바일에서만 못 했다. 모바일 기준으로는 **넓히는**
- *         변경이지만, 새 권한을 만든 게 아니라 이미 PC 에서 매일 쓰던 권한을 같은
- *         사람에게 기기와 무관하게 준 것이다.
- *       - 시스템 마스터를 넣은 건 PC 쪽 비대칭을 고친 것이라 **PC 기준으로도 넓힌다**.
- *         표 6행을 보면 시스템 마스터는 남의 글을 **삭제는 되는데 수정은 못 했다**.
- *         더 파괴적인 권한이 이미 열려 있는데 덜 파괴적인 권한만 막혀 있는 건 보호가
- *         아니라 사고 유발이다(고칠 수 없으니 지우게 된다). 새로 노출되는 대상은
- *         전권 계정 하나뿐이라 확대 위험도 없다.
- *       - 반대로 `permissions.admin=true` 만 가진 사용자(표 4행)는 **제외**했다.
- *         모바일 기준으로는 좁히는 변경이다. `admin` 은 게시판과 무관한 범용 관리자
- *         플래그이고, PC 는 이 사용자에게 남의 글 수정을 허용한 적이 없다.
- *         (`role='admin'` 은 부서장 판정에 이미 포함되어 그대로 통과한다.)
+ *  (나) **수정 권한 = 오직 작성자 본인(`isBoardPostAuthor`)만 가능.**
+ *       - 과거에는 부서장 또는 시스템 마스터에게 타인 글 수정 권한이 열려 있었으나,
+ *         타인이 작성한 글을 임의로 수정/위조할 수 있는 심각한 보안 및 신뢰성 문제가
+ *         발생하여 **오직 작성자 본인만 수정 가능**하도록 전면 제한하였다.
+ *       - 관리자나 부서장이라 하더라도 타인의 글을 임의로 수정할 수 없으며,
+ *         오직 삭제(유해 게시글 조치 등)만 관리자 권한으로 가능하다.
  *
  * 두 계열을 내보낸다.
  *  - `canEditBoardPost` / `canDeleteBoardPost` : user 객체로 직접 판정하는 **정본**.
  *    PC·모바일 모두 최종적으로 이쪽을 써야 한다.
  *  - `...ByAdminFlag` : 관리자 여부를 이미 bool 로 들고 있는 기존 호출부용 어댑터.
- *    이 bool 은 반드시 `isBoardEditAdmin` / `isBoardDeleteAdmin` 으로 만들어야 한다.
- *    아무 관리자 bool 이나 넣을 수 있게 열어 둔 것이 이번 재발의 원인이었다.
+ *    수정은 이제 관리자 플래그와 무관하게 작성자 본인만 통과한다.
  */
 import { canAccessBoard, isPrivilegedUser } from '@/lib/access-control';
 
@@ -121,15 +112,18 @@ export function isBoardPostAuthor(post: BoardPostLike, userId: string | null | u
   return authorId !== '' && uid !== '' && authorId === uid;
 }
 
-/** 게시글 수정 가능 — 작성자 본인 또는 부서장 이상. 관리자 여부를 bool 로 받는 어댑터. */
+/**
+ * 게시글 수정 가능 — 오직 작성자 본인만 수정 가능.
+ * 타인이 작성한 게시글을 관리자/부서장이 임의로 수정할 수 없도록 관리자 플래그 우회를 차단한다.
+ */
 export function canEditBoardPostByAdminFlag(
   post: BoardPostLike,
   userId: string | null | undefined,
-  isAdmin: boolean,
+  _isAdmin?: boolean,
 ): boolean {
   if (!post) return false;
   // 익명 글이라고 작성자를 막지 않는다 — 작성자는 자기 글임을 알고, PC 도 막지 않는다(위 ②).
-  return isBoardPostAuthor(post, userId) || isAdmin;
+  return isBoardPostAuthor(post, userId);
 }
 
 /** 게시글 삭제 가능 — 작성자 본인 또는 관리자. 수정보다 좁게 운용해야 한다(되돌릴 수 없다). */
@@ -156,7 +150,8 @@ export function canDeleteBoardCommentByAdminFlag(
 
 /**
  * 게시글 수정 가능 여부 (정본).
- * 게시판 쓰기 권한이 없으면 무조건 false — 호출부가 게이트를 빠뜨려도 결과가 같도록 여기서도 본다.
+ * 게시판 쓰기 권한이 있더라도 타인이 작성한 글은 수정할 수 없으며,
+ * 오직 작성자 본인만 수정할 수 있다.
  */
 export function canEditBoardPost(
   user: UserLike,
@@ -167,7 +162,7 @@ export function canEditBoardPost(
   if (!user || !post) return false;
   const board = String(post?.board_type ?? '') || String(boardType ?? '');
   if (!canAccessBoard(user, board, 'write')) return false;
-  return canEditBoardPostByAdminFlag(post, userId, isBoardEditAdmin(user));
+  return isBoardPostAuthor(post, userId);
 }
 
 /** 게시글 삭제 가능 여부 (정본). 삭제 관리자는 시스템 마스터로 좁다. */

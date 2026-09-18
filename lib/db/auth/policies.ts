@@ -594,15 +594,21 @@ const BOARD_POST_REACTION_COLUMNS = new Set([
   'updated_at',
 ]);
 
-async function boardPostsOwnerGuard(
+/**
+ * board_posts UPDATE 가드: 오직 작성자 본인만 수정 가능.
+ *
+ * 관리자나 부서장이라 하더라도 타인이 작성한 게시글의 본문/제목/첨부 등 핵심 정보를
+ * 임의로 수정할 수 없다. 오직 DB에 기록된 author_id 와 일치하는 작성자 본인만 허용한다.
+ *
+ * 단, 타인이 남기는 반응(좋아요 수, 투표 참여, 조회수, updated_at)만 건드리는 쓰기는
+ * changedKeys 화이트리스트로 통과시킨다.
+ */
+async function boardPostsUpdateOwnerGuard(
   db: D1Client,
   claims: ErpClaims,
   row: Record<string, unknown>,
   changedKeys?: ReadonlySet<string>,
 ): Promise<boolean> {
-  if (erpIsAdmin(claims)) return true;
-  if (erpCanManageCompany(claims)) return true;
-
   // 반응 컬럼만 건드리는 쓰기는 작성자 확인 없이 통과시킨다.
   // changedKeys 를 못 받은 호출(폴백)에서는 이 완화를 적용하지 않는다 —
   // 무엇이 바뀌는지 모르는 채로 열어 주면 본문 위조를 막을 수 없다.
@@ -610,6 +616,36 @@ async function boardPostsOwnerGuard(
     const onlyReactions = [...changedKeys].every((key) => BOARD_POST_REACTION_COLUMNS.has(key));
     if (onlyReactions) return true;
   }
+
+  // 게시글 본문/제목 등 핵심 내용 수정:
+  // 관리자(erpIsAdmin)나 인사(erpCanManageCompany)라 하더라도 타인 글 수정 불가.
+  // 오직 작성자 본인(author_id === me)만 허용한다.
+  const me = claimsStaffIdRaw(claims);
+  if (me === null) return false;
+
+  const id = getField<string | number>(row, 'id');
+  if (id === null) return false;
+
+  const rows = await db
+    .select({ author_id: board_posts.author_id })
+    .from(board_posts)
+    .where(eq(board_posts.id, String(id)))
+    .limit(1);
+  const target = rows[0];
+  if (!target) return false;
+  return target.author_id !== null && String(target.author_id).trim() === me;
+}
+
+/**
+ * board_posts DELETE 가드: 작성자 본인 또는 관리자만.
+ * 유해/부적절 게시글 조치를 위해 시스템 마스터/관리자에게 삭제 권한을 부여한다.
+ */
+async function boardPostsDeleteOwnerGuard(
+  db: D1Client,
+  claims: ErpClaims,
+  row: Record<string, unknown>,
+): Promise<boolean> {
+  if (erpIsAdmin(claims)) return true;
 
   const me = claimsStaffIdRaw(claims);
   if (me === null) return false;
@@ -626,6 +662,9 @@ async function boardPostsOwnerGuard(
   if (!target) return false;
   return target.author_id !== null && String(target.author_id).trim() === me;
 }
+
+/** 기존 참조 호환용 */
+const boardPostsOwnerGuard = boardPostsUpdateOwnerGuard;
 
 /**
  * claims.erp_staff_id 원문(시스템마스터 '9999' 등 non-UUID 포함).
@@ -790,8 +829,8 @@ export const POLICY_REGISTRY: Registry = {
     delete: 'AUTHENTICATED',
     staffIdField: 'author_id',
     asyncGuards: {
-      update: boardPostsOwnerGuard,
-      delete: boardPostsOwnerGuard } },
+      update: boardPostsUpdateOwnerGuard,
+      delete: boardPostsDeleteOwnerGuard } },
   // 마감보고: 환자명·수납금액·수표 정보가 들어 있다. PUBLIC_ALL 이던 시절에는
   // 로그인만 하면 타 회사 마감보고를 조회·삭제할 수 있었다(클라이언트 필터만 존재).
   // company_id 로 회사 스코프를 서버에서 강제한다.
@@ -2282,8 +2321,8 @@ async function filterMessagesByChatRoomMembership<T extends Record<string, unkno
   claims: ErpClaims,
   rows: T[],
 ): Promise<T[]> {
-  // 회사 관리 권한은 채팅 열람 권한이 아니다. 시스템 관리자만 멤버십 검사 예외를 둔다.
-  if (erpIsAdmin(claims)) return rows;
+  // 100% 엄격한 테넌트 및 사용자 데이터 격리:
+  // 시스템 관리자라 할지라도 참여 멤버가 아닌 대화방 메시지는 열람할 수 없다.
   const me = claimsStaffIdRaw(claims);
   if (me === null) return [];
 
@@ -2330,8 +2369,8 @@ async function filterChatRoomsByMembership<T extends Record<string, unknown>>(
   claims: ErpClaims,
   rows: T[],
 ): Promise<T[]> {
-  // 회사 관리 권한은 채팅 열람 권한이 아니다. 시스템 관리자만 멤버십 검사 예외를 둔다.
-  if (erpIsAdmin(claims)) return rows;
+  // 100% 엄격한 테넌트 및 사용자 데이터 격리:
+  // 시스템 관리자라 할지라도 참여 멤버가 아닌 비공개 대화방 목록은 열람할 수 없다 (공지방은 isNoticeRoomType으로 허용).
   const me = claimsStaffIdRaw(claims);
   if (me === null) return [];
 

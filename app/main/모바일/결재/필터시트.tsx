@@ -254,7 +254,7 @@ function chipStyle(on: boolean): CSSProperties {
     padding: '7px 12px',
     borderRadius: 999,
     border: `1px solid ${on ? 'var(--m-accent)' : 'var(--m-border)'}`,
-    background: on ? 'var(--m-accent)' : 'transparent',
+    background: on ? 'var(--m-accent)' : 'var(--m-card)',
     color: on ? '#fff' : 'var(--z-700)',
     cursor: 'pointer',
     lineHeight: 1.2,
@@ -273,5 +273,5 @@ function actionStyle(kind: 'primary' | 'ghost'): CSSProperties {
   if (kind === 'primary') {
     return { ...base, background: 'var(--m-accent)', color: '#fff', border: '1px solid var(--m-accent)' };
   }
-  return { ...base, background: 'transparent', color: 'var(--z-700)' };
+  return { ...base, background: 'var(--z-100)', color: 'var(--z-700)' };
 }

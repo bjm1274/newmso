@@ -1527,6 +1527,14 @@ select:not(.no-style) {
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.18);
 }
 
+.mso-mobile .macos-glass,
+.mso-mobile.dark .macos-glass,
+.mso-mobile [class*="macos-glass"] {
+  background: var(--m-card, #ffffff) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
 .macos-squircle {
   border-radius: 20px;
 }

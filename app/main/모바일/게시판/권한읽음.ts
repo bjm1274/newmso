@@ -58,11 +58,11 @@ export function isAnonymousReadStatusPost(post: BoardListPost | null): boolean {
   return isAnonymousAuthorPost(post) || hasAnonymousPoll(post);
 }
 
-/** 수정 가능 — 작성자 본인 또는 관리자. 판정은 lib/board-permissions 정본. */
+/** 수정 가능 — 오직 작성자 본인만 가능. 판정은 lib/board-permissions 정본. */
 export function canEditMobilePost(
   post: BoardListPost | null,
   userId: string | null | undefined,
-  canAdmin: boolean,
+  canAdmin?: boolean,
 ): boolean {
   return canEditBoardPostByAdminFlag(post, userId, canAdmin);
 }

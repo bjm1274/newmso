@@ -8,16 +8,23 @@ import { withMissingColumnsFallback } from '@/lib/db-compat';
 import type { ChatRoom } from '@/types';
 
 const CHAT_ROOMS_CACHE_KEY = 'newmso:chat-rooms:v1';
+
+function roomsCacheKey(userId?: string | null): string {
+  const id = String(userId || '').trim();
+  return id ? `${CHAT_ROOMS_CACHE_KEY}:${id}` : CHAT_ROOMS_CACHE_KEY;
+}
 const CHAT_ROOMS_CACHE_LIMIT = 200;
 const CHAT_ROOMS_FETCH_TTL_MS = 60_000; // D1 비용 절감: 30초 → 60초 (WS 활성 시 실시간 업데이트는 pokeChannel로 즉시 반영)
 
 type ChatRoomsFetchResult = { data: ChatRoom[]; error: unknown };
 type FetchAllChatRoomsOptions = {
   force?: boolean;
+  userId?: string | null;
 };
 
-let chatRoomsFetchInFlight: Promise<ChatRoomsFetchResult> | null = null;
-let chatRoomsFetchCache: { data: ChatRoom[]; error: unknown; fetchedAt: number } | null = null;
+type CacheEntry = { data: ChatRoom[]; error: unknown; fetchedAt: number };
+const chatRoomsFetchCacheByUser = new Map<string, CacheEntry>();
+const chatRoomsFetchInFlightByUser = new Map<string, Promise<ChatRoomsFetchResult>>();
 
 function sanitizePreviewField(raw: unknown): string | null {
   const t = String(raw ?? '').trim();
@@ -82,9 +89,15 @@ export function normalizeChatRoomsForClient(rooms: ChatRoom[]): ChatRoom[] {
 }
 
 /** 삭제 후 즉시 목록 재조회 시 stale TTL 캐시 무력화 */
-export function invalidateChatRoomsFetchCache() {
-  chatRoomsFetchCache = null;
-  chatRoomsFetchInFlight = null;
+export function invalidateChatRoomsFetchCache(userId?: string | null) {
+  const uid = String(userId || '').trim();
+  if (uid) {
+    chatRoomsFetchCacheByUser.delete(uid);
+    chatRoomsFetchInFlightByUser.delete(uid);
+  } else {
+    chatRoomsFetchCacheByUser.clear();
+    chatRoomsFetchInFlightByUser.clear();
+  }
 }
 
 function normalizeCachedChatRooms(value: unknown): ChatRoom[] {
@@ -107,19 +120,22 @@ function normalizeCachedChatRooms(value: unknown): ChatRoom[] {
 export async function fetchAllChatRooms(
   options: FetchAllChatRoomsOptions = {},
 ): Promise<ChatRoomsFetchResult> {
+  const userKey = String(options.userId || '').trim() || 'anon';
   const now = Date.now();
+  const cached = chatRoomsFetchCacheByUser.get(userKey);
   if (
     !options.force &&
-    chatRoomsFetchCache &&
-    now - chatRoomsFetchCache.fetchedAt < CHAT_ROOMS_FETCH_TTL_MS
+    cached &&
+    now - cached.fetchedAt < CHAT_ROOMS_FETCH_TTL_MS
   ) {
     return {
-      data: [...chatRoomsFetchCache.data],
-      error: chatRoomsFetchCache.error };
+      data: [...cached.data],
+      error: cached.error };
   }
 
-  if (chatRoomsFetchInFlight && !options.force) {
-    return chatRoomsFetchInFlight;
+  const inFlight = chatRoomsFetchInFlightByUser.get(userKey);
+  if (inFlight && !options.force) {
+    return inFlight;
   }
 
   const fetchPromise = (async () => {
@@ -135,45 +151,46 @@ export async function fetchAllChatRooms(
     const nextResult = {
       data: normalizeChatRoomsForClient(result.data || []),
       error: result.error ?? null };
-    chatRoomsFetchCache = {
+    chatRoomsFetchCacheByUser.set(userKey, {
       ...nextResult,
       data: [...nextResult.data],
-      fetchedAt: Date.now() };
+      fetchedAt: Date.now() });
     return {
       data: [...nextResult.data],
       error: nextResult.error };
   })();
 
-  chatRoomsFetchInFlight = fetchPromise;
+  chatRoomsFetchInFlightByUser.set(userKey, fetchPromise);
   fetchPromise.finally(() => {
-    if (chatRoomsFetchInFlight === fetchPromise) {
-      chatRoomsFetchInFlight = null;
+    if (chatRoomsFetchInFlightByUser.get(userKey) === fetchPromise) {
+      chatRoomsFetchInFlightByUser.delete(userKey);
     }
   });
 
   return fetchPromise;
 }
 
-export function readCachedChatRooms(): ChatRoom[] {
+export function readCachedChatRooms(userId?: string | null): ChatRoom[] {
   if (typeof window === 'undefined') return [];
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(CHAT_ROOMS_CACHE_KEY) || '[]');
+    const parsed = JSON.parse(window.localStorage.getItem(roomsCacheKey(userId)) || '[]');
     return normalizeCachedChatRooms(parsed);
   } catch {
     return [];
   }
 }
 
-export function writeCachedChatRooms(rooms: ChatRoom[]) {
+export function writeCachedChatRooms(rooms: ChatRoom[], userId?: string | null) {
+  const userKey = String(userId || '').trim() || 'anon';
   const normalizedRooms = normalizeChatRoomsForClient(rooms).slice(0, CHAT_ROOMS_CACHE_LIMIT);
-  chatRoomsFetchCache = {
+  chatRoomsFetchCacheByUser.set(userKey, {
     data: [...normalizedRooms],
     error: null,
-    fetchedAt: Date.now() };
+    fetchedAt: Date.now() });
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(
-      CHAT_ROOMS_CACHE_KEY,
+      roomsCacheKey(userId),
       JSON.stringify(normalizedRooms),
     );
   } catch {

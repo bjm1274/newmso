@@ -8,6 +8,7 @@ import {
   getPositionOrder,
   isActiveStaff,
   isDepartmentHeadOrAbove,
+  isJuniorStaffPosition,
 } from '@/lib/active-staff';
 
 export type ApproverCandidateInput = {
@@ -34,9 +35,30 @@ export type SelectDefaultApproverLineOptions = {
    * approver_positions: APPROVER_POSITIONS 엄격 포함
    */
   mode?: 'head_or_above' | 'approver_positions';
+  /** 과장급 이상 직책자 본인 결재선 포함 허용 */
+  allowSelf?: boolean;
 };
 
 export { APPROVER_POSITIONS };
+
+/**
+ * 자동 결재선 기본값에서 빼는 사람.
+ * 김이지는 SY INC. 경영지원 사원인데 role=admin 이라 예전에 병원 결재선 기본값에
+ * 끼어 들었다. 수동 지정은 막지 않는다(피커 extra 필터는 호출측).
+ */
+export const DEFAULT_APPROVER_EXCLUDED_NAMES = new Set(['김이지']);
+export const DEFAULT_APPROVER_EXCLUDED_IDS = new Set([
+  '76ddb717-6f2f-46ee-aa76-1db2ae11f359',
+]);
+
+export function isExcludedFromDefaultLine(staff: ApproverCandidateInput): boolean {
+  const id = String(staff.id ?? '').trim();
+  if (id && DEFAULT_APPROVER_EXCLUDED_IDS.has(id)) return true;
+  const name = String(staff.name ?? '').trim().normalize('NFC');
+  if (name && DEFAULT_APPROVER_EXCLUDED_NAMES.has(name)) return true;
+  if (isJuniorStaffPosition(String(staff.position ?? ''))) return true;
+  return false;
+}
 
 export function sortApproverCandidates<T extends ApproverCandidateInput>(staffs: T[]): T[] {
   return [...staffs].sort((a, b) => {
@@ -81,15 +103,32 @@ export function selectDefaultApproverLine<T extends ApproverCandidateInput>(
   const mode = options.mode ?? 'head_or_above';
   const includeSyInc = options.includeSyInc === true;
   const maxCount = options.maxCount;
+  const selfStaff = selfId ? staffs.find((s) => String(s?.id) === selfId) : null;
+  const selfIsApprover = Boolean(
+    selfStaff && isDepartmentHeadOrAbove(selfStaff as Parameters<typeof isDepartmentHeadOrAbove>[0]),
+  );
+  const allowSelf = options.allowSelf === true;
 
   const filtered = staffs.filter((s) => {
     if (!s?.id) return false;
-    if (String(s.id) === selfId) return false;
+    const isSelf = String(s.id) === selfId;
+    if (isSelf && !allowSelf) return false;
+    if (isExcludedFromDefaultLine(s)) return false;
     if (!isActiveStaff(s as Parameters<typeof isActiveStaff>[0])) return false;
     if (!matchesMode(s, mode)) return false;
     if (!matchesCompanyFilter(s, options.company, includeSyInc)) return false;
     return true;
   });
+
+  // 본인을 제외해 후보가 없으나 기안자가 과장급 이상 결재권자인 경우 본인을 결재선에 단독 포함 (자가 전결)
+  if (filtered.length === 0 && selfStaff && selfIsApprover && !isExcludedFromDefaultLine(selfStaff)) {
+    if (
+      matchesCompanyFilter(selfStaff, options.company, includeSyInc) &&
+      isActiveStaff(selfStaff as Parameters<typeof isActiveStaff>[0])
+    ) {
+      filtered.push(selfStaff);
+    }
+  }
 
   const sorted = sortApproverCandidates(filtered);
   if (typeof maxCount === 'number' && maxCount > 0) {

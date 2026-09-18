@@ -1,5 +1,6 @@
 import { APPROVAL_VIEW_KEY } from '@/app/main/navigation-state';
 import { isApprovalLocked } from '@/lib/approval-workflow';
+import { isDepartmentHeadOrAbove } from '@/lib/active-staff';
 import { selectDefaultApproverLine } from '@/lib/approval-routing';
 import { db } from '@/lib/db-client';
 import { toast } from '@/lib/toast';
@@ -377,12 +378,14 @@ export function useApprovalComposeDraft({
     }
 
     if (approverLineRef.current.length === 0 && user?.id) {
+      const allowSelf = Boolean(user && isDepartmentHeadOrAbove(user));
       const defaultApprovers = selectDefaultApproverLine(approvalDirectoryStaffs, {
         selfId: user.id,
         company: String(user.company || '').trim() || undefined,
         includeSyInc: true,
         maxCount: 3,
         mode: 'head_or_above',
+        allowSelf,
       });
       if (defaultApprovers.length > 0) {
         setApproverLine(defaultApprovers);

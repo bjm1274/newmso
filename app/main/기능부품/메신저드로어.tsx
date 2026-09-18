@@ -13,6 +13,7 @@ import {
   getAttachmentDisplayName,
   getMessageDisplayText,
   resolveAttachmentKind } from './메신저첨부';
+import { buildStorageInlineUrl } from '@/lib/object-storage-url';
 import { buildMessengerImageAlt, MessengerAvatar } from './메신저공통';
 import { getProfilePhotoUrl } from '@/lib/profile-photo';
 import { isSelfChatRoom, NOTICE_ROOM_ID, normalizeMemberIds, toChatDate } from './메신저유틸';
@@ -586,7 +587,7 @@ function MessengerDrawerImpl({
                 >
                   {resolveAttachmentKind(message.file_url, message.file_kind) === 'image' ? (
                     <img
-                      src={message.file_url || ''}
+                      src={buildStorageInlineUrl(message.file_url || '', message.file_name || '공유 이미지')}
                       alt={buildMessengerImageAlt(message.file_name, '공유 이미지')}
                       loading="lazy"
                       className="h-full w-full object-cover transition-opacity hover:opacity-90"

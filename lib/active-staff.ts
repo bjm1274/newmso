@@ -55,25 +55,39 @@ export function getScopedActiveStaffs<T extends StaffLike>(
 }
 
 export const APPROVER_POSITIONS = [
-  '팀장', '간호과장', '실장', '부장', '본부장', '총무부장', '진료부장', '간호부장',
-  '이사', '병원장', '원장', '대표',
+  '팀장', '간호과장', '과장', '차장', '실장', '부장', '본부장', '총무부장', '진료부장', '간호부장',
+  '센터장', '이사', '상무', '전무', '부원장', '부병원장', '병원장', '원장', '대표',
 ];
 
+/** 전결·기본 결재선에서 빼는 실무 직책. role=admin 이어도 사원은 결재권자가 아니다. */
+export const JUNIOR_STAFF_POSITIONS = new Set([
+  '사원', '주임', '계장', '인턴', '수습', '수습사원', '계약직', '대리',
+]);
+
+export function isJuniorStaffPosition(position: string | null | undefined): boolean {
+  const p = String(position || '').trim().normalize('NFC');
+  return JUNIOR_STAFF_POSITIONS.has(p);
+}
+
 export function isDepartmentHeadOrAbove(staff: { position?: string | null; role?: string | null }): boolean {
-  const role = staff.role;
-  if (role === 'manager' || role === 'admin') return true;
-  const position = String(staff.position || '').trim();
-  if (!position) return false;
+  const position = String(staff.position || '').trim().normalize('NFC');
+  // 사원·대리 등은 전결권자가 아니다. SY INC. 경영지원 사원처럼 role=admin 만으로
+  // 병원 결재선에 끼어들면 안 된다.
+  if (isJuniorStaffPosition(position)) return false;
   if (position === '부서장') return true;
-  // 팀장·간호과장·과장 포함 — 자동 결재선 공백 방지 (APPROVER_POSITIONS 와 정합)
-  return APPROVER_POSITIONS.includes(position) || position === '과장';
+  if (position && APPROVER_POSITIONS.includes(position)) return true;
+  // 직책이 비어 있을 때만 role 로 보조 판정. 직책이 있는데 과장급이 아니면 승격하지 않는다.
+  if (position) return false;
+  const role = String(staff.role || '').trim();
+  return role === 'manager' || role === 'admin';
 }
 
 export function getPositionOrder(position: string | null | undefined, role?: string | null): number {
-  const p = String(position || '').trim();
+  const p = String(position || '').trim().normalize('NFC');
   const idx = APPROVER_POSITIONS.indexOf(p);
   if (idx !== -1) return idx;
   if (p === '부서장') return APPROVER_POSITIONS.indexOf('부장');
+  if (isJuniorStaffPosition(p)) return 900;
   if (role === 'admin') return APPROVER_POSITIONS.indexOf('대표');
   if (role === 'manager') return APPROVER_POSITIONS.indexOf('부장');
   return 999;
